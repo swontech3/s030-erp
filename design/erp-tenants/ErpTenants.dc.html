@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="ERP · 입주사 관리" description="운영자용 ERP — 입주사 목록, 입주사 상세(계약·청구·멤버), 월별 청구 관리" -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>body{margin:0}</style>
+</helmet>
+<div style="min-width:1440px;height:900px;display:flex;background:#F8FAFC;font-family:'Pretendard Variable',Pretendard,Inter,system-ui,sans-serif">
+<aside data-sidebar="1" style="width:248px;flex:0 0 auto;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 16px;overflow:visible;transition:width 240ms cubic-bezier(.22,.61,.36,1),padding 240ms cubic-bezier(.22,.61,.36,1)">
+<div style="padding:0 0 24px">
+<button data-logo="1" data-nav="dashboard" style="position:relative;width:100%;display:flex;align-items:center;gap:10px;height:40px;padding:0 8px;border:0;border-radius:var(--radius-md);background:transparent;cursor:pointer;text-align:left;transition:background 240ms cubic-bezier(.22,.61,.36,1),padding 240ms cubic-bezier(.22,.61,.36,1)" style-hover="background:var(--surface-alt)">
+<img src="../../assets/swonbiz-logo.png" alt="" style="height:24px;width:auto;flex:0 0 auto">
+<span data-side-label="1" style="font-size:17px;font-weight:800;letter-spacing:-.03em;color:var(--text-heading);white-space:nowrap">S<span style="opacity:.55">·</span>won<span style="color:var(--color-primary)">{{ brandSuffix }}</span></span>
+<span data-tip="1" style="position:absolute;left:calc(100% + 22px);top:50%;transform:translateY(-50%);z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;font-weight:400;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none"><span style="position:absolute;left:-4px;top:50%;transform:translateY(-50%) rotate(45deg);width:8px;height:8px;background:var(--surface-inverse)"></span>대시보드</span>
+</button>
+</div>
+<nav style="display:flex;flex-direction:column;gap:2px">
+<button data-nav="tenants" style="position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:var(--color-accent-bg);color:var(--color-primary-hover);font-family:inherit;font-size:15px;font-weight:700;text-align:left;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1),color 180ms cubic-bezier(.22,.61,.36,1),padding 240ms cubic-bezier(.22,.61,.36,1)"><span style="display:flex;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="building-2" size="{{ 18 }}" hint-size="18px,18px"></x-import></span><span data-side-label="1" style="white-space:nowrap;overflow:hidden">입주사</span><span data-tip="1" style="position:absolute;left:calc(100% + 22px);top:50%;transform:translateY(-50%);z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;font-weight:400;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none"><span style="position:absolute;left:-4px;top:50%;transform:translateY(-50%) rotate(45deg);width:8px;height:8px;background:var(--surface-inverse)"></span>입주사</span></button>
+<button data-nav="billing" style="position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;font-weight:400;text-align:left;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1),color 180ms cubic-bezier(.22,.61,.36,1),padding 240ms cubic-bezier(.22,.61,.36,1)" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="receipt" size="{{ 18 }}" hint-size="18px,18px"></x-import></span><span data-side-label="1" style="white-space:nowrap;overflow:hidden">청구</span><span data-tip="1" style="position:absolute;left:calc(100% + 22px);top:50%;transform:translateY(-50%);z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;font-weight:400;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none"><span style="position:absolute;left:-4px;top:50%;transform:translateY(-50%) rotate(45deg);width:8px;height:8px;background:var(--surface-inverse)"></span>청구</span></button>
+<button data-nav="tax" style="position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;font-weight:400;text-align:left;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1),color 180ms cubic-bezier(.22,.61,.36,1),padding 240ms cubic-bezier(.22,.61,.36,1)" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="calculator" size="{{ 18 }}" hint-size="18px,18px"></x-import></span><span data-side-label="1" style="white-space:nowrap;overflow:hidden">세무</span><span data-tip="1" style="position:absolute;left:calc(100% + 22px);top:50%;transform:translateY(-50%);z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;font-weight:400;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none"><span style="position:absolute;left:-4px;top:50%;transform:translateY(-50%) rotate(45deg);width:8px;height:8px;background:var(--surface-inverse)"></span>세무</span></button>
+<button data-nav="spaces" style="position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;font-weight:400;text-align:left;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1),color 180ms cubic-bezier(.22,.61,.36,1),padding 240ms cubic-bezier(.22,.61,.36,1)" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="door-open" size="{{ 18 }}" hint-size="18px,18px"></x-import></span><span data-side-label="1" style="white-space:nowrap;overflow:hidden">호실</span><span data-tip="1" style="position:absolute;left:calc(100% + 22px);top:50%;transform:translateY(-50%);z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;font-weight:400;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none"><span style="position:absolute;left:-4px;top:50%;transform:translateY(-50%) rotate(45deg);width:8px;height:8px;background:var(--surface-inverse)"></span>호실</span></button>
+<button data-nav="settings" style="position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;font-weight:400;text-align:left;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1),color 180ms cubic-bezier(.22,.61,.36,1),padding 240ms cubic-bezier(.22,.61,.36,1)" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="settings" size="{{ 18 }}" hint-size="18px,18px"></x-import></span><span data-side-label="1" style="white-space:nowrap;overflow:hidden">설정</span><span data-tip="1" style="position:absolute;left:calc(100% + 22px);top:50%;transform:translateY(-50%);z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;font-weight:400;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none"><span style="position:absolute;left:-4px;top:50%;transform:translateY(-50%) rotate(45deg);width:8px;height:8px;background:var(--surface-inverse)"></span>설정</span></button>
+</nav>
+<div data-alert-full="1" style="margin-top:auto;padding:16px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-lg)">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="display:flex;color:var(--color-primary);flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="alert-circle" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>
+<span style="font-size:13px;font-weight:700;color:var(--text-heading);white-space:nowrap">만기 임박 2건</span>
+</div>
+<p style="margin:6px 0 0;font-size:13px;line-height:1.5;color:var(--text-muted)">30일 안에 만기되는 계약을 확인하세요.</p>
+</div>
+<div data-alert-mini="1" style="margin-top:auto;display:none;justify-content:center">
+<span style="position:relative;display:grid;place-items:center;width:40px;height:40px;border-radius:var(--radius-md);background:var(--surface-alt);border:1px solid var(--border);color:var(--color-warning);cursor:default">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="bell" size="{{ 20 }}" hint-size="20px,20px"></x-import>
+<span style="position:absolute;top:-5px;right:-5px;width:16px;height:16px;border-radius:999px;background:var(--color-warning);color:#FFFFFF;font-size:10px;font-weight:700;display:grid;place-items:center">2</span>
+<span data-tip="1" style="position:absolute;left:calc(100% + 22px);top:50%;transform:translateY(-50%);z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;font-weight:400;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none"><span style="position:absolute;left:-4px;top:50%;transform:translateY(-50%) rotate(45deg);width:8px;height:8px;background:var(--surface-inverse)"></span>만기 임박 2건</span>
+</span>
+</div>
+</aside>
+<button data-sidebar-toggle="1" aria-label="사이드바 접기" style="position:fixed;left:248px;top:50%;transform:translateX(-50%) translateY(-50%);z-index:50;width:24px;height:24px;display:grid;place-items:center;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--text-muted);cursor:pointer;padding:0;opacity:.45;transition:left 240ms cubic-bezier(.22,.61,.36,1),opacity 180ms cubic-bezier(.22,.61,.36,1),border-color 180ms cubic-bezier(.22,.61,.36,1),color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="opacity:1;border-color:var(--color-primary);color:var(--color-primary)">
+<span data-toggle-icon="collapse" style="display:flex"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-left" size="{{ 14 }}" hint-size="14px,14px"></x-import></span>
+<span data-toggle-icon="expand" style="display:none"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-right" size="{{ 14 }}" hint-size="14px,14px"></x-import></span>
+<span data-toggle-tip="1" style="position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;font-weight:400;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none"><span style="position:absolute;left:-4px;top:50%;transform:translateY(-50%) rotate(45deg);width:8px;height:8px;background:var(--surface-inverse)"></span>사이드바 접기</span>
+</button>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<header style="height:64px;flex:0 0 auto;border-bottom:1px solid #E2E8F0;background:#FFFFFF;display:flex;align-items:center;gap:16px;padding:0 32px">
+<div>
+<div data-crumb="1" style="font-size:12px;color:#94A3B8">운영 · 강남 삼성점</div>
+<div data-title="1" style="font-size:17px;font-weight:700;letter-spacing:-.015em;color:#0B1120">입주사</div>
+</div>
+<div style="flex:1"></div>
+<button aria-label="도움" style="width:36px;height:36px;display:grid;place-items:center;border:1px solid transparent;border-radius:8px;background:transparent;color:#64748B;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#F8FAFC"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="help-circle" size="{{ 18 }}" hint-size="18px,18px"></x-import></button>
+<button aria-label="알림" style="width:36px;height:36px;display:grid;place-items:center;border:1px solid transparent;border-radius:8px;background:transparent;color:#64748B;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#F8FAFC"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="bell" size="{{ 18 }}" hint-size="18px,18px"></x-import></button>
+<div style="display:flex;align-items:center;gap:10px;padding-left:16px;border-left:1px solid #E2E8F0">
+<span style="width:32px;height:32px;border-radius:6px;background:#EEF2FF;color:#4338CA;display:grid;place-items:center;font-size:13px;font-weight:700;flex:0 0 auto">최</span>
+<div style="line-height:1.3">
+<div style="font-size:14px;font-weight:700;color:#0B1120;white-space:nowrap">최현수</div>
+<div style="font-size:12px;color:#64748B;white-space:nowrap">운영 관리자</div>
+</div>
+</div>
+</header>
+<main style="flex:1;min-height:0;overflow:auto;padding:32px">
+
+<div data-view="tenants">
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px">
+<div>
+<h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-.012em;color:#0B1120">입주사 24곳</h2>
+<p style="margin:6px 0 0;font-size:14px;color:#64748B">계약 중 21곳 · 만기 임박 2곳 · 검토중 1곳</p>
+</div>
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" size="sm" hint-size="132px,40px"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="plus" size="{{ 16 }}" hint-size="16px,16px"></x-import>입주사 등록</x-import>
+</div>
+<div style="margin-top:24px;display:flex;align-items:center;gap:12px">
+<span style="position:relative;display:flex;align-items:center;width:280px">
+<span style="position:absolute;left:14px;display:flex;color:#94A3B8;pointer-events:none"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="search" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>
+<input placeholder="입주사명, 사업자번호 검색" style="width:100%;height:40px;padding:0 16px 0 42px;font-family:inherit;font-size:14px;color:#0B1120;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;outline:none;transition:border-color 180ms cubic-bezier(.22,.61,.36,1),box-shadow 180ms cubic-bezier(.22,.61,.36,1)" style-focus="border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,229,.32)">
+</span>
+<span style="position:relative;display:flex;width:160px">
+<select style="appearance:none;width:100%;height:40px;padding:0 36px 0 14px;font-family:inherit;font-size:14px;color:#0B1120;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;outline:none;cursor:pointer">
+<option>모든 플랜</option><option>비상주</option><option>개인 오피스</option><option>팀 오피스</option>
+</select>
+<span style="position:absolute;right:14px;top:50%;transform:translateY(-60%) rotate(45deg);width:6px;height:6px;border-right:1.5px solid #64748B;border-bottom:1.5px solid #64748B;pointer-events:none"></span>
+</span>
+<div style="flex:1"></div>
+<div style="display:inline-flex;gap:4px;padding:4px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px">
+<button data-filter="all" style="height:30px;padding:0 12px;border:0;border-radius:6px;background:#FFFFFF;color:#0B1120;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(11,17,32,.06)">전체 24</button>
+<button data-filter="soon" style="height:30px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:#64748B;font-family:inherit;font-size:13px;font-weight:400;cursor:pointer">만기 임박 2</button>
+<button data-filter="review" style="height:30px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:#64748B;font-family:inherit;font-size:13px;font-weight:400;cursor:pointer">검토중 1</button>
+</div>
+</div>
+<div style="margin-top:20px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:16px;height:44px;padding:0 20px;background:#F8FAFC;border-bottom:1px solid #E2E8F0">
+<span style="flex:2.2;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">입주사</span>
+<span style="flex:1.2;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">호실</span>
+<span style="flex:1.1;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">플랜</span>
+<span style="flex:1.5;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">계약 기간</span>
+<span style="width:120px;flex:0 0 auto;text-align:right;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">월 청구액</span>
+<span style="width:96px;flex:0 0 auto;text-align:right;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">상태</span>
+</div>
+<div data-open-detail="1" style="display:flex;align-items:center;gap:16px;padding:16px 20px;border-bottom:1px solid #E2E8F0;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#F8FAFC">
+<span style="flex:2.2;min-width:0"><span style="display:block;font-size:15px;font-weight:700;color:#0B1120;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">주식회사 노틸러스</span><span style="display:block;margin-top:2px;font-size:12px;color:#94A3B8">128-86-01234</span></span>
+<span style="flex:1.2;font-size:14px;color:#475569">3층 A-12</span>
+<span style="flex:1.1;font-size:14px;color:#475569">개인 오피스</span>
+<span style="flex:1.5;font-size:14px;color:#475569">2025.09.01 – 2026.08.31</span>
+<span style="width:120px;flex:0 0 auto;text-align:right;font-size:14px;font-weight:700;color:#0B1120">₩1,240,000</span>
+<span style="width:96px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">계약중</span></span>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:16px 20px;border-bottom:1px solid #E2E8F0;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#F8FAFC">
+<span style="flex:2.2;min-width:0"><span style="display:block;font-size:15px;font-weight:700;color:#0B1120;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">브릿지랩 주식회사</span><span style="display:block;margin-top:2px;font-size:12px;color:#94A3B8">211-88-05567</span></span>
+<span style="flex:1.2;font-size:14px;color:#475569">3층 B-03</span>
+<span style="flex:1.1;font-size:14px;color:#475569">팀 오피스</span>
+<span style="flex:1.5;font-size:14px;color:#475569">2026.01.15 – 2027.01.14</span>
+<span style="width:120px;flex:0 0 auto;text-align:right;font-size:14px;font-weight:700;color:#0B1120">₩3,480,000</span>
+<span style="width:96px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">계약중</span></span>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:16px 20px;border-bottom:1px solid #E2E8F0;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#F8FAFC">
+<span style="flex:2.2;min-width:0"><span style="display:block;font-size:15px;font-weight:700;color:#0B1120;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">오르카 스튜디오</span><span style="display:block;margin-top:2px;font-size:12px;color:#94A3B8">105-87-33421</span></span>
+<span style="flex:1.2;font-size:14px;color:#475569">2층 고정석 7</span>
+<span style="flex:1.1;font-size:14px;color:#475569">개인 오피스</span>
+<span style="flex:1.5;font-size:14px;color:#475569">2025.09.01 – 2026.08.31</span>
+<span style="width:120px;flex:0 0 auto;text-align:right;font-size:14px;font-weight:700;color:#0B1120">₩520,000</span>
+<span style="width:96px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#FFFFFF;border:1px solid #E2E8F0;color:#64748B;font-size:12px;font-weight:700;display:flex;align-items:center;gap:4px;white-space:nowrap">D-14</span></span>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:16px 20px;border-bottom:1px solid #E2E8F0;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#F8FAFC">
+<span style="flex:2.2;min-width:0"><span style="display:block;font-size:15px;font-weight:700;color:#0B1120;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">한결세무법인</span><span style="display:block;margin-top:2px;font-size:12px;color:#94A3B8">220-81-77812</span></span>
+<span style="flex:1.2;font-size:14px;color:#475569">비상주</span>
+<span style="flex:1.1;font-size:14px;color:#475569">비상주</span>
+<span style="flex:1.5;font-size:14px;color:#475569">2026.03.01 – 2027.02.28</span>
+<span style="width:120px;flex:0 0 auto;text-align:right;font-size:14px;font-weight:700;color:#0B1120">₩99,000</span>
+<span style="width:96px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">계약중</span></span>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:16px 20px;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#F8FAFC">
+<span style="flex:2.2;min-width:0"><span style="display:block;font-size:15px;font-weight:700;color:#0B1120;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">(가등록) 세움컴퍼니</span><span style="display:block;margin-top:2px;font-size:12px;color:#94A3B8">사업자등록 신청 중</span></span>
+<span style="flex:1.2;font-size:14px;color:#475569">3층 A-05</span>
+<span style="flex:1.1;font-size:14px;color:#475569">개인 오피스</span>
+<span style="flex:1.5;font-size:14px;color:#475569">2026.09.01 – 미정</span>
+<span style="width:120px;flex:0 0 auto;text-align:right;font-size:14px;font-weight:700;color:#0B1120">₩620,000</span>
+<span style="width:96px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:rgba(34,211,238,.14);color:#0E7490;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">검토중</span></span>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#F8FAFC;border-top:1px solid #E2E8F0">
+<span style="font-size:13px;color:#64748B">24건 중 1–5</span>
+<span style="display:flex;gap:6px">
+<button style="height:32px;padding:0 12px;border:1px solid #E2E8F0;border-radius:6px;background:#FFFFFF;color:#94A3B8;font-family:inherit;font-size:13px;cursor:not-allowed">이전</button>
+<button style="height:32px;padding:0 12px;border:1px solid #E2E8F0;border-radius:6px;background:#FFFFFF;color:#0B1120;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#F8FAFC">다음</button>
+</span>
+</div>
+</div>
+</div>
+
+<div data-view="detail" style="display:none">
+<button data-back="1" style="display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:#64748B;font-family:inherit;font-size:14px;cursor:pointer;padding:0;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#4F46E5"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-left" size="{{ 16 }}" hint-size="16px,16px"></x-import>입주사 목록</button>
+<div style="margin-top:16px;display:flex;align-items:flex-start;justify-content:space-between;gap:24px">
+<div>
+<div style="display:flex;align-items:center;gap:10px">
+<h2 style="margin:0;font-size:26px;font-weight:700;letter-spacing:-.02em;color:#0B1120">주식회사 노틸러스</h2>
+<span style="height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">계약중</span>
+</div>
+<p style="margin:8px 0 0;font-size:14px;color:#64748B">128-86-01234 · 대표 김도현 · 3층 A-12 · 멤버 4명</p>
+</div>
+<div style="display:flex;gap:8px;flex:0 0 auto">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" variant="ghost" size="sm" hint-size="108px,40px">계약 연장</x-import>
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" size="sm" hint-size="124px,40px">청구서 발행</x-import>
+</div>
+</div>
+<div style="margin-top:24px;display:flex;gap:24px;border-bottom:1px solid #E2E8F0">
+<button data-tab="contract" style="position:relative;border:0;background:transparent;padding:0 0 12px;font-family:inherit;font-size:15px;font-weight:700;color:#0B1120;cursor:pointer">계약<span data-tabline="contract" style="position:absolute;left:0;right:0;bottom:-1px;height:2px;background:#4F46E5"></span></button>
+<button data-tab="billing" style="position:relative;border:0;background:transparent;padding:0 0 12px;font-family:inherit;font-size:15px;font-weight:400;color:#64748B;cursor:pointer">청구 이력<span data-tabline="billing" style="position:absolute;left:0;right:0;bottom:-1px;height:2px;background:transparent"></span></button>
+<button data-tab="members" style="position:relative;border:0;background:transparent;padding:0 0 12px;font-family:inherit;font-size:15px;font-weight:400;color:#64748B;cursor:pointer">멤버<span data-tabline="members" style="position:absolute;left:0;right:0;bottom:-1px;height:2px;background:transparent"></span></button>
+</div>
+
+<div data-pane="contract" style="margin-top:24px">
+<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:20px;align-items:start">
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:24px">
+<h3 style="margin:0;font-size:17px;font-weight:600;color:#0B1120">계약 정보</h3>
+<div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:20px">
+<div><div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">플랜</div><div style="margin-top:4px;font-size:15px;color:#0B1120">개인 오피스 · 3층 A-12</div></div>
+<div><div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">계약 기간</div><div style="margin-top:4px;font-size:15px;color:#0B1120">2025.09.01 – 2026.08.31</div></div>
+<div><div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">월 이용료</div><div style="margin-top:4px;font-size:15px;color:#0B1120">₩1,240,000</div></div>
+<div><div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">보증금</div><div style="margin-top:4px;font-size:15px;color:#0B1120">₩2,480,000</div></div>
+<div><div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">납부일</div><div style="margin-top:4px;font-size:15px;color:#0B1120">매월 25일 자동 출금</div></div>
+<div><div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">회의실</div><div style="margin-top:4px;font-size:15px;color:#0B1120">월 20시간 (8시간 사용)</div></div>
+</div>
+<div style="margin-top:24px;padding-top:20px;border-top:1px solid #E2E8F0;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:center;gap:12px">
+<span style="display:flex;color:#4F46E5;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="file-text" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>
+<span style="flex:1;font-size:14px;color:#0B1120">임대차 계약서_노틸러스_2025.pdf</span>
+<span style="font-size:13px;color:#94A3B8;white-space:nowrap">2025.08.28</span>
+<button style="border:0;background:transparent;color:#4F46E5;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;padding:0">보기</button>
+</div>
+<div style="display:flex;align-items:center;gap:12px">
+<span style="display:flex;color:#4F46E5;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="file-text" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>
+<span style="flex:1;font-size:14px;color:#0B1120">사업자등록증_노틸러스.pdf</span>
+<span style="font-size:13px;color:#94A3B8;white-space:nowrap">2025.08.28</span>
+<button style="border:0;background:transparent;color:#4F46E5;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;padding:0">보기</button>
+</div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:20px">
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:24px">
+<div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">만기까지</div>
+<div style="margin-top:6px;display:flex;align-items:baseline;gap:8px"><span style="font-size:30px;font-weight:700;letter-spacing:-.02em;color:#0B1120">D-9</span><span style="font-size:14px;color:#64748B">2026.08.31</span></div>
+<div style="margin-top:16px;height:4px;border-radius:999px;background:#EEF2FF;overflow:hidden"><span style="display:block;width:97%;height:4px;border-radius:999px;background:#4F46E5"></span></div>
+<p style="margin:12px 0 0;font-size:13px;line-height:1.6;color:#64748B">연장 의사를 확인하지 않았습니다. 만기 30일 전 알림이 발송되었습니다.</p>
+<div style="margin-top:16px"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" variant="ghost" size="sm" full-width="{{ true }}" hint-size="100%,40px">연장 의사 확인</x-import></div>
+</div>
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:24px">
+<div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">계약 이력</div>
+<div style="margin-top:14px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;gap:10px"><span style="width:7px;height:7px;margin-top:6px;border-radius:999px;background:#4F46E5;flex:0 0 auto"></span><div><div style="font-size:14px;color:#0B1120">개인 오피스 신규 계약</div><div style="font-size:12px;color:#94A3B8">2025.09.01</div></div></div>
+<div style="display:flex;gap:10px"><span style="width:7px;height:7px;margin-top:6px;border-radius:999px;background:#CBD5E1;flex:0 0 auto"></span><div><div style="font-size:14px;color:#0B1120">비상주 → 개인 오피스 전환</div><div style="font-size:12px;color:#94A3B8">2025.08.28</div></div></div>
+<div style="display:flex;gap:10px"><span style="width:7px;height:7px;margin-top:6px;border-radius:999px;background:#CBD5E1;flex:0 0 auto"></span><div><div style="font-size:14px;color:#0B1120">비상주 신규 계약</div><div style="font-size:12px;color:#94A3B8">2025.03.01</div></div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div data-pane="billing" style="margin-top:24px;display:none">
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:16px;height:44px;padding:0 20px;background:#F8FAFC;border-bottom:1px solid #E2E8F0">
+<span style="flex:1.2;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">청구 월</span>
+<span style="flex:1.6;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">항목</span>
+<span style="width:130px;flex:0 0 auto;text-align:right;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">금액</span>
+<span style="width:110px;flex:0 0 auto;text-align:right;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">세금계산서</span>
+<span style="width:96px;flex:0 0 auto;text-align:right;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">수납</span>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid #E2E8F0">
+<span style="flex:1.2;font-size:14px;font-weight:700;color:#0B1120">2026.08</span>
+<span style="flex:1.6;font-size:14px;color:#475569">이용료 + 회의실 초과 2시간</span>
+<span style="width:130px;flex:0 0 auto;text-align:right;font-size:14px;font-weight:700;color:#0B1120">₩1,300,000</span>
+<span style="width:110px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">발행완료</span></span>
+<span style="width:96px;flex:0 0 auto;text-align:right;font-size:13px;color:#64748B">08.25</span>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid #E2E8F0">
+<span style="flex:1.2;font-size:14px;font-weight:700;color:#0B1120">2026.07</span>
+<span style="flex:1.6;font-size:14px;color:#475569">이용료</span>
+<span style="width:130px;flex:0 0 auto;text-align:right;font-size:14px;font-weight:700;color:#0B1120">₩1,240,000</span>
+<span style="width:110px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">발행완료</span></span>
+<span style="width:96px;flex:0 0 auto;text-align:right;font-size:13px;color:#64748B">07.25</span>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:14px 20px">
+<span style="flex:1.2;font-size:14px;font-weight:700;color:#0B1120">2026.06</span>
+<span style="flex:1.6;font-size:14px;color:#475569">이용료</span>
+<span style="width:130px;flex:0 0 auto;text-align:right;font-size:14px;font-weight:700;color:#0B1120">₩1,240,000</span>
+<span style="width:110px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">발행완료</span></span>
+<span style="width:96px;flex:0 0 auto;text-align:right;font-size:13px;color:#64748B">06.25</span>
+</div>
+</div>
+</div>
+
+<div data-pane="members" style="margin-top:24px;display:none">
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:24px">
+<p style="margin:0;font-size:15px;line-height:1.7;color:#64748B">멤버 관리 화면은 아직 정의되지 않았습니다. 출입 권한과 회의실 예약 권한을 멤버 단위로 다루는 화면이 필요합니다.</p>
+</div>
+</div>
+</div>
+
+<div data-view="billing" style="display:none">
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px">
+<div>
+<h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-.012em;color:#0B1120">2026년 8월 청구</h2>
+<p style="margin:6px 0 0;font-size:14px;color:#64748B">24건 · 발행 완료 18건 · 미발행 6건</p>
+</div>
+<div style="display:flex;gap:8px;flex:0 0 auto">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" variant="ghost" size="sm" hint-size="120px,40px"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="download" size="{{ 16 }}" hint-size="16px,16px"></x-import>내보내기</x-import>
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" size="sm" hint-size="158px,40px">미발행 6건 발행</x-import>
+</div>
+</div>
+<div style="margin-top:24px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:20px"><div style="font-size:13px;color:#64748B">총 청구액</div><div style="margin-top:6px;font-size:24px;font-weight:700;letter-spacing:-.02em;color:#0B1120">₩28,400,000</div></div>
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:20px"><div style="font-size:13px;color:#64748B">수납 완료</div><div style="margin-top:6px;font-size:24px;font-weight:700;letter-spacing:-.02em;color:#0B1120">₩21,900,000</div></div>
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:20px"><div style="font-size:13px;color:#64748B">미수금</div><div style="margin-top:6px;font-size:24px;font-weight:700;letter-spacing:-.02em;color:#0B1120">₩6,500,000</div></div>
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:20px"><div style="font-size:13px;color:#64748B">연체</div><div style="margin-top:6px;display:flex;align-items:baseline;gap:6px"><span style="font-size:24px;font-weight:700;letter-spacing:-.02em;color:#0B1120">2건</span><span style="font-size:13px;font-weight:700;color:var(--color-warning)">확인 필요</span></div></div>
+</div>
+<div style="margin-top:20px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:16px;height:44px;padding:0 20px;background:#F8FAFC;border-bottom:1px solid #E2E8F0">
+<span style="flex:2;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">입주사</span>
+<span style="flex:1.4;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">항목</span>
+<span style="width:130px;flex:0 0 auto;text-align:right;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">청구액</span>
+<span style="width:110px;flex:0 0 auto;text-align:right;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">세금계산서</span>
+<span style="width:110px;flex:0 0 auto;text-align:right;font-size:12px;font-weight:700;letter-spacing:.04em;color:#94A3B8">수납</span>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid #E2E8F0">
+<span style="flex:2;font-size:14px;font-weight:700;color:#0B1120">주식회사 노틸러스</span>
+<span style="flex:1.4;font-size:14px;color:#475569">이용료 + 회의실</span>
+<span style="width:130px;flex:0 0 auto;text-align:right;font-size:14px;font-weight:700;color:#0B1120">₩1,300,000</span>
+<span style="width:110px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">발행완료</span></span>
+<span style="width:110px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">수납</span></span>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid #E2E8F0">
+<span style="flex:2;font-size:14px;font-weight:700;color:#0B1120">브릿지랩 주식회사</span>
+<span style="flex:1.4;font-size:14px;color:#475569">이용료</span>
+<span style="width:130px;flex:0 0 auto;text-align:right;font-size:14px;font-weight:700;color:#0B1120">₩3,480,000</span>
+<span style="width:110px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:rgba(34,211,238,.14);color:#0E7490;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap">AI 발행 대기</span></span>
+<span style="width:110px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#FFFFFF;border:1px solid #E2E8F0;color:#64748B;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">대기</span></span>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid #E2E8F0">
+<span style="flex:2;font-size:14px;font-weight:700;color:#0B1120">오르카 스튜디오</span>
+<span style="flex:1.4;font-size:14px;color:#475569">이용료</span>
+<span style="width:130px;flex:0 0 auto;text-align:right;font-size:14px;font-weight:700;color:#0B1120">₩520,000</span>
+<span style="width:110px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">발행완료</span></span>
+<span style="width:110px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:var(--color-warning-bg);color:var(--color-warning-text);font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">연체 3일</span></span>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:14px 20px">
+<span style="flex:2;font-size:14px;font-weight:700;color:#0B1120">한결세무법인</span>
+<span style="flex:1.4;font-size:14px;color:#475569">비상주 이용료</span>
+<span style="width:130px;flex:0 0 auto;text-align:right;font-size:14px;font-weight:700;color:#0B1120">₩99,000</span>
+<span style="width:110px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">발행완료</span></span>
+<span style="width:110px;flex:0 0 auto;display:flex;justify-content:flex-end"><span style="height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap">수납</span></span>
+</div>
+</div>
+</div>
+
+<div data-view="empty" style="display:none">
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:48px;text-align:center">
+<h3 data-empty-title="1" style="margin:0;font-size:17px;font-weight:600;color:#0B1120">준비 중입니다</h3>
+<p style="margin:8px 0 0;font-size:15px;line-height:1.7;color:#64748B">이 화면은 아직 정의되지 않았습니다. 입주사 관리 패턴이 확정된 뒤 같은 구조로 그립니다.</p>
+</div>
+</div>
+
+</main>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;brand&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;biz&quot;,&quot;tech&quot;],&quot;default&quot;:&quot;biz&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;브랜드&quot;},&quot;sidebarCollapsed&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;사이드바&quot;}}">
+const SIDEBAR_KEY = "swonbiz-sidebar-collapsed";
+
+/** Wordmark suffix per domain — see brand.js. The symbol is shared. */
+const BRAND_SUFFIX = { biz: "Biz", tech: "Tech" };
+
+class Component extends DCLogic {
+  state = { collapsed: null };
+
+  /** Prop wins on change; otherwise the in-page toggle, then localStorage. */
+  get collapsed() {
+    if (this.state.collapsed !== null) return this.state.collapsed;
+    if (typeof this.props.sidebarCollapsed === "boolean") return this.props.sidebarCollapsed;
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === "1";
+    } catch (err) {
+      return false;
+    }
+  }
+
+  componentDidMount() {
+    this.bindNav();
+    this.bindDetail();
+    this.bindTabs();
+    this.bindSidebar();
+    this.applySidebar();
+    // Repaint the authored default through the same path so later clicks can clear it.
+    document.querySelectorAll("[data-nav]").forEach((b) => {
+      this.paintNavItem(b, b.getAttribute("data-nav") === "tenants");
+    });
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps && prevProps.sidebarCollapsed !== this.props.sidebarCollapsed && this.state.collapsed !== null) {
+      this.setState({ collapsed: null });
+      return;
+    }
+    this.applySidebar();
+  }
+
+  bindSidebar() {
+    const btn = document.querySelector("[data-sidebar-toggle]");
+    if (btn && !btn.getAttribute("data-bound")) {
+      btn.setAttribute("data-bound", "1");
+      btn.addEventListener("click", () => {
+        const next = !this.collapsed;
+        try { localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0"); } catch (err) { /* non-fatal */ }
+        this.setState({ collapsed: next });
+      });
+      const tip = btn.querySelector("[data-toggle-tip]");
+      btn.addEventListener("mouseenter", () => { if (tip) tip.style.display = "flex"; });
+      btn.addEventListener("mouseleave", () => { if (tip) tip.style.display = "none"; });
+      // Hovering the sidebar also brings the dimmed toggle to full opacity.
+      const aside = document.querySelector("[data-sidebar]");
+      if (aside) {
+        aside.addEventListener("mouseenter", () => { btn.style.opacity = "1"; });
+        aside.addEventListener("mouseleave", () => { btn.style.opacity = ".45"; });
+      }
+    }
+    // Icon-only rail needs a label on hover; the tooltip is inert when expanded.
+    document.querySelectorAll("[data-nav],[data-alert-mini] > span").forEach((el) => {
+      if (el.getAttribute("data-tipbound")) return;
+      el.setAttribute("data-tipbound", "1");
+      const tip = el.querySelector("[data-tip]");
+      if (!tip) return;
+      el.addEventListener("mouseenter", () => { if (this.collapsed) tip.style.display = "flex"; });
+      el.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+    });
+  }
+
+  /**
+   * Active styling for one rail item. `element.style.background = "var(--x)"`
+   * (a shorthand set to a custom property) does not resolve in this renderer, so
+   * resolve the tokens once and assign longhands.
+   */
+  paintNavItem(el, active) {
+    if (!this.tokens) {
+      const root = getComputedStyle(document.documentElement);
+      this.tokens = {
+        activeBg: root.getPropertyValue("--color-accent-bg").trim() || "#EEF2FF",
+        activeText: root.getPropertyValue("--color-primary-hover").trim() || "#4338CA",
+        idleText: root.getPropertyValue("--text-muted").trim() || "#64748B",
+      };
+    }
+    el.style.backgroundColor = active ? this.tokens.activeBg : "transparent";
+    // The logo IS the dashboard entry: it takes the tint but keeps brand typography.
+    if (el.hasAttribute("data-logo")) return;
+    el.style.color = active ? this.tokens.activeText : this.tokens.idleText;
+    el.style.fontWeight = active ? "700" : "400";
+  }
+
+  renderVals() {
+    return { brandSuffix: BRAND_SUFFIX[this.props.brand] || BRAND_SUFFIX.biz };
+  }
+
+  componentWillUnmount() {
+    clearTimeout(this.labelTimer);
+  }
+
+  applySidebar() {
+    const c = this.collapsed;
+    const aside = document.querySelector("[data-sidebar]");
+    if (!aside) return;
+    aside.style.width = c ? "64px" : "248px";
+    aside.style.padding = c ? "20px 12px" : "20px 16px";
+
+    // Labels toggle with `display` (not animatable) while width animates, and the
+    // aside must stay overflow:visible for the collapsed tooltips — so revealing
+    // them early paints full-width labels inside the still-64px rail. Hide instantly
+    // on collapse; wait for the width transition before showing on expand.
+    clearTimeout(this.labelTimer);
+    const setLabels = (value) => {
+      document.querySelectorAll("[data-side-label]").forEach((el) => { el.style.display = value; });
+    };
+    // CSS transitions advance on animation frames, which this document throttles, so
+    // a fixed timer desynchronizes from the width interpolation. Poll the measured
+    // rect instead — timers do run here — and reveal only once the rail is wide.
+    if (c) {
+      setLabels("none");
+    } else if (aside.getBoundingClientRect().width < 200) {
+      setLabels("none");
+      const waitForWidth = () => {
+        if (this.collapsed) return;
+        if (aside.getBoundingClientRect().width >= 200) { setLabels(""); return; }
+        this.labelTimer = setTimeout(waitForWidth, 60);
+      };
+      this.labelTimer = setTimeout(waitForWidth, 60);
+    } else {
+      setLabels("");
+    }
+    const logo = document.querySelector("[data-logo]");
+    if (logo) {
+      logo.style.justifyContent = c ? "center" : "";
+      logo.style.padding = c ? "0 0 24px" : "0 8px 24px";
+    }
+    document.querySelectorAll("[data-nav]").forEach((btn) => {
+      const isLogo = btn.hasAttribute("data-logo");
+      btn.style.padding = c ? "0" : isLogo ? "0 8px" : "0 12px";
+      btn.style.justifyContent = c ? "center" : "";
+      btn.style.gap = c ? "0" : isLogo ? "10px" : "12px";
+    });
+    const full = document.querySelector("[data-alert-full]");
+    const mini = document.querySelector("[data-alert-mini]");
+    if (full) full.style.display = c ? "none" : "block";
+    if (mini) mini.style.display = c ? "flex" : "none";
+
+    const btn = document.querySelector("[data-sidebar-toggle]");
+    if (btn) {
+      btn.style.left = c ? "64px" : "248px";
+      btn.setAttribute("aria-label", c ? "사이드바 펼치기" : "사이드바 접기");
+      const collapseIcon = btn.querySelector('[data-toggle-icon="collapse"]');
+      const expandIcon = btn.querySelector('[data-toggle-icon="expand"]');
+      if (collapseIcon) collapseIcon.style.display = c ? "none" : "flex";
+      if (expandIcon) expandIcon.style.display = c ? "flex" : "none";
+      const tip = btn.querySelector("[data-toggle-tip]");
+      if (tip) tip.lastChild.textContent = c ? "사이드바 펼치기" : "사이드바 접기";
+    }
+    document.querySelectorAll("[data-tip]").forEach((t) => { t.style.display = "none"; });
+  }
+
+  showView(key, title, crumb) {
+    document.querySelectorAll("[data-view]").forEach((v) => {
+      v.style.display = v.getAttribute("data-view") === key ? "block" : "none";
+    });
+    const t = document.querySelector("[data-title]");
+    const c = document.querySelector("[data-crumb]");
+    if (t && title) t.textContent = title;
+    if (c && crumb) c.textContent = crumb;
+    const main = document.querySelector("main");
+    if (main) main.scrollTop = 0;
+  }
+
+  /** Sidebar: 입주사 and 청구 are designed; the rest show the placeholder view. */
+  bindNav() {
+    const items = [...document.querySelectorAll("[data-nav]")];
+    const meta = {
+      dashboard: ["대시보드", "운영 · 강남 삼성점"],
+      tenants: ["입주사", "운영 · 강남 삼성점"],
+      // 대시보드 lives on the logo; the nav list starts at 입주사.
+      billing: ["청구", "운영 · 강남 삼성점"],
+      tax: ["세무", "운영 · 강남 삼성점"],
+      spaces: ["호실", "운영 · 강남 삼성점"],
+      settings: ["설정", "운영 · 강남 삼성점"],
+    };
+    items.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-nav");
+        items.forEach((b) => this.paintNavItem(b, b === btn));
+        const [title, crumb] = meta[key] || ["", ""];
+        if (key === "tenants" || key === "billing") {
+          this.showView(key, title, crumb);
+        } else {
+          const h = document.querySelector("[data-empty-title]");
+          if (h) h.textContent = title;
+          this.showView("empty", title, crumb);
+        }
+      });
+    });
+  }
+
+  /** Row click opens the tenant detail; the back link returns to the list. */
+  bindDetail() {
+    const row = document.querySelector("[data-open-detail]");
+    if (row) row.addEventListener("click", () => this.showView("detail", "주식회사 노틸러스", "운영 · 입주사"));
+    const back = document.querySelector("[data-back]");
+    if (back) back.addEventListener("click", () => this.showView("tenants", "입주사", "운영 · 강남 삼성점"));
+  }
+
+  /** Detail tabs: 계약 / 청구 이력 / 멤버. */
+  bindTabs() {
+    const tabs = [...document.querySelectorAll("[data-tab]")];
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const key = tab.getAttribute("data-tab");
+        tabs.forEach((t) => {
+          const on = t === tab;
+          t.style.color = on ? "#0B1120" : "#64748B";
+          t.style.fontWeight = on ? "700" : "400";
+          const line = t.querySelector("[data-tabline]");
+          if (line) line.style.background = on ? "#4F46E5" : "transparent";
+        });
+        document.querySelectorAll("[data-pane]").forEach((p) => {
+          p.style.display = p.getAttribute("data-pane") === key ? "block" : "none";
+        });
+      });
+    });
+  }
+}
+
+</script>
+</body>
+</html>

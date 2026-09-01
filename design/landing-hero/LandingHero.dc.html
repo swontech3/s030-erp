@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Landing hero" description="SwonBiz 랜딩 히어로 — sticky 네비게이션, 좌 카피/CTA, 우 운영 시스템 대시보드 목업" -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>html{scroll-behavior:smooth}body{margin:0}@keyframes swonPulse{0%,100%{opacity:1}50%{opacity:.35}}@keyframes swonReveal{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}@keyframes swonIconIn{from{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.06);color:rgba(129,140,248,.35)}to{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.10);color:#818CF8}}@keyframes swonFlash{0%{border-color:#818CF8;box-shadow:0 0 16px rgba(79,70,229,.35)}100%{border-color:rgba(255,255,255,.10);box-shadow:0 0 0 rgba(79,70,229,0)}}</style>
+</helmet>
+<div style="min-width:1440px;min-height:100vh;background:linear-gradient(180deg,#FFFFFF 0%,#F8FAFC 100%);position:relative;overflow:hidden">
+<div style="position:absolute;top:-160px;right:-120px;width:560px;height:560px;border-radius:999px;background:radial-gradient(circle,#4F46E5 0%,rgba(79,70,229,0) 70%);opacity:.08;pointer-events:none"></div>
+<div style="position:absolute;bottom:40px;left:-120px;width:380px;height:380px;border-radius:999px;background:radial-gradient(circle,#22D3EE 0%,rgba(34,211,238,0) 70%);opacity:.06;pointer-events:none"></div>
+<sc-if value="{{ showDotGrid }}" hint-placeholder-val="{{ true }}">
+<div style="position:absolute;inset:0;background-image:radial-gradient(#0B1120 1px,transparent 1px);background-size:32px 32px;opacity:.03;pointer-events:none"></div>
+</sc-if>
+<header style="position:sticky;top:0;z-index:30;height:72px;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid #E2E8F0">
+<div style="max-width:1200px;margin:0 auto;padding:0 24px;height:72px;display:flex;align-items:center;gap:48px">
+<a href="#" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:0 0 auto">
+<img src="../../assets/swonbiz-logo.png" alt="SwonBiz" style="height:32px;width:auto;display:block">
+<span style="font-size:20px;font-weight:800;letter-spacing:-.03em;color:#0B1120;white-space:nowrap">S<span style="opacity:.55;margin:0 .02em">·</span>won<span style="color:#4F46E5">Biz</span></span>
+</a>
+<nav style="display:flex;gap:32px;flex:1;justify-content:center">
+<a href="#services" style="font-size:14px;color:#475569;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#4F46E5">서비스</a>
+<a href="#erp" style="font-size:14px;color:#475569;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#4F46E5">운영시스템</a>
+<a href="#spaces" style="font-size:14px;color:#475569;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#4F46E5">공간안내</a>
+<a href="#pricing" style="font-size:14px;color:#475569;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#4F46E5">요금제</a>
+<a href="#process" style="font-size:14px;color:#475569;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#4F46E5">이용안내</a>
+</nav>
+<div style="display:flex;align-items:center;gap:16px;flex:0 0 auto">
+<a href="#" style="font-size:14px;color:#475569;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#4F46E5">로그인</a>
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" size="sm" data-inquiry="상담" hint-size="112px,40px">무료 상담</x-import>
+</div>
+</div>
+</header>
+<div style="position:relative;max-width:1200px;margin:0 auto;padding:120px 24px;display:grid;grid-template-columns:1.174fr 1fr;gap:72px;align-items:center">
+<div>
+<span style="display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 14px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:14px;font-weight:700;white-space:nowrap;flex:0 0 auto">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="sparkles" size="{{ 16 }}" hint-size="16px,16px"></x-import>
+AI 기반 법무·세무 자동화
+</span>
+<h1 style="margin:20px 0 0;font-size:60px;font-weight:800;line-height:1.12;letter-spacing:-.03em;color:#0B1120">법인설립부터 세무까지<br><span style="color:#4F46E5">AI가</span> 함께하는 공유오피스</h1>
+<p style="margin:24px 0 0;font-size:19px;line-height:1.65;color:#475569;max-width:520px">등기 서류 작성, 세금계산서 발행, 경비 관리까지. 입주와 동시에 켜지는 비즈니스 운영 시스템을 제공합니다.</p>
+<div style="margin-top:32px;display:flex;gap:12px">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" data-inquiry="상담" hint-size="210px,54px">무료 상담 신청<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-right" size="{{ 18 }}" hint-size="18px,18px"></x-import></x-import>
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" variant="ghost" as="a" href="#spaces" style="text-decoration:none" hint-size="190px,54px"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="play" size="{{ 18 }}" hint-size="18px,18px"></x-import>공간 둘러보기</x-import>
+</div>
+<sc-if value="{{ showSocialProof }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:40px;display:flex;align-items:center;gap:24px">
+<span style="display:inline-flex;align-items:center;gap:7px;font-size:14px;line-height:1.55;font-weight:700;color:#0B1120;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="shield-check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>12년째 운영 중</span>
+<span style="display:inline-flex;align-items:center;gap:7px;font-size:14px;line-height:1.55;color:#64748B;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>사업자등록 전 입주 가능</span>
+<span style="display:inline-flex;align-items:center;gap:7px;font-size:14px;line-height:1.55;color:#64748B;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>관리비 별도 없음</span>
+</div>
+</sc-if>
+</div>
+<sc-if value="{{ showMockup }}" hint-placeholder-val="{{ true }}">
+<div style="position:relative">
+<div style="position:absolute;left:8%;right:8%;bottom:-24px;height:120px;border-radius:999px;background:#4F46E5;opacity:.22;filter:blur(60px);pointer-events:none"></div>
+<div data-hero-docs="1" style="position:relative;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:24px">
+<div style="display:flex;align-items:center;gap:10px">
+<span style="display:flex;color:#22D3EE;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="sparkles" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<span style="flex:1;min-width:0;font-size:14px;font-weight:700;color:#0B1120;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">법인설립 서류 생성</span>
+<span data-hdoccount="1" style="font-size:12px;font-weight:700;color:#64748B;white-space:nowrap;flex:0 0 auto">0 / 5</span>
+</div>
+<div style="margin-top:12px;height:4px;border-radius:999px;background:#EEF2FF;overflow:hidden"><span data-hdocbar="1" style="display:block;width:0%;height:4px;border-radius:999px;background:linear-gradient(90deg,#4F46E5,#22D3EE);transition:width 480ms cubic-bezier(.22,.61,.36,1)"></span></div>
+<div style="margin-top:20px;display:flex;flex-direction:column;gap:10px">
+<div data-hdoc="1" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:10px;opacity:0;transform:translateY(10px);transition:opacity 380ms cubic-bezier(.22,.61,.36,1),transform 380ms cubic-bezier(.22,.61,.36,1),border-color 380ms cubic-bezier(.22,.61,.36,1)">
+<span data-hdocicon="1" style="width:38px;height:38px;flex:0 0 auto;border-radius:8px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="search" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:center;gap:6px"><span style="font-size:14px;font-weight:700;color:#0B1120;white-space:nowrap">사업목적 · 업종 · 업태</span><span style="padding:2px 6px;border-radius:999px;background:rgba(34,211,238,.14);color:#0E7490;font-size:10px;font-weight:700;white-space:nowrap;flex:0 0 auto">AI 시스템</span></div>
+<div style="margin-top:2px;font-size:12px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">관련 법령과 표준산업분류를 검색해 항목 제안</div>
+</div>
+<span style="display:flex;align-items:center;flex:0 0 auto">
+<span data-hdocfrom="1" style="height:22px;padding:0 9px;border-radius:999px;background:rgba(34,211,238,.14);color:#0E7490;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;transform:scale(1);transition:opacity 180ms cubic-bezier(.22,.61,.36,1),transform 180ms cubic-bezier(.22,.61,.36,1)"><span data-hdocdot="1" style="width:5px;height:5px;border-radius:999px;background:#22D3EE"></span>검색중</span>
+<span data-hdocto="1" style="display:none;align-items:center;gap:4px;height:22px;padding:0 9px;border-radius:999px;background:rgba(79,70,229,.12);color:#4F46E5;font-size:11px;font-weight:700;white-space:nowrap;opacity:0;transform:scale(1.05);transition:opacity 220ms cubic-bezier(.22,.61,.36,1),transform 220ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 12 }}" hint-size="12px,12px"></x-import>완료</span>
+</span>
+</div>
+<div data-hdoc="2" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:10px;opacity:0;transform:translateY(10px);transition:opacity 380ms cubic-bezier(.22,.61,.36,1),transform 380ms cubic-bezier(.22,.61,.36,1),border-color 380ms cubic-bezier(.22,.61,.36,1)">
+<span data-hdocicon="2" style="width:38px;height:38px;flex:0 0 auto;border-radius:8px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="file-text" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<div style="flex:1;min-width:0">
+<div style="font-size:14px;font-weight:700;color:#0B1120;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">정관</div>
+<div style="margin-top:2px;font-size:12px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">확정된 사업목적을 그대로 반영</div>
+</div>
+<span style="display:flex;align-items:center;flex:0 0 auto">
+<span data-hdocfrom="2" style="height:22px;padding:0 9px;border-radius:999px;background:rgba(34,211,238,.14);color:#0E7490;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;transform:scale(1);transition:opacity 180ms cubic-bezier(.22,.61,.36,1),transform 180ms cubic-bezier(.22,.61,.36,1)"><span data-hdocdot="2" style="width:5px;height:5px;border-radius:999px;background:#22D3EE"></span>작성중</span>
+<span data-hdocto="2" style="display:none;align-items:center;gap:4px;height:22px;padding:0 9px;border-radius:999px;background:rgba(79,70,229,.12);color:#4F46E5;font-size:11px;font-weight:700;white-space:nowrap;opacity:0;transform:scale(1.05);transition:opacity 220ms cubic-bezier(.22,.61,.36,1),transform 220ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 12 }}" hint-size="12px,12px"></x-import>완료</span>
+</span>
+</div>
+<div data-hdoc="3" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:10px;opacity:0;transform:translateY(10px);transition:opacity 380ms cubic-bezier(.22,.61,.36,1),transform 380ms cubic-bezier(.22,.61,.36,1),border-color 380ms cubic-bezier(.22,.61,.36,1)">
+<span data-hdocicon="3" style="width:38px;height:38px;flex:0 0 auto;border-radius:8px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="file-text" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<div style="flex:1;min-width:0">
+<div style="font-size:14px;font-weight:700;color:#0B1120;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">발기인총회 의사록</div>
+<div style="margin-top:2px;font-size:12px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">발기인 2명 · 의결사항 5건</div>
+</div>
+<span style="display:flex;align-items:center;flex:0 0 auto">
+<span data-hdocfrom="3" style="height:22px;padding:0 9px;border-radius:999px;background:rgba(34,211,238,.14);color:#0E7490;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;transform:scale(1);transition:opacity 180ms cubic-bezier(.22,.61,.36,1),transform 180ms cubic-bezier(.22,.61,.36,1)"><span data-hdocdot="3" style="width:5px;height:5px;border-radius:999px;background:#22D3EE"></span>작성중</span>
+<span data-hdocto="3" style="display:none;align-items:center;gap:4px;height:22px;padding:0 9px;border-radius:999px;background:rgba(79,70,229,.12);color:#4F46E5;font-size:11px;font-weight:700;white-space:nowrap;opacity:0;transform:scale(1.05);transition:opacity 220ms cubic-bezier(.22,.61,.36,1),transform 220ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 12 }}" hint-size="12px,12px"></x-import>완료</span>
+</span>
+</div>
+<div data-hdoc="4" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:10px;opacity:0;transform:translateY(10px);transition:opacity 380ms cubic-bezier(.22,.61,.36,1),transform 380ms cubic-bezier(.22,.61,.36,1),border-color 380ms cubic-bezier(.22,.61,.36,1)">
+<span data-hdocicon="4" style="width:38px;height:38px;flex:0 0 auto;border-radius:8px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="file-text" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<div style="flex:1;min-width:0">
+<div style="font-size:14px;font-weight:700;color:#0B1120;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">주주명부</div>
+<div style="margin-top:2px;font-size:12px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">주주 2명 · 발행주식 10,000주</div>
+</div>
+<span style="display:flex;align-items:center;flex:0 0 auto">
+<span data-hdocfrom="4" style="height:22px;padding:0 9px;border-radius:999px;background:rgba(34,211,238,.14);color:#0E7490;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;transform:scale(1);transition:opacity 180ms cubic-bezier(.22,.61,.36,1),transform 180ms cubic-bezier(.22,.61,.36,1)"><span data-hdocdot="4" style="width:5px;height:5px;border-radius:999px;background:#22D3EE"></span>작성중</span>
+<span data-hdocto="4" style="display:none;align-items:center;gap:4px;height:22px;padding:0 9px;border-radius:999px;background:rgba(79,70,229,.12);color:#4F46E5;font-size:11px;font-weight:700;white-space:nowrap;opacity:0;transform:scale(1.05);transition:opacity 220ms cubic-bezier(.22,.61,.36,1),transform 220ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 12 }}" hint-size="12px,12px"></x-import>완료</span>
+</span>
+</div>
+<div data-hdoc="5" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:10px;opacity:0;transform:translateY(10px);transition:opacity 380ms cubic-bezier(.22,.61,.36,1),transform 380ms cubic-bezier(.22,.61,.36,1),border-color 380ms cubic-bezier(.22,.61,.36,1)">
+<span data-hdocicon="5" style="width:38px;height:38px;flex:0 0 auto;border-radius:8px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="file-text" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<div style="flex:1;min-width:0">
+<div style="font-size:14px;font-weight:700;color:#0B1120;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">법인 인감신고서</div>
+<div style="margin-top:2px;font-size:12px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">대표이사 인감 등록용</div>
+</div>
+<span style="display:flex;align-items:center;flex:0 0 auto">
+<span data-hdocfrom="5" style="height:22px;padding:0 9px;border-radius:999px;background:rgba(34,211,238,.14);color:#0E7490;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;transform:scale(1);transition:opacity 180ms cubic-bezier(.22,.61,.36,1),transform 180ms cubic-bezier(.22,.61,.36,1)"><span data-hdocdot="5" style="width:5px;height:5px;border-radius:999px;background:#22D3EE"></span>작성중</span>
+<span data-hdocto="5" style="display:none;align-items:center;gap:4px;height:22px;padding:0 9px;border-radius:999px;background:rgba(79,70,229,.12);color:#4F46E5;font-size:11px;font-weight:700;white-space:nowrap;opacity:0;transform:scale(1.05);transition:opacity 220ms cubic-bezier(.22,.61,.36,1),transform 220ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 12 }}" hint-size="12px,12px"></x-import>완료</span>
+</span>
+</div>
+</div>
+<div data-hdocdone="1" style="margin-top:20px;display:flex;align-items:center;gap:10px;padding:14px 16px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;opacity:0;transform:translateY(10px);transition:opacity 380ms cubic-bezier(.22,.61,.36,1),transform 380ms cubic-bezier(.22,.61,.36,1)">
+<span style="display:flex;color:#4F46E5;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<span style="flex:1;min-width:0;font-size:13px;color:#475569">법인설립 등기 신청서류 준비가 끝났습니다. 셀프 등기 신청하거나 법무사에게 넘길 수 있습니다.</span>
+</div>
+</div>
+<div style="margin-top:10px;text-align:right;font-size:12px;color:#94A3B8">* AI 서류 생성 화면 예시</div>
+</div>
+</sc-if>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(180deg,rgba(248,250,252,0) 0%,#FFFFFF 100%);pointer-events:none"></div>
+</div>
+
+
+<section id="services" style="position:relative;scroll-margin-top:88px;min-width:1440px;background:#F8FAFC;padding:96px 0">
+<div style="position:absolute;left:0;right:0;top:0;height:120px;background:linear-gradient(180deg,#FFFFFF 0%,rgba(248,250,252,0) 100%);pointer-events:none"></div>
+<div style="position:relative;max-width:1200px;margin:0 auto;padding:0 24px">
+<div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px">
+<span style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4F46E5">WHAT WE PROVIDE</span>
+<h2 style="margin:0;font-size:30px;font-weight:700;line-height:1.3;letter-spacing:-.018em;color:#0B1120">공간을 빌리면, <span style="color:#4F46E5">AI가</span> 법무·세무를 처리합니다</h2>
+<p style="margin:0;font-size:16px;line-height:1.7;color:#475569;max-width:600px;text-wrap:pretty">담당자를 뽑거나 세무사를 따로 두지 않아도 됩니다. 가장 막히는 사업목적·업종·업태부터 정관과 의사록, 증빙 분류까지 AI가 관련 법령을 찾아 작성하고, 모든 플랜에 포함되어 있습니다.</p>
+</div>
+<div style="margin-top:64px;display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:24px;align-items:stretch">
+<div style="display:flex;flex-direction:column;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;transition:transform 180ms cubic-bezier(.22,.61,.36,1),border-color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="transform:translateY(-2px);border-color:#818CF8">
+<span style="height:4px;background:#4F46E5;flex:0 0 auto"></span>
+<div style="padding:32px;display:flex;flex-direction:column;flex:1">
+<span style="width:48px;height:48px;border-radius:12px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center;flex:0 0 auto">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="building-2" size="{{ 24 }}" hint-size="24px,24px"></x-import>
+</span>
+<h3 style="margin:24px 0 0;font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em;color:#0B1120">공간</h3>
+<p style="margin:4px 0 0;font-size:14px;line-height:1.55;color:#64748B">1인실부터 팀 오피스까지</p>
+<p style="margin:16px 0 0;font-size:16px;line-height:1.7;color:#475569;text-wrap:pretty;flex:1 0 auto">회의실·라운지·프린터·우편 수취까지 포함된 정액 요금. 별도 관리비나 숨은 비용이 없습니다.</p>
+<div style="margin-top:24px;padding-top:24px;border-top:1px solid #E2E8F0;display:flex;flex-direction:column;gap:10px">
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>24시간 자유 출입</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>회의실 월 20시간 무료</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>법인 주소지 등록 가능</span>
+</div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;transition:transform 180ms cubic-bezier(.22,.61,.36,1),border-color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="transform:translateY(-2px);border-color:#818CF8">
+<span style="height:4px;background:#4F46E5;flex:0 0 auto"></span>
+<div style="padding:32px;display:flex;flex-direction:column;flex:1">
+<span style="width:48px;height:48px;border-radius:12px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center;flex:0 0 auto">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="scale" size="{{ 24 }}" hint-size="24px,24px"></x-import>
+</span>
+<h3 style="margin:24px 0 0;font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em;color:#0B1120">법무</h3>
+<p style="margin:4px 0 0;font-size:14px;line-height:1.55;color:#64748B">법인설립·등기를 AI가 준비</p>
+<p style="margin:16px 0 0;font-size:16px;line-height:1.7;color:#475569;text-wrap:pretty;flex:1 0 auto">관련 법령과 표준산업분류를 근거로 사업목적·업태·업종을 정하고, 정관과 의사록, 주주명부까지 자동 생성합니다.</p>
+<div style="margin-top:24px;padding-top:24px;border-top:1px solid #E2E8F0;display:flex;flex-direction:column;gap:10px">
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>설립·변경 등기 서류 자동 작성</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>사업목적 자동 매핑</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>제휴 법무사 연결</span>
+</div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;transition:transform 180ms cubic-bezier(.22,.61,.36,1),border-color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="transform:translateY(-2px);border-color:#818CF8">
+<span style="height:4px;background:linear-gradient(90deg,#4F46E5,#22D3EE);flex:0 0 auto"></span>
+<div style="padding:32px;display:flex;flex-direction:column;flex:1">
+<span style="width:48px;height:48px;border-radius:12px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center;flex:0 0 auto">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="calculator" size="{{ 24 }}" hint-size="24px,24px"></x-import>
+</span>
+<h3 style="margin:24px 0 0;font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em;color:#0B1120">세무</h3>
+<p style="margin:4px 0 0;font-size:14px;line-height:1.55;color:#64748B">세금 혜택까지 챙기는 세무 자동화</p>
+<p style="margin:16px 0 0;font-size:16px;line-height:1.7;color:#475569;text-wrap:pretty;flex:1 0 auto">세금계산서 발행, 경비 증빙 분류, 부가세 신고 준비까지 AI가 처리하고, 기업부설연구소 설립으로 받을 수 있는 세액공제까지 안내합니다.</p>
+<div style="margin-top:24px;padding-top:24px;border-top:1px solid #E2E8F0;display:flex;flex-direction:column;gap:10px">
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>세금계산서 자동 발행</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>경비 증빙 AI 자동 분류</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import><span style="font-weight:600">기업부설연구소 설립 지원</span><span style="margin-left:8px;padding:3px 8px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:700;white-space:nowrap;flex:0 0 auto">세액공제</span></span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>제휴 세무사 연결</span>
+</div>
+</div>
+</div>
+</div>
+<div style="position:relative;margin-top:32px;display:grid;grid-template-columns:1.632fr 1fr;gap:40px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:32px 36px 32px 40px;overflow:hidden">
+<span style="position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,#4F46E5,#22D3EE);border-radius:12px 0 0 12px"></span>
+<div>
+<span style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4F46E5">ONLY AT SWONBIZ</span>
+<h3 style="margin:10px 0 0;font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em;color:#0B1120">기업부설연구소, 설립부터 인정까지</h3>
+<p style="margin:12px 0 0;font-size:16px;line-height:1.7;color:#475569;max-width:480px;text-wrap:pretty">연구원 인원과 연구비 규모에 따라 R&amp;D 세액공제를 받을 수 있습니다. 신청 서류 작성부터 한국산업기술진흥협회 인정까지 지원합니다.</p>
+</div>
+<div style="display:flex;flex-direction:column;padding-left:40px;border-left:1px solid rgba(226,232,240,.5)">
+<div style="display:flex;flex-direction:column;gap:12px">
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 18 }}" hint-size="18px,18px" style="color:#4F46E5;flex:0 0 auto"></x-import>R&amp;D 세액공제</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 18 }}" hint-size="18px,18px" style="color:#4F46E5;flex:0 0 auto"></x-import>전문연구요원 병역특례</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 18 }}" hint-size="18px,18px" style="color:#4F46E5;flex:0 0 auto"></x-import>정부 R&amp;D 과제 가점</span>
+</div>
+<a href="#" data-inquiry="연구소" style="margin-top:20px;align-self:flex-end;display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#4F46E5;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#4338CA">연구소 설립 상담<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-right" size="{{ 16 }}" hint-size="16px,16px"></x-import></a>
+</div>
+</div>
+<div style="margin-top:12px;display:flex;align-items:center;gap:12px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:18px 24px">
+<span style="width:36px;height:36px;flex:0 0 auto;border-radius:8px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="sparkles" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<div style="flex:1;min-width:0">
+<span style="font-size:14px;font-weight:700;color:#0B1120">AI 활용 지원</span>
+<span style="font-size:14px;line-height:1.55;color:#475569"> · 업무 자동화 AI 에이전트를 직접 개발하며, 입주사에는 AI 활용과 바이브 코딩 실무 교육을 지원합니다.</span>
+</div>
+</div>
+<div style="margin-top:40px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px">
+<span style="font-size:16px;line-height:1.7;color:#475569">어떤 서비스가 필요한지 모르시겠다면</span>
+<a href="#" data-inquiry="상담" style="display:inline-flex;align-items:center;gap:6px;font-size:16px;font-weight:700;color:#4F46E5;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#4338CA">10분 무료 상담 받기<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-right" size="{{ 16 }}" hint-size="16px,16px"></x-import></a>
+</div>
+</div>
+</section>
+
+<section id="erp" style="position:relative;scroll-margin-top:88px;min-width:1440px;background:linear-gradient(180deg,#131C33 0%,#0B1120 100%);padding:120px 0">
+<div style="position:absolute;inset:0;overflow:hidden;pointer-events:none">
+<div style="position:absolute;top:-180px;right:-120px;width:620px;height:620px;border-radius:999px;background:radial-gradient(circle,#4F46E5 0%,rgba(79,70,229,0) 72%);opacity:.22;filter:blur(40px);pointer-events:none"></div>
+<div style="position:absolute;bottom:-90px;left:-110px;width:420px;height:420px;border-radius:999px;background:radial-gradient(circle,#22D3EE 0%,rgba(34,211,238,0) 72%);opacity:.12;filter:blur(40px);pointer-events:none"></div>
+<div style="position:absolute;inset:0;background-image:radial-gradient(#FFFFFF 1px,transparent 1px);background-size:32px 32px;opacity:.06;pointer-events:none"></div>
+<div style="position:absolute;left:0;right:0;top:0;height:24px;background:linear-gradient(180deg,#F8FAFC 0%,rgba(19,28,51,0) 100%);opacity:.5;pointer-events:none"></div>
+</div>
+<div style="position:relative;max-width:1200px;margin:0 auto;padding:0 24px">
+<span style="display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 12px;border-radius:999px;background:rgba(79,70,229,.18);border:1px solid rgba(129,140,248,.35);color:#818CF8;font-size:12px;font-weight:700;white-space:nowrap">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="sparkles" size="{{ 14 }}" hint-size="14px,14px"></x-import>
+입주사 전용 · 추가 비용 없음
+</span>
+<h2 style="margin:16px 0 0;font-size:30px;font-weight:700;line-height:1.3;letter-spacing:-.018em;color:#FFFFFF">입주와 동시에, 경영 시스템이 켜집니다</h2>
+<p style="margin:14px 0 0;font-size:19px;line-height:1.65;color:#A8B3C7;max-width:640px;text-wrap:pretty">12년간 공유오피스를 운영하며 입주사들이 겪은 문제를 직접 보아왔습니다. 그 경험으로 만든 시스템이 입주 당일부터 청구·세무·경비를 대신 처리합니다.</p>
+<div ref="{{ rootRef }}" style="margin-top:64px;display:grid;grid-template-columns:.724fr 1fr;gap:64px;align-items:center">
+<div>
+<div ref="{{ listRef }}" style="position:relative;display:flex;flex-direction:column;gap:28px">
+<span style="position:absolute;left:20px;top:46px;bottom:46px;width:1px;background:rgba(255,255,255,.08);pointer-events:none"></span>
+<span style="position:absolute;left:20px;top:46px;bottom:46px;width:1px;background:linear-gradient(180deg,#4F46E5,#22D3EE);transform-origin:top;transform:scaleY(0);transition:transform 1100ms cubic-bezier(.22,.61,.36,1);pointer-events:none" data-line="1"></span>
+<div style="position:relative;display:flex;gap:16px;opacity:0;transform:translateY(12px);animation:swonReveal 640ms cubic-bezier(.22,.61,.36,1) both paused" data-reveal="1">
+<span style="width:40px;height:40px;flex:0 0 auto;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(129,140,248,.35);display:grid;place-items:center;animation:swonIconIn 640ms cubic-bezier(.22,.61,.36,1) both paused,swonFlash 520ms ease-out both paused" data-icon="1"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="file-pen-line" size="{{ 20 }}" hint-size="20px,20px"></x-import></span>
+<div><div style="font-size:16px;font-weight:700;color:#FFFFFF">계약·청구 자동화</div><p style="margin:6px 0 0;font-size:14px;line-height:1.55;color:#A8B3C7;text-wrap:pretty">계약 기간·요금이 등록되면 매달 청구서가 자동 생성되고 결제까지 이어집니다.</p></div>
+</div>
+<div style="position:relative;display:flex;gap:16px;opacity:0;transform:translateY(12px);animation:swonReveal 640ms cubic-bezier(.22,.61,.36,1) both paused" data-reveal="2">
+<span style="width:40px;height:40px;flex:0 0 auto;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(129,140,248,.35);display:grid;place-items:center;animation:swonIconIn 640ms cubic-bezier(.22,.61,.36,1) both paused,swonFlash 520ms ease-out both paused" data-icon="2"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="receipt" size="{{ 20 }}" hint-size="20px,20px"></x-import></span>
+<div><div style="font-size:16px;font-weight:700;color:#FFFFFF">세금계산서 원클릭 발행</div><p style="margin:6px 0 0;font-size:14px;line-height:1.55;color:#A8B3C7;text-wrap:pretty">결제 완료 시 자동 발행. 입주사는 포털에서 언제든 내려받을 수 있습니다.</p></div>
+</div>
+<div style="position:relative;display:flex;gap:16px;opacity:0;transform:translateY(12px);animation:swonReveal 640ms cubic-bezier(.22,.61,.36,1) both paused" data-reveal="3">
+<span style="width:40px;height:40px;flex:0 0 auto;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(129,140,248,.35);display:grid;place-items:center;animation:swonIconIn 640ms cubic-bezier(.22,.61,.36,1) both paused,swonFlash 520ms ease-out both paused" data-icon="3"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="credit-card" size="{{ 20 }}" hint-size="20px,20px"></x-import></span>
+<div><div style="font-size:16px;font-weight:700;color:#FFFFFF">법인카드 경비 통합 관리</div><p style="margin:6px 0 0;font-size:14px;line-height:1.55;color:#A8B3C7;text-wrap:pretty">카드 내역을 올리면 AI가 계정과목을 분류하고 증빙을 매칭합니다.</p></div>
+</div>
+<div style="position:relative;display:flex;gap:16px;opacity:0;transform:translateY(12px);animation:swonReveal 640ms cubic-bezier(.22,.61,.36,1) both paused" data-reveal="4">
+<span style="width:40px;height:40px;flex:0 0 auto;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(129,140,248,.35);display:grid;place-items:center;animation:swonIconIn 640ms cubic-bezier(.22,.61,.36,1) both paused,swonFlash 520ms ease-out both paused" data-icon="4"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="message-square-text" size="{{ 20 }}" hint-size="20px,20px"></x-import></span>
+<div><div style="font-size:16px;font-weight:700;color:#FFFFFF">AI 법무·세무 상담 무제한</div><p style="margin:6px 0 0;font-size:14px;line-height:1.55;color:#A8B3C7;text-wrap:pretty">등기·부가세·계약 관련 질문에 24시간 답변. 필요하면 전문가로 연결됩니다.</p></div>
+</div>
+</div>
+<div style="margin-top:40px">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" variant="inverse" hint-size="220px,54px">운영 시스템 미리보기<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-right" size="{{ 18 }}" hint-size="18px,18px"></x-import></x-import>
+</div>
+</div>
+<div style="position:relative;perspective:1600px">
+<div style="position:absolute;left:10%;right:10%;bottom:-20px;height:110px;border-radius:999px;background:#4F46E5;opacity:.26;filter:blur(70px);pointer-events:none"></div>
+<div style="position:relative;transform:rotateY(-4deg);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:12px;overflow:hidden">
+<div style="height:38px;border-bottom:1px solid rgba(255,255,255,.10);display:flex;align-items:center;gap:16px;padding:0 12px">
+<span style="display:flex;gap:6px"><span style="width:9px;height:9px;border-radius:999px;background:rgba(255,255,255,.22)"></span><span style="width:9px;height:9px;border-radius:999px;background:rgba(255,255,255,.22)"></span><span style="width:9px;height:9px;border-radius:999px;background:rgba(255,255,255,.22)"></span></span>
+<span style="flex:1;height:22px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);display:flex;align-items:center;padding:0 10px;font-size:11px;color:#A8B3C7">erp.swonbiz.com</span>
+</div>
+<div style="display:flex;min-height:392px">
+<div style="width:180px;flex:0 0 auto;background:rgba(255,255,255,.03);border-right:1px solid rgba(255,255,255,.08);padding:14px 10px;display:flex;flex-direction:column;gap:2px">
+<span style="display:flex;align-items:center;gap:8px;padding:0 6px 14px"><img src="../../assets/swonbiz-logo-white.png" alt="" style="height:16px;width:auto"><span style="font-size:12px;font-weight:800;letter-spacing:-.03em;color:#FFFFFF">S<span style="opacity:.55">·</span>wonBiz</span></span>
+<span style="height:30px;border-radius:6px;color:#A8B3C7;font-size:12px;display:flex;align-items:center;padding:0 10px">대시보드</span>
+<span style="height:30px;border-radius:6px;color:#A8B3C7;font-size:12px;display:flex;align-items:center;padding:0 10px">계약</span>
+<span style="height:30px;border-radius:6px;background:#4F46E5;color:#FFFFFF;font-size:12px;font-weight:700;display:flex;align-items:center;padding:0 10px">세무</span>
+<span style="height:30px;border-radius:6px;color:#A8B3C7;font-size:12px;display:flex;align-items:center;padding:0 10px">멤버</span>
+<span style="height:30px;border-radius:6px;color:#A8B3C7;font-size:12px;display:flex;align-items:center;padding:0 10px">회의실</span>
+<span style="height:30px;border-radius:6px;color:#A8B3C7;font-size:12px;display:flex;align-items:center;padding:0 10px">설정</span>
+</div>
+<div style="flex:1;min-width:0;padding:16px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+<span style="font-size:13px;font-weight:700;color:#FFFFFF;white-space:nowrap">세무 · 2026년 8월</span>
+<span style="display:flex;gap:4px;padding:3px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);flex:0 0 auto">
+<span style="height:22px;padding:0 10px;border-radius:6px;background:rgba(255,255,255,.12);color:#FFFFFF;font-size:11px;font-weight:700;display:flex;align-items:center">월</span>
+<span style="height:22px;padding:0 10px;border-radius:6px;color:#A8B3C7;font-size:11px;display:flex;align-items:center">분기</span>
+<span style="height:22px;padding:0 10px;border-radius:6px;color:#A8B3C7;font-size:11px;display:flex;align-items:center">연</span>
+</span>
+</div>
+<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:14px">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="display:flex;color:#22D3EE;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="sparkles" size="{{ 14 }}" hint-size="14px,14px"></x-import></span>
+<span style="flex:1;min-width:0;font-size:11px;font-weight:700;color:#FFFFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">경비 증빙 {{ classifiedLabel }} 자동 분류</span>
+<span style="height:20px;padding:0 8px;border-radius:999px;background:rgba(34,211,238,.16);color:#22D3EE;font-size:10px;font-weight:700;display:flex;align-items:center;white-space:nowrap;flex:0 0 auto">AI 처리중</span>
+</div>
+<div style="margin-top:10px;height:4px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden"><span style="display:block;width:93%;height:4px;border-radius:999px;background:linear-gradient(90deg,#4F46E5,#22D3EE)"></span></div>
+<div style="margin-top:8px;display:flex;justify-content:space-between;font-size:10px;color:#A8B3C7"><span>검토 필요 3건</span><span>부가세 예상 ₩3,120,000</span></div>
+</div>
+<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)"><span style="flex:1.6;font-size:10px;font-weight:700;letter-spacing:.04em;color:#A8B3C7">증빙</span><span style="flex:1;font-size:10px;font-weight:700;letter-spacing:.04em;color:#A8B3C7">계정과목</span><span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:#A8B3C7;flex:0 0 auto">금액</span><span style="width:58px;font-size:10px;font-weight:700;letter-spacing:.04em;color:#A8B3C7;flex:0 0 auto;text-align:right">분류</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)"><span style="flex:1.6;min-width:0;font-size:11px;color:#FFFFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">세금계산서_클라우드.pdf</span><span style="flex:1;min-width:0;font-size:11px;color:#A8B3C7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">지급수수료</span><span style="font-size:11px;color:#A8B3C7;white-space:nowrap;flex:0 0 auto">₩264,000</span><span style="height:20px;padding:0 8px;border-radius:999px;background:rgba(79,70,229,.28);color:#C7D2FE;font-size:10px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;flex:0 0 auto">자동</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)"><span style="flex:1.6;min-width:0;font-size:11px;color:#FFFFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">영수증_0812_카페.jpg</span><span style="flex:1;min-width:0;font-size:11px;color:#A8B3C7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">복리후생비</span><span style="font-size:11px;color:#A8B3C7;white-space:nowrap;flex:0 0 auto">₩18,000</span><span style="height:20px;padding:0 8px;border-radius:999px;background:rgba(79,70,229,.28);color:#C7D2FE;font-size:10px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;flex:0 0 auto">자동</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)"><span style="flex:1.6;min-width:0;font-size:11px;color:#FFFFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">카드내역_0814_주차.csv</span><span style="flex:1;min-width:0;font-size:11px;color:#A8B3C7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">차량유지비</span><span style="font-size:11px;color:#A8B3C7;white-space:nowrap;flex:0 0 auto">₩9,000</span><span style="height:20px;padding:0 8px;border-radius:999px;background:rgba(34,211,238,.16);color:#22D3EE;font-size:10px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;flex:0 0 auto"><span style="width:5px;height:5px;border-radius:999px;background:#22D3EE;animation:swonPulse 1.5s ease-in-out infinite paused" data-pulse="1"></span>AI 분류중</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)"><span style="flex:1.6;min-width:0;font-size:11px;color:#FFFFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">영수증_0815_택시.jpg</span><span style="flex:1;min-width:0;font-size:11px;color:#A8B3C7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">여비교통비</span><span style="font-size:11px;color:#A8B3C7;white-space:nowrap;flex:0 0 auto">₩12,400</span><span style="height:20px;padding:0 8px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#A8B3C7;font-size:10px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;flex:0 0 auto">확인 필요</span></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div style="margin-top:10px;text-align:right;font-size:12px;color:rgba(255,255,255,.45)">* 운영 시스템 화면 예시</div>
+</div>
+</div>
+<div style="margin-top:48px;padding-top:48px;border-top:1px solid rgba(255,255,255,.10);display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
+<div style="text-align:center;display:flex;flex-direction:column;align-items:center"><span style="display:flex;color:#818CF8"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="shield-check" size="{{ 24 }}" hint-size="24px,24px"></x-import></span><div style="margin-top:12px;font-size:16px;font-weight:700;color:#FFFFFF">12년째 운영 중</div><div style="margin-top:6px;font-size:14px;line-height:1.55;color:#A8B3C7">강남 삼성동에서 검증된 운영</div></div>
+<div style="text-align:center;display:flex;flex-direction:column;align-items:center"><span style="display:flex;color:#818CF8"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="infinity" size="{{ 24 }}" hint-size="24px,24px"></x-import></span><div style="margin-top:12px;font-size:16px;font-weight:700;color:#FFFFFF">전 기능 무제한</div><div style="margin-top:6px;font-size:14px;line-height:1.55;color:#A8B3C7">청구·세무·경비 제한 없이 이용</div></div>
+<div style="text-align:center;display:flex;flex-direction:column;align-items:center"><span style="display:flex;color:#818CF8"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="headphones" size="{{ 24 }}" hint-size="24px,24px"></x-import></span><div style="margin-top:12px;font-size:16px;font-weight:700;color:#FFFFFF">야간·주말 상담</div><div style="margin-top:6px;font-size:14px;line-height:1.55;color:#A8B3C7">매니저 상주, 예약 없이 문의</div></div>
+<div style="text-align:center;display:flex;flex-direction:column;align-items:center"><span style="display:flex;color:#818CF8"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="wallet" size="{{ 24 }}" hint-size="24px,24px"></x-import></span><div style="margin-top:12px;font-size:16px;font-weight:700;color:#22D3EE">추가 비용 0원</div><div style="margin-top:6px;font-size:14px;line-height:1.55;color:#A8B3C7">모든 플랜에 운영 시스템 포함</div></div>
+</div>
+</div>
+</section>
+
+<section id="spaces" style="position:relative;scroll-margin-top:88px;min-width:1440px;background:#FFFFFF;padding:120px 0">
+<div style="position:absolute;left:0;right:0;top:0;height:24px;background:linear-gradient(180deg,rgba(11,17,32,.35) 0%,rgba(255,255,255,0) 100%);pointer-events:none"></div>
+<div style="position:relative;max-width:1200px;margin:0 auto;padding:0 24px">
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:48px">
+<div>
+<span style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4F46E5">OUR SPACE</span>
+<h2 style="margin:12px 0 0;font-size:30px;font-weight:700;line-height:1.3;letter-spacing:-.018em;color:#0B1120">혼자여도, 여섯이어도 맞는 자리가 있습니다</h2>
+<p style="margin:12px 0 0;font-size:16px;line-height:1.7;color:#475569;max-width:520px;text-wrap:pretty">1인실부터 팀 오피스까지. 모든 공간에 회의실·라운지·탕비실 이용이 포함되고, 별도 관리비는 없습니다.</p>
+</div>
+<span style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:14px;font-weight:700;white-space:nowrap;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="map-pin" size="{{ 16 }}" hint-size="16px,16px"></x-import>강남 삼성점</span>
+</div>
+<div ref="{{ spaceRef }}" style="margin-top:56px;display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:200px 200px 260px 260px;gap:20px">
+<div data-space-card="1" style="position:relative;grid-column:1/8;grid-row:1/3;border-radius:12px;overflow:hidden;border:1px solid transparent;transition:border-color 180ms cubic-bezier(.22,.61,.36,1)">
+<img data-space-img="1" src="../../assets/spaces/lounge.png" alt="라운지" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1);transition:transform 520ms cubic-bezier(.22,.61,.36,1)">
+<span data-space-overlay="1" style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,17,32,0) 40%,rgba(11,17,32,.86) 100%);opacity:.907;transition:opacity 520ms cubic-bezier(.22,.61,.36,1)"></span>
+<span style="position:absolute;top:16px;right:16px;padding:4px 10px;border-radius:999px;background:rgba(11,17,32,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.24);color:#FFFFFF;font-size:12px;font-weight:700;white-space:nowrap" data-space-badge="1">전 입주사 이용</span>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:20px 24px">
+<div style="font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em;color:#FFFFFF">라운지 · 리셉션</div>
+<div style="margin-top:4px;font-size:14px;line-height:1.55;color:rgba(255,255,255,.82)">리셉션부터 회의실까지, 하루가 시작되는 중심 공간</div>
+</div>
+</div>
+<div data-space-card="2" style="position:relative;grid-column:8/13;grid-row:1/2;border-radius:12px;overflow:hidden;border:1px solid transparent;transition:border-color 180ms cubic-bezier(.22,.61,.36,1)">
+<img data-space-img="2" src="../../assets/spaces/single-room.png" alt="1인실" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1);transition:transform 520ms cubic-bezier(.22,.61,.36,1)">
+<span data-space-overlay="2" style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,17,32,0) 40%,rgba(11,17,32,.86) 100%);opacity:.907;transition:opacity 520ms cubic-bezier(.22,.61,.36,1)"></span>
+<span style="position:absolute;top:16px;right:16px;padding:4px 10px;border-radius:999px;background:rgba(11,17,32,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.24);color:#FFFFFF;font-size:12px;font-weight:700;white-space:nowrap" data-space-badge="2">1인</span>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:20px 24px">
+<div style="font-size:16px;font-weight:700;color:#FFFFFF">1인실</div>
+<div style="margin-top:4px;font-size:14px;line-height:1.55;color:rgba(255,255,255,.82)">창가 채광 · 개인 수납장 포함</div>
+</div>
+</div>
+<div data-space-card="3" style="position:relative;grid-column:8/13;grid-row:2/3;border-radius:12px;overflow:hidden;border:1px solid transparent;transition:border-color 180ms cubic-bezier(.22,.61,.36,1)">
+<img data-space-img="3" src="../../assets/spaces/two-person-room.png" alt="2인실" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1);transition:transform 520ms cubic-bezier(.22,.61,.36,1)">
+<span data-space-overlay="3" style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,17,32,0) 40%,rgba(11,17,32,.86) 100%);opacity:.907;transition:opacity 520ms cubic-bezier(.22,.61,.36,1)"></span>
+<span style="position:absolute;top:16px;right:16px;padding:4px 10px;border-radius:999px;background:rgba(11,17,32,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.24);color:#FFFFFF;font-size:12px;font-weight:700;white-space:nowrap" data-space-badge="3">2인</span>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:20px 24px">
+<div style="font-size:16px;font-weight:700;color:#FFFFFF">2인실</div>
+<div style="margin-top:4px;font-size:14px;line-height:1.55;color:rgba(255,255,255,.82)">독립 공간에서 두 사람이 함께</div>
+</div>
+</div>
+<div data-space-card="4" style="position:relative;grid-column:1/5;grid-row:3/4;border-radius:12px;overflow:hidden;border:1px solid transparent;transition:border-color 180ms cubic-bezier(.22,.61,.36,1)">
+<img data-space-img="4" src="../../assets/spaces/dedicated-desk.png" alt="고정석" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1);transition:transform 520ms cubic-bezier(.22,.61,.36,1)">
+<span data-space-overlay="4" style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,17,32,0) 40%,rgba(11,17,32,.86) 100%);opacity:.907;transition:opacity 520ms cubic-bezier(.22,.61,.36,1)"></span>
+<span style="position:absolute;top:16px;right:16px;padding:4px 10px;border-radius:999px;background:rgba(11,17,32,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.24);color:#FFFFFF;font-size:12px;font-weight:700;white-space:nowrap" data-space-badge="4">1인</span>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:20px 24px">
+<div style="font-size:16px;font-weight:700;color:#FFFFFF">고정석</div>
+<div style="margin-top:4px;font-size:14px;line-height:1.55;color:rgba(255,255,255,.82)">파티션으로 구분된 전용 좌석</div>
+</div>
+</div>
+<div data-space-card="5" style="position:relative;grid-column:5/13;grid-row:3/4;border-radius:12px;overflow:hidden;border:1px solid transparent;transition:border-color 180ms cubic-bezier(.22,.61,.36,1)">
+<img data-space-img="5" src="../../assets/spaces/team-office.png" alt="팀 오피스" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1);transition:transform 520ms cubic-bezier(.22,.61,.36,1)">
+<span data-space-overlay="5" style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,17,32,0) 40%,rgba(11,17,32,.86) 100%);opacity:.907;transition:opacity 520ms cubic-bezier(.22,.61,.36,1)"></span>
+<span style="position:absolute;top:16px;right:16px;padding:4px 10px;border-radius:999px;background:rgba(11,17,32,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.24);color:#FFFFFF;font-size:12px;font-weight:700;white-space:nowrap" data-space-badge="5">3~6인</span>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:20px 24px">
+<div style="font-size:16px;font-weight:700;color:#FFFFFF">팀 오피스</div>
+<div style="margin-top:4px;font-size:14px;line-height:1.55;color:rgba(255,255,255,.82)">TV·냉장고 완비, 팀 단위 독립 사무실</div>
+</div>
+</div>
+<div data-space-card="6" style="position:relative;grid-column:1/8;grid-row:4/5;border-radius:12px;overflow:hidden;border:1px solid transparent;transition:border-color 180ms cubic-bezier(.22,.61,.36,1)">
+<img data-space-img="6" src="../../assets/spaces/meeting-room.png" alt="회의실" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1);transition:transform 520ms cubic-bezier(.22,.61,.36,1)">
+<span data-space-overlay="6" style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,17,32,0) 40%,rgba(11,17,32,.86) 100%);opacity:.907;transition:opacity 520ms cubic-bezier(.22,.61,.36,1)"></span>
+<span style="position:absolute;top:16px;right:16px;padding:4px 10px;border-radius:999px;background:rgba(11,17,32,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.24);color:#FFFFFF;font-size:12px;font-weight:700;white-space:nowrap" data-space-badge="6">4~5인</span>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:20px 24px">
+<div style="font-size:16px;font-weight:700;color:#FFFFFF">회의실</div>
+<div style="margin-top:4px;font-size:14px;line-height:1.55;color:rgba(255,255,255,.82)">대형 TV·화이트보드 완비</div>
+</div>
+</div>
+<div data-space-card="7" style="position:relative;grid-column:8/13;grid-row:4/5;border-radius:12px;overflow:hidden;border:1px solid transparent;transition:border-color 180ms cubic-bezier(.22,.61,.36,1)">
+<img data-space-img="7" src="../../assets/spaces/pantry.png" alt="탕비실" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1);transition:transform 520ms cubic-bezier(.22,.61,.36,1)">
+<span data-space-overlay="7" style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,17,32,0) 40%,rgba(11,17,32,.86) 100%);opacity:.907;transition:opacity 520ms cubic-bezier(.22,.61,.36,1)"></span>
+<span style="position:absolute;top:16px;right:16px;padding:4px 10px;border-radius:999px;background:rgba(11,17,32,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.24);color:#FFFFFF;font-size:12px;font-weight:700;white-space:nowrap" data-space-badge="7">24시간</span>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:20px 24px">
+<div style="font-size:16px;font-weight:700;color:#FFFFFF">탕비실</div>
+<div style="margin-top:4px;font-size:14px;line-height:1.55;color:rgba(255,255,255,.82)">커피머신·정수기·냉장고 상시 이용</div>
+</div>
+</div>
+</div>
+<div style="margin-top:32px;display:flex;align-items:center;justify-content:space-between;gap:40px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:24px 32px">
+<div style="display:flex;align-items:center;gap:40px">
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 18 }}" hint-size="18px,18px" style="color:#4F46E5;flex:0 0 auto"></x-import>회의실 월 20시간 무료</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 18 }}" hint-size="18px,18px" style="color:#4F46E5;flex:0 0 auto"></x-import>라운지·탕비실 24시간 이용</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 18 }}" hint-size="18px,18px" style="color:#4F46E5;flex:0 0 auto"></x-import>관리비·공과금 별도 없음</span>
+</div>
+<a href="#" data-inquiry="투어" style="display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#4F46E5;text-decoration:none;white-space:nowrap;flex:0 0 auto;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#4338CA">공간 투어 예약<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-right" size="{{ 16 }}" hint-size="16px,16px"></x-import></a>
+</div>
+</div>
+</section>
+
+<section id="pricing" style="position:relative;scroll-margin-top:88px;min-width:1440px;background:#F8FAFC;padding:120px 0">
+<div style="position:relative;max-width:1200px;margin:0 auto;padding:0 24px">
+<div style="display:flex;flex-direction:column;align-items:center;text-align:center">
+<span style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4F46E5">PLANS</span>
+<h2 style="margin:12px 0 0;font-size:30px;font-weight:700;line-height:1.3;letter-spacing:-.018em;color:#0B1120">필요한 만큼만, 언제든 옮겨가며</h2>
+<p style="margin:12px 0 0;font-size:16px;line-height:1.7;color:#475569;max-width:620px;text-wrap:pretty">비상주로 시작해 개인 오피스로, 팀이 커지면 팀 오피스로. 플랜 변경에 위약금이나 재계약 절차가 없습니다.</p>
+</div>
+<div style="margin-top:56px;display:grid;grid-template-columns:repeat(3,1fr);gap:24px;align-items:stretch">
+<div style="display:flex;flex-direction:column;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:32px">
+<h3 style="margin:0;font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em;color:#0B1120">비상주</h3>
+<p style="margin:6px 0 0;font-size:14px;line-height:1.55;color:#64748B">주소지와 우편만 필요한 분</p>
+<p style="margin:20px 0 0;font-size:16px;font-weight:700;color:#4F46E5">상담 후 안내</p>
+<span style="display:block;height:1px;background:#E2E8F0;margin:24px 0"></span>
+<div style="display:flex;flex-direction:column;gap:12px;flex:1 0 auto">
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>법인 주소지 등록</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>우편물 수취 및 보관</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>회의실 월 5시간</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>라운지 이용</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>SwonBiz 운영 시스템 기본 제공</span>
+</div>
+<div style="margin-top:28px">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" variant="ghost" full-width="{{ true }}" data-inquiry="비상주" hint-size="100%,54px">비상주 문의</x-import>
+</div>
+</div>
+<div style="position:relative;display:flex;flex-direction:column;background:#FFFFFF;border:2px solid #4F46E5;border-radius:12px;overflow:hidden;transform:translateY(-8px)">
+<span style="height:4px;background:linear-gradient(90deg,#4F46E5,#22D3EE);flex:0 0 auto"></span>
+<span style="position:absolute;top:20px;right:20px;padding:4px 10px;border-radius:999px;background:#4F46E5;color:#FFFFFF;font-size:12px;font-weight:700;white-space:nowrap">가장 인기</span>
+<div style="display:flex;flex-direction:column;flex:1;padding:32px">
+<h3 style="margin:0;font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em;color:#0B1120">개인 오피스</h3>
+<p style="margin:6px 0 0;font-size:14px;line-height:1.55;color:#64748B">독립된 공간이 필요한 1~2인</p>
+<p style="margin:20px 0 0;font-size:16px;font-weight:700;color:#4F46E5">상담 후 안내</p>
+<span style="display:block;height:1px;background:#E2E8F0;margin:24px 0"></span>
+<div style="display:flex;flex-direction:column;gap:12px;flex:1 0 auto">
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>1인실 · 2인실 · 고정석 선택</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>24시간 자유 출입</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>회의실 월 20시간 무료</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>개인 수납장 · 전용 데스크</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>라운지 · 탕비실 24시간</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>SwonBiz 운영 시스템 전체 기능</span>
+</div>
+<div style="margin-top:28px">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" full-width="{{ true }}" data-inquiry="개인 오피스" hint-size="100%,54px">개인 오피스 상담 신청<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-right" size="{{ 18 }}" hint-size="18px,18px"></x-import></x-import>
+</div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:32px">
+<h3 style="margin:0;font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em;color:#0B1120">팀 오피스</h3>
+<p style="margin:6px 0 0;font-size:14px;line-height:1.55;color:#64748B">3~6인 팀 단위 운영</p>
+<p style="margin:20px 0 0;font-size:16px;font-weight:700;color:#4F46E5">상담 후 안내</p>
+<span style="display:block;height:1px;background:#E2E8F0;margin:24px 0"></span>
+<div style="display:flex;flex-direction:column;gap:12px;flex:1 0 auto">
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>독립 사무실 (3~6인)</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>TV · 냉장고 완비</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>회의실 월 20시간 무료</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>팀원 전원 운영 시스템 계정</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>법인카드 경비 통합 관리</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>팀 단위 법무·세무 상담</span>
+</div>
+<div style="margin-top:28px">
+<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Button" variant="ghost" full-width="{{ true }}" data-inquiry="팀 오피스" hint-size="100%,54px">팀 오피스 문의</x-import>
+</div>
+</div>
+</div>
+<div style="margin-top:40px;display:flex;align-items:center;justify-content:space-between;gap:40px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:24px 32px">
+<div style="display:flex;align-items:center;gap:24px">
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 18 }}" hint-size="18px,18px" style="color:#4F46E5;flex:0 0 auto"></x-import>모든 플랜 관리비·공과금 별도 없음</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 18 }}" hint-size="18px,18px" style="color:#4F46E5;flex:0 0 auto"></x-import>플랜 변경 시 위약금 없음</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 18 }}" hint-size="18px,18px" style="color:#4F46E5;flex:0 0 auto"></x-import>최소 계약 1개월부터</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 18 }}" hint-size="18px,18px" style="color:#4F46E5;flex:0 0 auto"></x-import>매니저 상주 · 야간·주말 상담 가능</span>
+</div>
+<a href="#" data-inquiry="요금" style="display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#4F46E5;text-decoration:none;white-space:nowrap;flex:0 0 auto;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#4338CA">요금 안내 받기<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-right" size="{{ 16 }}" hint-size="16px,16px"></x-import></a>
+</div>
+</div>
+</section>
+
+<section id="process" style="position:relative;scroll-margin-top:88px;min-width:1440px;background:#FFFFFF;padding:120px 0">
+<div style="position:relative;max-width:1200px;margin:0 auto;padding:0 24px">
+<div style="display:flex;flex-direction:column;align-items:center;text-align:center">
+<span style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4F46E5">HOW IT WORKS</span>
+<h2 style="margin:12px 0 0;font-size:30px;font-weight:700;line-height:1.3;letter-spacing:-.018em;color:#0B1120">계약 후 바로 입주 가능합니다</h2>
+<p style="margin:12px 0 0;font-size:16px;line-height:1.7;color:#475569;max-width:620px;text-wrap:pretty">사업자등록 전이어도 시작할 수 있습니다. 대표자 신분증만 있으면 가등록으로 먼저 진행합니다.</p>
+</div>
+<div ref="{{ procRef }}">
+<div style="margin-top:48px;display:flex;justify-content:center">
+<div style="display:inline-flex;gap:4px;padding:4px;background:#F8FAFC;border-radius:8px">
+<button data-proc-tab="1" style="padding:10px 24px;border:0;border-radius:6px;background:#FFFFFF;color:#0B1120;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 3px rgba(11,17,32,.08);white-space:nowrap;transition:background 180ms cubic-bezier(.22,.61,.36,1),color 180ms cubic-bezier(.22,.61,.36,1)">방문 상담</button>
+<button data-proc-tab="2" style="padding:10px 24px;border:0;border-radius:6px;background:transparent;color:#64748B;font-family:inherit;font-size:14px;font-weight:400;cursor:pointer;box-shadow:none;white-space:nowrap;transition:background 180ms cubic-bezier(.22,.61,.36,1),color 180ms cubic-bezier(.22,.61,.36,1)">비대면 신청</button>
+</div>
+</div>
+<div data-proc-note="1" style="margin-top:16px;text-align:center;font-size:14px;line-height:1.55;color:#64748B">공간을 직접 보고 결정하고 싶은 분께 권합니다</div>
+<div data-proc-note="2" style="margin-top:16px;text-align:center;font-size:14px;line-height:1.55;color:#64748B;display:none">비상주 또는 방문 없이 바로 시작하고 싶은 분께 권합니다</div>
+<div data-proc-panel="1" style="margin-top:40px;min-height:200px;display:grid;grid-template-columns:repeat(5,1fr);gap:0">
+<div style="position:relative;padding:0 12px;text-align:center">
+<span style="position:absolute;top:24px;left:calc(50% + 28px);right:calc(-50% + 28px);height:1px;background:#E2E8F0"></span>
+<span style="position:relative;width:48px;height:48px;margin:0 auto;border-radius:999px;background:#EEF2FF;border:1px solid rgba(129,140,248,.4);display:grid;place-items:center;font-size:16px;font-weight:700;color:#4F46E5">01</span>
+<div style="margin-top:20px;font-size:16px;font-weight:700;color:#0B1120">신청</div>
+<p style="margin:8px 0 0;font-size:14px;line-height:1.55;color:#475569;text-wrap:pretty">온라인 신청 또는 전화 상담으로 접수합니다. 원하는 공간과 입주 희망일을 알려주세요.</p>
+<span style="margin-top:10px;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#64748B;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="clock" size="{{ 12 }}" hint-size="12px,12px"></x-import>즉시</span>
+</div>
+<div style="position:relative;padding:0 12px;text-align:center">
+<span style="position:absolute;top:24px;left:calc(50% + 28px);right:calc(-50% + 28px);height:1px;background:#E2E8F0"></span>
+<span style="position:relative;width:48px;height:48px;margin:0 auto;border-radius:999px;background:#EEF2FF;border:1px solid rgba(129,140,248,.4);display:grid;place-items:center;font-size:16px;font-weight:700;color:#4F46E5">02</span>
+<div style="margin-top:20px;font-size:16px;font-weight:700;color:#0B1120">공간 투어</div>
+<p style="margin:8px 0 0;font-size:14px;line-height:1.55;color:#475569;text-wrap:pretty">실제 공간을 둘러보고 시설을 확인합니다. 평일 방문 예약제로 운영합니다.</p>
+<span style="margin-top:10px;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#64748B;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="clock" size="{{ 12 }}" hint-size="12px,12px"></x-import>20분 내외</span>
+</div>
+<div style="position:relative;padding:0 12px;text-align:center">
+<span style="position:absolute;top:24px;left:calc(50% + 28px);right:calc(-50% + 28px);height:1px;background:#E2E8F0"></span>
+<span style="position:relative;width:48px;height:48px;margin:0 auto;border-radius:999px;background:#EEF2FF;border:1px solid rgba(129,140,248,.4);display:grid;place-items:center;font-size:16px;font-weight:700;color:#4F46E5">03</span>
+<div style="margin-top:20px;font-size:16px;font-weight:700;color:#0B1120">입주 상담</div>
+<p style="margin:8px 0 0;font-size:14px;line-height:1.55;color:#475569;text-wrap:pretty">업종과 인원에 맞는 공간을 제안하고, 법무·세무 지원 범위를 안내합니다.</p>
+<span style="margin-top:10px;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#64748B;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="clock" size="{{ 12 }}" hint-size="12px,12px"></x-import>30분 내외</span>
+</div>
+<div style="position:relative;padding:0 12px;text-align:center">
+<span style="position:absolute;top:24px;left:calc(50% + 28px);right:calc(-50% + 28px);height:1px;background:#E2E8F0"></span>
+<span style="position:relative;width:48px;height:48px;margin:0 auto;border-radius:999px;background:#EEF2FF;border:1px solid rgba(129,140,248,.4);display:grid;place-items:center;font-size:16px;font-weight:700;color:#4F46E5">04</span>
+<div style="margin-top:20px;font-size:16px;font-weight:700;color:#0B1120">계약</div>
+<p style="margin:8px 0 0;font-size:14px;line-height:1.55;color:#475569;text-wrap:pretty">계약서를 작성하고 보증금을 납부합니다. 사업자등록 전이어도 가등록으로 진행 가능합니다.</p>
+<span style="margin-top:10px;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#64748B;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="clock" size="{{ 12 }}" hint-size="12px,12px"></x-import>당일</span>
+</div>
+<div style="position:relative;padding:0 12px;text-align:center">
+<span style="position:relative;width:48px;height:48px;margin:0 auto;border-radius:999px;background:#4F46E5;border:1px solid transparent;box-shadow:0 0 16px rgba(79,70,229,.25);display:grid;place-items:center;font-size:16px;font-weight:700;color:#FFFFFF">05</span>
+<div style="margin-top:20px;font-size:16px;font-weight:700;color:#0B1120">입주 + 운영 시스템 계정 발급</div>
+<p style="margin:8px 0 0;font-size:14px;line-height:1.55;color:#475569;text-wrap:pretty">출입 등록이 완료되고, 당일 운영 시스템 계정이 발급됩니다. 청구·세무·경비 관리가 바로 시작됩니다.</p>
+<span style="margin-top:10px;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#64748B;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="clock" size="{{ 12 }}" hint-size="12px,12px"></x-import>당일</span>
+</div>
+</div>
+<div data-proc-panel="2" style="margin-top:40px;min-height:200px;display:none;grid-template-columns:repeat(3,1fr);gap:0">
+<div style="position:relative;padding:0 12px;text-align:center">
+<span style="position:absolute;top:24px;left:calc(50% + 28px);right:calc(-50% + 28px);height:1px;background:#E2E8F0"></span>
+<span style="position:relative;width:48px;height:48px;margin:0 auto;border-radius:999px;background:#EEF2FF;border:1px solid rgba(129,140,248,.4);display:grid;place-items:center;font-size:16px;font-weight:700;color:#4F46E5">01</span>
+<div style="margin-top:20px;font-size:16px;font-weight:700;color:#0B1120">온라인 신청</div>
+<p style="margin:8px auto 0;max-width:320px;font-size:14px;line-height:1.55;color:#475569;text-wrap:pretty">신청서를 작성합니다. 비상주는 물론 개인 오피스도 방문 없이 바로 신청할 수 있습니다. 대표자 신분증만 있으면 접수 가능합니다.</p>
+<span style="margin-top:10px;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#64748B;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="clock" size="{{ 12 }}" hint-size="12px,12px"></x-import>10분</span>
+</div>
+<div style="position:relative;padding:0 12px;text-align:center">
+<span style="position:absolute;top:24px;left:calc(50% + 28px);right:calc(-50% + 28px);height:1px;background:#E2E8F0"></span>
+<span style="position:relative;width:48px;height:48px;margin:0 auto;border-radius:999px;background:#EEF2FF;border:1px solid rgba(129,140,248,.4);display:grid;place-items:center;font-size:16px;font-weight:700;color:#4F46E5">02</span>
+<div style="margin-top:20px;font-size:16px;font-weight:700;color:#0B1120">서류 확인</div>
+<p style="margin:8px auto 0;max-width:320px;font-size:14px;line-height:1.55;color:#475569;text-wrap:pretty">제출 서류를 확인합니다. 사업자등록증이 있으면 1~2일, 등록 신청 중이면 가등록으로 먼저 진행합니다.</p>
+<span style="margin-top:10px;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#64748B;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="clock" size="{{ 12 }}" hint-size="12px,12px"></x-import>1~2일</span>
+</div>
+<div style="position:relative;padding:0 12px;text-align:center">
+<span style="position:relative;width:48px;height:48px;margin:0 auto;border-radius:999px;background:#4F46E5;border:1px solid transparent;box-shadow:0 0 16px rgba(79,70,229,.25);display:grid;place-items:center;font-size:16px;font-weight:700;color:#FFFFFF">03</span>
+<div style="margin-top:20px;font-size:16px;font-weight:700;color:#0B1120">등록 완료 + 운영 시스템 계정 발급</div>
+<p style="margin:8px auto 0;max-width:320px;font-size:14px;line-height:1.55;color:#475569;text-wrap:pretty">계약이 완료되고 운영 시스템 계정이 발급됩니다. 비상주는 우편물 수취가, 개인 오피스는 출입이 바로 시작됩니다.</p>
+<span style="margin-top:10px;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#64748B;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="clock" size="{{ 12 }}" hint-size="12px,12px"></x-import>당일</span>
+</div>
+</div>
+</div>
+<div style="position:relative;margin-top:48px;display:grid;grid-template-columns:1.941fr 1fr;gap:32px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:28px 32px 28px 36px;overflow:hidden">
+<span style="position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,#4F46E5,#22D3EE);border-radius:12px 0 0 12px"></span>
+<div>
+<div style="font-size:16px;font-weight:700;color:#0B1120">사업자등록 전이어도 괜찮습니다</div>
+<p style="margin:8px 0 0;font-size:14px;line-height:1.6;color:#475569;text-wrap:pretty">사업자등록을 신청 중이거나 아직 시작 전이어도 가등록으로 입주할 수 있습니다. 등록증이 나오면 그때 제출하시면 됩니다. 법인설립 등기가 필요하다면 서류 작성부터 함께 진행합니다.</p>
+</div>
+<div style="padding-left:32px;border-left:1px solid #E2E8F0">
+<span style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#64748B">필요 서류</span>
+<div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>대표자 신분증 (필수)</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.55;color:#475569"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 16 }}" hint-size="16px,16px" style="color:#4F46E5;flex:0 0 auto"></x-import>사업자등록증 (발급 후 제출)</span>
+</div>
+</div>
+</div>
+<div style="margin-top:40px;display:flex;justify-content:center;gap:12px">
+<button data-inquiry="비대면 신청" style="height:60px;padding:0 30px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:8px;background:#4F46E5;color:#FFFFFF;font-family:inherit;font-size:16px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;cursor:pointer;box-shadow:0 4px 16px rgba(79,70,229,.22);transition:background 180ms cubic-bezier(.22,.61,.36,1),box-shadow 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#4338CA;box-shadow:0 6px 20px rgba(79,70,229,.28)">온라인 신청하기<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-right" size="{{ 18 }}" hint-size="18px,18px"></x-import></button>
+<a href="tel:07043552312" style="height:60px;padding:0 24px;display:inline-flex;align-items:center;gap:10px;border:1px solid #E2E8F0;border-radius:8px;background:#FFFFFF;text-decoration:none;white-space:nowrap;transition:border-color 180ms cubic-bezier(.22,.61,.36,1),background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="border-color:#4F46E5">
+<span style="display:flex;color:#4F46E5;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="phone" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<span style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.2">
+<span style="font-size:12px;color:#64748B">전화 상담</span>
+<span style="margin-top:4px;font-size:16px;font-weight:700;color:#0B1120">070-4355-2312</span>
+</span>
+</a>
+</div>
+<div style="margin-top:14px;display:flex;justify-content:center">
+<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;line-height:1.5;color:#64748B;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="clock" size="{{ 12 }}" hint-size="12px,12px"></x-import>평일 09:00 - 18:00 · <span style="font-weight:700;color:#4F46E5">야간·주말 상담도 가능합니다</span></span>
+</div>
+</div>
+</section>
+
+<section id="faq" style="position:relative;scroll-margin-top:88px;min-width:1440px;background:#F8FAFC;padding:120px 0">
+<div style="position:relative;max-width:1200px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:.515fr 1fr;gap:64px;align-items:start">
+<div>
+<span style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4F46E5">FAQ</span>
+<h2 style="margin:12px 0 0;font-size:30px;font-weight:700;line-height:1.3;letter-spacing:-.018em;color:#0B1120">궁금한 점,<br>미리 정리했습니다</h2>
+<p style="margin:14px 0 0;font-size:16px;line-height:1.7;color:#475569;max-width:300px;text-wrap:pretty">여기에 없는 내용은 전화나 온라인으로 편하게 물어보세요.</p>
+<div style="margin-top:28px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:20px">
+<div style="font-size:14px;font-weight:700;color:#0B1120">바로 문의하기</div>
+<a href="tel:07043552312" style="margin-top:8px;display:inline-flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:#4F46E5;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#4338CA"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="phone" size="{{ 16 }}" hint-size="16px,16px"></x-import>070-4355-2312</a>
+<div style="margin-top:6px;font-size:12px;line-height:1.5;color:#64748B">평일 09:00 - 18:00 · 야간·주말 가능</div>
+</div>
+</div>
+<div ref="{{ faqRef }}" style="display:flex;flex-direction:column;gap:12px">
+<div data-faq="1" style="background:#FFFFFF;border:1px solid #4F46E5;border-radius:12px;overflow:hidden;transition:border-color 240ms cubic-bezier(.22,.61,.36,1)">
+<button data-faq-q="1" style="width:100%;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border:0;background:transparent;cursor:pointer;text-align:left;font-family:inherit;font-size:16px;font-weight:700;color:#4F46E5;transition:color 240ms cubic-bezier(.22,.61,.36,1)">SwonBiz는 언제부터 운영했나요?<span data-faq-chev="1" style="display:flex;flex:0 0 auto;color:#4F46E5;transform:rotate(180deg);transition:transform 240ms cubic-bezier(.22,.61,.36,1),color 240ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-down" size="{{ 20 }}" hint-size="20px,20px"></x-import></span></button>
+<div data-faq-a="1" style="display:block">
+<span style="display:block;height:1px;background:#E2E8F0;margin:0 24px"></span>
+<p style="margin:14px 0 0;padding:0 24px 22px;font-size:14px;line-height:1.75;color:#475569;text-wrap:pretty">강남 삼성동에서 12년째 공유오피스를 운영하고 있습니다. 그동안 입주사들이 겪은 법무·세무 문제를 직접 보아왔고, 그 경험을 SwonBiz 운영 시스템으로 만들었습니다. 입주 중에 사무실이 사라질 걱정 없이 이용하실 수 있습니다.</p>
+</div>
+</div>
+<div data-faq="2" style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;transition:border-color 240ms cubic-bezier(.22,.61,.36,1)">
+<button data-faq-q="2" style="width:100%;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border:0;background:transparent;cursor:pointer;text-align:left;font-family:inherit;font-size:16px;font-weight:700;color:#0B1120;transition:color 240ms cubic-bezier(.22,.61,.36,1)">사업자등록 전인데 입주할 수 있나요?<span data-faq-chev="2" style="display:flex;flex:0 0 auto;color:#64748B;transform:rotate(0deg);transition:transform 240ms cubic-bezier(.22,.61,.36,1),color 240ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-down" size="{{ 20 }}" hint-size="20px,20px"></x-import></span></button>
+<div data-faq-a="2" style="display:none">
+<span style="display:block;height:1px;background:#E2E8F0;margin:0 24px"></span>
+<p style="margin:14px 0 0;padding:0 24px 22px;font-size:14px;line-height:1.75;color:#475569;text-wrap:pretty">가능합니다. 대표자 신분증만 있으면 가등록으로 먼저 진행하고, 사업자등록증이 발급되면 그때 제출하시면 됩니다. 사업자등록 신청 절차도 함께 안내해 드립니다.</p>
+</div>
+</div>
+<div data-faq="3" style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;transition:border-color 240ms cubic-bezier(.22,.61,.36,1)">
+<button data-faq-q="3" style="width:100%;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border:0;background:transparent;cursor:pointer;text-align:left;font-family:inherit;font-size:16px;font-weight:700;color:#0B1120;transition:color 240ms cubic-bezier(.22,.61,.36,1)">법인설립 등기까지 도와주시나요?<span data-faq-chev="3" style="display:flex;flex:0 0 auto;color:#64748B;transform:rotate(0deg);transition:transform 240ms cubic-bezier(.22,.61,.36,1),color 240ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-down" size="{{ 20 }}" hint-size="20px,20px"></x-import></span></button>
+<div data-faq-a="3" style="display:none">
+<span style="display:block;height:1px;background:#E2E8F0;margin:0 24px"></span>
+<p style="margin:14px 0 0;padding:0 24px 22px;font-size:14px;line-height:1.75;color:#475569;text-wrap:pretty">AI 시스템을 활용해 사업목적 선정부터 정관, 발기인총회 의사록, 주주명부까지 법인 설립등기 서류를 작성해 드립니다. 설립 이후 본점 이전, 임원 변경, 증자 같은 변경등기 서류도 함께 준비합니다. 작성된 서류로 직접 등기를 신청하실 때는 접수 절차와 제출 서류를 단계별로 도와 드리고, 대리 진행을 원하시면 제휴 법무사를 연결해 드립니다.</p>
+</div>
+</div>
+<div data-faq="4" style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;transition:border-color 240ms cubic-bezier(.22,.61,.36,1)">
+<button data-faq-q="4" style="width:100%;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border:0;background:transparent;cursor:pointer;text-align:left;font-family:inherit;font-size:16px;font-weight:700;color:#0B1120;transition:color 240ms cubic-bezier(.22,.61,.36,1)">운영 시스템은 별도 요금인가요?<span data-faq-chev="4" style="display:flex;flex:0 0 auto;color:#64748B;transform:rotate(0deg);transition:transform 240ms cubic-bezier(.22,.61,.36,1),color 240ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-down" size="{{ 20 }}" hint-size="20px,20px"></x-import></span></button>
+<div data-faq-a="4" style="display:none">
+<span style="display:block;height:1px;background:#E2E8F0;margin:0 24px"></span>
+<p style="margin:14px 0 0;padding:0 24px;font-size:14px;line-height:1.75;color:#475569;text-wrap:pretty">시스템 사용료는 없습니다. 모든 플랜에 포함되어 있고, 입주 당일 계정이 발급되어 청구·세금계산서·경비 관리를 바로 사용하실 수 있습니다.</p>
+<p style="margin:12px 0 0;padding:0 24px 22px;font-size:14px;line-height:1.75;color:#64748B;text-wrap:pretty"><span style="color:#4F46E5;font-weight:700">※</span> 세금계산서 발행, 법인카드 내역 조회처럼 외부 기관 연동이 필요한 항목은 건당 실비가 발생합니다. 사용한 만큼만 청구되고, 이용 전에 단가를 안내해 드립니다.</p>
+</div>
+</div>
+<div data-faq="5" style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;transition:border-color 240ms cubic-bezier(.22,.61,.36,1)">
+<button data-faq-q="5" style="width:100%;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border:0;background:transparent;cursor:pointer;text-align:left;font-family:inherit;font-size:16px;font-weight:700;color:#0B1120;transition:color 240ms cubic-bezier(.22,.61,.36,1)">비상주도 법인 주소지로 쓸 수 있나요?<span data-faq-chev="5" style="display:flex;flex:0 0 auto;color:#64748B;transform:rotate(0deg);transition:transform 240ms cubic-bezier(.22,.61,.36,1),color 240ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-down" size="{{ 20 }}" hint-size="20px,20px"></x-import></span></button>
+<div data-faq-a="5" style="display:none">
+<span style="display:block;height:1px;background:#E2E8F0;margin:0 24px"></span>
+<p style="margin:14px 0 0;padding:0 24px 22px;font-size:14px;line-height:1.75;color:#475569;text-wrap:pretty">가능합니다. 사업자등록과 법인등기 주소지로 사용하실 수 있고, 우편물은 도착 즉시 알림을 보내드립니다. 방문 수령 또는 착불 발송 중 선택하실 수 있습니다.</p>
+</div>
+</div>
+<div data-faq="6" style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;transition:border-color 240ms cubic-bezier(.22,.61,.36,1)">
+<button data-faq-q="6" style="width:100%;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border:0;background:transparent;cursor:pointer;text-align:left;font-family:inherit;font-size:16px;font-weight:700;color:#0B1120;transition:color 240ms cubic-bezier(.22,.61,.36,1)">최소 계약 기간이 어떻게 되나요?<span data-faq-chev="6" style="display:flex;flex:0 0 auto;color:#64748B;transform:rotate(0deg);transition:transform 240ms cubic-bezier(.22,.61,.36,1),color 240ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-down" size="{{ 20 }}" hint-size="20px,20px"></x-import></span></button>
+<div data-faq-a="6" style="display:none">
+<span style="display:block;height:1px;background:#E2E8F0;margin:0 24px"></span>
+<p style="margin:14px 0 0;padding:0 24px 22px;font-size:14px;line-height:1.75;color:#475569;text-wrap:pretty">1개월부터 가능합니다. 계약 기간 중 플랜을 바꾸셔도 위약금이나 재계약 절차가 없습니다. 비상주로 시작해 개인 오피스로 옮기는 경우가 많습니다.</p>
+</div>
+</div>
+<div data-faq="7" style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;transition:border-color 240ms cubic-bezier(.22,.61,.36,1)">
+<button data-faq-q="7" style="width:100%;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border:0;background:transparent;cursor:pointer;text-align:left;font-family:inherit;font-size:16px;font-weight:700;color:#0B1120;transition:color 240ms cubic-bezier(.22,.61,.36,1)">회의실은 어떻게 예약하나요?<span data-faq-chev="7" style="display:flex;flex:0 0 auto;color:#64748B;transform:rotate(0deg);transition:transform 240ms cubic-bezier(.22,.61,.36,1),color 240ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-down" size="{{ 20 }}" hint-size="20px,20px"></x-import></span></button>
+<div data-faq-a="7" style="display:none">
+<span style="display:block;height:1px;background:#E2E8F0;margin:0 24px"></span>
+<p style="margin:14px 0 0;padding:0 24px 22px;font-size:14px;line-height:1.75;color:#475569;text-wrap:pretty">웹과 모바일, 태블릿 어디에서든 운영 시스템에 접속해 실시간으로 예약하거나 전화로 요청하실 수 있습니다. 개인 오피스·팀 오피스는 월 20시간, 비상주는 월 5시간이 무료이며, 초과 이용은 매니저에게 문의해 주세요.</p>
+</div>
+</div>
+<div data-faq="8" style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;transition:border-color 240ms cubic-bezier(.22,.61,.36,1)">
+<button data-faq-q="8" style="width:100%;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border:0;background:transparent;cursor:pointer;text-align:left;font-family:inherit;font-size:16px;font-weight:700;color:#0B1120;transition:color 240ms cubic-bezier(.22,.61,.36,1)">야간이나 주말에도 문의할 수 있나요?<span data-faq-chev="8" style="display:flex;flex:0 0 auto;color:#64748B;transform:rotate(0deg);transition:transform 240ms cubic-bezier(.22,.61,.36,1),color 240ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-down" size="{{ 20 }}" hint-size="20px,20px"></x-import></span></button>
+<div data-faq-a="8" style="display:none">
+<span style="display:block;height:1px;background:#E2E8F0;margin:0 24px"></span>
+<p style="margin:14px 0 0;padding:0 24px 22px;font-size:14px;line-height:1.75;color:#475569;text-wrap:pretty">입주사는 사전 예약 없이 야간·주말에도 전화 상담이 가능합니다. 매니저가 상주하고 있어 현장 문의도 언제든 받습니다. 개인 오피스·팀 오피스는 24시간 자유롭게 출입하실 수 있습니다.</p>
+</div>
+</div>
+<div data-faq="9" style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;transition:border-color 240ms cubic-bezier(.22,.61,.36,1)">
+<button data-faq-q="9" style="width:100%;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border:0;background:transparent;cursor:pointer;text-align:left;font-family:inherit;font-size:16px;font-weight:700;color:#0B1120;transition:color 240ms cubic-bezier(.22,.61,.36,1)">관리비나 추가 비용이 있나요?<span data-faq-chev="9" style="display:flex;flex:0 0 auto;color:#64748B;transform:rotate(0deg);transition:transform 240ms cubic-bezier(.22,.61,.36,1),color 240ms cubic-bezier(.22,.61,.36,1)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-down" size="{{ 20 }}" hint-size="20px,20px"></x-import></span></button>
+<div data-faq-a="9" style="display:none">
+<span style="display:block;height:1px;background:#E2E8F0;margin:0 24px"></span>
+<p style="margin:14px 0 0;padding:0 24px 22px;font-size:14px;line-height:1.75;color:#475569;text-wrap:pretty">없습니다. 전기·수도·인터넷·냉난방비가 모두 포함되어 있고, 라운지와 탕비실의 커피·정수기도 무료로 이용하실 수 있습니다. 별도로 청구되는 항목은 없습니다.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="location" style="position:relative;scroll-margin-top:88px;min-width:1440px;background:#FFFFFF;padding:120px 0">
+<div style="position:relative;max-width:1200px;margin:0 auto;padding:0 24px">
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:40px">
+<div>
+<span style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4F46E5">VISIT US</span>
+<h2 style="margin:12px 0 0;font-size:30px;font-weight:700;line-height:1.3;letter-spacing:-.018em;color:#0B1120">찾아오시는 길</h2>
+<p style="margin:12px 0 0;font-size:16px;line-height:1.7;color:#475569;max-width:520px;text-wrap:pretty">선정릉역에서 걸어서 3분입니다. 방문 상담은 예약제로 운영하니 오시기 전에 연락 주세요.</p>
+</div>
+<span style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border-radius:999px;background:#EEF2FF;color:#4338CA;font-size:14px;font-weight:700;white-space:nowrap;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="map-pin" size="{{ 16 }}" hint-size="16px,16px"></x-import>강남 삼성점</span>
+</div>
+<div style="margin-top:56px;display:grid;grid-template-columns:1.222fr 1fr;gap:32px;align-items:stretch">
+<a href="https://map.naver.com/p/search/%EB%B4%89%EC%9D%80%EC%82%AC%EB%A1%9C55%EA%B8%B819" target="_blank" rel="noopener" style="position:relative;display:block;min-height:380px;border:1px solid #E2E8F0;border-radius:12px;background:#F8FAFC;overflow:hidden;text-decoration:none">
+<span style="position:absolute;inset:0;background-image:radial-gradient(#0B1120 1px,transparent 1px);background-size:32px 32px;opacity:.05"></span>
+<span style="position:absolute;left:50%;top:44%;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;gap:6px">
+<span style="display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;background:#4F46E5;color:#FFFFFF;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 4px 16px rgba(79,70,229,.22)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="map-pin" size="{{ 14 }}" hint-size="14px,14px"></x-import>SwonBiz</span>
+<span style="width:1px;height:14px;background:#4F46E5"></span>
+</span>
+<span style="position:absolute;left:0;right:0;top:52%;text-align:center;font-size:13px;color:#94A3B8">지도 자리 · 클릭하면 네이버지도가 열립니다</span>
+<span style="position:absolute;left:24px;bottom:24px;display:flex;flex-direction:column;gap:6px">
+<span style="font-size:13px;color:#64748B">선정릉역 2번 출구 · 도보 3분</span>
+<span style="display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 16px;border-radius:8px;background:#FFFFFF;border:1px solid #E2E8F0;color:#0B1120;font-size:14px;font-weight:700;white-space:nowrap;width:fit-content;transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#F8FAFC">네이버지도로 길찾기<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-up-right" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>
+</span>
+</a>
+<div style="display:flex;flex-direction:column;gap:24px;padding:32px;border:1px solid #E2E8F0;border-radius:12px">
+<div style="display:flex;gap:12px">
+<span style="width:36px;height:36px;flex:0 0 auto;border-radius:8px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="map-pin" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<div style="flex:1;min-width:0">
+<div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#94A3B8">주소</div>
+<div style="margin-top:4px;font-size:15px;line-height:1.6;color:#0B1120;text-wrap:pretty">서울특별시 강남구 봉은사로55길 19, 3층<br>(삼성동, 우리빌딩)</div>
+</div>
+</div>
+<div style="display:flex;gap:12px">
+<span style="width:36px;height:36px;flex:0 0 auto;border-radius:8px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="train-front" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<div style="flex:1;min-width:0">
+<div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#94A3B8">지하철</div>
+<div style="margin-top:4px;font-size:15px;line-height:1.6;color:#0B1120;text-wrap:pretty">9호선·수인분당선 선정릉역 2번 출구 도보 3분<br>7호선·수인분당선 강남구청역 도보 10분</div>
+</div>
+</div>
+<div style="display:flex;gap:12px">
+<span style="width:36px;height:36px;flex:0 0 auto;border-radius:8px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="car" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<div style="flex:1;min-width:0">
+<div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#94A3B8">주차</div>
+<div style="margin-top:4px;font-size:15px;line-height:1.6;color:#0B1120;text-wrap:pretty">방문 주차 가능 · 방문 전 연락 주시면 안내해 드립니다</div>
+</div>
+</div>
+<div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
+<a href="tel:07043552312" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;height:54px;border-radius:8px;background:#4F46E5;color:#FFFFFF;font-size:16px;font-weight:700;text-decoration:none;box-shadow:0 4px 16px rgba(79,70,229,.22);transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#4338CA"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="phone" size="{{ 18 }}" hint-size="18px,18px"></x-import>070-4355-2312</a>
+<button data-copy="070-4355-2312" style="height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #E2E8F0;border-radius:8px;background:#FFFFFF;color:#0B1120;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#F8FAFC"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="copy" size="{{ 16 }}" hint-size="16px,16px"></x-import><span data-copy-label="1">번호 복사</span></button>
+<span style="display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:12px;line-height:1.5;color:#64748B;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="clock" size="{{ 12 }}" hint-size="12px,12px"></x-import>평일 09:00 - 18:00 · <span style="font-weight:700;color:#4F46E5">야간·주말 상담도 가능합니다</span></span>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section style="min-width:1440px;background:#F8FAFC;padding:96px 0">
+<div style="max-width:1200px;margin:0 auto;padding:0 24px">
+<div style="position:relative;border-radius:12px;background:linear-gradient(180deg,#131C33 0%,#0B1120 100%);padding:80px 0;overflow:hidden">
+<div style="position:absolute;top:-260px;left:50%;transform:translateX(-50%);width:700px;height:700px;border-radius:999px;background:radial-gradient(circle,#4F46E5 0%,rgba(79,70,229,0) 70%);opacity:.18;filter:blur(40px);pointer-events:none"></div>
+<div style="position:absolute;bottom:-80px;right:-60px;width:320px;height:320px;border-radius:999px;background:radial-gradient(circle,#22D3EE 0%,rgba(34,211,238,0) 72%);opacity:.10;pointer-events:none"></div>
+<div style="position:absolute;inset:0;background-image:radial-gradient(#FFFFFF 1px,transparent 1px);background-size:32px 32px;opacity:.05;pointer-events:none"></div>
+<div style="position:relative;max-width:1200px;margin:0 auto;padding:0 48px;display:flex;flex-direction:column;align-items:center;text-align:center">
+<span style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#818CF8">GET STARTED</span>
+<h2 style="margin:14px 0 0;font-size:30px;font-weight:700;line-height:1.3;letter-spacing:-.018em;color:#FFFFFF">사업자등록 전이어도, 오늘 시작할 수 있습니다</h2>
+<p style="margin:14px 0 0;font-size:19px;line-height:1.65;color:#A8B3C7;max-width:620px;text-wrap:pretty">대표자 신분증만 준비하세요. 공간 배정부터 법인설립 서류, 세무 자동화까지 한 번에 안내해 드립니다.</p>
+<div style="margin-top:36px;display:flex;justify-content:center;gap:12px">
+<button data-inquiry="상담" style="height:60px;padding:0 34px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:8px;background:#4F46E5;color:#FFFFFF;font-family:inherit;font-size:16px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;cursor:pointer;box-shadow:0 4px 16px rgba(79,70,229,.22);transition:background 180ms cubic-bezier(.22,.61,.36,1),box-shadow 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#4338CA;box-shadow:0 6px 20px rgba(79,70,229,.28)">무료 상담 신청<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-right" size="{{ 18 }}" hint-size="18px,18px"></x-import></button>
+<a data-cta-phone="1" href="tel:07043552312" style="height:60px;padding:0 24px;display:inline-flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.22);border-radius:8px;background:rgba(255,255,255,.10);text-decoration:none;white-space:nowrap;transition:background 180ms cubic-bezier(.22,.61,.36,1)">
+<span data-cta-phone-icon="1" style="display:flex;color:#FFFFFF;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="phone" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<span style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.2">
+<span data-cta-phone-label="1" style="font-size:12px;color:rgba(255,255,255,.6)">전화 상담</span>
+<span data-cta-phone-num="1" style="margin-top:4px;font-size:16px;font-weight:700;color:#FFFFFF">070-4355-2312</span>
+</span>
+</a>
+</div>
+<span style="margin-top:16px;display:inline-flex;align-items:center;gap:5px;font-size:12px;line-height:1.5;color:rgba(255,255,255,.55);white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="clock" size="{{ 12 }}" hint-size="12px,12px"></x-import>평일 09:00 - 18:00 · <span style="font-weight:700;color:#818CF8">야간·주말 상담도 가능합니다</span></span>
+<div style="margin-top:40px;display:flex;justify-content:center;gap:32px">
+<span style="display:inline-flex;align-items:center;gap:7px;font-size:14px;line-height:1.55;color:rgba(255,255,255,.72);white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 16 }}" hint-size="16px,16px" style="color:#818CF8;flex:0 0 auto"></x-import>최소 계약 1개월</span>
+<span style="display:inline-flex;align-items:center;gap:7px;font-size:14px;line-height:1.55;color:rgba(255,255,255,.72);white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 16 }}" hint-size="16px,16px" style="color:#818CF8;flex:0 0 auto"></x-import>위약금 없음</span>
+<span style="display:inline-flex;align-items:center;gap:7px;font-size:14px;line-height:1.55;color:rgba(255,255,255,.72);white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 16 }}" hint-size="16px,16px" style="color:#818CF8;flex:0 0 auto"></x-import>관리비 별도 없음</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<footer style="min-width:1440px;background:#0B1120;padding:64px 0 32px">
+<div style="max-width:1200px;margin:0 auto;padding:0 24px">
+<div style="display:grid;grid-template-columns:2.2fr 1fr 1fr 1.4fr;gap:48px">
+<div>
+<span style="display:flex;align-items:center;gap:10px"><img src="../../assets/swonbiz-logo.png" alt="SwonBiz" style="height:28px;width:auto;display:block"><span style="font-size:20px;font-weight:800;letter-spacing:-.03em;color:#FFFFFF;white-space:nowrap">S<span style="opacity:.55;margin:0 .02em">·</span>wonBiz</span></span>
+<p style="margin:16px 0 0;font-size:14px;line-height:1.7;color:#A8B3C7;max-width:300px;text-wrap:pretty">강남 삼성동에서 12년째 운영 중인 공유오피스입니다. 법인설립부터 세무 자동화까지, 입주와 동시에 시작됩니다.</p>
+<p style="margin:12px 0 0;font-size:12px;line-height:1.6;color:rgba(255,255,255,.45);max-width:300px;text-wrap:pretty">SwonBiz는 주식회사 에스원테크가 운영하는 공유오피스 브랜드입니다.</p>
+<span style="margin-top:16px;display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#FFFFFF;font-size:12px;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="map-pin" size="{{ 12 }}" hint-size="12px,12px"></x-import>강남 삼성점</span>
+</div>
+<div>
+<span style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">SERVICE</span>
+<div style="margin-top:16px;display:flex;flex-direction:column;gap:12px;align-items:flex-start">
+<a href="#" style="font-size:14px;color:#A8B3C7;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF">공간 안내</a>
+<a href="#" style="font-size:14px;color:#A8B3C7;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF">요금제</a>
+<a href="#" style="font-size:14px;color:#A8B3C7;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF">비즈니스지원</a>
+<a href="#" style="font-size:14px;color:#A8B3C7;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF">운영 시스템</a>
+<a href="#" style="font-size:14px;color:#A8B3C7;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF">입주 절차</a>
+</div>
+</div>
+<div>
+<span style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">SUPPORT</span>
+<div style="margin-top:16px;display:flex;flex-direction:column;gap:12px;align-items:flex-start">
+<a href="#" style="font-size:14px;color:#A8B3C7;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF">자주 묻는 질문</a>
+<a href="#" style="font-size:14px;color:#A8B3C7;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF">온라인 신청</a>
+<a href="#" data-inquiry="투어" style="font-size:14px;color:#A8B3C7;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF">공간 투어 예약</a>
+<a href="#" style="font-size:14px;color:#A8B3C7;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF">이용약관</a>
+<a href="#" style="font-size:14px;color:#A8B3C7;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF">개인정보처리방침</a>
+</div>
+</div>
+<div>
+<span style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">CONTACT</span>
+<a href="tel:07043552312" style="margin-top:16px;display:inline-flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:#FFFFFF;text-decoration:none;white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="phone" size="{{ 16 }}" hint-size="16px,16px"></x-import>070-4355-2312</a>
+<div style="margin-top:6px;font-size:12px;line-height:1.5;color:rgba(255,255,255,.5)">평일 09:00 - 18:00 · 야간·주말 가능</div>
+<div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:14px;color:#A8B3C7;white-space:nowrap"><span style="display:flex;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="printer" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>팩스 070-4015-3344</div>
+<a href="mailto:contact@swonbiz.com" style="margin-top:14px;display:inline-flex;align-items:center;gap:8px;font-size:14px;color:#A8B3C7;text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="mail" size="{{ 16 }}" hint-size="16px,16px"></x-import>swonbiz@s-onetech.com</a>
+<div style="margin-top:12px;display:flex;align-items:flex-start;gap:8px;font-size:14px;line-height:1.6;color:#A8B3C7"><span style="display:flex;flex:0 0 auto;margin-top:3px"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="map-pin" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>서울특별시 강남구 봉은사로55길 19, 3층<br>(삼성동, 우리빌딩)</div>
+</div>
+</div>
+<div style="margin-top:40px;padding-top:24px;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:flex-end;justify-content:space-between;gap:40px">
+<div style="font-size:12px;line-height:1.7;color:rgba(255,255,255,.45)">
+<div>상호: 주식회사 에스원테크 · 대표: 최현수 · 사업자등록번호: 105-87-68698</div>
+<div>주소: 서울특별시 강남구 봉은사로55길 19, 3층 (삼성동, 우리빌딩)</div>
+<div style="margin-top:8px">© 2026 SwonBiz. All rights reserved.</div>
+</div>
+<div style="display:flex;align-items:center;gap:20px;flex:0 0 auto">
+<a href="#" style="font-size:12px;color:rgba(255,255,255,.55);text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF">이용약관</a>
+<a href="#" style="font-size:12px;font-weight:700;color:rgba(255,255,255,.55);text-decoration:none;white-space:nowrap;transition:color 180ms cubic-bezier(.22,.61,.36,1)" style-hover="color:#FFFFFF">개인정보처리방침</a>
+</div>
+</div>
+</div>
+</footer>
+
+<div data-modal="1" style="display:none;position:fixed;inset:0;z-index:80;align-items:center;justify-content:center;padding:24px;background:rgba(11,17,32,.44);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)">
+<div data-modal-panel="1" style="width:100%;max-width:560px;max-height:calc(100vh - 48px);overflow:auto;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;box-shadow:0 20px 48px rgba(11,17,32,.18);padding:32px">
+<div data-modal-form="1">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+<div>
+<h3 style="margin:0;font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em;color:#0B1120">상담 신청</h3>
+<p style="margin:8px 0 0;font-size:15px;line-height:1.6;color:#475569">연락처를 남겨 주시면 영업일 기준 1일 안에 연락드립니다.</p>
+</div>
+<button data-modal-close="1" aria-label="닫기" style="width:32px;height:32px;flex:0 0 auto;display:grid;place-items:center;border:0;background:transparent;color:#94A3B8;cursor:pointer;border-radius:6px;font-size:18px;line-height:1">×</button>
+</div>
+<div style="margin-top:24px;display:flex;flex-direction:column;gap:16px">
+<label style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:14px;font-weight:700;color:#0B1120">문의 유형</span>
+<div style="position:relative;display:flex">
+<select data-modal-type="1" style="appearance:none;width:100%;height:48px;padding:0 40px 0 16px;font-family:inherit;font-size:15px;color:#0B1120;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;outline:none;transition:border-color 180ms cubic-bezier(.22,.61,.36,1),box-shadow 180ms cubic-bezier(.22,.61,.36,1)" style-focus="border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,229,.32)">
+<option value="상담">입주 상담</option>
+<option value="투어">공간 투어 예약</option>
+<option value="요금">요금 안내</option>
+<option value="비상주">비상주</option>
+<option value="개인 오피스">개인 오피스</option>
+<option value="팀 오피스">팀 오피스</option>
+<option value="비대면 신청">비대면 신청 (방문 없이)</option>
+<option value="연구소">기업부설연구소 설립</option>
+</select>
+<span style="position:absolute;right:16px;top:50%;transform:translateY(-60%) rotate(45deg);width:7px;height:7px;border-right:1.5px solid #64748B;border-bottom:1.5px solid #64748B;pointer-events:none"></span>
+</div>
+</label>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+<label style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:14px;font-weight:700;color:#0B1120">회사명</span>
+<input type="text" name="company" placeholder="아직 없으면 비워 두세요" style="height:48px;padding:0 16px;font-family:inherit;font-size:15px;color:#0B1120;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;outline:none;transition:border-color 180ms cubic-bezier(.22,.61,.36,1),box-shadow 180ms cubic-bezier(.22,.61,.36,1)" style-focus="border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,229,.32)">
+</label>
+<label style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:14px;font-weight:700;color:#0B1120">담당자</span>
+<input type="text" name="name" placeholder="홍길동" style="height:48px;padding:0 16px;font-family:inherit;font-size:15px;color:#0B1120;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;outline:none;transition:border-color 180ms cubic-bezier(.22,.61,.36,1),box-shadow 180ms cubic-bezier(.22,.61,.36,1)" style-focus="border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,229,.32)">
+</label>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+<label style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:14px;font-weight:700;color:#0B1120">연락처</span>
+<input type="tel" name="phone" placeholder="010-0000-0000" style="height:48px;padding:0 16px;font-family:inherit;font-size:15px;color:#0B1120;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;outline:none;transition:border-color 180ms cubic-bezier(.22,.61,.36,1),box-shadow 180ms cubic-bezier(.22,.61,.36,1)" style-focus="border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,229,.32)">
+</label>
+<label style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:14px;font-weight:700;color:#0B1120">이메일</span>
+<input type="email" name="email" placeholder="name@company.com" style="height:48px;padding:0 16px;font-family:inherit;font-size:15px;color:#0B1120;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;outline:none;transition:border-color 180ms cubic-bezier(.22,.61,.36,1),box-shadow 180ms cubic-bezier(.22,.61,.36,1)" style-focus="border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,229,.32)">
+</label>
+</div>
+<label style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:14px;font-weight:700;color:#0B1120">문의 내용</span>
+<textarea name="message" rows="3" placeholder="희망 입주일, 인원, 필요한 지원을 적어 주세요" style="padding:12px 16px;font-family:inherit;font-size:15px;line-height:1.6;color:#0B1120;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;outline:none;resize:vertical;transition:border-color 180ms cubic-bezier(.22,.61,.36,1),box-shadow 180ms cubic-bezier(.22,.61,.36,1)" style-focus="border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,229,.32)"></textarea>
+</label>
+<label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+<input data-modal-agree="1" type="checkbox" style="width:18px;height:18px;flex:0 0 auto;accent-color:#4F46E5">
+<span style="font-size:14px;color:#475569">개인정보 수집·이용에 동의합니다 <span style="color:#64748B">(상담 목적, 3개월 보관)</span></span>
+</label>
+</div>
+<div style="margin-top:24px;display:flex;gap:10px">
+<button data-modal-submit="1" style="flex:1;height:54px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:8px;background:#4F46E5;color:#FFFFFF;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(79,70,229,.22);transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#4338CA">신청하기<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-right" size="{{ 18 }}" hint-size="18px,18px"></x-import></button>
+<a href="tel:07043552312" style="height:54px;padding:0 20px;display:inline-flex;align-items:center;gap:8px;border:1px solid #E2E8F0;border-radius:8px;background:#FFFFFF;color:#0B1120;font-size:16px;font-weight:700;text-decoration:none;white-space:nowrap;transition:background 180ms cubic-bezier(.22,.61,.36,1)" style-hover="background:#F8FAFC"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="phone" size="{{ 18 }}" hint-size="18px,18px"></x-import>전화</a>
+</div>
+</div>
+<div data-modal-done="1" style="display:none;flex-direction:column;align-items:center;text-align:center;padding:16px 0">
+<span style="width:56px;height:56px;border-radius:999px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="check" size="{{ 26 }}" hint-size="26px,26px"></x-import></span>
+<h3 style="margin:20px 0 0;font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em;color:#0B1120">신청이 접수되었습니다</h3>
+<p style="margin:10px 0 0;font-size:15px;line-height:1.7;color:#475569;max-width:380px">영업일 기준 1일 안에 연락드립니다. 급하시면 아래로 바로 전화 주세요.</p>
+<a href="tel:07043552312" style="margin-top:20px;height:54px;padding:0 24px;display:inline-flex;align-items:center;gap:8px;border-radius:8px;background:#4F46E5;color:#FFFFFF;font-size:16px;font-weight:700;text-decoration:none;white-space:nowrap;box-shadow:0 4px 16px rgba(79,70,229,.22)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="phone" size="{{ 18 }}" hint-size="18px,18px"></x-import>070-4355-2312</a>
+<button data-modal-close="1" style="margin-top:16px;border:0;background:transparent;color:#64748B;font-family:inherit;font-size:14px;cursor:pointer">닫기</button>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:940},&quot;showDotGrid&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;배경&quot;},&quot;showSocialProof&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;히어로&quot;},&quot;showMockup&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;히어로&quot;}}">
+const EASE = "cubic-bezier(.22,.61,.36,1)";
+
+class Component extends DCLogic {
+  state = { count: 0 };
+  listRef = React.createRef();
+  rootRef = React.createRef();
+  spaceRef = React.createRef();
+  procRef = React.createRef();
+  faqRef = React.createRef();
+
+  /** Final-CTA phone button inverts on hover (white fill, dark text) — needs its children recolored too. */
+  bindCtaPhone() {
+    const a = document.querySelector("[data-cta-phone]");
+    if (!a) return;
+    const icon = a.querySelector("[data-cta-phone-icon]");
+    const label = a.querySelector("[data-cta-phone-label]");
+    const num = a.querySelector("[data-cta-phone-num]");
+    const set = (on) => {
+      a.style.background = on ? "#FFFFFF" : "rgba(255,255,255,.10)";
+      a.style.borderColor = on ? "#FFFFFF" : "rgba(255,255,255,.22)";
+      if (icon) icon.style.color = on ? "#4F46E5" : "#FFFFFF";
+      if (label) label.style.color = on ? "#64748B" : "rgba(255,255,255,.6)";
+      if (num) num.style.color = on ? "#0B1120" : "#FFFFFF";
+    };
+    a.addEventListener("mouseenter", () => set(true));
+    a.addEventListener("mouseleave", () => set(false));
+  }
+
+  /** Hero document scene: one-shot load sequence — four documents drafted in order. */
+  playHeroMockup() {
+    const root = document.querySelector("[data-hero-docs]");
+    if (!root || this.heroPlayed) return;
+    this.heroPlayed = true;
+    const q = (sel) => root.querySelector(sel);
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const total = 5;
+
+    const showDoc = (i) => {
+      const el = q('[data-hdoc="' + i + '"]');
+      if (!el) return;
+      el.style.opacity = "1";
+      el.style.transform = "translateY(0)";
+    };
+    const completeDoc = (i) => {
+      const from = q('[data-hdocfrom="' + i + '"]');
+      const to = q('[data-hdocto="' + i + '"]');
+      const bar = q('[data-hdocbar="1"]');
+      const count = q('[data-hdoccount="1"]');
+      if (from) { from.style.display = "none"; }
+      if (to) { to.style.display = "flex"; to.style.opacity = "1"; to.style.transform = "scale(1)"; }
+      if (bar) bar.style.width = Math.round((i / total) * 100) + "%";
+      if (count) count.textContent = i + " / " + total;
+    };
+    const showSummary = () => {
+      const el = q("[data-hdocdone]");
+      if (!el) return;
+      el.style.opacity = "1";
+      el.style.transform = "translateY(0)";
+    };
+
+    const finish = () => {
+      for (let i = 1; i <= total; i++) { showDoc(i); completeDoc(i); }
+      showSummary();
+    };
+    this.heroFinish = finish;
+    if (reduce) { finish(); return; }
+    // safety net: force the end state if anything stalls
+    this.heroFallback = setTimeout(finish, 6000);
+
+    // 300ms lead-in so the headline is read first, then one document every 600ms.
+    for (let i = 1; i <= total; i++) {
+      const at = 300 + (i - 1) * 600;
+      this.timers.push(setTimeout(() => showDoc(i), at));
+      this.timers.push(setTimeout(() => {
+        const from = q('[data-hdocfrom="' + i + '"]');
+        const to = q('[data-hdocto="' + i + '"]');
+        const dot = q('[data-hdocdot="' + i + '"]');
+        if (dot) dot.style.animation = "swonPulse 1.2s ease-in-out infinite";
+        this.timers.push(setTimeout(() => {
+          if (from) { from.style.opacity = "0"; from.style.transform = "scale(0.9)"; }
+          this.timers.push(setTimeout(() => {
+            completeDoc(i);
+            if (dot) dot.style.animation = "none";
+            const icon = q('[data-hdocicon="' + i + '"]');
+            if (icon) {
+              icon.style.transition = "box-shadow 360ms cubic-bezier(.22,.61,.36,1)";
+              icon.style.boxShadow = "0 0 14px rgba(79,70,229,.30)";
+              this.timers.push(setTimeout(() => { icon.style.boxShadow = "none"; }, 60));
+            }
+          }, 180));
+        }, 300));
+      }, at + 80));
+    }
+    this.timers.push(setTimeout(showSummary, 300 + total * 600 + 200));
+  }
+
+  /** FAQ accordion: one open at a time, first item open by default. */
+  bindFaq() {
+    const root = this.faqRef.current;
+    if (!root) return;
+    const items = [...root.querySelectorAll("[data-faq]")];
+    const open = (key) => {
+      items.forEach((item) => {
+        const k = item.getAttribute("data-faq");
+        const on = k === key;
+        const q = item.querySelector("[data-faq-q]");
+        const chev = item.querySelector("[data-faq-chev]");
+        const a = item.querySelector("[data-faq-a]");
+        item.style.borderColor = on ? "#4F46E5" : "#E2E8F0";
+        if (q) q.style.color = on ? "#4F46E5" : "#0B1120";
+        if (chev) { chev.style.color = on ? "#4F46E5" : "#64748B"; chev.style.transform = on ? "rotate(180deg)" : "rotate(0deg)"; }
+        if (a) a.style.display = on ? "block" : "none";
+      });
+    };
+    items.forEach((item) => {
+      const q = item.querySelector("[data-faq-q]");
+      if (q) q.addEventListener("click", () => open(item.getAttribute("data-faq")));
+    });
+  }
+
+  /** 입주 절차 tabs: swap the segmented control's active look and the visible timeline. */
+  bindProcessTabs() {
+    const root = this.procRef.current;
+    if (!root) return;
+    const tabs = [...root.querySelectorAll("[data-proc-tab]")];
+    const panels = [...root.querySelectorAll("[data-proc-panel]")];
+    const select = (key) => {
+      tabs.forEach((t) => {
+        const on = t.getAttribute("data-proc-tab") === key;
+        t.style.background = on ? "#FFFFFF" : "transparent";
+        t.style.color = on ? "#0B1120" : "#64748B";
+        t.style.fontWeight = on ? "700" : "400";
+        t.style.boxShadow = on ? "0 1px 3px rgba(11,17,32,.08)" : "none";
+      });
+      panels.forEach((p) => {
+        p.style.display = p.getAttribute("data-proc-panel") === key ? "grid" : "none";
+      });
+      root.querySelectorAll("[data-proc-note]").forEach((n) => {
+        n.style.display = n.getAttribute("data-proc-note") === key ? "block" : "none";
+      });
+    };
+    tabs.forEach((t) => t.addEventListener("click", () => select(t.getAttribute("data-proc-tab"))));
+  }
+
+  /** Photo zoom + overlay/border lift on the space cards (a parent-hover effect inline CSS can't express). */
+  bindSpaceHovers() {
+    const grid = this.spaceRef.current;
+    if (!grid) return;
+    grid.querySelectorAll("[data-space-card]").forEach((card) => {
+      const img = card.querySelector("[data-space-img]");
+      const overlay = card.querySelector("[data-space-overlay]");
+      const set = (on) => {
+        if (img) img.style.transform = on ? "scale(1.04)" : "scale(1)";
+        if (overlay) overlay.style.opacity = on ? "1" : ".907";
+        card.style.borderColor = on ? "#4F46E5" : "transparent";
+      };
+      card.addEventListener("mouseenter", () => set(true));
+      card.addEventListener("mouseleave", () => set(false));
+    });
+  }
+
+  /**
+   * Where inquiry submissions go. Paste a Google Apps Script web-app URL to start
+   * collecting into a Sheet today, or the ERP endpoint (POST /api/inquiries) once it
+   * exists. Left empty, the modal just confirms receipt on screen.
+   */
+  static INQUIRY_ENDPOINT = "";
+
+  /** Copy-to-clipboard buttons (desktop visitors can't dial a tel: link). */
+  bindCopyButtons() {
+    document.querySelectorAll("[data-copy]").forEach((btn) => {
+      const label = btn.querySelector("[data-copy-label]");
+      const original = label ? label.textContent : "";
+      btn.addEventListener("click", async () => {
+        const text = btn.getAttribute("data-copy");
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch (err) {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+        if (label) {
+          label.textContent = "복사되었습니다";
+          btn.style.color = "#4F46E5";
+          // restore the authored value — clearing it would delete the inline declaration
+          setTimeout(() => { label.textContent = original; btn.style.color = "#0B1120"; }, 1600);
+        }
+      });
+    });
+  }
+
+  /** Every CTA opens one inquiry modal with 문의 유형 preselected from the button. */
+  bindInquiry() {
+    const modal = document.querySelector("[data-modal]");
+    if (!modal) return;
+    const form = modal.querySelector("[data-modal-form]");
+    const done = modal.querySelector("[data-modal-done]");
+    const select = modal.querySelector("[data-modal-type]");
+    const agree = modal.querySelector("[data-modal-agree]");
+    const submit = modal.querySelector("[data-modal-submit]");
+
+    const close = () => { modal.style.display = "none"; };
+    const open = (type) => {
+      if (form) form.style.display = "block";
+      if (done) done.style.display = "none";
+      if (select && type) select.value = type;
+      modal.style.display = "flex";
+    };
+
+    document.addEventListener("click", (e) => {
+      const trigger = e.target.closest("[data-inquiry]");
+      if (!trigger) return;
+      e.preventDefault();
+      open(trigger.getAttribute("data-inquiry"));
+    });
+    modal.querySelectorAll("[data-modal-close]").forEach((b) => b.addEventListener("click", close));
+    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+
+    const val = (name) => {
+      const el = modal.querySelector('[name="' + name + '"]');
+      return el ? el.value.trim() : "";
+    };
+
+    if (submit) submit.addEventListener("click", async () => {
+      if (agree && !agree.checked) {
+        const label = agree.parentElement;
+        if (label) {
+          label.style.color = "#DC2626";
+          setTimeout(() => { label.style.color = ""; }, 1600);
+        }
+        return;
+      }
+      const payload = {
+        type: select ? select.value : "",
+        company: val("company"),
+        name: val("name"),
+        phone: val("phone"),
+        email: val("email"),
+        message: val("message"),
+        agreedAt: new Date().toISOString(),
+        source: "landing",
+      };
+      const endpoint = Component.INQUIRY_ENDPOINT;
+      if (endpoint) {
+        submit.disabled = true;
+        try {
+          await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+        } catch (err) {
+          console.warn("inquiry submit failed", err);
+        }
+        submit.disabled = false;
+      }
+      if (form) form.style.display = "none";
+      if (done) done.style.display = "flex";
+    });
+  }
+
+  componentDidMount() {
+    this.bindInquiry();
+    this.bindCopyButtons();
+    this.bindSpaceHovers();
+    this.bindProcessTabs();
+    this.bindFaq();
+    this.bindCtaPhone();
+    this.playHeroMockup();
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) { this.instantReveal(); return; }
+    // Timer watcher, not rAF/IntersectionObserver: this preview document can be
+    // hidden (no animation frames, no scroll events) while timers still fire.
+    this.checkReveal();
+    this.armRevealTimer();
+  }
+
+  /** Re-arm after any remount so the page is never left without a watcher. */
+  componentDidUpdate() {
+    if (!this.started && !this.revealTimer) this.armRevealTimer();
+  }
+
+  armRevealTimer() {
+    if (this.revealTimer || this.started) return;
+    this.revealTimer = setInterval(() => this.checkReveal(), 120);
+  }
+
+  clearRevealTimer() {
+    clearInterval(this.revealTimer);
+    this.revealTimer = null;
+  }
+
+  /** Fire the reveal once the feature list is at least half visible. */
+  checkReveal() {
+    if (this.started) { this.clearRevealTimer(); return; }
+    const el = this.listRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    const visible = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+    if (visible >= Math.min(r.height, vh * 0.4) * 0.5) this.start();
+  }
+
+  componentWillUnmount() {
+    this.clearRevealTimer();
+    this.timers.forEach(clearTimeout);
+    clearInterval(this.countTimer);
+  }
+
+  timers = [];
+
+  /** Elements ship with their reveal animations paused at frame 0; play them in sequence. */
+  start() {
+    if (this.started) return;
+    this.started = true;
+    this.clearRevealTimer();
+    const root = this.rootRef.current;
+    if (root) {
+      root.querySelectorAll("[data-reveal]").forEach((el, i) => {
+        el.style.animationDelay = i * 340 + "ms";
+        el.style.animationPlayState = "running";
+      });
+      root.querySelectorAll("[data-icon]").forEach((el, i) => {
+        el.style.animationDelay = i * 340 + "ms," + i * 340 + "ms";
+        el.style.animationPlayState = "running";
+      });
+      const line = root.querySelector("[data-line]");
+      if (line) requestAnimationFrame(() => { line.style.transform = "scaleY(1)"; });
+    }
+    this.timers.push(setTimeout(() => {
+      const dot = root && root.querySelector("[data-pulse]");
+      if (dot) dot.style.animationPlayState = "running";
+      this.countUp();
+    }, 3 * 340 + 640 + 240));
+  }
+
+  /** prefers-reduced-motion: jump straight to the revealed state. */
+  instantReveal() {
+    this.started = true;
+    const root = this.rootRef.current;
+    if (root) {
+      root.querySelectorAll("[data-reveal],[data-icon]").forEach((el) => {
+        el.style.animationDuration = "1ms";
+        el.style.animationPlayState = "running";
+      });
+      const line = root.querySelector("[data-line]");
+      if (line) { line.style.transitionDuration = "0ms"; line.style.transform = "scaleY(1)"; }
+      const dot = root.querySelector("[data-pulse]");
+      if (dot) dot.style.animationPlayState = "running";
+    }
+    this.setState({ count: 39 });
+  }
+
+  countUp() {
+    const t0 = Date.now();
+    clearInterval(this.countTimer);
+    this.countTimer = setInterval(() => {
+      const p = Math.min(1, (Date.now() - t0) / 1600);
+      this.setState({ count: Math.round(39 * (1 - Math.pow(1 - p, 3))) });
+      if (p >= 1) { clearInterval(this.countTimer); this.countTimer = null; }
+    }, 40);
+  }
+
+  renderVals() {
+    return {
+      listRef: this.listRef,
+      rootRef: this.rootRef,
+      spaceRef: this.spaceRef,
+      procRef: this.procRef,
+      faqRef: this.faqRef,
+      classifiedLabel: this.state.count + "/42",
+      showDotGrid: this.props.showDotGrid ?? true,
+      showSocialProof: this.props.showSocialProof ?? true,
+      showMockup: this.props.showMockup ?? true,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="ERP · 설정" description="설정형 템플릿 — 좌측 카테고리 네비 + 6개 설정 화면. 변경 감지·저장 바·이탈 경고·위험 구역 격리" -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>body{margin:0}[data-scroll]::-webkit-scrollbar{width:8px}[data-scroll]::-webkit-scrollbar-track{background:transparent}[data-scroll]::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}@keyframes sUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes spin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}</style>
+</helmet>
+<div style="min-width:1440px;height:900px;display:flex;background:var(--surface-alt);font-family:var(--font-core)">
+
+<aside style="width:248px;flex:0 0 auto;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 16px">
+<div style="padding:0 0 24px">
+<button style="width:100%;display:flex;align-items:center;gap:10px;height:40px;padding:0 8px;border:0;border-radius:var(--radius-md);background:transparent;cursor:pointer;text-align:left;transition:background 240ms var(--ease-out)" style-hover="background:var(--surface-alt)">
+<img src="../../assets/swonbiz-logo.png" alt="" style="height:24px;width:auto;flex:0 0 auto">
+<span style="font-size:17px;font-weight:800;letter-spacing:-.03em;color:var(--text-heading);white-space:nowrap">S<span style="opacity:.55">·</span>won<span style="color:var(--color-primary)">Biz</span></span>
+</button>
+</div>
+<nav style="display:flex;flex-direction:column;gap:2px">
+<button style="display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;text-align:left;cursor:pointer" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="building-2" size="{{ 18 }}" hint-size="18px,18px"></x-import>입주사</button>
+<button style="display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;text-align:left;cursor:pointer" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="receipt" size="{{ 18 }}" hint-size="18px,18px"></x-import>청구</button>
+<button style="display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;text-align:left;cursor:pointer" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="calculator" size="{{ 18 }}" hint-size="18px,18px"></x-import>세무</button>
+<button style="display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;text-align:left;cursor:pointer" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="calendar-check" size="{{ 18 }}" hint-size="18px,18px"></x-import>회의실</button>
+<button style="display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:var(--color-accent-bg);color:var(--color-primary-hover);font-family:inherit;font-size:15px;font-weight:700;text-align:left;cursor:pointer"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="settings" size="{{ 18 }}" hint-size="18px,18px"></x-import>설정</button>
+</nav>
+</aside>
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<header style="flex:0 0 auto;height:64px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:16px;padding:0 28px">
+<div>
+<div style="font-size:12px;color:var(--text-caption)">운영 · 강남 삼성점</div>
+<div data-crumb="1" style="font-size:17px;font-weight:700;letter-spacing:-.015em;color:var(--text-heading)">설정 · 조직 정보</div>
+</div>
+<div style="flex:1"></div>
+<span data-role-note="1" style="font-size:12px;color:var(--text-muted);white-space:nowrap"></span>
+<div style="display:flex;align-items:center;gap:10px;padding-left:16px;border-left:1px solid var(--border)">
+<span data-user-avatar="1" style="width:32px;height:32px;border-radius:var(--radius-sm);background:var(--color-accent-bg);color:var(--color-primary-hover);display:grid;place-items:center;font-size:13px;font-weight:700;flex:0 0 auto">최</span>
+<div style="line-height:1.3">
+<div data-user-name="1" style="font-size:14px;font-weight:700;color:var(--text-heading);white-space:nowrap">최현수</div>
+<div data-user-org="1" style="font-size:12px;color:var(--text-muted);white-space:nowrap">운영 관리자</div>
+</div>
+</div>
+</header>
+
+<div data-toast="1" role="status" style="display:none;position:absolute;top:80px;right:28px;z-index:70;align-items:center;gap:10px;width:380px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-float)">
+<span style="display:flex;color:var(--color-primary);flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 20 }}" hint-size="20px,20px"></x-import></span>
+<span style="flex:1;font-size:14px;font-weight:700;color:var(--text-heading)">변경 사항을 저장했습니다</span>
+</div>
+
+<div style="flex:1;min-height:0;display:flex;gap:32px;padding:24px 28px 0">
+
+<div style="width:240px;flex:0 0 auto;align-self:flex-start;position:sticky;top:24px;display:flex;flex-direction:column;gap:20px">
+<div>
+<div style="padding:0 12px 8px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)">운영</div>
+<div style="display:flex;flex-direction:column;gap:2px">
+<button data-cat-btn="org" style="display:flex;align-items:center;height:44px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-body);font-family:inherit;font-size:15px;text-align:left;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">조직 정보</button>
+<button data-cat-btn="branch" style="display:flex;align-items:center;height:44px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-body);font-family:inherit;font-size:15px;text-align:left;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">지점 설정</button>
+<button data-cat-btn="booking" style="display:flex;align-items:center;height:44px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-body);font-family:inherit;font-size:15px;text-align:left;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">회의실 예약 정책</button>
+<button data-cat-btn="notify" style="display:flex;align-items:center;height:44px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-body);font-family:inherit;font-size:15px;text-align:left;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">알림 설정</button>
+</div>
+</div>
+<div>
+<div style="padding:0 12px 8px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)">보안</div>
+<div style="display:flex;flex-direction:column;gap:2px">
+<button data-cat-btn="ip" style="display:flex;align-items:center;height:44px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-body);font-family:inherit;font-size:15px;text-align:left;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">접속 IP 관리</button>
+<div data-cat-locked="permissions" style="display:flex;align-items:center;justify-content:space-between;gap:8px;height:44px;padding:0 12px;color:var(--text-muted);font-size:15px;cursor:default"><span>권한 관리</span><span style="height:24px;padding:0 9px;display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-alt);font-size:12px;color:var(--text-muted);white-space:nowrap">준비 중</span></div>
+</div>
+</div>
+<div>
+<div style="padding:0 12px 8px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)">개인</div>
+<div style="display:flex;flex-direction:column;gap:2px">
+<button data-cat-btn="account" style="display:flex;align-items:center;height:44px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-body);font-family:inherit;font-size:15px;text-align:left;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">계정 설정</button>
+</div>
+</div>
+</div>
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0">
+<div data-scroll="1" data-body="1" style="flex:1;min-height:0;overflow-y:auto;padding-bottom:24px">
+<div style="max-width:800px">
+
+<section data-cat="org" style="display:flex;flex-direction:column;gap:40px">
+<div>
+<h2 style="margin:0 0 20px;font-size:18px;font-weight:700;color:var(--text-heading)">기본 정보</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px;row-gap:24px">
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">회사명</span><input data-f="1" value="주식회사 에스원테크" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">영문 회사명</span><input data-f="1" value="S-ONE TECH Co., Ltd." style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">대표자명</span><input data-f="1" value="최현수" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">설립일</span><input data-f="1" type="date" value="2014-03-01" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none"></label>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">대표 전화</span><input data-f="1" data-mask="phone" value="070-4355-2312" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">팩스</span><input data-f="1" data-mask="phone" value="070-4015-3344" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label data-field="1" style="grid-column:span 2;display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">대표 이메일</span><input data-f="1" value="swonbiz@s-onetech.com" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<div data-field="1" style="grid-column:span 2;display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">본사 주소</span>
+<span style="display:flex;gap:8px">
+<input data-f="1" readonly value="06158" style="width:120px;flex:0 0 auto;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:default;font-variant-numeric:tabular-nums">
+<button style="width:100px;flex:0 0 auto;height:44px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">주소 검색</button>
+<input data-f="1" readonly value="서울특별시 강남구 봉은사로 55길 19" style="flex:1;min-width:0;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:default">
+</span>
+<input data-f="1" value="3층 (삼성동, 우리빌딩)" placeholder="상세주소" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)">
+</div>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<h2 style="margin:0 0 8px;font-size:18px;font-weight:700;color:var(--text-heading)">사업자 정보</h2>
+<p style="margin:0 0 20px;font-size:13px;line-height:1.6;color:var(--text-muted)">계약서에 출력되는 "갑" 정보의 원본입니다. 이후 생성되는 계약서에 반영되며 기존 계약서는 변경되지 않습니다.</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px;row-gap:24px">
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">사업자등록번호</span>
+<span style="display:flex;align-items:center;gap:8px">
+<input data-f="1" data-mask="bizno" value="105-87-68698" style="flex:1;min-width:0;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)">
+<span data-biz-ok="1" style="position:relative;flex:0 0 auto;display:flex;color:var(--color-primary)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 20 }}" hint-size="20px,20px"></x-import><span data-tip="1" style="position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none">국세청에 등록된 사업자입니다</span></span>
+</span>
+</div>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">법인등록번호</span><input data-f="1" data-mask="corpno" value="110111-4806381" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">업태</span><input data-f="1" value="서비스" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">종목</span><input data-f="1" value="정보통신업" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<h2 style="margin:0 0 8px;font-size:18px;font-weight:700;color:var(--text-heading)">브랜드</h2>
+<p style="margin:0 0 20px;font-size:13px;line-height:1.6;color:var(--text-muted)">PNG 투명 배경 권장 · 로고 높이 64px 이상 · 워드마크 색상은 시스템에서 고정됩니다.</p>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius-md)">
+<div><div style="font-size:15px;font-weight:700;color:var(--text-heading)">로고 (라이트)</div><div style="margin-top:4px;font-size:13px;color:var(--text-muted)">밝은 배경용 · 현재 swonbiz-logo.png</div></div>
+<button style="flex:0 0 auto;height:40px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="upload" size="{{ 16 }}" hint-size="16px,16px"></x-import>파일 선택</button>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius-md)">
+<div><div style="font-size:15px;font-weight:700;color:var(--text-heading)">로고 (다크)</div><div style="margin-top:4px;font-size:13px;color:var(--text-muted)">어두운 배경용 · 현재 swonbiz-logo-white.png</div></div>
+<button style="flex:0 0 auto;height:40px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="upload" size="{{ 16 }}" hint-size="16px,16px"></x-import>파일 선택</button>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius-md)">
+<div><div style="font-size:15px;font-weight:700;color:var(--text-heading)">사용인감</div><div style="margin-top:4px;font-size:13px;color:var(--text-muted)">계약서 출력용 · 현재 사용인감.png</div></div>
+<button style="flex:0 0 auto;height:40px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="upload" size="{{ 16 }}" hint-size="16px,16px"></x-import>파일 선택</button>
+</div>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<h2 style="margin:0 0 8px;font-size:18px;font-weight:700;color:var(--text-heading)">계약서 기본값</h2>
+<p style="margin:0 0 20px;font-size:13px;line-height:1.6;color:var(--text-muted)">계약서에 인쇄되는 담당자 정보입니다. 지점 설정에 담당자가 지정되어 있으면 그 값이 우선합니다.</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px;row-gap:24px">
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">계약 담당자명</span><input data-f="1" value="이정희" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">담당자 직위</span><input data-f="1" value="센터매니저" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+</div>
+</div>
+</section>
+
+<section data-cat="branch" style="display:none;flex-direction:column;gap:40px">
+<div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px">
+<h2 style="margin:0;font-size:18px;font-weight:700;color:var(--text-heading)">지점 목록</h2>
+<button style="height:36px;padding:0 14px;display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;border-radius:var(--radius-md);background:var(--color-primary);color:var(--text-on-primary);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:var(--shadow-primary)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="plus" size="{{ 16 }}" hint-size="16px,16px"></x-import>지점 추가</button>
+</div>
+<div style="border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden">
+<div style="display:grid;grid-template-columns:1.2fr 2fr 1fr 100px 64px;align-items:center;height:44px;padding:0 16px;background:var(--surface-alt);border-bottom:1px solid var(--border)">
+<span style="font-size:12px;font-weight:700;color:var(--text-muted)">지점명</span><span style="font-size:12px;font-weight:700;color:var(--text-muted)">주소</span><span style="font-size:12px;font-weight:700;color:var(--text-muted)">담당자</span><span style="font-size:12px;font-weight:700;color:var(--text-muted)">상태</span><span style="text-align:right;font-size:12px;font-weight:700;color:var(--text-muted)">관리</span>
+</div>
+<button data-branch-row="1" style="width:100%;display:grid;grid-template-columns:1.2fr 2fr 1fr 100px 64px;align-items:center;height:56px;padding:0 16px;border:0;border-bottom:1px solid var(--border);background:var(--color-accent-bg);font-family:inherit;text-align:left;cursor:pointer">
+<span style="font-size:14px;font-weight:700;color:var(--text-heading)">강남 삼성점</span><span style="font-size:14px;color:var(--text-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">서울 강남구 봉은사로 55길 19</span><span style="font-size:14px;color:var(--text-body)">이정희</span><span><span style="height:24px;padding:0 9px;display:inline-flex;align-items:center;border-radius:var(--radius-pill);background:var(--color-accent-bg);color:var(--color-primary-hover);font-size:12px;font-weight:700">운영중</span></span><span style="display:flex;justify-content:flex-end;color:var(--text-muted)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-right" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>
+</button>
+<button data-branch-row="1" style="width:100%;display:grid;grid-template-columns:1.2fr 2fr 1fr 100px 64px;align-items:center;height:56px;padding:0 16px;border:0;background:var(--surface);font-family:inherit;text-align:left;cursor:pointer" style-hover="background:var(--surface-alt)">
+<span style="font-size:14px;font-weight:700;color:var(--text-heading)">강남 역삼점</span><span style="font-size:14px;color:var(--text-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">서울 강남구 테헤란로 152</span><span style="font-size:14px;color:var(--text-body)">—</span><span><span style="height:24px;padding:0 9px;display:inline-flex;align-items:center;border-radius:var(--radius-pill);background:var(--color-warning-bg);color:var(--color-warning-text);font-size:12px;font-weight:700">준비중</span></span><span style="display:flex;justify-content:flex-end;color:var(--text-muted)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-right" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>
+</button>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<h2 style="margin:0 0 8px;font-size:18px;font-weight:700;color:var(--text-heading)">강남 삼성점</h2>
+<p style="margin:0 0 20px;font-size:13px;line-height:1.6;color:var(--text-muted)">건물·층·호실은 센터 관리에서 다룹니다. 여기서는 지점의 운영 정보만 설정합니다.</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px;row-gap:24px">
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">지점명</span><input data-f="1" value="삼성센터" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">표시명</span><input data-f="1" value="강남 삼성점" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<div data-field="1" style="grid-column:span 2;display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">주소</span>
+<span style="display:flex;gap:8px">
+<input data-f="1" readonly value="06158" style="width:120px;flex:0 0 auto;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:default;font-variant-numeric:tabular-nums">
+<button style="width:100px;flex:0 0 auto;height:44px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">주소 검색</button>
+<input data-f="1" readonly value="서울 강남구 봉은사로 55길 19, 3층" style="flex:1;min-width:0;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:default">
+</span>
+</div>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">대표 전화</span><input data-f="1" data-mask="phone" value="070-4355-2312" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">지점 담당자명</span><span style="font-size:13px;color:var(--text-muted)">이 지점 계약서에 인쇄됩니다</span><input data-f="1" value="이정희" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></div>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">담당자 연락처</span><input data-f="1" data-mask="phone" value="010-2345-6789" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">운영 시간</span>
+<span style="font-size:13px;color:var(--text-muted)">공용 공간 기준</span>
+<span style="display:flex;align-items:center;gap:8px">
+<span style="position:relative;flex:1;min-width:0;display:flex"><select data-f="1" style="appearance:none;width:100%;height:44px;padding:0 34px 0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:pointer"><option>09:00</option><option>08:00</option><option>10:00</option></select><span style="position:absolute;right:14px;top:50%;transform:translateY(-60%) rotate(45deg);width:6px;height:6px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);pointer-events:none"></span></span>
+<span style="flex:0 0 auto;font-size:14px;color:var(--text-muted)">–</span>
+<span style="position:relative;flex:1;min-width:0;display:flex"><select data-f="1" style="appearance:none;width:100%;height:44px;padding:0 34px 0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:pointer"><option>22:00</option><option>20:00</option><option>24:00</option></select><span style="position:absolute;right:14px;top:50%;transform:translateY(-60%) rotate(45deg);width:6px;height:6px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);pointer-events:none"></span></span>
+</span>
+</div>
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">운영 상태</span>
+<span data-seg="branchStatus" style="display:inline-flex;gap:4px;padding:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md)">
+<button data-seg-btn="운영중" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(11,17,32,.06)">운영중</button>
+<button data-seg-btn="준비중" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;cursor:pointer">준비중</button>
+<button data-seg-btn="운영종료" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;cursor:pointer">운영종료</button>
+</span>
+</div>
+<div data-field="1" style="grid-column:span 2;display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">지점 소개</span><span style="font-size:13px;color:var(--text-muted)">랜딩과 신청 폼에 노출될 수 있습니다</span><textarea data-f="1" rows="3" style="padding:12px 14px;font-family:inherit;font-size:14px;line-height:1.6;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;resize:vertical" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)">선정릉역 2번 출구에서 도보 3분. 1인실부터 팀 오피스까지 운영합니다.</textarea></div>
+</div>
+</div>
+
+<div style="padding:20px 24px;border:1px solid var(--color-danger);border-radius:var(--radius-lg)">
+<div style="font-size:16px;font-weight:700;color:var(--color-danger)">위험 구역</div>
+<div style="margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:20px">
+<div><div style="font-size:15px;font-weight:700;color:var(--text-heading)">지점 삭제</div><div style="margin-top:4px;font-size:13px;color:var(--text-muted)">호실과 계약이 모두 정리된 뒤에만 삭제할 수 있습니다</div></div>
+<span data-danger-wrap="1" style="position:relative;flex:0 0 auto">
+<button data-danger="branch" style="height:40px;padding:0 16px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-caption);font-family:inherit;font-size:14px;font-weight:700;cursor:not-allowed;white-space:nowrap;opacity:.6">지점 삭제</button>
+<span data-tip="1" style="position:absolute;right:0;bottom:calc(100% + 8px);z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none">호실 12개, 진행 중 계약 8건이 있습니다</span>
+</span>
+</div>
+</div>
+</section>
+
+<section data-cat="booking" style="display:none;flex-direction:column;gap:40px">
+<div style="display:flex;align-items:flex-start;gap:10px;padding:16px 20px;background:var(--color-accent-bg);border-radius:var(--radius-md)">
+<span style="display:flex;color:var(--color-primary);flex:0 0 auto;margin-top:1px"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="info" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<span style="font-size:14px;line-height:1.6;color:var(--text-body)">여기서 정한 값은 새로 등록되는 회의실의 기본값입니다. 회의실별로 다르게 설정하려면 센터 관리에서 변경하세요.</span>
+</div>
+<div>
+<h2 style="margin:0 0 20px;font-size:18px;font-weight:700;color:var(--text-heading)">운영 시간</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px;row-gap:24px">
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">운영 시간</span>
+<span style="display:flex;align-items:center;gap:8px">
+<span style="position:relative;flex:1;min-width:0;display:flex"><select data-f="1" style="appearance:none;width:100%;height:44px;padding:0 34px 0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:pointer"><option>09:00</option><option>08:30</option><option>10:00</option></select><span style="position:absolute;right:14px;top:50%;transform:translateY(-60%) rotate(45deg);width:6px;height:6px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);pointer-events:none"></span></span>
+<span style="flex:0 0 auto;font-size:14px;color:var(--text-muted)">–</span>
+<span style="position:relative;flex:1;min-width:0;display:flex"><select data-f="1" style="appearance:none;width:100%;height:44px;padding:0 34px 0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:pointer"><option>22:00</option><option>21:00</option><option>23:30</option></select><span style="position:absolute;right:14px;top:50%;transform:translateY(-60%) rotate(45deg);width:6px;height:6px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);pointer-events:none"></span></span>
+</span>
+</div>
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">슬롯 단위</span>
+<span data-seg="slot" style="display:inline-flex;gap:4px;padding:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md)">
+<button data-seg-btn="30분" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(11,17,32,.06)">30분</button>
+<button data-seg-btn="1시간" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;cursor:pointer">1시간</button>
+</span>
+</div>
+<div data-field="1" style="grid-column:span 2;display:flex;align-items:center;justify-content:space-between;gap:20px;padding-left:11px;border-left:3px solid transparent">
+<div><div style="font-size:14px;font-weight:600;color:var(--text-heading)">주말 운영</div><div style="margin-top:4px;font-size:13px;color:var(--text-muted)">토·일요일에도 예약을 받습니다</div></div>
+<button data-switch="weekend" data-on="1" role="switch" style="width:44px;height:26px;flex:0 0 auto;padding:3px;display:flex;justify-content:flex-end;border:0;border-radius:999px;background:var(--color-primary);cursor:pointer;transition:background var(--dur) var(--ease-out)"><span style="width:20px;height:20px;border-radius:999px;background:#FFFFFF;box-shadow:0 1px 2px rgba(11,17,32,.2)"></span></button>
+</div>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<h2 style="margin:0 0 20px;font-size:18px;font-weight:700;color:var(--text-heading)">이용 한도</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px;row-gap:24px">
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">조직당 무료 시간</span><span style="position:relative;display:flex"><select data-f="1" style="appearance:none;width:100%;height:44px;padding:0 34px 0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:pointer"><option>2시간</option><option>1시간</option><option>1시간 30분</option><option>3시간</option><option>4시간</option></select><span style="position:absolute;right:14px;top:50%;transform:translateY(-60%) rotate(45deg);width:6px;height:6px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);pointer-events:none"></span></span></label>
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">리셋 주기</span>
+<span data-seg="reset" style="display:inline-flex;gap:4px;padding:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md)">
+<button data-seg-btn="일" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(11,17,32,.06)">일</button>
+<button data-seg-btn="주" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;cursor:pointer">주</button>
+<button data-seg-btn="월" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;cursor:pointer">월</button>
+</span>
+</div>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">1회 최대 연속 예약</span><span style="position:relative;display:flex"><select data-f="1" style="appearance:none;width:100%;height:44px;padding:0 34px 0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:pointer"><option>4시간</option><option>2시간</option><option>3시간</option><option>6시간</option></select><span style="position:absolute;right:14px;top:50%;transform:translateY(-60%) rotate(45deg);width:6px;height:6px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);pointer-events:none"></span></span></label>
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">예약 가능 기간</span><span style="position:relative;display:flex;align-items:center"><input data-f="1" data-num="1" value="30" style="width:100%;height:44px;padding:0 56px 0 14px;text-align:right;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"><span style="position:absolute;right:14px;font-size:13px;color:var(--text-muted);pointer-events:none">일 이내</span></span></div>
+<div data-field="1" style="grid-column:span 2;display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">동시 보유 예약 건수</span><span style="font-size:13px;color:var(--text-muted)">0이면 무제한</span><input data-f="1" data-num="1" value="3" style="width:200px;height:44px;padding:0 14px;text-align:right;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></div>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<h2 style="margin:0 0 20px;font-size:18px;font-weight:700;color:var(--text-heading)">요금</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px;row-gap:24px">
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">초과 요금</span><span style="position:relative;display:flex;align-items:center"><input data-f="1" data-money="1" value="0" style="width:100%;height:44px;padding:0 66px 0 14px;text-align:right;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"><span style="position:absolute;right:14px;font-size:13px;color:var(--text-muted);pointer-events:none">원 / 30분</span></span></div>
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">외부 이용 요금</span><span style="position:relative;display:flex;align-items:center"><input data-f="1" data-money="1" value="0" style="width:100%;height:44px;padding:0 66px 0 14px;text-align:right;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"><span style="position:absolute;right:14px;font-size:13px;color:var(--text-muted);pointer-events:none">원 / 30분</span></span><span style="font-size:13px;color:var(--text-caption)">외부 예약 기능 준비 중</span></div>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<h2 style="margin:0 0 20px;font-size:18px;font-weight:700;color:var(--text-heading)">취소 정책</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px;row-gap:24px">
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">취소 가능 시점</span><span style="position:relative;display:flex"><select data-f="1" style="appearance:none;width:100%;height:44px;padding:0 34px 0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:pointer"><option>시작 30분 전까지</option><option>시작 1시간 전까지</option><option>시작 직전까지</option></select><span style="position:absolute;right:14px;top:50%;transform:translateY(-60%) rotate(45deg);width:6px;height:6px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);pointer-events:none"></span></span></label>
+<div data-field="1" style="display:flex;flex-direction:column;gap:10px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">취소 시 무료 시간 반환</span>
+<button data-switch="refund" data-on="1" role="switch" style="width:44px;height:26px;flex:0 0 auto;padding:3px;display:flex;justify-content:flex-end;border:0;border-radius:999px;background:var(--color-primary);cursor:pointer;transition:background var(--dur) var(--ease-out)"><span style="width:20px;height:20px;border-radius:999px;background:#FFFFFF;box-shadow:0 1px 2px rgba(11,17,32,.2)"></span></button>
+</div>
+<div data-field="1" style="grid-column:span 2;display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">노쇼 처리</span>
+<span style="font-size:13px;color:var(--text-muted)">운영 방식 확정 전 — 기본은 수동 처리</span>
+<span data-seg="noshow" style="display:inline-flex;gap:4px;padding:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md);width:360px">
+<button data-seg-btn="소진" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;cursor:pointer">소진</button>
+<button data-seg-btn="반환" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;cursor:pointer">반환</button>
+<button data-seg-btn="수동 처리" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(11,17,32,.06)">수동 처리</button>
+</span>
+</div>
+</div>
+</div>
+
+<div style="display:flex;align-items:flex-start;gap:10px;padding:16px 20px;background:var(--color-warning-bg);border-radius:var(--radius-md)">
+<span style="display:flex;color:var(--color-warning);flex:0 0 auto;margin-top:1px"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="triangle-alert" size="{{ 18 }}" hint-size="18px,18px"></x-import></span>
+<span style="font-size:14px;line-height:1.6;color:var(--text-body)">정책 변경은 이미 확정된 예약에 소급 적용되지 않습니다.</span>
+</div>
+</section>
+
+<section data-cat="notify" style="display:none;flex-direction:column;gap:40px">
+<div>
+<h2 style="margin:0 0 20px;font-size:18px;font-weight:700;color:var(--text-heading)">발송 채널</h2>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div data-field="1" style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius-md)">
+<div><div style="font-size:15px;font-weight:700;color:var(--text-heading)">이메일</div><div style="margin-top:4px;font-size:13px;color:var(--text-muted)">발신 주소 swonbiz@s-onetech.com</div></div>
+<button data-switch="mail" data-on="1" role="switch" style="width:44px;height:26px;flex:0 0 auto;padding:3px;display:flex;justify-content:flex-end;border:0;border-radius:999px;background:var(--color-primary);cursor:pointer;transition:background var(--dur) var(--ease-out)"><span style="width:20px;height:20px;border-radius:999px;background:#FFFFFF;box-shadow:0 1px 2px rgba(11,17,32,.2)"></span></button>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-alt)">
+<div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:700;color:var(--text-muted)">카카오 알림톡</span><span style="height:24px;padding:0 9px;display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-size:12px;color:var(--text-muted);white-space:nowrap">준비 중</span></div><div style="margin-top:4px;font-size:13px;color:var(--text-caption)">채널 연동 확정 후 제공됩니다</div></div>
+<span style="width:44px;height:26px;flex:0 0 auto;padding:3px;display:flex;border-radius:999px;background:var(--border);opacity:.6"><span style="width:20px;height:20px;border-radius:999px;background:#FFFFFF"></span></span>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-alt)">
+<div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:700;color:var(--text-muted)">앱 푸시</span><span style="height:24px;padding:0 9px;display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-size:12px;color:var(--text-muted);white-space:nowrap">준비 중</span></div><div style="margin-top:4px;font-size:13px;color:var(--text-caption)">모바일 앱 출시 후 제공됩니다</div></div>
+<span style="width:44px;height:26px;flex:0 0 auto;padding:3px;display:flex;border-radius:999px;background:var(--border);opacity:.6"><span style="width:20px;height:20px;border-radius:999px;background:#FFFFFF"></span></span>
+</div>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<h2 style="margin:0 0 20px;font-size:18px;font-weight:700;color:var(--text-heading)">알림 종류</h2>
+<div style="border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden">
+<div style="display:grid;grid-template-columns:1fr 88px 88px 88px;align-items:center;height:44px;padding:0 16px;background:var(--surface-alt);border-bottom:1px solid var(--border)">
+<span style="font-size:12px;font-weight:700;color:var(--text-muted)">알림</span><span style="text-align:center;font-size:12px;font-weight:700;color:var(--text-muted)">이메일</span><span style="text-align:center;font-size:12px;font-weight:700;color:var(--text-muted)">알림톡</span><span style="text-align:center;font-size:12px;font-weight:700;color:var(--text-muted)">푸시</span>
+</div>
+<div data-notify-rows="1"></div>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<h2 style="margin:0 0 8px;font-size:18px;font-weight:700;color:var(--text-heading)">수신자</h2>
+<p style="margin:0 0 20px;font-size:13px;line-height:1.6;color:var(--text-muted)">입주사 알림은 각 계약의 담당자에게 자동 발송됩니다.</p>
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">운영사 수신 이메일</span>
+<div style="min-height:44px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface)">
+<span style="height:28px;padding:0 10px;display:inline-flex;align-items:center;gap:6px;border-radius:var(--radius-sm);background:var(--surface-alt);font-size:13px;color:var(--text-heading)">choi@s-onetech.com<button data-chip-x="1" aria-label="제거" style="border:0;background:transparent;padding:0;color:var(--text-caption);cursor:pointer;font-size:14px;line-height:1">×</button></span>
+<span style="height:28px;padding:0 10px;display:inline-flex;align-items:center;gap:6px;border-radius:var(--radius-sm);background:var(--surface-alt);font-size:13px;color:var(--text-heading)">lee@s-onetech.com<button data-chip-x="1" aria-label="제거" style="border:0;background:transparent;padding:0;color:var(--text-caption);cursor:pointer;font-size:14px;line-height:1">×</button></span>
+<input data-f="1" placeholder="이메일 입력 후 Enter" style="flex:1;min-width:160px;height:28px;border:0;background:transparent;font-family:inherit;font-size:13px;color:var(--text-heading);outline:none">
+</div>
+</div>
+</div>
+</section>
+
+<section data-cat="ip" style="display:none;flex-direction:column;gap:40px">
+<div>
+<h2 style="margin:0 0 8px;font-size:18px;font-weight:700;color:var(--text-heading)">IP 화이트리스트</h2>
+<p style="margin:0 0 20px;font-size:13px;line-height:1.6;color:var(--text-muted)">2단계 인증 대신 IP 제한과 실패 잠금으로 접속을 통제합니다.</p>
+<div data-field="1" style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 20px;border:1px solid var(--border);border-radius:var(--radius-md)">
+<div><div style="font-size:15px;font-weight:700;color:var(--text-heading)">적용</div><div data-ip-note="1" style="margin-top:4px;font-size:13px;color:var(--text-muted)">현재 접속 IP 121.130.44.19</div></div>
+<button data-ip-switch="1" role="switch" style="width:44px;height:26px;flex:0 0 auto;padding:3px;display:flex;justify-content:flex-start;border:0;border-radius:999px;background:var(--border);cursor:pointer;transition:background var(--dur) var(--ease-out)"><span style="width:20px;height:20px;border-radius:999px;background:#FFFFFF;box-shadow:0 1px 2px rgba(11,17,32,.2)"></span></button>
+</div>
+<div style="margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:16px">
+<span data-ip-count="1" style="font-size:14px;color:var(--text-muted)">등록된 IP 2개</span>
+<button data-ip-add="1" style="height:36px;padding:0 14px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="plus" size="{{ 16 }}" hint-size="16px,16px"></x-import>IP 추가</button>
+</div>
+<div style="margin-top:10px;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden">
+<div style="display:grid;grid-template-columns:1.2fr 1fr 1.6fr 64px;align-items:center;height:44px;padding:0 16px;background:var(--surface-alt);border-bottom:1px solid var(--border)">
+<span style="font-size:12px;font-weight:700;color:var(--text-muted)">IP</span><span style="font-size:12px;font-weight:700;color:var(--text-muted)">대역</span><span style="font-size:12px;font-weight:700;color:var(--text-muted)">설명</span><span style="text-align:right;font-size:12px;font-weight:700;color:var(--text-muted)">관리</span>
+</div>
+<div data-ip-rows="1"></div>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<h2 style="margin:0 0 20px;font-size:18px;font-weight:700;color:var(--text-heading)">로그인 보안</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px;row-gap:24px">
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">실패 허용 횟수</span><span style="position:relative;display:flex"><select data-f="1" style="appearance:none;width:100%;height:44px;padding:0 34px 0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:pointer"><option>5회</option><option>3회</option><option>10회</option></select><span style="position:absolute;right:14px;top:50%;transform:translateY(-60%) rotate(45deg);width:6px;height:6px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);pointer-events:none"></span></span></label>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">잠금 시간</span><span style="position:relative;display:flex"><select data-f="1" style="appearance:none;width:100%;height:44px;padding:0 34px 0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:pointer"><option>30분</option><option>10분</option><option>1시간</option></select><span style="position:absolute;right:14px;top:50%;transform:translateY(-60%) rotate(45deg);width:6px;height:6px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);pointer-events:none"></span></span></label>
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">잠금 해제</span>
+<span data-seg="unlock" style="display:inline-flex;gap:4px;padding:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md)">
+<button data-seg-btn="자동" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(11,17,32,.06)">자동</button>
+<button data-seg-btn="관리자 수동" style="flex:1;height:36px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;cursor:pointer">관리자 수동</button>
+</span>
+</div>
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">세션 만료</span><span style="font-size:13px;color:var(--text-muted)">JWT 설정과 일치해야 합니다</span><span style="position:relative;display:flex"><select data-f="1" style="appearance:none;width:100%;height:44px;padding:0 34px 0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:pointer"><option>8시간</option><option>4시간</option><option>24시간</option></select><span style="position:absolute;right:14px;top:50%;transform:translateY(-60%) rotate(45deg);width:6px;height:6px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);pointer-events:none"></span></span></div>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px">
+<h2 style="margin:0;font-size:18px;font-weight:700;color:var(--text-heading)">최근 접속 이력</h2>
+<button style="border:0;background:transparent;padding:0;color:var(--color-primary);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer">전체 보기</button>
+</div>
+<div style="border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden">
+<div style="display:grid;grid-template-columns:1.4fr 1.2fr 1.2fr 1.2fr 80px;align-items:center;height:44px;padding:0 16px;background:var(--surface-alt);border-bottom:1px solid var(--border)">
+<span style="font-size:12px;font-weight:700;color:var(--text-muted)">일시</span><span style="font-size:12px;font-weight:700;color:var(--text-muted)">계정</span><span style="font-size:12px;font-weight:700;color:var(--text-muted)">IP</span><span style="font-size:12px;font-weight:700;color:var(--text-muted)">기기</span><span style="text-align:right;font-size:12px;font-weight:700;color:var(--text-muted)">결과</span>
+</div>
+<div data-log-rows="1"></div>
+</div>
+</div>
+</section>
+
+<section data-cat="account" style="display:none;flex-direction:column;gap:40px">
+<div>
+<h2 style="margin:0 0 20px;font-size:18px;font-weight:700;color:var(--text-heading)">프로필</h2>
+<div style="display:flex;align-items:center;gap:20px;margin-bottom:24px">
+<span style="width:64px;height:64px;flex:0 0 auto;border-radius:var(--radius-md);background:var(--color-accent-bg);color:var(--color-primary-hover);display:grid;place-items:center;font-size:24px;font-weight:700">최</span>
+<button style="height:40px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="upload" size="{{ 16 }}" hint-size="16px,16px"></x-import>이미지 변경</button>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px;row-gap:24px">
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">이름</span><input data-f="1" value="최현수" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">직위</span><input data-f="1" value="대표" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">연락처</span><input data-f="1" data-mask="phone" value="010-2345-6789" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">이메일</span><input readonly value="choi@s-onetech.com" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:default"></label>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<h2 style="margin:0 0 20px;font-size:18px;font-weight:700;color:var(--text-heading)">비밀번호 변경</h2>
+<div style="display:flex;flex-direction:column;gap:24px;max-width:400px">
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">현재 비밀번호</span><input data-f="1" type="password" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<div data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent">
+<span style="font-size:14px;font-weight:600;color:var(--text-heading)">새 비밀번호</span>
+<input data-f="1" data-pw="1" type="password" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)">
+<span style="display:flex;align-items:center;gap:8px">
+<span style="flex:1;display:flex;gap:4px">
+<span data-pw-bar="0" style="flex:1;height:4px;border-radius:2px;background:var(--border)"></span>
+<span data-pw-bar="1" style="flex:1;height:4px;border-radius:2px;background:var(--border)"></span>
+<span data-pw-bar="2" style="flex:1;height:4px;border-radius:2px;background:var(--border)"></span>
+</span>
+<span data-pw-label="1" style="flex:0 0 auto;font-size:12px;color:var(--text-muted);white-space:nowrap"></span>
+</span>
+</div>
+<label data-field="1" style="display:flex;flex-direction:column;gap:6px;padding-left:11px;border-left:3px solid transparent"><span style="font-size:14px;font-weight:600;color:var(--text-heading)">새 비밀번호 확인</span><input data-f="1" type="password" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<div data-field="1" style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding-left:11px;border-left:3px solid transparent">
+<div><div style="font-size:14px;font-weight:600;color:var(--text-heading)">다른 기기 세션 종료</div><div style="margin-top:4px;font-size:13px;color:var(--text-muted)">변경 시 이 기기만 로그인 상태로 남습니다</div></div>
+<button data-switch="logoutOthers" data-on="1" role="switch" style="width:44px;height:26px;flex:0 0 auto;padding:3px;display:flex;justify-content:flex-end;border:0;border-radius:999px;background:var(--color-primary);cursor:pointer;transition:background var(--dur) var(--ease-out)"><span style="width:20px;height:20px;border-radius:999px;background:#FFFFFF;box-shadow:0 1px 2px rgba(11,17,32,.2)"></span></button>
+</div>
+</div>
+</div>
+
+<div style="height:1px;background:var(--border)"></div>
+<div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px">
+<h2 style="margin:0;font-size:18px;font-weight:700;color:var(--text-heading)">접속 기기</h2>
+<button style="height:36px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--color-danger);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--color-danger-bg)">다른 기기 모두 로그아웃</button>
+</div>
+<div data-session-rows="1" style="display:flex;flex-direction:column;gap:8px"></div>
+</div>
+</section>
+
+</div>
+</div>
+
+<div data-savebar="1" style="display:none;flex:0 0 auto;height:72px;margin:0 -28px;padding:0 28px;align-items:center;justify-content:space-between;gap:16px;background:var(--surface);border-top:1px solid var(--border);box-shadow:0 -8px 24px rgba(11,17,32,.08);animation:sUp 200ms var(--ease-out)">
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text-body)"><span style="display:flex;color:var(--color-warning)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-alert" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>저장하지 않은 변경 사항이 있습니다</span>
+<span style="display:flex;gap:8px">
+<button data-revert="1" style="height:40px;padding:0 16px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">되돌리기</button>
+<button data-save="1" style="height:40px;padding:0 20px;display:inline-flex;align-items:center;gap:8px;border:1px solid transparent;border-radius:var(--radius-md);background:var(--color-primary);color:var(--text-on-primary);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:var(--shadow-primary);transition:background var(--dur) var(--ease-out)" style-hover="background:var(--color-primary-hover)"><span data-save-spin="1" style="display:none;width:14px;height:14px;border-radius:999px;border:2px solid rgba(255,255,255,.4);border-top-color:#FFFFFF;animation:spin 700ms linear infinite"></span><span data-save-label="1">저장</span></button>
+</span>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+
+<sc-if value="{{ showModal }}" hint-placeholder-val="{{ false }}">
+<div data-overlay="1" style="position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(11,17,32,.45)">
+<div style="width:480px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-overlay);padding:28px">
+<div style="display:flex;justify-content:center"><span data-modal-icon="1" style="width:56px;height:56px;border-radius:999px;display:grid;place-items:center;background:var(--color-warning-bg);color:var(--color-warning)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="triangle-alert" size="{{ 24 }}" hint-size="24px,24px"></x-import></span></div>
+<h3 data-modal-title="1" style="margin:16px 0 0;font-size:var(--text-h3-size);font-weight:var(--weight-semibold);line-height:var(--text-h3-lh);letter-spacing:var(--text-h3-ls);color:var(--text-heading);text-align:center"></h3>
+<p data-modal-desc="1" style="margin:8px 0 0;font-size:14px;line-height:1.6;color:var(--text-body);text-align:center;text-wrap:pretty"></p>
+<div data-modal-extra="1" style="display:none;margin-top:16px"></div>
+<div style="margin-top:24px;display:flex;gap:8px">
+<button data-modal-cancel="1" style="flex:1;height:44px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">취소</button>
+<button data-modal-ok="1" style="flex:1;height:44px;border:1px solid transparent;border-radius:var(--radius-md);background:var(--color-primary);color:#FFFFFF;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer">확인</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;viewer&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;operator&quot;,&quot;tenant&quot;],&quot;default&quot;:&quot;operator&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;권한&quot;}}">
+/* ── 미확정 상수 ── */
+/** 알림톡·푸시 채널 연동 방식 미정 — UI 자리만 두고 구현하지 않는다. */
+const CHANNELS_READY = { mail: true, kakao: false, push: false };
+/** 권한 관리 화면은 별도 권한 시스템 확인 후 얹는다. */
+const PERMISSIONS_READY = false;
+/** JWT 설정과 일치해야 하는 값. 서버 확인 후 기본값을 맞춘다. */
+const SESSION_TTL_DEFAULT = "8시간";
+
+/** 지점 삭제 가능 여부의 근거. 실데이터 연결 시 이 값만 교체한다. */
+const BRANCH_DEPS = { rooms: 12, contracts: 8 };
+
+const SAVE_MS = 900;
+const TOAST_MS = 2600;
+
+const TOKEN_FALLBACK = {
+  "--surface": "#FFFFFF", "--surface-alt": "#F8FAFC", "--surface-inverse": "#0B1120",
+  "--border": "#E2E8F0", "--text-heading": "#0B1120", "--text-body": "#475569",
+  "--text-muted": "#64748B", "--text-caption": "#94A3B8",
+  "--color-primary": "#4F46E5", "--color-primary-hover": "#4338CA",
+  "--color-accent-bg": "#EEF2FF", "--color-warning": "#D97706",
+  "--color-warning-bg": "#FEF3C7", "--color-warning-text": "#92400E",
+  "--color-danger": "#DC2626", "--color-danger-bg": "#FEE2E2",
+};
+
+const CATS = {
+  org: "조직 정보", branch: "지점 설정", booking: "회의실 예약 정책",
+  notify: "알림 설정", ip: "접속 IP 관리", account: "계정 설정",
+};
+
+/** 입주사가 접근할 수 있는 유일한 카테고리. */
+const TENANT_CATS = ["account"];
+
+/** 미구현 기능의 알림은 행을 두되 비활성으로 표시한다. */
+const NOTIFY_ROWS = [
+  { name: "계약 만기 임박", desc: "D-30 / D-7 시점", on: true },
+  { name: "신규 입주 신청 접수", desc: "온라인 신청서가 접수될 때", on: true },
+  { name: "회의실 예약 확정 / 취소", desc: "예약 상태가 바뀔 때", on: true },
+  { name: "외부 예약 요청 접수", desc: "외부 예약 기능 준비 중", on: false },
+  { name: "청구서 발행 / 결제 완료", desc: "청구 상태가 바뀔 때", on: true },
+];
+
+const IP_ROWS = [
+  { ip: "121.130.44.19", cidr: "/32", desc: "삼성센터 사무실" },
+  { ip: "10.20.0.0", cidr: "/24", desc: "사내 VPN 대역" },
+];
+
+const LOG_ROWS = [
+  { at: "2026.08.27 09:12", who: "choi@s-onetech.com", ip: "121.130.44.19", dev: "Chrome · macOS", ok: true },
+  { at: "2026.08.27 08:41", who: "lee@s-onetech.com", ip: "121.130.44.19", dev: "Safari · iOS", ok: true },
+  { at: "2026.08.26 22:03", who: "unknown", ip: "45.83.12.7", dev: "curl", ok: false },
+  { at: "2026.08.26 18:55", who: "lee@s-onetech.com", ip: "58.29.11.4", dev: "Chrome · Windows", ok: true },
+];
+
+const SESSIONS = [
+  { dev: "Chrome · macOS", place: "서울", at: "지금", current: true },
+  { dev: "Safari · iPhone", place: "서울", at: "2시간 전", current: false },
+  { dev: "Chrome · Windows", place: "성남", at: "어제", current: false },
+];
+
+class Component extends DCLogic {
+  state = { cat: null, dirty: false, saving: false, modal: null, ipOn: false, pending: null };
+
+  get viewer() { return this.props.viewer || "operator"; }
+
+  /** 입주사는 계정 설정만 볼 수 있다. */
+  get cat() {
+    const c = this.state.cat || "org";
+    if (this.viewer !== "operator" && TENANT_CATS.indexOf(c) < 0) return "account";
+    return c;
+  }
+
+  renderVals() { return { showModal: !!this.state.modal }; }
+
+  componentDidMount() {
+    this.snapshot();
+    this.bindAll();
+    this.paint();
+  }
+
+  componentDidUpdate(prev) {
+    if (prev && prev.viewer !== this.props.viewer) { this.setState({ cat: null, dirty: false }); return; }
+    this.bindAll();
+    this.paint();
+  }
+
+  componentWillUnmount() {
+    clearTimeout(this.saveTimer);
+    clearTimeout(this.toastTimer);
+  }
+
+  token(name) {
+    if (!this.tk) this.tk = {};
+    if (this.tk[name]) return this.tk[name];
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    if (v) { this.tk[name] = v; return v; }
+    return TOKEN_FALLBACK[name] || "";
+  }
+
+  once(el, key) {
+    if (!el || el.getAttribute("data-bound-" + key)) return false;
+    el.setAttribute("data-bound-" + key, "1");
+    return true;
+  }
+
+  /** 저장 시점의 값을 기억해 변경 여부를 필드 단위로 판정한다. */
+  snapshot() {
+    this.base = new Map();
+    document.querySelectorAll("[data-f]").forEach((el) => this.base.set(el, el.value));
+    document.querySelectorAll("[data-switch],[data-ip-switch]").forEach((el) => this.base.set(el, el.getAttribute("data-on") || ""));
+    document.querySelectorAll("[data-seg] [data-seg-btn]").forEach((el) => this.base.set(el, el.getAttribute("data-on") || ""));
+  }
+
+  /** 변경된 필드는 좌측 3px 인디고 바로 표시한다 — 저장 전까지. */
+  markDirty() {
+    let dirty = false;
+    const primary = this.token("--color-primary");
+    document.querySelectorAll("[data-field]").forEach((field) => {
+      const changed = [...field.querySelectorAll("[data-f],[data-switch],[data-ip-switch],[data-seg-btn]")]
+        .some((el) => {
+          const now = el.hasAttribute("data-f") ? el.value : (el.getAttribute("data-on") || "");
+          return this.base.has(el) && this.base.get(el) !== now;
+        });
+      field.style.borderLeftColor = changed ? primary : "transparent";
+      if (changed) dirty = true;
+    });
+    if (dirty !== this.state.dirty) this.setState({ dirty });
+  }
+
+  bindAll() {
+    document.querySelectorAll("[data-cat-btn]").forEach((b) => {
+      if (!this.once(b, "cat")) return;
+      b.addEventListener("click", () => this.go(b.getAttribute("data-cat-btn")));
+    });
+    document.querySelectorAll("[data-f]").forEach((el) => {
+      if (!this.once(el, "dirty")) return;
+      const mask = el.getAttribute("data-mask");
+      el.addEventListener("input", () => {
+        if (mask) this.applyMask(el, mask);
+        if (el.hasAttribute("data-money") || el.hasAttribute("data-num")) this.applyNumber(el);
+        if (el.hasAttribute("data-pw")) this.paintStrength(el.value);
+        this.markDirty();
+      });
+      el.addEventListener("change", () => this.markDirty());
+    });
+    document.querySelectorAll("[data-switch]").forEach((b) => {
+      if (!this.once(b, "sw")) return;
+      b.addEventListener("click", () => { this.toggleSwitch(b, b.getAttribute("data-on") !== "1"); this.markDirty(); });
+    });
+    document.querySelectorAll("[data-seg]").forEach((seg) => {
+      seg.querySelectorAll("[data-seg-btn]").forEach((b) => {
+        if (!this.once(b, "seg")) return;
+        b.addEventListener("click", () => { this.pickSeg(seg, b); this.markDirty(); });
+      });
+    });
+    const revert = document.querySelector("[data-revert]");
+    if (this.once(revert, "revert")) revert.addEventListener("click", () => this.revert());
+    const save = document.querySelector("[data-save]");
+    if (this.once(save, "save")) save.addEventListener("click", () => this.save());
+    const ipSw = document.querySelector("[data-ip-switch]");
+    if (this.once(ipSw, "ipsw")) ipSw.addEventListener("click", () => this.tryIpToggle());
+    const danger = document.querySelector('[data-danger="branch"]');
+    if (this.once(danger, "danger")) danger.addEventListener("click", () => this.openDanger());
+    document.querySelectorAll("[data-danger-wrap],[data-biz-ok]").forEach((wrap) => {
+      if (!this.once(wrap, "tip")) return;
+      const tip = wrap.querySelector("[data-tip]");
+      if (!tip) return;
+      wrap.addEventListener("mouseenter", () => { if (!tip.getAttribute("data-mute")) tip.style.display = "flex"; });
+      wrap.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+    });
+    this.bindModal();
+  }
+
+  /** 카테고리 이동 — 저장하지 않은 변경이 있으면 먼저 묻는다. */
+  go(cat) {
+    if (this.state.dirty) { this.setState({ modal: "leave", pending: cat }); return; }
+    this.setState({ cat });
+  }
+
+  toggleSwitch(b, on) {
+    b.setAttribute("data-on", on ? "1" : "");
+    b.style.background = this.token(on ? "--color-primary" : "--border");
+    b.style.justifyContent = on ? "flex-end" : "flex-start";
+  }
+
+  pickSeg(seg, active) {
+    seg.querySelectorAll("[data-seg-btn]").forEach((b) => {
+      const on = b === active;
+      b.setAttribute("data-on", on ? "1" : "");
+      b.style.background = on ? this.token("--surface") : "transparent";
+      b.style.color = on ? this.token("--text-heading") : this.token("--text-muted");
+      b.style.fontWeight = on ? "700" : "400";
+      b.style.boxShadow = on ? "0 1px 2px rgba(11,17,32,.06)" : "none";
+    });
+  }
+
+  applyMask(el, kind) {
+    const d = el.value.replace(/\D/g, "").slice(0, kind === "corpno" ? 13 : kind === "phone" ? 11 : 10);
+    if (kind === "bizno") {
+      el.value = d.length > 5 ? d.slice(0, 3) + "-" + d.slice(3, 5) + "-" + d.slice(5)
+        : d.length > 3 ? d.slice(0, 3) + "-" + d.slice(3) : d;
+    } else if (kind === "corpno") {
+      el.value = d.length > 6 ? d.slice(0, 6) + "-" + d.slice(6) : d;
+    } else {
+      const mid = d.startsWith("010") || d.length > 10 ? 7 : 6;
+      el.value = d.length > mid ? d.slice(0, 3) + "-" + d.slice(3, mid) + "-" + d.slice(mid)
+        : d.length > 3 ? d.slice(0, 3) + "-" + d.slice(3) : d;
+    }
+  }
+
+  /** 콤마를 다시 넣으면 커서가 앞으로 튀므로 길이 차이만큼 보정한다. */
+  applyNumber(el) {
+    const prevLen = el.value.length;
+    const prevPos = el.selectionStart;
+    const digits = el.value.replace(/[^0-9]/g, "");
+    const out = el.hasAttribute("data-money")
+      ? (digits ? Number(digits).toLocaleString("ko-KR") : "")
+      : digits.slice(0, 4);
+    el.value = out;
+    const pos = Math.max(0, Math.min(out.length, prevPos + (out.length - prevLen)));
+    try { el.setSelectionRange(pos, pos); } catch (err) { /* detached */ }
+  }
+
+  /** 초대 수락 화면과 같은 3단계 강도 표시. */
+  paintStrength(v) {
+    const score = (v.length >= 8 ? 1 : 0) + (/[A-Za-z]/.test(v) && /\d/.test(v) ? 1 : 0) + (/[^A-Za-z0-9]/.test(v) ? 1 : 0);
+    const colors = ["--color-danger", "--color-warning", "--color-primary"];
+    const names = ["약함", "보통", "강함"];
+    document.querySelectorAll("[data-pw-bar]").forEach((bar, i) => {
+      bar.style.background = v && i < score ? this.token(colors[Math.max(0, score - 1)]) : this.token("--border");
+    });
+    const label = document.querySelector("[data-pw-label]");
+    if (label) {
+      label.textContent = v ? names[Math.max(0, score - 1)] : "";
+      label.style.color = v ? this.token(colors[Math.max(0, score - 1)]) : this.token("--text-muted");
+    }
+  }
+
+  /** 목록이 0개면 켤 수 없다 — 스스로를 잠그는 것을 막는다. */
+  tryIpToggle() {
+    const on = this.state.ipOn;
+    if (on) { this.setState({ ipOn: false }); return; }
+    if (!IP_ROWS.length) return;
+    this.setState({ modal: "ip" });
+  }
+
+  openDanger() { this.setState({ modal: "danger" }); }
+
+  revert() {
+    this.base.forEach((v, el) => {
+      if (el.hasAttribute("data-f")) { el.value = v; return; }
+      if (el.hasAttribute("data-seg-btn")) {
+        const seg = el.closest("[data-seg]");
+        if (v === "1" && seg) this.pickSeg(seg, el);
+        return;
+      }
+      this.toggleSwitch(el, v === "1");
+    });
+    this.setState({ dirty: false });
+    this.markDirty();
+  }
+
+  save() {
+    if (this.state.saving) return;
+    this.setState({ saving: true });
+    this.saveTimer = setTimeout(() => {
+      this.snapshot();
+      this.setState({ saving: false, dirty: false });
+      this.markDirty();
+      const toast = document.querySelector("[data-toast]");
+      if (toast) {
+        toast.style.display = "flex";
+        clearTimeout(this.toastTimer);
+        this.toastTimer = setTimeout(() => { toast.style.display = "none"; }, TOAST_MS);
+      }
+    }, SAVE_MS);
+  }
+
+  bindModal() {
+    const cancel = document.querySelector("[data-modal-cancel]");
+    const ok = document.querySelector("[data-modal-ok]");
+    const overlay = document.querySelector("[data-overlay]");
+    if (this.once(cancel, "mc")) cancel.addEventListener("click", () => this.setState({ modal: null, pending: null }));
+    if (this.once(overlay, "mo")) overlay.addEventListener("click", (e) => { if (e.target === overlay) this.setState({ modal: null, pending: null }); });
+    if (this.once(ok, "mok")) {
+      ok.addEventListener("click", () => {
+        const m = this.state.modal;
+        if (m === "leave") { this.revert(); this.setState({ modal: null, cat: this.state.pending, pending: null }); return; }
+        if (m === "ip") { this.setState({ modal: null, ipOn: true }); return; }
+        this.setState({ modal: null });
+      });
+    }
+    if (!this.state.modal) return;
+
+    const title = document.querySelector("[data-modal-title]");
+    const desc = document.querySelector("[data-modal-desc]");
+    const extra = document.querySelector("[data-modal-extra]");
+    const icon = document.querySelector("[data-modal-icon]");
+    if (!title || !desc || !extra || !ok) return;
+    extra.textContent = "";
+    extra.style.display = "none";
+    ok.disabled = false;
+    ok.style.opacity = "1";
+    ok.style.cursor = "pointer";
+    ok.style.background = this.token("--color-primary");
+
+    if (this.state.modal === "leave") {
+      icon.style.background = this.token("--color-warning-bg");
+      icon.style.color = this.token("--color-warning");
+      title.textContent = "변경 사항이 저장되지 않았습니다";
+      desc.textContent = "이동하면 입력한 내용이 사라집니다.";
+      cancel.textContent = "머무르기";
+      ok.textContent = "저장하지 않고 이동";
+      return;
+    }
+    if (this.state.modal === "ip") {
+      icon.style.background = this.token("--color-warning-bg");
+      icon.style.color = this.token("--color-warning");
+      title.textContent = "IP 제한을 적용할까요?";
+      desc.textContent = "현재 접속 IP가 목록에 없으면 즉시 접속이 차단됩니다.";
+      cancel.textContent = "취소";
+      ok.textContent = "적용";
+      extra.style.display = "block";
+      const box = document.createElement("div");
+      box.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:" +
+        this.token("--surface-alt") + ";border-radius:8px";
+      const label = document.createElement("span");
+      label.textContent = "현재 접속 IP 121.130.44.19";
+      label.style.cssText = "font-size:14px;font-weight:700;color:" + this.token("--text-heading") + ";font-variant-numeric:tabular-nums";
+      const add = document.createElement("button");
+      add.textContent = "현재 IP 추가";
+      add.style.cssText = "flex:0 0 auto;height:36px;padding:0 12px;border:1px solid " + this.token("--border") +
+        ";border-radius:8px;background:" + this.token("--surface") + ";color:" + this.token("--text-heading") +
+        ";font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap";
+      box.appendChild(label);
+      box.appendChild(add);
+      extra.appendChild(box);
+      return;
+    }
+    // 되돌릴 수 없는 동작은 대상 이름을 직접 입력해야 실행된다.
+    icon.style.background = this.token("--color-danger-bg");
+    icon.style.color = this.token("--color-danger");
+    title.textContent = "지점을 삭제할까요?";
+    desc.textContent = "이 작업은 되돌릴 수 없습니다. 확인을 위해 지점명을 입력하세요.";
+    cancel.textContent = "취소";
+    ok.textContent = "삭제";
+    ok.style.background = this.token("--color-danger");
+    ok.disabled = true;
+    ok.style.opacity = ".45";
+    ok.style.cursor = "not-allowed";
+    extra.style.display = "block";
+    const input = document.createElement("input");
+    input.placeholder = "강남 삼성점";
+    input.style.cssText = "width:100%;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:" +
+      this.token("--text-heading") + ";background:" + this.token("--surface") + ";border:1px solid " +
+      this.token("--border") + ";border-radius:8px;outline:none";
+    input.addEventListener("input", () => {
+      const match = input.value.trim() === "강남 삼성점";
+      ok.disabled = !match;
+      ok.style.opacity = match ? "1" : ".45";
+      ok.style.cursor = match ? "pointer" : "not-allowed";
+    });
+    extra.appendChild(input);
+  }
+
+  paint() {
+    const cat = this.cat;
+    document.querySelectorAll("[data-cat]").forEach((s) => {
+      s.style.display = s.getAttribute("data-cat") === cat ? "flex" : "none";
+    });
+    const operator = this.viewer === "operator";
+    document.querySelectorAll("[data-cat-btn]").forEach((b) => {
+      const key = b.getAttribute("data-cat-btn");
+      const on = key === cat;
+      // 입주사에게 없는 카테고리는 렌더링하지 않는다 — 비활성으로 두면 문의가 생긴다.
+      b.style.display = operator || TENANT_CATS.indexOf(key) > -1 ? "flex" : "none";
+      b.style.background = on ? "rgba(79,70,229,.08)" : "transparent";
+      b.style.color = on ? this.token("--color-primary") : this.token("--text-body");
+      b.style.fontWeight = on ? "600" : "400";
+    });
+    // 준비 중 행도 운영사 전용 — 그룹 가시성 판정에 반드시 포함해야 한다.
+    document.querySelectorAll("[data-cat-locked]").forEach((el) => {
+      el.style.display = operator ? "flex" : "none";
+    });
+    // 그룹 라벨은 그 안에 보이는 항목이 하나도 없으면 함께 사라진다.
+    document.querySelectorAll("[data-cat-btn],[data-cat-locked]").forEach((el) => {
+      const group = el.parentElement;
+      if (!group || !group.parentElement) return;
+      const anyVisible = [...group.children].some((c) => c.style.display !== "none");
+      group.parentElement.style.display = anyVisible ? "block" : "none";
+    });
+
+    // 하위 호실·계약이 0건일 때만 삭제할 수 있다. bare disabled 속성은 이 런타임에
+    // 반영되지 않으므로 실제 의존 건수로 여기서 판정한다.
+    const danger = document.querySelector('[data-danger="branch"]');
+    if (danger) {
+      const blocked = BRANCH_DEPS.rooms > 0 || BRANCH_DEPS.contracts > 0;
+      danger.disabled = blocked;
+      danger.style.cursor = blocked ? "not-allowed" : "pointer";
+      danger.style.opacity = blocked ? ".6" : "1";
+      danger.style.color = this.token(blocked ? "--text-caption" : "--color-danger");
+      const tip = danger.parentElement && danger.parentElement.querySelector("[data-tip]");
+      if (tip) {
+        tip.textContent = "호실 " + BRANCH_DEPS.rooms + "개, 진행 중 계약 " + BRANCH_DEPS.contracts + "건이 있습니다";
+        tip.setAttribute("data-mute", blocked ? "" : "1");
+      }
+    }
+    const crumb = document.querySelector("[data-crumb]");
+    if (crumb) crumb.textContent = "설정 · " + CATS[cat];
+    const note = document.querySelector("[data-role-note]");
+    if (note) note.textContent = this.viewer === "operator" ? "" : "입주사 계정 · 계정 설정만 변경할 수 있습니다";
+    const avatar = document.querySelector("[data-user-avatar]");
+    const uname = document.querySelector("[data-user-name]");
+    const uorg = document.querySelector("[data-user-org]");
+    if (avatar && uname && uorg) {
+      const tenant = this.viewer !== "operator";
+      avatar.textContent = tenant ? "김" : "최";
+      uname.textContent = tenant ? "김도현" : "최현수";
+      uorg.textContent = tenant ? "브릿지랩 주식회사" : "운영 관리자";
+    }
+
+    const bar = document.querySelector("[data-savebar]");
+    if (bar) bar.style.display = this.state.dirty ? "flex" : "none";
+    const spin = document.querySelector("[data-save-spin]");
+    const label = document.querySelector("[data-save-label]");
+    const body = document.querySelector("[data-body]");
+    if (spin) spin.style.display = this.state.saving ? "block" : "none";
+    if (label) label.textContent = this.state.saving ? "저장 중" : "저장";
+    if (body) body.style.pointerEvents = this.state.saving ? "none" : "auto";
+
+    const ipSw = document.querySelector("[data-ip-switch]");
+    if (ipSw) this.toggleSwitch(ipSw, this.state.ipOn);
+    const ipNote = document.querySelector("[data-ip-note]");
+    if (ipNote) {
+      ipNote.textContent = IP_ROWS.length
+        ? "현재 접속 IP 121.130.44.19"
+        : "IP를 먼저 등록해야 적용할 수 있습니다";
+    }
+    if (ipSw) {
+      const usable = IP_ROWS.length > 0;
+      ipSw.disabled = !usable;
+      ipSw.style.opacity = usable ? "1" : ".5";
+      ipSw.style.cursor = usable ? "pointer" : "not-allowed";
+    }
+
+    this.fillNotify();
+    this.fillIp();
+    this.fillLogs();
+    this.fillSessions();
+  }
+
+  fillNotify() {
+    const host = document.querySelector("[data-notify-rows]");
+    if (!host || host.getAttribute("data-drawn")) return;
+    host.setAttribute("data-drawn", "1");
+    const border = this.token("--border");
+    NOTIFY_ROWS.forEach((r, i) => {
+      const row = document.createElement("div");
+      row.style.cssText = "display:grid;grid-template-columns:1fr 88px 88px 88px;align-items:center;min-height:56px;padding:10px 16px;" +
+        (i === NOTIFY_ROWS.length - 1 ? "" : "border-bottom:1px solid " + border + ";") +
+        "background:" + this.token(r.on ? "--surface" : "--surface-alt");
+      const info = document.createElement("div");
+      const name = document.createElement("div");
+      name.textContent = r.name;
+      name.style.cssText = "font-size:14px;font-weight:700;color:" + this.token(r.on ? "--text-heading" : "--text-muted");
+      const desc = document.createElement("div");
+      desc.textContent = r.desc;
+      desc.style.cssText = "margin-top:2px;font-size:13px;color:" + this.token("--text-caption");
+      info.appendChild(name);
+      info.appendChild(desc);
+      row.appendChild(info);
+      ["mail", "kakao", "push"].forEach((ch) => {
+        const cell = document.createElement("span");
+        cell.style.cssText = "display:flex;justify-content:center";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = r.on && ch === "mail";
+        cb.disabled = !r.on || !CHANNELS_READY[ch];
+        cb.style.cssText = "width:18px;height:18px;accent-color:" + this.token("--color-primary") +
+          (cb.disabled ? ";opacity:.4" : "");
+        cell.appendChild(cb);
+        row.appendChild(cell);
+      });
+      host.appendChild(row);
+    });
+  }
+
+  fillIp() {
+    const host = document.querySelector("[data-ip-rows]");
+    if (!host || host.getAttribute("data-drawn")) return;
+    host.setAttribute("data-drawn", "1");
+    const border = this.token("--border");
+    IP_ROWS.forEach((r, i) => {
+      const row = document.createElement("div");
+      row.style.cssText = "display:grid;grid-template-columns:1.2fr 1fr 1.6fr 64px;align-items:center;height:52px;padding:0 16px;" +
+        (i === IP_ROWS.length - 1 ? "" : "border-bottom:1px solid " + border);
+      [r.ip, r.cidr, r.desc].forEach((v, k) => {
+        const c = document.createElement("span");
+        c.textContent = v;
+        c.style.cssText = "font-size:14px;color:" + this.token(k === 0 ? "--text-heading" : "--text-body") +
+          (k === 0 ? ";font-weight:700;font-variant-numeric:tabular-nums" : "");
+        row.appendChild(c);
+      });
+      const act = document.createElement("span");
+      act.style.cssText = "display:flex;justify-content:flex-end";
+      const del = document.createElement("button");
+      del.textContent = "삭제";
+      del.style.cssText = "border:0;background:transparent;padding:0;color:" + this.token("--color-danger") +
+        ";font-family:inherit;font-size:13px;font-weight:700;cursor:pointer";
+      act.appendChild(del);
+      row.appendChild(act);
+      host.appendChild(row);
+    });
+    const count = document.querySelector("[data-ip-count]");
+    if (count) count.textContent = "등록된 IP " + IP_ROWS.length + "개";
+  }
+
+  fillLogs() {
+    const host = document.querySelector("[data-log-rows]");
+    if (!host || host.getAttribute("data-drawn")) return;
+    host.setAttribute("data-drawn", "1");
+    const border = this.token("--border");
+    LOG_ROWS.forEach((r, i) => {
+      const row = document.createElement("div");
+      row.style.cssText = "display:grid;grid-template-columns:1.4fr 1.2fr 1.2fr 1.2fr 80px;align-items:center;height:48px;padding:0 16px;" +
+        (i === LOG_ROWS.length - 1 ? "" : "border-bottom:1px solid " + border);
+      [r.at, r.who, r.ip, r.dev].forEach((v) => {
+        const c = document.createElement("span");
+        c.textContent = v;
+        c.style.cssText = "font-size:13px;color:" + this.token("--text-body") +
+          ";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums";
+        row.appendChild(c);
+      });
+      const res = document.createElement("span");
+      res.textContent = r.ok ? "성공" : "실패";
+      res.style.cssText = "text-align:right;font-size:13px;font-weight:700;color:" +
+        this.token(r.ok ? "--text-muted" : "--color-danger");
+      row.appendChild(res);
+      host.appendChild(row);
+    });
+  }
+
+  fillSessions() {
+    const host = document.querySelector("[data-session-rows]");
+    if (!host || host.getAttribute("data-drawn")) return;
+    host.setAttribute("data-drawn", "1");
+    SESSIONS.forEach((s) => {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 18px;border:1px solid " +
+        this.token("--border") + ";border-radius:8px";
+      const info = document.createElement("div");
+      const top = document.createElement("div");
+      top.style.cssText = "display:flex;align-items:center;gap:8px";
+      const dev = document.createElement("span");
+      dev.textContent = s.dev;
+      dev.style.cssText = "font-size:14px;font-weight:700;color:" + this.token("--text-heading");
+      top.appendChild(dev);
+      if (s.current) {
+        const tag = document.createElement("span");
+        tag.textContent = "현재 기기";
+        tag.style.cssText = "height:22px;padding:0 8px;display:inline-flex;align-items:center;border-radius:6px;background:" +
+          this.token("--color-accent-bg") + ";color:" + this.token("--color-primary-hover") + ";font-size:12px;font-weight:700";
+        top.appendChild(tag);
+      }
+      const sub = document.createElement("div");
+      sub.textContent = s.place + " · " + s.at;
+      sub.style.cssText = "margin-top:2px;font-size:13px;color:" + this.token("--text-muted");
+      info.appendChild(top);
+      info.appendChild(sub);
+      row.appendChild(info);
+      if (!s.current) {
+        const out = document.createElement("button");
+        out.textContent = "로그아웃";
+        out.style.cssText = "flex:0 0 auto;height:36px;padding:0 14px;border:1px solid " + this.token("--border") +
+          ";border-radius:8px;background:" + this.token("--surface") + ";color:" + this.token("--text-heading") +
+          ";font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap";
+        row.appendChild(out);
+      }
+      host.appendChild(row);
+    });
+  }
+}
+
+</script>
+</body>
+</html>

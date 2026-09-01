@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="회의실 현황판" description="벽면 태블릿 현황판 — 표시 전용. 당일 타임라인 2행, 다음 예약, 현장 예약은 QR" -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>:root{--k-booked:#818CF8;--k-booked-bar:#4F46E5;--k-empty:#EEF0F4;--k-now:#22D3EE}html,body{margin:0;height:100%;overflow:hidden}*{box-sizing:border-box}@keyframes kFade{from{opacity:.55}to{opacity:1}}</style>
+</helmet>
+<div data-k-root="1" style="position:relative;width:100vw;height:100dvh;overflow:hidden;background:var(--surface);font-family:var(--font-core);user-select:none">
+
+<div data-k-dim="1" style="display:none;position:absolute;inset:0;z-index:40;background:rgba(11,17,32,.6);pointer-events:none">
+<span style="position:absolute;left:50%;top:clamp(16px,2vw,32px);transform:translateX(-50%);height:44px;padding:0 20px;display:inline-flex;align-items:center;border-radius:var(--radius-pill);background:rgba(255,255,255,.14);color:#FFFFFF;font-size:20px;font-weight:700;white-space:nowrap">운영 시간 외</span>
+</div>
+
+<div data-k-vp="1" style="display:none;position:absolute;right:12px;bottom:12px;z-index:60;padding:8px 12px;border-radius:6px;background:var(--surface-inverse);color:#FFFFFF;font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums;pointer-events:none;text-align:right"></div>
+<button data-k-vp-hit="1" aria-label="개발 정보" style="position:absolute;right:0;bottom:0;z-index:59;width:72px;height:72px;border:0;background:transparent;padding:0;cursor:default;pointer-events:auto"></button>
+
+<div data-k-screen="1" style="width:100%;height:100%;display:flex;flex-direction:column;gap:clamp(12px,1.5vh,24px);padding:clamp(16px,2vw,32px);pointer-events:none">
+
+<div data-k-offline="1" style="display:none;flex:0 0 auto;min-height:0;align-items:center;gap:12px;padding:0 clamp(16px,2vw,24px);height:56px;border-radius:var(--radius-md);background:var(--color-danger-bg);border:1px solid rgba(220,38,38,.3)">
+<span style="display:flex;color:var(--color-danger);flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="wifi-off" size="{{ 22 }}" hint-size="22px,22px"></x-import></span>
+<span style="font-size:clamp(18px,1.8vw,22px);font-weight:700;color:var(--color-danger);white-space:nowrap">연결이 끊어졌습니다</span>
+<span style="flex:1"></span>
+<span data-k-offline-at="1" style="font-size:clamp(16px,1.6vw,18px);color:var(--text-body);white-space:nowrap;font-variant-numeric:tabular-nums"></span>
+</div>
+
+<div style="flex:0 0 auto;min-height:88px;display:flex;align-items:center;justify-content:space-between;gap:16px">
+<div style="display:flex;align-items:center;gap:16px;min-width:0">
+<img src="../../assets/swonbiz-logo.png" alt="" style="height:32px;width:auto;flex:0 0 auto">
+<div style="min-width:0">
+<div style="font-size:clamp(24px,2.6vw,34px);font-weight:800;letter-spacing:-.02em;color:var(--text-heading);white-space:nowrap">회의실 A</div>
+<div data-k-date="1" style="margin-top:2px;font-size:20px;color:var(--text-muted);white-space:nowrap">8월 26일 수요일</div>
+</div>
+</div>
+<div data-k-clock="1" style="flex:0 0 auto;font-size:clamp(56px,6vw,76px);font-weight:800;line-height:1;letter-spacing:-.02em;color:var(--text-heading);font-variant-numeric:tabular-nums">13:40</div>
+</div>
+
+<div data-k-banner="1" style="flex:0 0 auto;min-height:64px;display:flex;align-items:center;gap:14px;padding:0 clamp(16px,2vw,24px);border-radius:var(--radius-md);background:var(--color-primary)">
+<span data-k-dot="1" style="width:16px;height:16px;flex:0 0 auto;border-radius:999px;background:#FFFFFF"></span>
+<span data-k-banner-main="1" style="font-size:clamp(26px,2.8vw,36px);font-weight:800;letter-spacing:-.02em;color:#FFFFFF;white-space:nowrap">사용 중 · 14:00까지</span>
+<span style="flex:1"></span>
+<span data-k-banner-sub="1" style="font-size:clamp(20px,2vw,24px);color:rgba(255,255,255,.75);white-space:nowrap">다음 예약 16:00</span>
+</div>
+
+<div style="flex:1 1 auto;min-height:0;min-width:0;display:flex;flex-direction:column;gap:clamp(12px,1.5vh,24px)">
+<div style="flex:1 1 0;min-height:0;min-width:0;display:flex">
+<div style="flex:0 0 64px;display:flex;align-items:center;font-size:20px;color:var(--text-muted)">주간</div>
+<div style="flex:1 1 auto;min-width:0;display:flex;flex-direction:column">
+<div data-k-ticks="day" style="position:relative;flex:0 0 24px;width:100%"></div>
+<div data-k-track="day" style="position:relative;flex:1 1 auto;min-height:0;width:100%;border-radius:var(--radius-md);background:var(--k-empty);overflow:hidden"></div>
+</div>
+</div>
+<div style="flex:1 1 0;min-height:0;min-width:0;display:flex">
+<div style="flex:0 0 64px;display:flex;align-items:center;font-size:20px;color:var(--text-muted)">야간</div>
+<div style="flex:1 1 auto;min-width:0;display:flex;flex-direction:column">
+<div data-k-ticks="night" style="position:relative;flex:0 0 24px;width:calc(100% * 8 / 18)"></div>
+<div data-k-track="night" style="position:relative;flex:1 1 auto;min-height:0;width:calc(100% * 8 / 18);border-radius:var(--radius-md);background:var(--k-empty);overflow:hidden"></div>
+</div>
+</div>
+</div>
+
+<div style="flex:0 0 auto;min-height:160px;display:flex;gap:clamp(16px,2vw,32px)">
+<div style="flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:8px">
+<div style="flex:0 0 auto;font-size:20px;font-weight:700;color:var(--text-heading)">다음 예약</div>
+<div data-k-next="1" style="flex:1 1 auto;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(10px,1.2vw,16px)"></div>
+</div>
+<div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px">
+<div data-k-qr="1" style="width:144px;height:144px;flex:0 0 auto;padding:8px;border-radius:var(--radius-md);background:#FFFFFF;border:1px solid var(--border)"></div>
+<div style="text-align:center">
+<div style="font-size:20px;font-weight:700;color:var(--text-heading);white-space:nowrap">지금 예약하기</div>
+<div style="margin-top:2px;font-size:16px;color:var(--text-muted);white-space:nowrap">휴대폰으로 스캔</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:800},&quot;offline&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;상태&quot;},&quot;afterHours&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;상태&quot;}}">
+/* ── 미확정 상수 ── */
+/** 로그인 세션이 있으면 조직 자동 확정, 없으면 로그인 후 리다이렉트.
+ *  회의실이 늘어나면 ROOM_ID만 바꿔 붙인다. */
+const BOOKING_QR_URL = "https://erp.swonbiz.com/booking/new";
+const ROOM_ID = "A";
+
+const OPEN_HOUR = 9;
+const CLOSE_HOUR = 22;
+const SLOTS = (CLOSE_HOUR - OPEN_HOUR) * 2; // 26
+
+/** 데이터 폴링 30초. 5초 폴링은 24시간 화면에서 하루 17,000회 요청이 되고
+ *  얻는 것은 최대 55초의 반영 지연 단축뿐이다. */
+const POLL_MS = 30000;
+/** 시계·마커는 데이터 요청 없이 로컬 시계로 1초마다. */
+const TICK_MS = 1000;
+const VP_MS = 5000;
+
+const TOKEN_FALLBACK = {
+  "--surface": "#FFFFFF", "--surface-alt": "#F8FAFC", "--border": "#E2E8F0",
+  "--text-heading": "#0B1120", "--text-body": "#475569", "--text-muted": "#64748B",
+  "--text-caption": "#94A3B8", "--surface-inverse": "#0B1120",
+  "--color-primary": "#4F46E5", "--color-primary-hover": "#4338CA",
+  "--color-accent-bg": "#EEF2FF", "--color-danger": "#DC2626",
+};
+
+/** 오늘 예약. 현황판은 시간만 노출하므로 제목·조직을 담지 않는다. */
+const TODAY = [
+  { slot: 4, len: 4 },   // 11:00–13:00
+  { slot: 8, len: 2 },   // 13:00–14:00 (현재)
+  { slot: 14, len: 4 },  // 16:00–18:00
+  { slot: 22, len: 2 },  // 20:00–21:00
+];
+
+class Component extends DCLogic {
+  state = { now: null, lastSync: null };
+
+  /** 시안은 13:40 고정. 슬롯 8 = 13:00이므로 +40분은 8 + 40/30. */
+  get nowSlot() {
+    if (this.props.demoTime === false && this.state.now !== null) return this.state.now;
+    return 8 + 40 / 30;
+  }
+
+  get offline() { return !!this.props.offline; }
+  get afterHours() { return !!this.props.afterHours; }
+
+  componentDidMount() {
+    this.paint();
+    this.startTimers();
+    this.requestWakeLock();
+  }
+
+  componentDidUpdate() { this.paint(); }
+
+  componentWillUnmount() {
+    clearInterval(this.pollTimer);
+    clearInterval(this.tickTimer);
+    clearTimeout(this.vpTimer);
+    clearTimeout(this.wakeRetry);
+    if (this.wakeLock) { try { this.wakeLock.release(); } catch (err) { /* 이미 해제 */ } }
+  }
+
+  /**
+   * 두 주기를 분리한다 — 데이터는 30초, 시계와 마커는 1초.
+   * 마커가 계속 움직이므로 화면이 정지된 인상을 주지 않는다.
+   */
+  startTimers() {
+    this.tickTimer = setInterval(() => { this.paintClock(); this.paintTimeline(); }, TICK_MS);
+    this.pollTimer = setInterval(() => this.poll(), POLL_MS);
+    this.poll();
+  }
+
+  /** 데이터 갱신 — 페이드만, 레이아웃 이동 없음. 실패가 이어져도 폴링은 계속. */
+  poll() {
+    const ok = !this.offline;
+    if (ok) {
+      this.failures = 0;
+      this.setState({ lastSync: new Date() });
+      const screen = document.querySelector("[data-k-screen]");
+      if (screen) {
+        screen.style.animation = "none";
+        requestAnimationFrame(() => { screen.style.animation = "kFade 420ms var(--ease-out)"; });
+      }
+    } else {
+      this.failures = (this.failures || 0) + 1;
+    }
+    // 자정 경과 시 날짜·타임라인 리셋
+    const today = new Date().toDateString();
+    if (this.dayKey && this.dayKey !== today) this.paintDate();
+    this.dayKey = today;
+  }
+
+  /** 화면 꺼짐 방지. 실패하면 재시도한다. */
+  requestWakeLock() {
+    if (!navigator.wakeLock) return;
+    navigator.wakeLock.request("screen").then((lock) => {
+      this.wakeLock = lock;
+      lock.addEventListener("release", () => { this.wakeRetry = setTimeout(() => this.requestWakeLock(), 5000); });
+    }).catch(() => { this.wakeRetry = setTimeout(() => this.requestWakeLock(), 10000); });
+  }
+
+  token(name) {
+    if (!this.tk) this.tk = {};
+    if (this.tk[name]) return this.tk[name];
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    if (v) { this.tk[name] = v; return v; }
+    return TOKEN_FALLBACK[name] || "";
+  }
+
+  label(slot) {
+    const h = OPEN_HOUR + Math.floor(slot / 2);
+    return String(h).padStart(2, "0") + ":" + (slot % 2 ? "30" : "00");
+  }
+
+  paint() {
+    this.paintDate();
+    this.paintClock();
+    this.paintBanner();
+    this.paintTimeline();
+    this.paintNext();
+    this.paintQr();
+    this.paintOverlays();
+    this.bindDevBadge();
+  }
+
+  paintDate() {
+    const el = document.querySelector("[data-k-date]");
+    if (!el) return;
+    const d = new Date();
+    const week = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
+    el.textContent = (d.getMonth() + 1) + "월 " + d.getDate() + "일 " + week + "요일";
+  }
+
+  paintClock() {
+    const el = document.querySelector("[data-k-clock]");
+    if (!el) return;
+    // 슬롯은 30분 단위다. 소수부를 시간으로 환산하면 마커와 어긋나므로
+    // 분으로 직접 바꿔 조립한다: 09:00 + 슬롯 × 30분.
+    const m = Math.round(OPEN_HOUR * 60 + this.nowSlot * 30);
+    el.textContent = String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+  }
+
+  paintOverlays() {
+    const off = document.querySelector("[data-k-offline]");
+    if (off) {
+      off.style.display = this.offline ? "flex" : "none";
+      const at = off.querySelector("[data-k-offline-at]");
+      if (at) at.textContent = this.state.lastSync
+        ? "마지막 갱신 " + this.state.lastSync.toTimeString().slice(0, 5)
+        : "마지막 갱신 없음";
+    }
+    // 운영 시간 외에는 디밍만 하고 타임라인은 계속 보여준다 — 다음날 예약 확인용.
+    const dim = document.querySelector("[data-k-dim]");
+    if (dim) dim.style.display = this.afterHours ? "block" : "none";
+  }
+
+  /** 한 줄 상태 스트립. 배경색만으로 원거리에서 판단되게 한다. */
+  paintBanner() {
+    const banner = document.querySelector("[data-k-banner]");
+    const main = document.querySelector("[data-k-banner-main]");
+    const sub = document.querySelector("[data-k-banner-sub]");
+    const dot = document.querySelector("[data-k-dot]");
+    if (!banner || !main || !sub || !dot) return;
+    const now = this.nowSlot;
+    const live = TODAY.find((b) => now >= b.slot && now < b.slot + b.len);
+    const next = TODAY.filter((b) => b.slot > now).sort((a, b) => a.slot - b.slot)[0];
+
+    if (live) {
+      banner.style.background = this.token("--color-primary");
+      main.style.color = "#FFFFFF";
+      sub.style.color = "rgba(255,255,255,.75)";
+      dot.style.background = "#FFFFFF";
+      main.textContent = "사용 중 · " + this.label(live.slot + live.len) + "까지";
+      sub.textContent = next ? "다음 예약 " + this.label(next.slot) : "이후 예약 없음";
+    } else {
+      banner.style.background = this.token("--surface-alt");
+      main.style.color = this.token("--text-heading");
+      sub.style.color = this.token("--text-muted");
+      dot.style.background = this.token("--text-caption");
+      main.textContent = next ? "비어 있음" : "오늘 남은 예약이 없습니다";
+      sub.textContent = next ? "다음 예약 " + this.label(next.slot) : "";
+    }
+  }
+
+  /**
+   * 타임라인 2행. 폭은 전부 %로 계산해 뷰포트가 줄어도 가로 스크롤이 없다.
+   * 야간 트랙 자체를 18슬롯 폭의 8/18로 두어 두 행의 슬롯 폭이 같다.
+   * 트랙 안에는 어떤 문자도 넣지 않는다 — 색이 "예약 여부"만 말한다.
+   */
+  paintTimeline() {
+    const border = this.token("--border");
+    const muted = this.token("--text-muted");
+    const now = this.nowSlot;
+    const ROWS = [
+      { key: "day", from: 0, to: 18 },
+      { key: "night", from: 18, to: SLOTS },
+    ];
+
+    ROWS.forEach((row) => {
+      const host = document.querySelector('[data-k-track="' + row.key + '"]');
+      const ticks = document.querySelector('[data-k-ticks="' + row.key + '"]');
+      if (!host || !ticks) return;
+      const span = row.to - row.from;
+      const pct = (slots) => (slots / span) * 100;
+
+      host.textContent = "";
+      // 텍스트가 없으므로 30분 경계를 반드시 그린다: 정시 실선, 30분 점선.
+      for (let i = 1; i < span; i++) {
+        const g = document.createElement("span");
+        const onHour = (row.from + i) % 2 === 0;
+        g.style.cssText = "position:absolute;top:0;bottom:0;left:" + pct(i) + "%;width:1px;" +
+          (onHour ? "background:" + border : "border-left:1px dashed " + border);
+        host.appendChild(g);
+      }
+
+      TODAY.forEach((b) => {
+        const from = Math.max(b.slot, row.from);
+        const to = Math.min(b.slot + b.len, row.to);
+        if (to <= from) return;
+        const bar = document.createElement("div");
+        bar.style.cssText = "position:absolute;top:0;bottom:0;left:" + pct(from - row.from) + "%;width:" + pct(to - from) +
+          "%;border-radius:8px;background:var(--k-booked);border-left:3px solid var(--k-booked-bar)";
+        host.appendChild(bar);
+      });
+
+      // 눈금은 시간 경계 위에 중앙 정렬한다. 마지막 경계까지 찍어 마지막 막대의
+      // 오른쪽 끝에도 기준이 있게 한다.
+      ticks.textContent = "";
+      for (let h = 0; h <= span / 2; h++) {
+        const hour = OPEN_HOUR + (row.from / 2) + h;
+        const t = document.createElement("span");
+        t.textContent = String(hour).padStart(2, "0");
+        const first = h === 0;
+        const last = h === span / 2;
+        t.style.cssText = "position:absolute;bottom:0;left:" + pct(h * 2) + "%;" +
+          (first ? "" : last ? "transform:translateX(-100%);" : "transform:translateX(-50%);") +
+          "font-size:20px;color:" + muted + ";font-variant-numeric:tabular-nums;white-space:nowrap;opacity:" +
+          (row.from + h * 2 < now ? ".3" : "1");
+        ticks.appendChild(t);
+      }
+
+      // 시안은 현재 시각 마커에만 쓴다 — 화면 내 유일한 액센트.
+      if (now >= row.from && now < row.to) {
+        const x = pct(now - row.from);
+        const line = document.createElement("div");
+        line.style.cssText = "position:absolute;top:0;bottom:0;left:" + x + "%;width:3px;background:var(--k-now);z-index:3";
+        host.appendChild(line);
+        const tri = document.createElement("span");
+        tri.style.cssText = "position:absolute;bottom:0;left:" + x +
+          "%;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid var(--k-now)";
+        ticks.appendChild(tri);
+      }
+    });
+  }
+
+  /** 다음 예약 3장 — 시간과 "예약됨"만. 제목·조직·인원은 어디에도 없다. */
+  paintNext() {
+    const host = document.querySelector("[data-k-next]");
+    if (!host) return;
+    const now = this.nowSlot;
+    const upcoming = TODAY.filter((b) => b.slot + b.len > now).sort((a, b) => a.slot - b.slot).slice(0, 3);
+    host.textContent = "";
+
+    if (!upcoming.length) {
+      const empty = document.createElement("div");
+      empty.textContent = "오늘 남은 예약이 없습니다";
+      empty.style.cssText = "grid-column:1 / -1;display:flex;align-items:center;font-size:22px;color:" + this.token("--text-muted");
+      host.appendChild(empty);
+      return;
+    }
+
+    upcoming.forEach((b) => {
+      const card = document.createElement("div");
+      card.style.cssText = "height:96px;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:0 20px;border:1px solid " +
+        this.token("--border") + ";border-radius:var(--radius-md);background:" + this.token("--surface");
+      const time = document.createElement("div");
+      time.textContent = this.label(b.slot) + " – " + this.label(b.slot + b.len);
+      time.style.cssText = "font-size:28px;font-weight:700;color:" + this.token("--text-heading") +
+        ";white-space:nowrap;font-variant-numeric:tabular-nums";
+      const tag = document.createElement("div");
+      tag.textContent = "예약됨";
+      tag.style.cssText = "font-size:20px;color:" + this.token("--text-muted");
+      card.appendChild(time);
+      card.appendChild(tag);
+      host.appendChild(card);
+    });
+  }
+
+  /**
+   * QR — 현장 예약은 본인 기기의 로그인 세션에서 처리한다. 공용 화면에서
+   * 조직을 직접 고르게 하면 오선택·사칭이 무료 시간 소진으로 이어진다.
+   * 시안에서는 외부 이미지 없이 CSS 격자로 자리를 표현한다.
+   */
+  paintQr() {
+    const host = document.querySelector("[data-k-qr]");
+    if (!host || host.getAttribute("data-drawn")) return;
+    host.setAttribute("data-drawn", "1");
+    host.setAttribute("data-url", BOOKING_QR_URL + "?room=" + ROOM_ID);
+    const dark = this.token("--text-heading");
+    const grid = document.createElement("div");
+    grid.style.cssText = "width:100%;height:100%;display:grid;grid-template-columns:repeat(21,1fr);grid-template-rows:repeat(21,1fr);gap:1px";
+    // 결정적 패턴 — 실제 QR은 서버에서 생성해 교체한다.
+    for (let i = 0; i < 441; i++) {
+      const r = Math.floor(i / 21), c = i % 21;
+      const finder = (r < 7 && c < 7) || (r < 7 && c > 13) || (r > 13 && c < 7);
+      const ring = finder && (r % 6 === 0 || c % 6 === 0 || (r > 1 && r < 5 && c > 1 && c < 5));
+      const on = finder ? ring : ((r * 7 + c * 13 + (r % 3) * (c % 5)) % 3 === 0);
+      const cell = document.createElement("span");
+      cell.style.cssText = "background:" + (on ? dark : "transparent");
+      grid.appendChild(cell);
+    }
+    host.appendChild(grid);
+  }
+
+  /**
+   * 표시 전용 화면이므로 오터치로 어떤 상태도 바뀌지 않는다.
+   * 예외는 우하단 모서리 3회 탭 — 개발 확인용 오버레이, 5초 후 자동 숨김.
+   */
+  bindDevBadge() {
+    const badge = document.querySelector("[data-k-vp]");
+    const hit = document.querySelector("[data-k-vp-hit]");
+    if (!badge || !hit || hit.getAttribute("data-bound")) return;
+    hit.setAttribute("data-bound", "1");
+    let taps = 0, reset = null;
+    hit.addEventListener("click", () => {
+      taps += 1;
+      clearTimeout(reset);
+      reset = setTimeout(() => { taps = 0; }, 600);
+      if (taps < 3) return;
+      taps = 0;
+      badge.textContent = window.innerWidth + " × " + window.innerHeight;
+      const line = document.createElement("div");
+      line.textContent = "갱신 " + (this.state.lastSync ? this.state.lastSync.toTimeString().slice(0, 8) : "—");
+      badge.appendChild(line);
+      badge.style.display = "block";
+      clearTimeout(this.vpTimer);
+      this.vpTimer = setTimeout(() => { badge.style.display = "none"; }, VP_MS);
+    });
+  }
+}
+
+</script>
+</body>
+</html>

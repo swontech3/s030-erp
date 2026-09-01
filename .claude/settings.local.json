@@ -1,0 +1,29 @@
+{
+  "autoMode": {
+    "environment": [
+      "### Org-wide",
+      "**Organization**: 에스원비즈 (SwonBiz) — 공유오피스(shared-office) operations system (erp.swonbiz.com)",
+      "**Cloud provider(s)**: None configured (none found in the tree)",
+      "**Repository visibility**: No git remote configured. Given the multi-tenant ERP with customer/PII data, treat as private — nothing here is intended to be published",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured in this repo. Authentication is delegated to an external 삐용 JWT API (session/token policy lives there, e.g. SESSION_TTL — not in this repo)",
+      "**Default / protected branches**: No remote yet — treat main/master as protected once one exists",
+      "**CI/CD deploy targets**: None configured (deploy target presumably erp.swonbiz.com, unconfirmed)",
+      "**Network posture**: None configured",
+      "**Source control**: The trusted repo only (no remote configured, no additional orgs)",
+      "**Trusted internal domains**: erp.swonbiz.com (the product\u0027s own domain). The 삐용 JWT auth API host is not yet present in the tree — confirm before trusting",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: 삐용 JWT authentication API (external auth provider; exact host unconfirmed)",
+      "**Internal package registry**: None configured (standard npm assumed for this Next.js project)",
+      "**Sensitive data locations \u0026 audiences**: Tenant/입주사 records (features/tenants/, /tenants routes); contract data carrying 사업자번호 (business-registration numbers), 전화번호 (phone), and 금액 (billing amounts) in features/contracts/, lib/format.ts masking, /contracts/[id], /billing; auth/session tokens from the 삐용 JWT API (lib/auth/). Share only with SwonBiz operators and each tenant\u0027s own records — audience needs confirmation",
+      "**Data retention / declassification**: Not documented in the tree — data schema still being decided (see doc/SWONBIZ_PROJECT_STRUCTURE.md §8)",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries `prod` or `production` as a whole word or name segment (hyphen/underscore/dot-delimited — e.g. matches `prod-db`, not `producer`)",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries `prod` or `production` as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: Frontend/full-stack development — migrating design/*.dc.html design templates into a Next.js app (components, features, screens)",
+      "**Trusted repo**: C:\\workspace\\SwonBiz-erp (no remote configured; treat as private — OK for this project\u0027s own work)",
+      "**Org-specific CLIs**: None configured (no command history recorded in this project yet)"
+    ]
+  }
+}

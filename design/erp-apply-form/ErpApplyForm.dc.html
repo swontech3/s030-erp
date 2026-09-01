@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="공개 · 온라인 입주 신청" description="swonbiz.com/apply — 4블록 신청 폼, sticky 요약 패널, 제출 바, 접수 완료 화면" -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>body{margin:0}[data-scroll]::-webkit-scrollbar{width:6px}[data-scroll]::-webkit-scrollbar-track{background:transparent}[data-scroll]::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}@keyframes swonSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}</style>
+</helmet>
+<div style="min-width:1440px;background:var(--surface-alt);font-family:var(--font-core)">
+
+<header style="position:sticky;top:0;z-index:30;height:72px;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)">
+<div style="max-width:1200px;margin:0 auto;padding:0 24px;height:72px;display:flex;align-items:center;gap:48px">
+<a href="#" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:0 0 auto">
+<img src="../../assets/swonbiz-logo.png" alt="SwonBiz" style="height:32px;width:auto;display:block">
+<span style="font-size:20px;font-weight:800;letter-spacing:-.03em;color:var(--text-heading);white-space:nowrap">S<span style="opacity:.55">·</span>won<span style="color:var(--color-primary)">Biz</span></span>
+</a>
+<nav style="display:flex;gap:32px;flex:1">
+<a href="#" style="font-size:14px;color:var(--text-body);text-decoration:none;transition:color var(--dur) var(--ease-out)" style-hover="color:var(--color-primary)">공간안내</a>
+<a href="#" style="font-size:14px;color:var(--text-body);text-decoration:none;transition:color var(--dur) var(--ease-out)" style-hover="color:var(--color-primary)">요금제</a>
+<a href="#" style="font-size:14px;color:var(--text-body);text-decoration:none;transition:color var(--dur) var(--ease-out)" style-hover="color:var(--color-primary)">이용안내</a>
+</nav>
+<a href="tel:07043552312" style="flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:var(--color-primary);text-decoration:none;white-space:nowrap;transition:color var(--dur) var(--ease-out)" style-hover="color:var(--color-primary-hover)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="phone" size="{{ 16 }}" hint-size="16px,16px"></x-import>070-4355-2312</a>
+</div>
+</header>
+
+<sc-if value="{{ isForm }}" hint-placeholder-val="{{ true }}">
+<div style="height:168px;display:flex;align-items:center;background:var(--surface);border-bottom:1px solid var(--border)">
+<div style="max-width:960px;margin:0 auto;padding:0 24px;width:100%">
+<h1 style="margin:0;font-size:var(--text-h1-size);font-weight:var(--weight-bold);line-height:var(--text-h1-lh);letter-spacing:var(--text-h1-ls);color:var(--text-heading)">온라인 입주 신청</h1>
+<p style="margin:12px 0 0;font-size:var(--text-body-lg-size);line-height:var(--text-body-lg-lh);color:var(--text-body)">접수 후 영업일 1일 내 담당자가 연락드립니다</p>
+</div>
+</div>
+
+<div data-form-root="1" style="max-width:1008px;margin:0 auto;padding:32px 24px 132px;display:flex;gap:40px;align-items:flex-start">
+
+<div style="width:640px;flex:0 0 auto;display:flex;flex-direction:column;gap:20px">
+
+<div data-error-summary="1" style="display:none;flex-direction:column;gap:8px;padding:16px 20px;background:var(--color-danger-bg);border:1px solid rgba(220,38,38,.3);border-radius:var(--radius-lg)">
+<div style="display:flex;align-items:center;gap:8px"><span style="display:flex;color:var(--color-danger);flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-alert" size="{{ 16 }}" hint-size="16px,16px"></x-import></span><span data-error-title="1" style="font-size:14px;font-weight:700;color:var(--color-danger)"></span></div>
+<div data-error-list="1" style="display:flex;flex-direction:column;gap:4px"></div>
+</div>
+
+<section data-block="1" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px 28px">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="width:3px;height:16px;flex:0 0 auto;background:var(--color-primary)"></span>
+<h2 style="margin:0;font-size:var(--text-h3-size);font-weight:var(--weight-semibold);line-height:var(--text-h3-lh);letter-spacing:var(--text-h3-ls);color:var(--text-heading)">회사 기본정보</h2>
+</div>
+<div style="margin:16px 0;height:1px;background:var(--border)"></div>
+<div style="display:flex;flex-direction:column">
+<span style="display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-heading)"><span style="width:5px;height:5px;border-radius:999px;background:var(--color-primary)"></span>회원구분</span>
+<div data-seg="member" style="margin-top:8px;display:inline-flex;gap:4px;padding:4px;background:var(--surface-alt);border-radius:var(--radius-md);width:fit-content">
+<button data-seg-opt="사업자" style="height:36px;padding:0 18px;border:0;border-radius:var(--radius-sm);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 3px rgba(11,17,32,.08);white-space:nowrap">사업자</button>
+<button data-seg-opt="개인" style="height:36px;padding:0 18px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:400;cursor:pointer;white-space:nowrap">개인</button>
+<button data-seg-opt="예비창업자" style="height:36px;padding:0 18px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:400;cursor:pointer;white-space:nowrap">예비창업자</button>
+</div>
+</div>
+<div style="margin-top:18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px;row-gap:18px">
+<label style="display:flex;flex-direction:column"><span style="display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-heading)"><span style="width:5px;height:5px;border-radius:999px;background:var(--color-primary)"></span>상호(법인명)</span><input data-f="company" data-req="1" placeholder="브릿지랩 주식회사" style="margin-top:6px;width:100%;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"><span data-err="company" style="display:none;margin-top:4px;font-size:12px;color:var(--color-danger)"></span></label>
+<label style="display:flex;flex-direction:column"><span style="display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-heading)"><span style="width:5px;height:5px;border-radius:999px;background:var(--color-primary)"></span>대표자명</span><input data-f="ceo" data-req="1" placeholder="김도현" style="margin-top:6px;width:100%;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"><span data-err="ceo" style="display:none;margin-top:4px;font-size:12px;color:var(--color-danger)"></span></label>
+<div data-bizno-row="1" style="grid-column:span 2;display:flex;flex-direction:column">
+<span style="display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-heading)"><span data-bizno-dot="1" style="width:5px;height:5px;border-radius:999px;background:var(--color-primary)"></span>사업자등록번호</span>
+<span style="margin-top:6px;display:flex;align-items:center;gap:8px">
+<input data-f="bizno" data-mask="bizno" placeholder="000-00-00000" style="width:260px;flex:0 0 auto;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)">
+<button data-bizno-check="1" style="width:72px;flex:0 0 auto;height:44px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">확인</button>
+<span data-bizno-spin="1" style="display:none;width:18px;height:18px;flex:0 0 auto;border-radius:999px;border:2px solid var(--border);border-top-color:var(--color-primary);animation:swonSpin 700ms linear infinite"></span>
+<span data-bizno-wrap="1" style="position:relative;display:none;flex:0 0 auto">
+<span data-bizno-variant="success" style="display:none;color:var(--color-primary)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 20 }}" hint-size="20px,20px"></x-import></span>
+<span data-bizno-variant="duplicate" style="display:none;color:var(--color-danger)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-alert" size="{{ 20 }}" hint-size="20px,20px"></x-import></span>
+<span data-bizno-variant="invalid" style="display:none;color:var(--color-warning)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-alert" size="{{ 20 }}" hint-size="20px,20px"></x-import></span>
+<span data-bizno-tip="1" style="position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none"></span>
+</span>
+</span>
+<span data-err="bizno" style="display:none;margin-top:4px;font-size:12px;color:var(--color-danger)"></span>
+</div>
+<label style="display:flex;flex-direction:column"><span style="font-size:14px;font-weight:700;color:var(--text-heading)">업태</span><input data-f="bizKind" placeholder="서비스" style="margin-top:6px;width:100%;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label style="display:flex;flex-direction:column"><span style="font-size:14px;font-weight:700;color:var(--text-heading)">종목</span><input data-f="industry" placeholder="정보통신업" style="margin-top:6px;width:100%;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<div style="grid-column:span 2;display:flex;flex-direction:column">
+<span style="display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-heading)"><span style="width:5px;height:5px;border-radius:999px;background:var(--color-primary)"></span>사업장 주소</span>
+<span style="margin-top:6px;display:flex;gap:8px">
+<input data-f="zip" data-req="1" readonly placeholder="우편번호" style="width:120px;flex:0 0 auto;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:default;font-variant-numeric:tabular-nums">
+<button style="width:100px;flex:0 0 auto;height:44px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">주소 검색</button>
+<input data-f="addr1" readonly placeholder="기본주소" style="flex:1;min-width:0;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:default">
+</span>
+<input data-f="addr2" placeholder="상세주소 (동·호수 등)" style="margin-top:8px;width:100%;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)">
+<span data-err="zip" style="display:none;margin-top:4px;font-size:12px;color:var(--color-danger)"></span>
+</div>
+<label style="display:flex;flex-direction:column"><span style="display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-heading)"><span style="width:5px;height:5px;border-radius:999px;background:var(--color-primary)"></span>담당자 연락처</span><input data-f="phone" data-mask="phone" data-req="1" placeholder="010-0000-0000" style="margin-top:6px;width:100%;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"><span data-err="phone" style="display:none;margin-top:4px;font-size:12px;color:var(--color-danger)"></span></label>
+<label style="display:flex;flex-direction:column"><span style="display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-heading)"><span style="width:5px;height:5px;border-radius:999px;background:var(--color-primary)"></span>이메일</span><input data-f="email" data-req="1" placeholder="name@company.com" style="margin-top:6px;width:100%;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"><span style="margin-top:4px;font-size:12px;color:var(--text-muted)">접수 확인 메일을 보내드립니다</span><span data-err="email" style="display:none;margin-top:4px;font-size:12px;color:var(--color-danger)"></span></label>
+</div>
+</section>
+
+<section data-block="2" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px 28px">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="width:3px;height:16px;flex:0 0 auto;background:var(--color-primary)"></span>
+<h2 style="margin:0;font-size:var(--text-h3-size);font-weight:var(--weight-semibold);line-height:var(--text-h3-lh);letter-spacing:var(--text-h3-ls);color:var(--text-heading)">희망 조건</h2>
+</div>
+<div style="margin:16px 0;height:1px;background:var(--border)"></div>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px;row-gap:18px">
+<label style="display:flex;flex-direction:column"><span style="display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-heading)"><span style="width:5px;height:5px;border-radius:999px;background:var(--color-primary)"></span>희망 입주일</span><input data-f="moveIn" data-req="1" type="date" min="2026-08-27" style="margin-top:6px;width:100%;height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none"><span data-err="moveIn" style="display:none;margin-top:4px;font-size:12px;color:var(--color-danger)"></span></label>
+<div style="display:flex;flex-direction:column">
+<span style="display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-heading)"><span style="width:5px;height:5px;border-radius:999px;background:var(--color-primary)"></span>사용 인원</span>
+<span style="margin-top:6px;display:inline-flex;align-items:center;gap:4px;width:fit-content">
+<button data-step="-1" aria-label="인원 감소" style="width:44px;height:44px;display:grid;place-items:center;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);cursor:pointer;padding:0;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="minus" size="{{ 16 }}" hint-size="16px,16px"></x-import></button>
+<input data-f="headcount" readonly value="1" style="width:72px;height:44px;padding:0;text-align:center;font-family:inherit;font-size:16px;font-weight:700;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:default;font-variant-numeric:tabular-nums">
+<button data-step="1" aria-label="인원 증가" style="width:44px;height:44px;display:grid;place-items:center;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);cursor:pointer;padding:0;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="plus" size="{{ 16 }}" hint-size="16px,16px"></x-import></button>
+<span style="margin-left:4px;font-size:12px;color:var(--text-muted);white-space:nowrap">최대 20명</span>
+</span>
+</div>
+<div style="grid-column:span 2;display:flex;flex-direction:column">
+<span style="display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-heading)"><span style="width:5px;height:5px;border-radius:999px;background:var(--color-primary)"></span>호실 유형</span>
+<div data-seg="room" style="margin-top:8px;display:inline-flex;gap:4px;padding:4px;background:var(--surface-alt);border-radius:var(--radius-md);width:fit-content">
+<button data-seg-opt="1인실" style="height:36px;padding:0 18px;border:0;border-radius:var(--radius-sm);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 3px rgba(11,17,32,.08);white-space:nowrap">1인실</button>
+<button data-seg-opt="2~4인실" style="height:36px;padding:0 18px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:400;cursor:pointer;white-space:nowrap">2~4인실</button>
+<button data-seg-opt="독립형" style="height:36px;padding:0 18px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:400;cursor:pointer;white-space:nowrap">독립형</button>
+<button data-seg-opt="데스크" style="height:36px;padding:0 18px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:400;cursor:pointer;white-space:nowrap">데스크</button>
+</div>
+</div>
+<div style="grid-column:span 2;display:flex;flex-direction:column">
+<span style="display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-heading)"><span style="width:5px;height:5px;border-radius:999px;background:var(--color-primary)"></span>희망 계약 기간</span>
+<div data-seg="term" style="margin-top:8px;display:inline-flex;gap:4px;padding:4px;background:var(--surface-alt);border-radius:var(--radius-md);width:fit-content">
+<button data-seg-opt="6개월" style="height:36px;padding:0 18px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:400;cursor:pointer;white-space:nowrap">6개월</button>
+<button data-seg-opt="12개월" style="height:36px;padding:0 18px;border:0;border-radius:var(--radius-sm);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 3px rgba(11,17,32,.08);white-space:nowrap">12개월</button>
+<button data-seg-opt="24개월" style="height:36px;padding:0 18px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:400;cursor:pointer;white-space:nowrap">24개월</button>
+<button data-seg-opt="협의" style="height:36px;padding:0 18px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:400;cursor:pointer;white-space:nowrap">협의</button>
+</div>
+</div>
+<label style="grid-column:span 2;display:flex;flex-direction:column"><span style="font-size:14px;font-weight:700;color:var(--text-heading)">문의사항</span><textarea data-f="message" data-limit="500" rows="4" placeholder="필요한 지원이나 궁금한 점을 적어 주세요" style="margin-top:6px;width:100%;padding:12px 14px;font-family:inherit;font-size:14px;line-height:1.6;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;resize:vertical;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></textarea><span data-count="message" style="margin-top:4px;text-align:right;font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums">0 / 500</span></label>
+</div>
+<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px">
+<span style="font-size:14px;color:var(--text-muted)">금액은 상담 시 안내드립니다.</span>
+<a href="#pricing" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:700;color:var(--color-primary);text-decoration:none;white-space:nowrap;transition:color var(--dur) var(--ease-out)" style-hover="color:var(--color-primary-hover)">요금제 보기<x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="arrow-up-right" size="{{ 14 }}" hint-size="14px,14px"></x-import></a>
+</div>
+</section>
+
+<section data-block="3" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px 28px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="width:3px;height:16px;flex:0 0 auto;background:var(--color-primary)"></span>
+<h2 style="margin:0;font-size:var(--text-h3-size);font-weight:var(--weight-semibold);line-height:var(--text-h3-lh);letter-spacing:var(--text-h3-ls);color:var(--text-heading)">사용자 정보</h2>
+</div>
+<span data-user-count="1" style="font-size:14px;color:var(--text-muted);white-space:nowrap">1명</span>
+</div>
+<div style="margin:16px 0;height:1px;background:var(--border)"></div>
+<div data-user-head="1" style="display:grid;grid-template-columns:minmax(96px,.8fr) minmax(80px,.6fr) minmax(130px,.9fr) minmax(160px,1.1fr) 44px;align-items:center;padding:10px 0;background:var(--surface-alt);border-radius:var(--radius-sm)">
+<span style="padding:0 8px;text-align:center;font-size:12px;font-weight:700;color:var(--text-muted)">이름</span>
+<span style="padding:0 8px;text-align:center;font-size:12px;font-weight:700;color:var(--text-muted)">직위</span>
+<span style="padding:0 8px;text-align:center;font-size:12px;font-weight:700;color:var(--text-muted)">연락처</span>
+<span style="padding:0 8px;text-align:center;font-size:12px;font-weight:700;color:var(--text-muted)">이메일</span>
+<span style="text-align:center;font-size:12px;font-weight:700;color:var(--text-muted)">삭제</span>
+</div>
+<div data-user-rows="1"></div>
+<button data-user-add="1" style="position:relative;margin-top:12px;width:100%;height:44px;display:flex;align-items:center;justify-content:center;gap:6px;border:1px dashed var(--border);border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;cursor:pointer;transition:border-color var(--dur) var(--ease-out),color var(--dur) var(--ease-out)" style-hover="border-color:var(--color-primary);color:var(--color-primary)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="plus" size="{{ 16 }}" hint-size="16px,16px"></x-import>사용자 추가<span data-user-tip="1" style="position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;font-weight:400;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none">신청서에는 최대 5명까지 등록할 수 있습니다</span></button>
+<div data-user-note="1" style="margin-top:10px;display:none;align-items:flex-start;gap:8px;padding:12px 14px;background:var(--surface-alt);border-radius:var(--radius-md)">
+<span style="display:flex;color:var(--text-muted);flex:0 0 auto;margin-top:1px"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="info" size="{{ 14 }}" hint-size="14px,14px"></x-import></span>
+<span data-user-note-text="1" style="font-size:12px;line-height:1.6;color:var(--text-muted)"></span>
+</div>
+</section>
+
+<section data-block="4" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px 28px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="width:3px;height:16px;flex:0 0 auto;background:var(--color-primary)"></span>
+<h2 style="margin:0;font-size:var(--text-h3-size);font-weight:var(--weight-semibold);line-height:var(--text-h3-lh);letter-spacing:var(--text-h3-ls);color:var(--text-heading)">첨부 서류</h2>
+</div>
+<span data-doc-count="1" style="font-size:14px;color:var(--text-muted);white-space:nowrap">0 / 2 등록</span>
+</div>
+<div style="margin:16px 0;height:1px;background:var(--border)"></div>
+<div data-doc-list="1" style="display:flex;flex-direction:column;gap:12px"></div>
+<div style="margin-top:12px;font-size:12px;color:var(--text-caption)">PDF, JPG, PNG 형식 · 파일당 최대 20MB · 서류당 1개</div>
+</section>
+
+<section data-block="agree" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px 28px">
+<div style="display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+<label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+<input data-f="agreePrivacy" data-req="1" type="checkbox" style="width:18px;height:18px;flex:0 0 auto;accent-color:var(--color-primary)">
+<span style="font-size:14px;color:var(--text-heading)">개인정보 수집·이용에 동의합니다 <span style="color:var(--color-primary);font-weight:700">(필수)</span></span>
+</label>
+<button data-privacy-open="1" style="flex:0 0 auto;border:0;background:transparent;padding:0;font-family:inherit;font-size:14px;color:var(--text-muted);text-decoration:underline;cursor:pointer;white-space:nowrap;transition:color var(--dur) var(--ease-out)" style-hover="color:var(--color-primary)">전문 보기</button>
+</div>
+<label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+<input data-f="agreeMarketing" type="checkbox" style="width:18px;height:18px;flex:0 0 auto;accent-color:var(--color-primary)">
+<span style="font-size:14px;color:var(--text-heading)">마케팅 정보 수신에 동의합니다 <span style="color:var(--text-muted)">(선택)</span></span>
+</label>
+<span data-err="agreePrivacy" style="display:none;font-size:12px;color:var(--color-danger)"></span>
+</div>
+<input data-honeypot="1" type="text" name="company_url" tabindex="-1" autocomplete="off" style="display:none">
+</section>
+<div data-glyphs="1" style="display:none" aria-hidden="true">
+<span data-glyph="trash-2"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="trash-2" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>
+<span data-glyph="upload"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="upload" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>
+<span data-glyph="file-text"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="file-text" size="{{ 16 }}" hint-size="16px,16px"></x-import></span>
+</div>
+
+</div>
+
+<aside style="width:280px;flex:0 0 auto;position:sticky;top:96px;display:flex;flex-direction:column;gap:16px">
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px">
+<div style="font-size:14px;font-weight:700;color:var(--text-heading)">작성 진행</div>
+<div style="margin-top:14px;display:flex;flex-direction:column;gap:4px">
+<button data-goto="1" style="display:flex;align-items:center;gap:10px;padding:8px;border:0;border-radius:var(--radius-sm);background:transparent;font-family:inherit;text-align:left;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><span data-mark="off" data-for="1" style="display:flex;color:var(--text-caption)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle" size="{{ 16 }}" hint-size="16px,16px"></x-import></span><span data-mark="on" data-for="1" style="display:none;color:var(--color-primary)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 16 }}" hint-size="16px,16px"></x-import></span></span><span data-goto-label="1" style="flex:1;font-size:14px;color:var(--text-body)">회사 기본정보</span></button>
+<button data-goto="2" style="display:flex;align-items:center;gap:10px;padding:8px;border:0;border-radius:var(--radius-sm);background:transparent;font-family:inherit;text-align:left;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><span data-mark="off" data-for="2" style="display:flex;color:var(--text-caption)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle" size="{{ 16 }}" hint-size="16px,16px"></x-import></span><span data-mark="on" data-for="2" style="display:none;color:var(--color-primary)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 16 }}" hint-size="16px,16px"></x-import></span></span><span data-goto-label="1" style="flex:1;font-size:14px;color:var(--text-body)">희망 조건</span></button>
+<button data-goto="3" style="display:flex;align-items:center;gap:10px;padding:8px;border:0;border-radius:var(--radius-sm);background:transparent;font-family:inherit;text-align:left;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><span data-mark="off" data-for="3" style="display:flex;color:var(--text-caption)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle" size="{{ 16 }}" hint-size="16px,16px"></x-import></span><span data-mark="on" data-for="3" style="display:none;color:var(--color-primary)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 16 }}" hint-size="16px,16px"></x-import></span></span><span data-goto-label="1" style="flex:1;font-size:14px;color:var(--text-body)">사용자 정보</span></button>
+<button data-goto="4" style="display:flex;align-items:center;gap:10px;padding:8px;border:0;border-radius:var(--radius-sm);background:transparent;font-family:inherit;text-align:left;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><span data-mark="off" data-for="4" style="display:flex;color:var(--text-caption)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle" size="{{ 16 }}" hint-size="16px,16px"></x-import></span><span data-mark="on" data-for="4" style="display:none;color:var(--color-primary)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 16 }}" hint-size="16px,16px"></x-import></span></span><span data-goto-label="1" style="flex:1;font-size:14px;color:var(--text-body)">첨부 서류</span></button>
+</div>
+</div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px">
+<div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-caption)">담당자</div>
+<div style="margin-top:8px;font-size:14px;font-weight:700;color:var(--text-heading)">이정희</div>
+<a href="tel:07043552312" style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;font-size:16px;font-weight:700;color:var(--color-primary);text-decoration:none;white-space:nowrap;transition:color var(--dur) var(--ease-out)" style-hover="color:var(--color-primary-hover)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="phone" size="{{ 16 }}" hint-size="16px,16px"></x-import>070-4355-2312</a>
+<div style="margin-top:8px;font-size:12px;line-height:1.6;color:var(--text-muted)">평일 09:00 - 18:00<br>야간·주말 상담도 가능합니다</div>
+</div>
+<div style="background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px">
+<div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-caption)">접수 후 절차</div>
+<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;font-size:12px;line-height:1.6;color:var(--text-muted)">
+<span>1. 접수 확인 메일 발송</span>
+<span>2. 영업일 1일 내 담당자 연락</span>
+<span>3. 방문 상담 후 계약</span>
+</div>
+</div>
+</aside>
+
+</div>
+
+<div style="position:sticky;bottom:0;z-index:40;height:88px;background:var(--surface);border-top:1px solid var(--border);box-shadow:0 -8px 24px rgba(11,17,32,.10);display:flex;align-items:center">
+<div style="width:100%;max-width:1008px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:16px">
+<span data-submit-note="1" style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--color-warning)"><span data-submit-icon="1" style="display:none"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 16 }}" hint-size="16px,16px"></x-import></span><span data-submit-text="1"></span></span>
+<button data-submit="1" style="position:relative;height:52px;padding:0 28px;display:inline-flex;align-items:center;gap:8px;border:1px solid transparent;border-radius:var(--radius-md);background:var(--color-primary);color:var(--text-on-primary);font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:var(--shadow-primary);transition:background var(--dur) var(--ease-out),opacity var(--dur) var(--ease-out)" style-hover="background:var(--color-primary-hover)"><span data-submit-spin="1" style="display:none;width:16px;height:16px;border-radius:999px;border:2px solid rgba(255,255,255,.4);border-top-color:#FFFFFF;animation:swonSpin 700ms linear infinite"></span>신청서 제출<span data-submit-tip="1" style="position:absolute;bottom:calc(100% + 10px);right:0;z-index:40;display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#FFFFFF;font-size:14px;font-weight:400;white-space:nowrap;box-shadow:var(--shadow-float);pointer-events:none"></span></button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+<div style="min-height:640px;display:flex;align-items:center;justify-content:center;padding:80px 24px">
+<div style="width:560px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:40px;text-align:center">
+<div style="display:flex;justify-content:center"><span style="width:64px;height:64px;border-radius:999px;background:var(--color-accent-bg);color:var(--color-primary);display:grid;place-items:center"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-check" size="{{ 30 }}" hint-size="30px,30px"></x-import></span></div>
+<h2 style="margin:20px 0 0;font-size:var(--text-h2-size);font-weight:var(--weight-bold);line-height:var(--text-h2-lh);letter-spacing:var(--text-h2-ls);color:var(--text-heading)">신청서를 접수했습니다</h2>
+<p style="margin:12px 0 0;font-size:16px;line-height:1.7;color:var(--text-body)">입력하신 이메일로 접수 확인 메일을 보냈습니다. 영업일 1일 내 담당자가 연락드립니다.</p>
+<div style="margin-top:24px;padding:16px 20px;background:var(--surface-alt);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:space-between;gap:12px">
+<div style="text-align:left">
+<div style="font-size:12px;color:var(--text-muted)">접수번호</div>
+<div data-apply-no="1" style="margin-top:2px;font-size:19px;font-weight:700;color:var(--text-heading);font-family:var(--font-mono)">APP-20260826-014</div>
+</div>
+<button data-copy-no="1" style="flex:0 0 auto;height:40px;padding:0 14px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="copy" size="{{ 16 }}" hint-size="16px,16px"></x-import><span data-copy-label="1">복사</span></button>
+</div>
+<div data-apply-at="1" style="margin-top:10px;font-size:12px;color:var(--text-muted)"></div>
+<div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px;text-align:left">
+<div style="font-size:14px;font-weight:700;color:var(--text-heading)">다음 절차</div>
+<div style="display:flex;gap:10px"><span style="width:22px;height:22px;flex:0 0 auto;border-radius:999px;background:var(--color-accent-bg);color:var(--color-primary-hover);font-size:12px;font-weight:700;display:grid;place-items:center">1</span><span style="font-size:14px;line-height:1.6;color:var(--text-body)">접수 확인 메일을 받으셨는지 확인해 주세요</span></div>
+<div style="display:flex;gap:10px"><span style="width:22px;height:22px;flex:0 0 auto;border-radius:999px;background:var(--color-accent-bg);color:var(--color-primary-hover);font-size:12px;font-weight:700;display:grid;place-items:center">2</span><span style="font-size:14px;line-height:1.6;color:var(--text-body)">담당자가 희망 조건을 확인해 연락드립니다</span></div>
+<div style="display:flex;gap:10px"><span style="width:22px;height:22px;flex:0 0 auto;border-radius:999px;background:var(--color-accent-bg);color:var(--color-primary-hover);font-size:12px;font-weight:700;display:grid;place-items:center">3</span><span style="font-size:14px;line-height:1.6;color:var(--text-body)">방문 상담 후 계약을 진행합니다</span></div>
+</div>
+<div style="margin-top:28px;display:flex;gap:10px">
+<button data-restart="1" style="flex:1;height:52px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">홈으로</button>
+<a href="tel:07043552312" style="flex:1;height:52px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-size:16px;font-weight:700;text-decoration:none;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="phone" size="{{ 18 }}" hint-size="18px,18px"></x-import>전화 문의</a>
+</div>
+</div>
+</div>
+</sc-if>
+
+<footer style="background:var(--surface-inverse);padding:40px 0 32px">
+<div style="max-width:960px;margin:0 auto;padding:0 24px;display:flex;align-items:flex-start;justify-content:space-between;gap:40px">
+<div>
+<div style="display:flex;align-items:center;gap:10px">
+<img src="../../assets/swonbiz-logo.png" alt="" style="height:26px;width:auto">
+<span style="font-size:19px;font-weight:800;letter-spacing:-.03em;color:#FFFFFF">S<span style="opacity:.55">·</span>wonBiz</span>
+</div>
+<div style="margin-top:12px;font-size:12px;line-height:1.7;color:rgba(255,255,255,.45)">
+상호: 주식회사 에스원테크 · 대표: 최현수 · 사업자등록번호: 105-87-68698<br>
+주소: 서울특별시 강남구 봉은사로55길 19, 3층 (삼성동, 우리빌딩)<br>
+© 2026 SwonBiz. All rights reserved.
+</div>
+</div>
+<div style="flex:0 0 auto;display:flex;flex-direction:column;gap:6px;text-align:right">
+<span style="font-size:14px;font-weight:700;color:#FFFFFF">070-4355-2312</span>
+<span style="font-size:12px;color:var(--text-on-inverse-muted)">swonbiz@s-onetech.com</span>
+<span style="font-size:12px;color:rgba(255,255,255,.45)">팩스 070-4015-3344</span>
+</div>
+</div>
+</footer>
+</div>
+
+<sc-if value="{{ showPrivacy }}" hint-placeholder-val="{{ false }}">
+<div data-overlay="1" style="position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(11,17,32,.45)">
+<div style="width:560px;max-height:calc(100vh - 48px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-overlay);overflow:hidden">
+<div style="flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:24px;border-bottom:1px solid var(--border)">
+<h3 style="margin:0;font-size:var(--text-h3-size);font-weight:var(--weight-semibold);line-height:var(--text-h3-lh);letter-spacing:var(--text-h3-ls);color:var(--text-heading)">개인정보 수집·이용 동의</h3>
+<button data-privacy-close="1" aria-label="닫기" style="flex:0 0 auto;width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-caption);cursor:pointer;padding:0;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="x" size="{{ 20 }}" hint-size="20px,20px"></x-import></button>
+</div>
+<div data-scroll="1" style="flex:1;min-height:0;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:16px">
+<div><div style="font-size:14px;font-weight:700;color:var(--text-heading)">수집 항목</div><p style="margin:6px 0 0;font-size:14px;line-height:1.7;color:var(--text-body)">상호, 대표자명, 사업자등록번호, 사업장 주소, 담당자 연락처, 이메일, 사용자 정보(이름·직위·연락처·이메일), 첨부 서류</p></div>
+<div><div style="font-size:14px;font-weight:700;color:var(--text-heading)">수집 목적</div><p style="margin:6px 0 0;font-size:14px;line-height:1.7;color:var(--text-body)">입주 신청 접수 및 상담 진행, 계약 체결을 위한 본인 확인과 연락</p></div>
+<div><div style="font-size:14px;font-weight:700;color:var(--text-heading)">보유 기간</div><p style="margin:6px 0 0;font-size:14px;line-height:1.7;color:var(--text-body)">접수일로부터 6개월. 계약이 체결되면 계약 종료 후 관계 법령이 정한 기간까지 보관합니다.</p></div>
+<div><div style="font-size:14px;font-weight:700;color:var(--text-heading)">동의 거부 권리</div><p style="margin:6px 0 0;font-size:14px;line-height:1.7;color:var(--text-body)">동의를 거부하실 수 있으나, 이 경우 온라인 입주 신청 접수가 제한됩니다. 전화(070-4355-2312)로 상담을 요청하실 수 있습니다.</p></div>
+</div>
+<div style="flex:0 0 auto;display:flex;justify-content:flex-end;gap:8px;padding:20px 24px;border-top:1px solid var(--border)">
+<button data-privacy-close="1" style="height:44px;padding:0 16px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">닫기</button>
+<button data-privacy-agree="1" style="height:44px;padding:0 16px;border:1px solid transparent;border-radius:var(--radius-md);background:var(--color-primary);color:var(--text-on-primary);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:var(--shadow-primary);transition:background var(--dur) var(--ease-out)" style-hover="background:var(--color-primary-hover)">동의합니다</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;form&quot;,&quot;submitted&quot;],&quot;default&quot;:&quot;form&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;화면&quot;},&quot;memberType&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;사업자&quot;,&quot;개인&quot;,&quot;예비창업자&quot;],&quot;default&quot;:&quot;사업자&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;신청&quot;},&quot;userCount&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;1&quot;,&quot;3&quot;,&quot;5&quot;],&quot;default&quot;:&quot;1&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;신청&quot;},&quot;docState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;partial&quot;,&quot;all&quot;,&quot;error&quot;],&quot;default&quot;:&quot;none&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;첨부 서류&quot;},&quot;bizCheckState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;success&quot;,&quot;duplicate&quot;,&quot;invalid&quot;],&quot;default&quot;:&quot;none&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;검증&quot;}}">
+/** Where the application posts. Empty → the screen confirms without a network call.
+ *  Separate from the landing INQUIRY_ENDPOINT: attachments make this multipart. */
+const APPLY_ENDPOINT = "";
+
+const MAX_USERS = 5;
+const MAX_HEADCOUNT = 20;
+
+/** Literal per token name, used only until the DS stylesheet resolves. */
+const TOKEN_FALLBACK = {
+  "--surface": "#FFFFFF", "--surface-alt": "#F8FAFC", "--surface-inverse": "#0B1120",
+  "--border": "#E2E8F0", "--text-heading": "#0B1120", "--text-body": "#475569",
+  "--text-muted": "#64748B", "--text-caption": "#94A3B8",
+  "--color-primary": "#4F46E5", "--color-primary-hover": "#4338CA", "--color-accent-bg": "#EEF2FF",
+  "--color-warning": "#D97706", "--color-warning-bg": "#FEF3C7",
+  "--color-danger": "#DC2626", "--color-danger-bg": "#FEE2E2",
+};
+
+/** Required documents per 회원구분 — drives the badge and the count denominator. */
+const DOC_RULES = {
+  "사업자": [
+    { key: "biz", name: "사업자등록증", required: true, desc: "발급 3개월 이내 사본" },
+    { key: "id", name: "신분증 사본", required: true, desc: "주민등록증 또는 운전면허증" },
+    { key: "corp", name: "법인등기부등본", required: false, desc: "법인인 경우 제출" },
+  ],
+  "개인": [
+    { key: "id", name: "신분증 사본", required: true, desc: "주민등록증 또는 운전면허증" },
+  ],
+  "예비창업자": [
+    { key: "id", name: "신분증 사본", required: true, desc: "주민등록증 또는 운전면허증" },
+  ],
+};
+
+const BIZ_RESULTS = {
+  success: { variant: "success", tip: "등록 가능한 사업자입니다", short: "" },
+  duplicate: { variant: "duplicate", tip: "이미 등록된 사업자번호입니다", short: "이미 등록된 번호" },
+  invalid: { variant: "invalid", tip: "국세청에 등록되지 않은 번호입니다", short: "국세청 미등록" },
+};
+
+const BLOCK_LABELS = { 1: "회사 기본정보", 2: "희망 조건", 3: "사용자 정보", 4: "첨부 서류" };
+
+class Component extends DCLogic {
+  state = {
+    screen: undefined, member: undefined, room: undefined, term: undefined,
+    users: null, docs: null, headcount: null, privacy: false, showErrors: false, busy: false,
+  };
+
+  get screen() {
+    if (this.state.screen !== undefined) return this.state.screen;
+    return this.props.screen || "form";
+  }
+
+  get member() {
+    if (this.state.member !== undefined) return this.state.member;
+    return this.props.memberType || "사업자";
+  }
+
+  get docRules() { return DOC_RULES[this.member] || DOC_RULES["개인"]; }
+
+  /** Uploaded-file state per document key, seeded from the docState Tweak. */
+  get docs() {
+    if (this.state.docs) return this.state.docs;
+    const preset = this.props.docState || "none";
+    const out = {};
+    this.docRules.forEach((d, i) => {
+      if (preset === "all") out[d.key] = { name: d.name + ".pdf", size: "1.2MB", status: "done" };
+      else if (preset === "partial" && i === 0) out[d.key] = { name: d.name + ".pdf", size: "1.2MB", status: "done" };
+      else if (preset === "error" && i === 0) out[d.key] = { name: d.name + ".zip", size: "24MB", status: "error", message: "PDF, JPG, PNG 형식만 등록할 수 있습니다" };
+    });
+    return out;
+  }
+
+  get userRows() {
+    if (this.state.users) return this.state.users;
+    const n = Math.max(1, Math.min(MAX_USERS, parseInt(this.props.userCount, 10) || 1));
+    const seed = [
+      { name: "", role: "", phone: "", email: "" },
+      { name: "이서준", role: "팀장", phone: "010-3456-7890", email: "lee@bridgelab.co.kr" },
+      { name: "박민지", role: "매니저", phone: "010-4567-8901", email: "park@bridgelab.co.kr" },
+      { name: "", role: "", phone: "", email: "" },
+      { name: "", role: "", phone: "", email: "" },
+    ];
+    return seed.slice(0, n).map((r) => ({ ...r }));
+  }
+
+  get headcount() {
+    if (this.state.headcount !== null) return this.state.headcount;
+    return 1;
+  }
+
+  renderVals() {
+    return {
+      isForm: this.screen !== "submitted",
+      isDone: this.screen === "submitted",
+      showPrivacy: this.state.privacy,
+    };
+  }
+
+  componentDidMount() { this.bindAll(); }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps) {
+      // A Tweak change always beats an in-page interaction.
+      if (prevProps.screen !== this.props.screen && this.state.screen !== undefined) {
+        this.setState({ screen: undefined }); return;
+      }
+      if (prevProps.memberType !== this.props.memberType && this.state.member !== undefined) {
+        this.setState({ member: undefined, docs: null }); return;
+      }
+      if (prevProps.docState !== this.props.docState && this.state.docs) {
+        this.setState({ docs: null }); return;
+      }
+      if (prevProps.userCount !== this.props.userCount && this.state.users) {
+        this.setState({ users: null }); return;
+      }
+    }
+    this.bindAll();
+  }
+
+  bindAll() {
+    if (this.screen === "submitted") { this.bindResult(); return; }
+    this.bindSegments();
+    this.bindMasks();
+    this.bindStepper();
+    this.bindCounter();
+    this.bindBizCheck();
+    this.bindPrivacy();
+    this.bindProgressNav();
+    this.bindSubmit();
+    this.applyMember();
+    this.renderUsers();
+    this.renderDocs();
+    this.refreshStatus();
+  }
+
+  once(el, key) {
+    if (!el || el.getAttribute("data-bound-" + key)) return false;
+    el.setAttribute("data-bound-" + key, "1");
+    return true;
+  }
+
+  token(name) {
+    if (!this.tokenCache) this.tokenCache = {};
+    if (this.tokenCache[name]) return this.tokenCache[name];
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    if (v) { this.tokenCache[name] = v; return v; }
+    return TOKEN_FALLBACK[name] || "";
+  }
+
+  val(key) {
+    const el = document.querySelector('[data-f="' + key + '"]');
+    if (!el) return "";
+    return el.type === "checkbox" ? el.checked : el.value.trim();
+  }
+
+  /** Segmented controls: 회원구분 / 호실 유형 / 희망 계약 기간. */
+  bindSegments() {
+    document.querySelectorAll("[data-seg]").forEach((group) => {
+      const name = group.getAttribute("data-seg");
+      const opts = [...group.querySelectorAll("[data-seg-opt]")];
+      const paint = (value) => {
+        opts.forEach((b) => {
+          const on = b.getAttribute("data-seg-opt") === value;
+          b.style.background = on ? this.token("--surface") : "transparent";
+          b.style.color = on ? this.token("--text-heading") : this.token("--text-muted");
+          b.style.fontWeight = on ? "700" : "400";
+          b.style.boxShadow = on ? "0 1px 3px rgba(11,17,32,.08)" : "none";
+        });
+      };
+      const current = name === "member" ? this.member
+        : name === "room" ? (this.state.room !== undefined ? this.state.room : "1인실")
+        : (this.state.term !== undefined ? this.state.term : "12개월");
+      paint(current);
+      opts.forEach((b) => {
+        if (!this.once(b, "seg")) return;
+        b.addEventListener("click", () => {
+          const value = b.getAttribute("data-seg-opt");
+          if (name === "member") this.setState({ member: value, docs: null });
+          else if (name === "room") { this.setState({ room: value }); }
+          else this.setState({ term: value });
+        });
+      });
+    });
+  }
+
+  /** Digits-only entry with auto hyphens. */
+  bindMasks() {
+    document.querySelectorAll("[data-mask]").forEach((el) => {
+      if (!this.once(el, "mask")) return;
+      const kind = el.getAttribute("data-mask");
+      el.addEventListener("input", () => {
+        const d = el.value.replace(/\D/g, "").slice(0, kind === "phone" ? 11 : 10);
+        if (kind === "bizno") {
+          el.value = d.length > 5 ? d.slice(0, 3) + "-" + d.slice(3, 5) + "-" + d.slice(5)
+            : d.length > 3 ? d.slice(0, 3) + "-" + d.slice(3) : d;
+          this.bizResult = null;
+          this.applyBizResult();
+        } else {
+          const mid = d.startsWith("010") || d.length > 10 ? 7 : 6;
+          el.value = d.length > mid ? d.slice(0, 3) + "-" + d.slice(3, mid) + "-" + d.slice(mid)
+            : d.length > 3 ? d.slice(0, 3) + "-" + d.slice(3) : d;
+          this.renderUsers();
+        }
+        this.refreshStatus();
+      });
+    });
+    // Row 1 of 사용자 정보 mirrors 대표자명; keep them in step while typing.
+    const ceo = document.querySelector('[data-f="ceo"]');
+    if (this.once(ceo, "mirror")) {
+      ceo.addEventListener("input", () => { this.renderUsers(); this.refreshStatus(); });
+    }
+    document.querySelectorAll("[data-req]").forEach((el) => {
+      if (!this.once(el, "req")) return;
+      el.addEventListener("input", () => this.refreshStatus());
+      el.addEventListener("change", () => this.refreshStatus());
+    });
+  }
+
+  bindStepper() {
+    document.querySelectorAll("[data-step]").forEach((btn) => {
+      if (!this.once(btn, "step")) return;
+      const delta = parseInt(btn.getAttribute("data-step"), 10);
+      btn.addEventListener("click", () => {
+        const next = Math.max(1, Math.min(MAX_HEADCOUNT, this.headcount + delta));
+        this.setState({ headcount: next });
+      });
+    });
+    const field = document.querySelector('[data-f="headcount"]');
+    if (field) field.value = String(this.headcount);
+    document.querySelectorAll("[data-step]").forEach((btn) => {
+      const delta = parseInt(btn.getAttribute("data-step"), 10);
+      const limit = delta < 0 ? this.headcount <= 1 : this.headcount >= MAX_HEADCOUNT;
+      btn.disabled = limit;
+      btn.style.opacity = limit ? ".45" : "1";
+      btn.style.cursor = limit ? "not-allowed" : "pointer";
+    });
+  }
+
+  bindCounter() {
+    const el = document.querySelector("[data-limit]");
+    const out = document.querySelector('[data-count="message"]');
+    if (!el || !out) return;
+    const limit = parseInt(el.getAttribute("data-limit"), 10);
+    const paint = () => {
+      if (el.value.length > limit) el.value = el.value.slice(0, limit);
+      out.textContent = el.value.length + " / " + limit;
+    };
+    paint();
+    if (this.once(el, "limit")) el.addEventListener("input", paint);
+  }
+
+  /** 사업자등록번호 확인 — only this field spins; the form stays usable. */
+  bindBizCheck() {
+    const btn = document.querySelector("[data-bizno-check]");
+    if (this.once(btn, "bizcheck")) {
+      btn.addEventListener("click", () => {
+        const digits = this.val("bizno").replace(/\D/g, "");
+        if (digits.length !== 10) {
+          this.bizResult = "invalid";
+          this.applyBizResult();
+          return;
+        }
+        const spin = document.querySelector("[data-bizno-spin]");
+        if (spin) spin.style.display = "block";
+        this.bizResult = null;
+        this.applyBizResult();
+        clearTimeout(this.bizTimer);
+        this.bizTimer = setTimeout(() => {
+          if (spin) spin.style.display = "none";
+          this.bizResult = this.props.bizCheckState && this.props.bizCheckState !== "none"
+            ? this.props.bizCheckState : "success";
+          this.applyBizResult();
+        }, 900);
+      });
+    }
+    if (this.bizResult === undefined) {
+      this.bizResult = this.props.bizCheckState && this.props.bizCheckState !== "none"
+        ? this.props.bizCheckState : null;
+    }
+    this.applyBizResult();
+  }
+
+  applyBizResult() {
+    const wrap = document.querySelector("[data-bizno-wrap]");
+    const err = document.querySelector('[data-err="bizno"]');
+    if (!wrap) return;
+    const r = BIZ_RESULTS[this.bizResult];
+    wrap.style.display = r ? "block" : "none";
+    wrap.querySelectorAll("[data-bizno-variant]").forEach((el) => {
+      el.style.display = r && el.getAttribute("data-bizno-variant") === r.variant ? "flex" : "none";
+    });
+    const tip = wrap.querySelector("[data-bizno-tip]");
+    if (tip && r) {
+      tip.textContent = r.tip;
+      if (this.once(wrap, "biztip")) {
+        wrap.addEventListener("mouseenter", () => { tip.style.display = "flex"; });
+        wrap.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+      }
+    }
+    if (err) {
+      const show = r && r.short;
+      err.style.display = show ? "block" : "none";
+      err.style.color = this.token(this.bizResult === "invalid" ? "--color-warning" : "--color-danger");
+      if (show) err.textContent = r.short;
+    }
+  }
+
+  bindPrivacy() {
+    const open = document.querySelector("[data-privacy-open]");
+    if (this.once(open, "privacy")) open.addEventListener("click", () => this.setState({ privacy: true }));
+    document.querySelectorAll("[data-privacy-close]").forEach((b) => {
+      if (this.once(b, "privacyclose")) b.addEventListener("click", () => this.setState({ privacy: false }));
+    });
+    const agree = document.querySelector("[data-privacy-agree]");
+    if (this.once(agree, "privacyagree")) {
+      agree.addEventListener("click", () => {
+        const cb = document.querySelector('[data-f="agreePrivacy"]');
+        if (cb) cb.checked = true;
+        this.setState({ privacy: false });
+      });
+    }
+    document.querySelectorAll("[data-overlay]").forEach((el) => {
+      if (this.once(el, "overlay")) {
+        el.addEventListener("click", (e) => { if (e.target === el) this.setState({ privacy: false }); });
+      }
+    });
+  }
+
+  /** 회원구분 decides whether 사업자등록번호 is shown and required. */
+  applyMember() {
+    const isBiz = this.member === "사업자";
+    const row = document.querySelector("[data-bizno-row]");
+    if (row) row.style.display = isBiz ? "flex" : "none";
+    const dot = document.querySelector("[data-bizno-dot]");
+    if (dot) dot.style.background = this.token("--color-primary");
+    const input = document.querySelector('[data-f="bizno"]');
+    if (input) {
+      if (isBiz) input.setAttribute("data-req", "1");
+      else { input.removeAttribute("data-req"); input.value = ""; this.bizResult = null; this.applyBizResult(); }
+    }
+  }
+
+  /** Row 1 mirrors 대표자명·연락처 read-only; rows 2+ are free input. */
+  renderUsers() {
+    const host = document.querySelector("[data-user-rows]");
+    if (!host) return;
+    const rows = this.userRows;
+    const border = this.token("--border");
+    const heading = this.token("--text-heading");
+    const muted = this.token("--text-muted");
+    const surface = this.token("--surface");
+    const alt = this.token("--surface-alt");
+    const GRID = "display:grid;grid-template-columns:minmax(96px,.8fr) minmax(80px,.6fr) minmax(130px,.9fr) minmax(160px,1.1fr) 44px;align-items:center";
+
+    // Preserve typed values in rows 2+ across re-renders.
+    if (!this.rowCache) this.rowCache = {};
+    host.querySelectorAll("[data-user-row]").forEach((r) => {
+      const i = r.getAttribute("data-user-row");
+      if (i === "1") return;
+      this.rowCache[i] = [...r.querySelectorAll("input")].map((el) => el.value);
+    });
+
+    const cell = (child) => {
+      const sp = document.createElement("span");
+      sp.style.cssText = "min-width:0;padding:0 8px";
+      if (child) sp.appendChild(child);
+      return sp;
+    };
+    const input = (value, ro, placeholder) => {
+      const el = document.createElement("input");
+      el.value = value || "";
+      el.readOnly = !!ro;
+      if (placeholder) el.placeholder = placeholder;
+      el.style.cssText = "width:100%;height:40px;padding:0 10px;font-family:inherit;font-size:14px;color:" + heading +
+        ";background:" + (ro ? alt : surface) + ";border:1px solid " + border + ";border-radius:6px;outline:none;" +
+        (ro ? "cursor:default;" : "");
+      return el;
+    };
+
+    host.textContent = "";
+    rows.forEach((row, i) => {
+      const first = i === 0;
+      const cached = this.rowCache[String(i + 1)];
+      const el = document.createElement("div");
+      el.setAttribute("data-user-row", String(i + 1));
+      el.style.cssText = GRID + ";padding:10px 0;border-bottom:1px solid " + border;
+
+      el.appendChild(cell(input(first ? this.val("ceo") : (cached ? cached[0] : row.name), first, first ? "대표자명 자동 반영" : "이름")));
+      el.appendChild(cell(input(cached ? cached[1] : row.role, false, "직위")));
+      const phone = input(first ? this.val("phone") : (cached ? cached[2] : row.phone), first, first ? "" : "010-0000-0000");
+      phone.style.fontVariantNumeric = "tabular-nums";
+      if (!first) {
+        phone.addEventListener("input", () => {
+          const d = phone.value.replace(/\D/g, "").slice(0, 11);
+          const mid = d.startsWith("010") || d.length > 10 ? 7 : 6;
+          phone.value = d.length > mid ? d.slice(0, 3) + "-" + d.slice(3, mid) + "-" + d.slice(mid)
+            : d.length > 3 ? d.slice(0, 3) + "-" + d.slice(3) : d;
+        });
+      }
+      el.appendChild(cell(phone));
+      el.appendChild(cell(input(first ? this.val("email") : (cached ? cached[3] : row.email), first, first ? "" : "name@company.com")));
+
+      const del = document.createElement("button");
+      del.setAttribute("aria-label", "삭제");
+      del.disabled = first;
+      del.style.cssText = "width:32px;height:32px;margin:0 auto;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:" +
+        muted + ";cursor:" + (first ? "not-allowed" : "pointer") + ";opacity:" + (first ? ".45" : "1");
+      del.appendChild(this.glyph("trash-2", 16));
+      del.addEventListener("click", () => {
+        if (first) return;
+        this.setState({ users: this.userRows.filter((_, idx) => idx !== i).map((r) => ({ ...r })) });
+      });
+      const delCell = document.createElement("span");
+      delCell.style.cssText = "display:flex;justify-content:center";
+      delCell.appendChild(del);
+      el.appendChild(delCell);
+
+      host.appendChild(el);
+    });
+
+    const count = document.querySelector("[data-user-count]");
+    if (count) count.textContent = rows.length + "명";
+
+    const add = document.querySelector("[data-user-add]");
+    if (add) {
+      const full = rows.length >= MAX_USERS;
+      add.disabled = full;
+      add.style.opacity = full ? ".45" : "1";
+      add.style.cursor = full ? "not-allowed" : "pointer";
+      const tip = add.querySelector("[data-user-tip]");
+      if (tip && this.once(add, "usertip")) {
+        add.addEventListener("mouseenter", () => { if (add.disabled) tip.style.display = "flex"; });
+        add.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+      }
+      if (this.once(add, "useradd")) {
+        add.addEventListener("click", () => {
+          if (this.userRows.length >= MAX_USERS) return;
+          this.setState({ users: this.userRows.concat([{ name: "", role: "", phone: "", email: "" }]) });
+        });
+      }
+    }
+
+    // Headcount mismatch is informational only — never a blocker.
+    const note = document.querySelector("[data-user-note]");
+    const noteText = document.querySelector("[data-user-note-text]");
+    if (note && noteText) {
+      const diff = this.headcount - rows.length;
+      const show = diff !== 0;
+      note.style.display = show ? "flex" : "none";
+      if (show) {
+        noteText.textContent = diff > 0
+          ? "사용 인원 " + this.headcount + "명 중 " + rows.length + "명을 등록하셨습니다. 입주 시점에 추가 등록할 수 있습니다."
+          : "등록 인원이 사용 인원보다 많습니다. 상담 시 확인해 드립니다.";
+      }
+    }
+  }
+
+  /** Cards run empty → uploading → done → error; delete is implemented here. */
+  renderDocs() {
+    const host = document.querySelector("[data-doc-list]");
+    if (!host) return;
+    const rules = this.docRules;
+    const docs = this.docs;
+    const border = this.token("--border");
+    const heading = this.token("--text-heading");
+    const muted = this.token("--text-muted");
+    const primary = this.token("--color-primary");
+
+    const setDoc = (key, value) => {
+      const next = { ...this.docs };
+      if (value) next[key] = value; else delete next[key];
+      this.setState({ docs: next });
+    };
+
+    host.textContent = "";
+    rules.forEach((rule) => {
+      const file = docs[rule.key];
+      const card = document.createElement("div");
+      card.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:20px;background:" +
+        this.token("--surface") + ";border:1px solid " + (file && file.status === "error" ? this.token("--color-danger") : border) +
+        ";border-radius:8px;padding:16px 20px";
+
+      const left = document.createElement("div");
+      left.style.cssText = "min-width:0";
+      const title = document.createElement("div");
+      title.style.cssText = "display:flex;align-items:center;gap:8px";
+      const name = document.createElement("span");
+      name.textContent = rule.name;
+      name.style.cssText = "font-size:16px;font-weight:700;color:" + heading;
+      title.appendChild(name);
+      const badge = document.createElement("span");
+      badge.textContent = rule.required ? "필수" : "선택";
+      badge.style.cssText = "height:22px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:700;display:flex;align-items:center;white-space:nowrap;background:" +
+        this.token(rule.required ? "--color-danger-bg" : "--surface-alt") + ";color:" +
+        this.token(rule.required ? "--color-danger" : "--text-muted");
+      title.appendChild(badge);
+      left.appendChild(title);
+      const desc = document.createElement("div");
+      desc.textContent = file && file.status === "error" ? file.message : rule.desc;
+      desc.style.cssText = "margin-top:4px;font-size:14px;color:" +
+        (file && file.status === "error" ? this.token("--color-danger") : muted);
+      left.appendChild(desc);
+      if (file && file.status === "uploading") {
+        const track = document.createElement("div");
+        track.style.cssText = "margin-top:8px;width:220px;height:4px;border-radius:999px;background:" + this.token("--surface-alt") + ";overflow:hidden";
+        const bar = document.createElement("span");
+        bar.style.cssText = "display:block;width:" + (file.progress || 40) + "%;height:4px;border-radius:999px;background:" + primary +
+          ";transition:width 240ms var(--ease-out)";
+        track.appendChild(bar);
+        left.appendChild(track);
+      }
+      card.appendChild(left);
+
+      const right = document.createElement("div");
+      right.style.cssText = "flex:0 0 auto;display:flex;align-items:center;gap:10px";
+      if (file && file.status === "done") {
+        const chip = document.createElement("span");
+        chip.style.cssText = "display:inline-flex;align-items:center;gap:6px;max-width:220px;height:32px;padding:0 10px;border-radius:6px;background:" +
+          this.token("--surface-alt") + ";font-size:14px;color:" + heading;
+        const icon = document.createElement("span");
+        icon.style.cssText = "display:flex;flex:0 0 auto;color:" + primary;
+        icon.appendChild(this.glyph("file-text"));
+        chip.appendChild(icon);
+        const label = document.createElement("span");
+        label.textContent = file.name;
+        label.style.cssText = "min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+        chip.appendChild(label);
+        const size = document.createElement("span");
+        size.textContent = file.size;
+        size.style.cssText = "flex:0 0 auto;font-size:12px;color:" + this.token("--text-caption");
+        chip.appendChild(size);
+        right.appendChild(chip);
+
+        const del = document.createElement("button");
+        del.setAttribute("aria-label", "삭제");
+        del.style.cssText = "width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:" +
+          muted + ";cursor:pointer;padding:0";
+        del.appendChild(this.glyph("trash-2", 16));
+        del.addEventListener("click", () => setDoc(rule.key, null));
+        right.appendChild(del);
+      } else {
+        const pick = document.createElement("button");
+        pick.style.cssText = "height:40px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;border:1px solid " + border +
+          ";border-radius:8px;background:" + this.token("--surface") + ";color:" + heading +
+          ";font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap";
+        const ic = document.createElement("span");
+        ic.style.cssText = "display:flex";
+        ic.appendChild(this.glyph("upload"));
+        pick.appendChild(ic);
+        pick.appendChild(document.createTextNode(file && file.status === "error" ? "다시 선택" : "파일 선택"));
+        pick.addEventListener("click", () => {
+          // No file input in the mock: run the uploading state, then land on done.
+          setDoc(rule.key, { name: rule.name + ".pdf", size: "1.2MB", status: "uploading", progress: 40 });
+          clearTimeout(this.uploadTimer);
+          this.uploadTimer = setTimeout(() => setDoc(rule.key, { name: rule.name + ".pdf", size: "1.2MB", status: "done" }), 700);
+        });
+        right.appendChild(pick);
+      }
+      card.appendChild(right);
+      host.appendChild(card);
+    });
+
+    const requiredKeys = rules.filter((r) => r.required).map((r) => r.key);
+    const done = requiredKeys.filter((k) => docs[k] && docs[k].status === "done").length;
+    const count = document.querySelector("[data-doc-count]");
+    if (count) count.textContent = done + " / " + requiredKeys.length + " 등록";
+  }
+
+  /** Which required fields each block still needs. */
+  missingByBlock() {
+    const out = { 1: [], 2: [], 3: [], 4: [] };
+    const need = (block, key, label) => { if (!this.val(key)) out[block].push(label); };
+    need(1, "company", "상호(법인명)");
+    need(1, "ceo", "대표자명");
+    if (this.member === "사업자") need(1, "bizno", "사업자등록번호");
+    need(1, "zip", "사업장 주소");
+    need(1, "phone", "담당자 연락처");
+    need(1, "email", "이메일");
+    need(2, "moveIn", "희망 입주일");
+    const rows = this.userRows;
+    if (!this.val("ceo") && !(rows[0] && rows[0].name)) out[3].push("사용자 이름");
+    this.docRules.filter((r) => r.required).forEach((r) => {
+      const f = this.docs[r.key];
+      if (!f || f.status !== "done") out[4].push(r.name);
+    });
+    return out;
+  }
+
+  bindProgressNav() {
+    document.querySelectorAll("[data-goto]").forEach((btn) => {
+      if (!this.once(btn, "goto")) return;
+      btn.addEventListener("click", () => {
+        const target = document.querySelector('[data-block="' + btn.getAttribute("data-goto") + '"]');
+        if (!target) return;
+        const y = target.getBoundingClientRect().top + window.scrollY - 96;
+        const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        window.scrollTo({ top: y, behavior: reduce ? "auto" : "smooth" });
+      });
+    });
+  }
+
+  /** Progress marks, per-field errors, the summary card and the submit bar. */
+  refreshStatus() {
+    const missing = this.missingByBlock();
+    const total = Object.keys(missing).reduce((n, k) => n + missing[k].length, 0);
+    const agreed = this.val("agreePrivacy");
+    const ready = total === 0 && agreed;
+
+    document.querySelectorAll("[data-goto]").forEach((btn) => {
+      const key = btn.getAttribute("data-goto");
+      const done = missing[key].length === 0;
+      const label = btn.querySelector("[data-goto-label]");
+      // Toggle the authored variants; never replace their children.
+      const off = btn.querySelector('[data-mark="off"]');
+      const on = btn.querySelector('[data-mark="on"]');
+      if (off) off.style.display = done ? "none" : "flex";
+      if (on) on.style.display = done ? "flex" : "none";
+      if (label) {
+        label.textContent = BLOCK_LABELS[key];
+        label.style.color = this.token(done ? "--text-heading" : "--text-body");
+        label.style.fontWeight = done ? "700" : "400";
+      }
+    });
+
+    const show = this.state.showErrors;
+    ["company", "ceo", "zip", "phone", "email", "moveIn"].forEach((key) => {
+      const err = document.querySelector('[data-err="' + key + '"]');
+      if (!err) return;
+      const bad = show && !this.val(key);
+      err.style.display = bad ? "block" : "none";
+      if (bad) err.textContent = "필수 항목입니다";
+      const field = document.querySelector('[data-f="' + key + '"]');
+      if (field) field.style.borderColor = bad ? this.token("--color-danger") : this.token("--border");
+    });
+    const agreeErr = document.querySelector('[data-err="agreePrivacy"]');
+    if (agreeErr) {
+      const bad = show && !agreed;
+      agreeErr.style.display = bad ? "block" : "none";
+      if (bad) agreeErr.textContent = "개인정보 수집·이용에 동의해 주세요";
+    }
+
+    const summary = document.querySelector("[data-error-summary]");
+    if (summary) {
+      const items = [];
+      Object.keys(missing).forEach((k) => {
+        if (missing[k].length) items.push(BLOCK_LABELS[k] + " — " + missing[k].join(", "));
+      });
+      if (!agreed) items.push("동의 — 개인정보 수집·이용 동의");
+      const on = show && items.length > 0;
+      summary.style.display = on ? "flex" : "none";
+      if (on) {
+        const title = summary.querySelector("[data-error-title]");
+        if (title) title.textContent = "입력하지 않은 필수 항목이 " + items.length + "곳 있습니다";
+        const list = summary.querySelector("[data-error-list]");
+        if (list) {
+          list.textContent = "";
+          items.forEach((t) => {
+            const li = document.createElement("span");
+            li.textContent = "· " + t;
+            li.style.cssText = "font-size:14px;line-height:1.6;color:" + this.token("--text-body");
+            list.appendChild(li);
+          });
+        }
+      }
+    }
+
+    const note = document.querySelector("[data-submit-note]");
+    const noteIcon = document.querySelector("[data-submit-icon]");
+    const noteText = document.querySelector("[data-submit-text]");
+    if (note && noteText) {
+      const count = total + (agreed ? 0 : 1);
+      note.style.color = this.token(ready ? "--color-primary" : "--color-warning");
+      if (noteIcon) noteIcon.style.display = ready ? "flex" : "none";
+      noteText.textContent = ready ? "제출할 준비가 되었습니다" : "필수 항목 " + count + "개가 남았습니다";
+    }
+
+    const btn = document.querySelector("[data-submit]");
+    if (btn) {
+      const busy = this.state.busy;
+      btn.disabled = !ready || busy;
+      btn.style.opacity = ready && !busy ? "1" : ".55";
+      btn.style.cursor = ready && !busy ? "pointer" : "not-allowed";
+      const spin = btn.querySelector("[data-submit-spin]");
+      if (spin) spin.style.display = busy ? "block" : "none";
+      const tip = btn.querySelector("[data-submit-tip]");
+      if (tip) {
+        const blocks = Object.keys(missing).filter((k) => missing[k].length).map((k) => BLOCK_LABELS[k]);
+        if (!agreed) blocks.push("동의");
+        tip.textContent = blocks.length ? blocks.join(" · ") + " 확인이 필요합니다" : "";
+      }
+    }
+
+    const root = document.querySelector("[data-form-root]");
+    if (root) root.style.pointerEvents = this.state.busy ? "none" : "";
+  }
+
+  bindSubmit() {
+    const btn = document.querySelector("[data-submit]");
+    if (!this.once(btn, "submit")) return;
+    const tip = btn.querySelector("[data-submit-tip]");
+    btn.addEventListener("mouseenter", () => { if (btn.disabled && tip && tip.textContent) tip.style.display = "flex"; });
+    btn.addEventListener("mouseleave", () => { if (tip) tip.style.display = "none"; });
+    btn.addEventListener("click", async () => {
+      const missing = this.missingByBlock();
+      const total = Object.keys(missing).reduce((n, k) => n + missing[k].length, 0);
+      if (total || !this.val("agreePrivacy")) {
+        this.setState({ showErrors: true });
+        // Anchor on the first offending block.
+        const firstKey = Object.keys(missing).find((k) => missing[k].length);
+        const target = firstKey ? document.querySelector('[data-block="' + firstKey + '"]') : document.querySelector('[data-block="agree"]');
+        if (target) {
+          const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 96, behavior: reduce ? "auto" : "smooth" });
+        }
+        return;
+      }
+      // Honeypot: a filled hidden field means a bot — fail silently.
+      const trap = document.querySelector("[data-honeypot]");
+      if (trap && trap.value) return;
+
+      this.setState({ busy: true });
+      if (APPLY_ENDPOINT) {
+        try {
+          const body = new FormData();
+          body.append("payload", JSON.stringify({
+            memberType: this.member,
+            company: this.val("company"), ceo: this.val("ceo"), bizno: this.val("bizno"),
+            bizKind: this.val("bizKind"), industry: this.val("industry"),
+            zip: this.val("zip"), addr1: this.val("addr1"), addr2: this.val("addr2"),
+            phone: this.val("phone"), email: this.val("email"),
+            moveIn: this.val("moveIn"), headcount: this.headcount,
+            roomType: this.state.room !== undefined ? this.state.room : "1인실",
+            term: this.state.term !== undefined ? this.state.term : "12개월",
+            message: this.val("message"),
+            users: this.userRows,
+            marketing: this.val("agreeMarketing"),
+            source: "apply",
+          }));
+          await fetch(APPLY_ENDPOINT, { method: "POST", body });
+        } catch (err) {
+          console.warn("apply submit failed", err);
+        }
+      }
+      setTimeout(() => this.setState({ busy: false, screen: "submitted" }), APPLY_ENDPOINT ? 0 : 600);
+    });
+  }
+
+  bindResult() {
+    const at = document.querySelector("[data-apply-at]");
+    if (at && !at.textContent) {
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      at.textContent = "접수 일시 " + d.getFullYear() + "." + pad(d.getMonth() + 1) + "." + pad(d.getDate()) +
+        " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+    }
+    const copy = document.querySelector("[data-copy-no]");
+    if (this.once(copy, "copy")) {
+      copy.addEventListener("click", async () => {
+        const no = document.querySelector("[data-apply-no]");
+        const label = copy.querySelector("[data-copy-label]");
+        const text = no ? no.textContent.trim() : "";
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch (err) {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.cssText = "position:fixed;opacity:0";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+        if (label) {
+          label.textContent = "복사됨";
+          setTimeout(() => { label.textContent = "복사"; }, 1600);
+        }
+      });
+    }
+    const restart = document.querySelector("[data-restart]");
+    if (this.once(restart, "restart")) {
+      restart.addEventListener("click", () => this.setState({ screen: "form", showErrors: false }));
+    }
+  }
+
+  /**
+   * Icons for JS-built nodes. This renderer paints mask-image spans as solid blocks,
+   * so every glyph is authored ONCE in the hidden [data-glyphs] library with the DS
+   * Icon component and cloned from there.
+   */
+  glyph(name) {
+    const src = document.querySelector('[data-glyph="' + name + '"]');
+    const el = document.createElement("span");
+    el.style.cssText = "display:flex;align-items:center;justify-content:center";
+    if (src) {
+      [...src.childNodes].forEach((n) => el.appendChild(n.cloneNode(true)));
+    }
+    return el;
+  }
+
+  componentWillUnmount() {
+    clearTimeout(this.bizTimer);
+    clearTimeout(this.uploadTimer);
+  }
+}
+
+</script>
+</body>
+</html>

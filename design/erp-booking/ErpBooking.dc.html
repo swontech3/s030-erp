@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="ERP · 회의실 예약" description="주간 현황 그리드 + 등록·수정 모달. 권한별 마스킹, 드래그 선택, 무료 4슬롯 초과 고지" -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>body{margin:0}[data-scroll]::-webkit-scrollbar{width:8px}[data-scroll]::-webkit-scrollbar-track{background:transparent}[data-scroll]::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}[data-scroll]:hover::-webkit-scrollbar-thumb{background:var(--text-caption)}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}</style>
+</helmet>
+<div style="min-width:1280px;height:900px;display:flex;background:var(--surface-alt);font-family:var(--font-core)">
+<aside data-sidebar="1" style="width:248px;flex:0 0 auto;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 16px;transition:width 240ms var(--ease-out),padding 240ms var(--ease-out)">
+<div style="padding:0 0 24px">
+<button data-logo="1" style="position:relative;width:100%;display:flex;align-items:center;gap:10px;height:40px;padding:0 8px;border:0;border-radius:var(--radius-md);background:transparent;cursor:pointer;text-align:left;transition:background 240ms var(--ease-out)" style-hover="background:var(--surface-alt)">
+<img src="../../assets/swonbiz-logo.png" alt="" style="height:24px;width:auto;flex:0 0 auto">
+<span data-side-label="1" style="font-size:17px;font-weight:800;letter-spacing:-.03em;color:var(--text-heading);white-space:nowrap">S<span style="opacity:.55">·</span>won<span style="color:var(--color-primary)">Biz</span></span>
+</button>
+</div>
+<nav style="display:flex;flex-direction:column;gap:2px">
+<button data-nav="tenants" style="position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;font-weight:400;text-align:left;cursor:pointer" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="building-2" size="{{ 18 }}" hint-size="18px,18px"></x-import></span><span data-side-label="1" style="white-space:nowrap;overflow:hidden">입주사</span></button>
+<button data-nav="billing" style="position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;font-weight:400;text-align:left;cursor:pointer" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="receipt" size="{{ 18 }}" hint-size="18px,18px"></x-import></span><span data-side-label="1" style="white-space:nowrap;overflow:hidden">청구</span></button>
+<button data-nav="tax" style="position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;font-weight:400;text-align:left;cursor:pointer" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="calculator" size="{{ 18 }}" hint-size="18px,18px"></x-import></span><span data-side-label="1" style="white-space:nowrap;overflow:hidden">세무</span></button>
+<button data-nav="rooms" style="position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:var(--color-accent-bg);color:var(--color-primary-hover);font-family:inherit;font-size:15px;font-weight:700;text-align:left;cursor:pointer"><span style="display:flex;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="calendar-check" size="{{ 18 }}" hint-size="18px,18px"></x-import></span><span data-side-label="1" style="white-space:nowrap;overflow:hidden">회의실</span></button>
+<button data-nav="spaces" style="position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;font-weight:400;text-align:left;cursor:pointer" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="door-open" size="{{ 18 }}" hint-size="18px,18px"></x-import></span><span data-side-label="1" style="white-space:nowrap;overflow:hidden">호실</span></button>
+<button data-nav="settings" style="position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-family:inherit;font-size:15px;font-weight:400;text-align:left;cursor:pointer" style-hover="background:var(--surface-alt)"><span style="display:flex;flex:0 0 auto"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="settings" size="{{ 18 }}" hint-size="18px,18px"></x-import></span><span data-side-label="1" style="white-space:nowrap;overflow:hidden">설정</span></button>
+</nav>
+</aside>
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<header style="flex:0 0 auto;height:64px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:16px;padding:0 28px">
+<div>
+<div style="font-size:12px;color:var(--text-caption)">운영 · 강남 삼성점</div>
+<div style="font-size:17px;font-weight:700;letter-spacing:-.015em;color:var(--text-heading)">회의실 예약</div>
+</div>
+<div style="flex:1"></div>
+<span data-role-note="1" style="font-size:12px;color:var(--text-muted);white-space:nowrap"></span>
+<div style="display:flex;align-items:center;gap:10px;padding-left:16px;border-left:1px solid var(--border)">
+<span data-user-avatar="1" style="width:32px;height:32px;border-radius:var(--radius-sm);background:var(--color-accent-bg);color:var(--color-primary-hover);display:grid;place-items:center;font-size:13px;font-weight:700;flex:0 0 auto">최</span>
+<div style="line-height:1.3">
+<div data-user-name="1" style="font-size:14px;font-weight:700;color:var(--text-heading);white-space:nowrap">최현수</div>
+<div data-user-org="1" style="font-size:12px;color:var(--text-muted);white-space:nowrap">운영 관리자</div>
+</div>
+</div>
+</header>
+
+<div style="flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 28px 14px">
+<div style="display:flex;align-items:center;gap:12px">
+<span style="display:flex;gap:4px">
+<button data-step="-1" aria-label="이전" style="width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-muted);cursor:pointer;padding:0;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-left" size="{{ 16 }}" hint-size="16px,16px"></x-import></button>
+<button data-step="0" style="height:36px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">오늘</button>
+<button data-step="1" aria-label="다음" style="width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-muted);cursor:pointer;padding:0;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-right" size="{{ 16 }}" hint-size="16px,16px"></x-import></button>
+</span>
+<span data-range="1" style="font-size:17px;font-weight:700;letter-spacing:-.015em;color:var(--text-heading);white-space:nowrap">2026.08.24 – 08.30</span>
+<span data-room-picker="1" style="position:relative;display:flex;align-items:center;height:36px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-alt);font-size:14px;color:var(--text-body);white-space:nowrap;gap:6px"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="door-open" size="{{ 16 }}" hint-size="16px,16px"></x-import>회의실 A (4~5인)</span>
+</div>
+<span data-view-seg="1" style="display:inline-flex;gap:4px;padding:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md)">
+<button data-view-btn="month" style="height:28px;padding:0 14px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:13px;cursor:pointer;white-space:nowrap">월간</button>
+<button data-view-btn="week" style="height:28px;padding:0 14px;border:0;border-radius:var(--radius-sm);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 1px 2px rgba(11,17,32,.06)">주간</button>
+</span>
+<div style="display:flex;align-items:center;gap:16px">
+<span data-free-quota="1" style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text-body);white-space:nowrap"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="clock" size="{{ 16 }}" hint-size="16px,16px"></x-import>오늘 무료 잔여 <span data-free-left="1" style="font-weight:700;color:var(--text-heading)">1시간 30분</span></span>
+<button data-new="1" style="height:36px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;border-radius:var(--radius-md);background:var(--color-primary);color:var(--text-on-primary);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:var(--shadow-primary);transition:background var(--dur) var(--ease-out)" style-hover="background:var(--color-primary-hover)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="plus" size="{{ 16 }}" hint-size="16px,16px"></x-import>예약 추가</button>
+</div>
+</div>
+
+<div data-panel="month" style="--month-cols:repeat(7,minmax(0,1fr));display:none;flex:1;min-height:0;margin:0 28px 24px;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">
+<div data-scroll="1" style="flex:1;min-height:0;overflow-y:auto">
+<div data-month-head="1" style="position:sticky;top:0;z-index:5;display:grid;grid-template-columns:var(--month-cols);gap:8px;height:40px;padding:0 8px;background:var(--surface);border-bottom:1px solid var(--border)"></div>
+<div data-month-grid="1" style="display:grid;grid-template-columns:var(--month-cols);gap:8px;padding:8px"></div>
+</div>
+<div style="flex:0 0 auto;display:flex;align-items:center;gap:16px;padding:12px 20px;border-top:1px solid var(--border);background:var(--surface-alt)">
+ 예약</span>
+<span style="flex:1"></span>
+<span style="font-size:12px;color:var(--text-caption)">날짜를 누르면 그 주의 시간표로 이동합니다</span>
+</div>
+</div>
+
+<div data-panel="week" style="--grid-cols:72px repeat(7,minmax(0,1fr));flex:1;min-height:0;margin:0 28px 24px;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">
+<div data-scroll="1" data-grid-scroll="1" style="flex:1;min-height:0;overflow-y:auto">
+<div data-grid-head="1" style="position:sticky;top:0;z-index:5;display:grid;grid-template-columns:var(--grid-cols);border-bottom:1px solid var(--border);background:var(--surface)"></div>
+<div data-grid-body="1" style="position:relative;display:grid;grid-template-columns:var(--grid-cols)"></div>
+</div>
+<div style="flex:0 0 auto;display:flex;align-items:center;gap:20px;padding:12px 20px;border-top:1px solid var(--border);background:var(--surface-alt)">
+<span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)"><span style="width:12px;height:12px;border-radius:3px;background:rgba(79,70,229,.08);border-left:3px solid var(--color-primary)"></span>확정</span>
+<span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)"><span data-legend-req="1" style="width:12px;height:12px;border-radius:3px;border-left:3px solid var(--color-warning)"></span>승인 대기</span>
+<span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)"><span style="width:12px;height:2px;background:var(--color-accent)"></span>현재 시각</span>
+<span style="flex:1"></span>
+<span style="font-size:12px;color:var(--text-caption)">운영 09:00 – 22:00 · 30분 단위 · 조직당 일 2시간 무료</span>
+</div>
+</div>
+</div>
+</div>
+
+<sc-if value="{{ showForm }}" hint-placeholder-val="{{ false }}">
+<div data-overlay="1" style="position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(11,17,32,.45)">
+<div style="width:640px;max-height:calc(100vh - 48px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-overlay);overflow:hidden">
+<div style="flex:0 0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:24px;border-bottom:1px solid var(--border)">
+<div>
+<h3 data-form-title="1" style="margin:0;font-size:var(--text-h3-size);font-weight:var(--weight-semibold);line-height:var(--text-h3-lh);letter-spacing:var(--text-h3-ls);color:var(--text-heading)">회의실 예약</h3>
+<p style="margin:6px 0 0;font-size:14px;color:var(--text-muted)">회의실 A · 4~5인 · 30분 단위</p>
+</div>
+<button data-close="1" aria-label="닫기" style="flex:0 0 auto;width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-caption);cursor:pointer;padding:0;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="x" size="{{ 20 }}" hint-size="20px,20px"></x-import></button>
+</div>
+<div data-scroll="1" style="flex:1;min-height:0;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:24px">
+
+<div>
+<div style="display:flex;align-items:center;gap:8px"><span style="width:3px;height:16px;flex:0 0 auto;background:var(--color-primary)"></span><span style="font-size:16px;font-weight:700;color:var(--text-heading)">예약 정보</span></div>
+<div style="margin-top:12px;display:grid;grid-template-columns:1.2fr 1fr 1fr;column-gap:12px;row-gap:14px">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--text-muted)">날짜</span><input data-bf="date" type="date" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--text-muted)">시작</span><span style="position:relative;display:flex"><select data-bf="start" style="appearance:none;width:100%;height:44px;padding:0 34px 0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:pointer"></select><span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);display:flex;color:var(--text-muted);pointer-events:none"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-down" size="{{ 16 }}" hint-size="16px,16px"></x-import></span></span></label>
+<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--text-muted)">종료</span><span style="position:relative;display:flex"><select data-bf="end" style="appearance:none;width:100%;height:44px;padding:0 34px 0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;cursor:pointer"></select><span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);display:flex;color:var(--text-muted);pointer-events:none"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="chevron-down" size="{{ 16 }}" hint-size="16px,16px"></x-import></span></span><span data-conflict="1" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--color-danger)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="circle-alert" size="{{ 12 }}" hint-size="12px,12px"></x-import><span data-conflict-text="1"></span></span></div>
+</div>
+</div>
+
+<div>
+<div style="display:flex;align-items:center;gap:8px"><span style="width:3px;height:16px;flex:0 0 auto;background:var(--color-primary)"></span><span style="font-size:16px;font-weight:700;color:var(--text-heading)">예약 내용</span></div>
+<div style="margin-top:12px;display:flex;flex-direction:column;gap:14px">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--text-muted)">회의 제목 <span style="color:var(--color-danger)">*</span></span><input data-bf="title" maxlength="40" placeholder="주간 회의" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<div style="display:flex;flex-direction:column;gap:6px">
+<span style="font-size:12px;color:var(--text-muted)">참석 인원</span>
+<span style="display:inline-flex;align-items:center;gap:0;width:fit-content;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden">
+<button data-step="-1" aria-label="인원 감소" style="width:44px;height:44px;display:grid;place-items:center;border:0;border-right:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;padding:0;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="minus" size="{{ 16 }}" hint-size="16px,16px"></x-import></button>
+<span data-bf-people="1" style="width:56px;text-align:center;font-size:16px;font-weight:700;color:var(--text-heading);font-variant-numeric:tabular-nums">4</span>
+<button data-step="1" aria-label="인원 증가" style="width:44px;height:44px;display:grid;place-items:center;border:0;border-left:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;padding:0;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)"><x-import component-from-global-scope="SwonBizDesignSystem_9f2a02.Icon" name="plus" size="{{ 16 }}" hint-size="16px,16px"></x-import></button>
+</span>
+</div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--text-muted)">메모</span><textarea data-bf="memo" maxlength="200" rows="2" placeholder="준비물, 참석자 안내 등" style="padding:12px 14px;font-family:inherit;font-size:14px;line-height:1.6;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;resize:vertical;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></textarea></label>
+</div>
+</div>
+
+<div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+<div style="display:flex;align-items:center;gap:8px"><span style="width:3px;height:16px;flex:0 0 auto;background:var(--color-primary)"></span><span style="font-size:16px;font-weight:700;color:var(--text-heading)">예약자 정보</span></div>
+<span data-booker-note="1" style="font-size:12px;color:var(--text-muted);white-space:nowrap">로그인 정보로 자동 입력됩니다</span>
+</div>
+<div data-booker-locked="1" style="margin-top:12px;position:relative;padding:16px 16px 16px 20px;background:var(--surface-alt);border-radius:var(--radius-md);overflow:hidden">
+<span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--color-primary)"></span>
+<div style="display:grid;grid-template-columns:1fr 1fr;row-gap:14px;column-gap:20px">
+<div><div style="font-size:12px;color:var(--text-muted)">조직명</div><div data-booker="org" style="margin-top:2px;font-size:16px;font-weight:700;color:var(--text-heading)">브릿지랩 주식회사</div></div>
+<div><div style="font-size:12px;color:var(--text-muted)">예약자</div><div data-booker="name" style="margin-top:2px;font-size:16px;color:var(--text-heading)">김도현</div></div>
+<div><div style="font-size:12px;color:var(--text-muted)">연락처</div><div data-booker="phone" style="margin-top:2px;font-size:16px;color:var(--text-heading)">010-2345-6789</div></div>
+</div>
+</div>
+<div data-booker-input="1" style="margin-top:12px;display:none;flex-direction:column;gap:14px">
+<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:12px;row-gap:14px">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--text-muted)">소속 <span style="color:var(--color-danger)">*</span></span><input data-bf="extOrg" placeholder="회사 또는 단체명" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--text-muted)">이름 <span style="color:var(--color-danger)">*</span></span><input data-bf="extName" placeholder="홍길동" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--text-muted)">연락처 <span style="color:var(--color-danger)">*</span></span><input data-bf="extPhone" data-mask="phone" placeholder="010-0000-0000" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;font-variant-numeric:tabular-nums;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--text-muted)">이메일 <span style="color:var(--color-danger)">*</span></span><input data-bf="extEmail" placeholder="name@company.com" style="height:44px;padding:0 14px;font-family:inherit;font-size:14px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)" style-focus="border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)"></label>
+</div>
+<label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" style="width:18px;height:18px;flex:0 0 auto;accent-color:var(--color-primary)"><span style="font-size:14px;color:var(--text-body)">개인정보 수집·이용에 동의합니다 <span style="color:var(--text-muted)">(예약 목적, 3개월 보관)</span></span></label>
+</div>
+</div>
+
+<div>
+<div style="display:flex;align-items:center;gap:8px"><span style="width:3px;height:16px;flex:0 0 auto;background:var(--color-primary)"></span><span style="font-size:16px;font-weight:700;color:var(--text-heading)">요금 요약</span></div>
+<div data-fee-box="1" style="margin-top:12px;padding:16px 18px;background:var(--surface-alt);border-radius:var(--radius-md);display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="font-size:14px;color:var(--text-body)">오늘 무료 잔여</span><span data-fee="remain" style="font-size:14px;font-weight:700;color:var(--text-heading);font-variant-numeric:tabular-nums">1시간 30분</span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="font-size:14px;color:var(--text-body)">이번 예약</span><span data-fee="length" style="font-size:14px;font-weight:700;color:var(--text-heading);font-variant-numeric:tabular-nums">1시간</span></div>
+<div data-fee-over-row="1" style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span data-fee-over-label="1" style="font-size:14px;color:var(--text-body)">초과 시간</span><span data-fee="over" style="font-size:14px;font-weight:700;color:var(--text-heading);font-variant-numeric:tabular-nums">없음</span></div>
+<div style="height:1px;background:var(--border)"></div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="font-size:14px;font-weight:700;color:var(--text-heading)">예상 추가 금액</span><span data-fee="amount" style="font-size:16px;font-weight:700;color:var(--color-primary);font-variant-numeric:tabular-nums">₩0</span></div>
+<span style="font-size:12px;color:var(--text-muted)">초과분은 월 청구서에 반영됩니다</span>
+</div>
+</div>
+
+</div>
+<div style="flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:20px 24px;border-top:1px solid var(--border)">
+<button data-delete="1" style="display:none;height:44px;padding:0 16px;align-items:center;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--color-danger);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--color-danger-bg)">예약 취소</button>
+<span style="flex:1"></span>
+<button data-close="1" style="height:44px;padding:0 16px;display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:background var(--dur) var(--ease-out)" style-hover="background:var(--surface-alt)">취소</button>
+<button data-submit="1" style="height:44px;padding:0 20px;display:inline-flex;align-items:center;border:1px solid transparent;border-radius:var(--radius-md);background:var(--color-primary);color:var(--text-on-primary);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:var(--shadow-primary);transition:background var(--dur) var(--ease-out)" style-hover="background:var(--color-primary-hover)">예약하기</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;viewer&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;operator&quot;,&quot;tenant&quot;,&quot;external&quot;],&quot;default&quot;:&quot;operator&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;권한&quot;},&quot;modal&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;form&quot;],&quot;default&quot;:&quot;none&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;모달&quot;}}">
+/* ── 미확정 상수 · 값이 정해지면 이 세 줄만 교체 ── */
+const OVER_RATE_PER_SLOT = 0;   // 초과 30분당 단가 (원)
+const MAX_SLOTS_PER_BOOKING = 8; // 1회 최대 연속 예약 (8슬롯 = 4시간)
+const CLOSE_HOUR = 22;           // 운영 종료 시각
+
+const OPEN_HOUR = 9;
+const SLOT_MIN = 30;
+const SLOTS = (CLOSE_HOUR - OPEN_HOUR) * (60 / SLOT_MIN); // 26
+const SLOT_H = 28;
+const FREE_SLOTS = 4; // 조직당 일 2시간
+const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
+
+const TOKEN_FALLBACK = {
+  "--surface": "#FFFFFF", "--surface-alt": "#F8FAFC", "--surface-inverse": "#0B1120",
+  "--border": "#E2E8F0", "--text-heading": "#0B1120", "--text-body": "#475569",
+  "--text-muted": "#64748B", "--text-caption": "#94A3B8",
+  "--color-primary": "#4F46E5", "--color-primary-hover": "#4338CA",
+  "--color-accent": "#22D3EE", "--color-accent-bg": "#EEF2FF",
+  "--color-warning": "#D97706", "--color-warning-bg": "#FEF3C7", "--color-warning-text": "#92400E",
+  "--color-danger": "#DC2626", "--color-danger-bg": "#FEE2E2",
+};
+
+/** 시안 예약. day 0=월 … 6=일, slot 0=09:00 */
+const BOOKINGS = [
+  { id: 1, day: 0, slot: 2, len: 2, title: "주간 스프린트 회의", org: "브릿지랩 주식회사", people: 4, status: "confirmed", owner: "tenant", mine: true },
+  { id: 2, day: 0, slot: 10, len: 4, title: "투자사 미팅", org: "오르카 스튜디오", people: 5, status: "confirmed", owner: "tenant" },
+  { id: 3, day: 1, slot: 6, len: 3, title: "신규 입주 상담", org: "에스원테크", people: 3, status: "confirmed", owner: "operator" },
+  { id: 4, day: 2, slot: 4, len: 2, title: "세무 검토 회의", org: "한결세무법인", people: 2, status: "requested", owner: "tenant" },
+  { id: 5, day: 2, slot: 16, len: 6, title: "제품 워크숍", org: "브릿지랩 주식회사", people: 5, status: "confirmed", owner: "tenant", mine: true },
+  { id: 6, day: 3, slot: 8, len: 1, title: "채용 면접", org: "노틸러스", people: 2, status: "confirmed", owner: "tenant" },
+  { id: 7, day: 4, slot: 12, len: 4, title: "협력사 방문", org: "외부 방문", people: 4, status: "confirmed", owner: "external" },
+  { id: 8, day: 5, slot: 6, len: 4, title: "주말 스터디", org: "세움컴퍼니", people: 3, status: "requested", owner: "tenant" },
+];
+
+const OWNER_LABEL = { tenant: "입주사", operator: "운영사", external: "외부" };
+
+class Component extends DCLogic {
+  state = { modal: undefined, viewer: undefined, sel: null, people: 4, editing: null, view: null, anchor: null };
+
+  /**
+   * 월간은 실적·가동률 분석 용도이므로 운영사 전용이다. 입주사는 타사의
+   * 한 달치 사용 밀도를 볼 이유가 없고, 본인 예약 확인은 주간에서 더 빠르다.
+   * URL로 view=month 를 넣어도 주간으로 강제한다 (서버에서도 같이 차단).
+   */
+  get view() {
+    if (this.viewer !== "operator") return "week";
+    if (this.state.view) return this.state.view;
+    return new URLSearchParams(location.search).get("view") === "month" ? "month" : "week";
+  }
+
+  /** 월↔주 전환의 기준 날짜. 전환해도 이 날짜를 유지한다. */
+  get anchor() {
+    if (this.state.anchor) return this.state.anchor;
+    const p = new URLSearchParams(location.search).get("date");
+    if (p) {
+      const parts = p.split("-").map(Number);
+      // date=2026-08 이면 그 달, date=2026-08-26 이면 그 날
+      return new Date(parts[0], parts[1] - 1, parts[2] || 26);
+    }
+    return new Date(2026, 7, 26);
+  }
+
+  /** operator | tenant | external — 조회 권한을 결정한다 */
+  get viewer() {
+    if (this.state.viewer !== undefined) return this.state.viewer;
+    return this.props.viewer || "operator";
+  }
+
+  get modal() {
+    if (this.state.modal !== undefined) return this.state.modal;
+    return this.props.modal === "form" ? "form" : "none";
+  }
+
+  /** 데모 기준 오늘 = 2026.08.26(수) */
+  get todayDate() { return new Date(2026, 7, 26); }
+
+  /** 기준 날짜가 속한 주의 월요일. 열 날짜와 오늘 판정이 모두 여기서 나온다. */
+  get weekStart() {
+    const a = this.anchor;
+    return new Date(a.getFullYear(), a.getMonth(), a.getDate() - ((a.getDay() + 6) % 7));
+  }
+
+  /** 기준 주에 오늘이 없으면 -1 — 강조도 현재 시각 라인도 그리지 않는다. */
+  get today() {
+    const mon = this.weekStart;
+    const t = this.todayDate;
+    const diff = Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()) - mon) / 86400000);
+    return diff >= 0 && diff < 7 ? diff : -1;
+  }
+
+  /** 기준 주가 오늘보다 과거인지 — 지난 슬롯 판정에 쓴다. */
+  get weekIsPast() {
+    const mon = this.weekStart;
+    return mon < this.todayDate && this.today === -1;
+  }
+  get nowSlot() { return 8 + 40 / 60; }
+
+  renderVals() { return { showForm: this.modal === "form" }; }
+
+  componentDidMount() {
+    this.buildGrid();
+    this.bindStatic();
+    this.applyViewer();
+    this.applyView();
+    this.bindForm();
+    // 현재 시각 -1시간 위치로 스크롤
+    const sc = document.querySelector("[data-grid-scroll]");
+    if (sc) sc.scrollTop = Math.max(0, (this.nowSlot - 2) * SLOT_H);
+  }
+
+  componentDidUpdate(prev) {
+    if (prev) {
+      if (prev.viewer !== this.props.viewer && this.state.viewer !== undefined) { this.setState({ viewer: undefined }); return; }
+      if (prev.modal !== this.props.modal && this.state.modal !== undefined) { this.setState({ modal: undefined }); return; }
+    }
+    this.buildGrid();
+    this.applyViewer();
+    this.applyView();
+    this.bindForm();
+  }
+
+  once(el, key) {
+    if (!el || el.getAttribute("data-bound-" + key)) return false;
+    el.setAttribute("data-bound-" + key, "1");
+    return true;
+  }
+
+  token(name) {
+    if (!this.tk) this.tk = {};
+    if (this.tk[name]) return this.tk[name];
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    if (v) { this.tk[name] = v; return v; }
+    return TOKEN_FALLBACK[name] || "";
+  }
+
+  label(slot) {
+    const h = OPEN_HOUR + Math.floor(slot / 2);
+    return String(h).padStart(2, "0") + ":" + (slot % 2 ? "30" : "00");
+  }
+
+  duration(len) {
+    const h = Math.floor(len / 2), m = (len % 2) * 30;
+    return (h ? h + "시간" : "") + (h && m ? " " : "") + (m ? m + "분" : "");
+  }
+
+  /** 입주사는 타사 예약을, 외부는 모든 예약 내용을 볼 수 없다 */
+  visibleTo(b) {
+    const v = this.viewer;
+    if (v === "operator") return "full";
+    if (v === "external") return "none";
+    return b.mine ? "full" : "masked";
+  }
+
+  buildGrid() {
+    const head = document.querySelector("[data-grid-head]");
+    const body = document.querySelector("[data-grid-body]");
+    if (!head || !body) return;
+    const border = this.token("--border");
+    const muted = this.token("--text-muted");
+    const caption = this.token("--text-caption");
+    const primary = this.token("--color-primary");
+    const heading = this.token("--text-heading");
+
+    // ── 헤더: 요일 7개
+    head.textContent = "";
+    const corner = document.createElement("div");
+    corner.style.cssText = "height:56px;border-right:1px solid " + border;
+    head.appendChild(corner);
+    // 열 날짜는 기준 주의 월요일에서 센다 — 라벨과 그리드가 같은 주를 가리키게.
+    const mon = this.weekStart;
+    DAYS.forEach((d, i) => {
+      const date = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
+      const isToday = i === this.today;
+      const cell = document.createElement("div");
+      cell.style.cssText = "position:relative;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-right:" +
+        (i === 6 ? "0" : "1px solid " + border) + ";background:" + (isToday ? "rgba(79,70,229,.03)" : "transparent");
+      const dow = document.createElement("span");
+      dow.textContent = d;
+      dow.style.cssText = "font-size:12px;font-weight:700;color:" + (isToday ? primary : muted);
+      const num = document.createElement("span");
+      num.textContent = String(date.getDate());
+      num.style.cssText = "font-size:16px;font-weight:700;color:" + (isToday ? primary : heading) + ";font-variant-numeric:tabular-nums";
+      cell.appendChild(dow);
+      cell.appendChild(num);
+      if (isToday) {
+        const bar = document.createElement("span");
+        bar.style.cssText = "position:absolute;left:20%;right:20%;bottom:0;height:2px;background:" + primary;
+        cell.appendChild(bar);
+      }
+      head.appendChild(cell);
+    });
+
+    // ── 본문: 시간 라벨 + 7일 컬럼
+    body.textContent = "";
+    const times = document.createElement("div");
+    times.style.cssText = "border-right:1px solid " + border;
+    for (let s = 0; s < SLOTS; s++) {
+      const row = document.createElement("div");
+      row.style.cssText = "height:" + SLOT_H + "px;display:flex;align-items:flex-start;justify-content:flex-end;padding:2px 8px 0 0;border-top:" +
+        (s % 2 ? "1px dashed " + border : "1px solid " + border);
+      if (s % 2 === 0) {
+        const t = document.createElement("span");
+        t.textContent = this.label(s);
+        t.style.cssText = "font-size:12px;color:" + caption + ";font-variant-numeric:tabular-nums";
+        row.appendChild(t);
+      }
+      times.appendChild(row);
+    }
+    body.appendChild(times);
+
+    DAYS.forEach((_, day) => {
+      const col = document.createElement("div");
+      col.setAttribute("data-day", String(day));
+      col.style.cssText = "position:relative;border-right:" + (day === 6 ? "0" : "1px solid " + border) +
+        ";background:" + (day === this.today ? "rgba(79,70,229,.03)" : "transparent");
+
+      for (let s = 0; s < SLOTS; s++) {
+        // 미래 주에서는 오전 슬롯이 잘못 잠기지 않아야 한다.
+        const past = this.weekIsPast ||
+          (this.today >= 0 && (day < this.today || (day === this.today && s + 1 <= this.nowSlot)));
+        const cell = document.createElement("div");
+        cell.setAttribute("data-slot", String(s));
+        cell.style.cssText = "height:" + SLOT_H + "px;border-top:" + (s % 2 ? "1px dashed " + border : "1px solid " + border) +
+          ";background:" + (past ? this.token("--surface-alt") : "transparent") + ";cursor:" + (past ? "not-allowed" : "pointer");
+        if (!past) {
+          cell.addEventListener("mousedown", () => this.dragStart(day, s));
+          cell.addEventListener("mouseenter", () => this.dragMove(day, s));
+        }
+        col.appendChild(cell);
+      }
+
+      BOOKINGS.filter((b) => b.day === day).forEach((b) => this.paintBooking(col, b));
+
+      if (day === this.today) {
+        const line = document.createElement("div");
+        line.style.cssText = "position:absolute;left:0;right:0;top:" + (this.nowSlot * SLOT_H) + "px;height:0;border-top:1px solid " +
+          this.token("--color-accent") + ";pointer-events:none;z-index:3";
+        const dot = document.createElement("span");
+        dot.style.cssText = "position:absolute;left:-4px;top:-4px;width:8px;height:8px;border-radius:999px;background:" + this.token("--color-accent");
+        line.appendChild(dot);
+        col.appendChild(line);
+      }
+
+      const ghost = document.createElement("div");
+      ghost.setAttribute("data-ghost", String(day));
+      ghost.style.cssText = "position:absolute;left:3px;right:3px;display:none;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px dashed " +
+        primary + ";border-radius:4px;background:rgba(79,70,229,.08);pointer-events:none;z-index:4;overflow:hidden";
+      col.appendChild(ghost);
+
+      body.appendChild(col);
+    });
+
+    if (this.once(document.body, "dragend")) {
+      document.addEventListener("mouseup", () => this.dragEnd());
+    }
+  }
+
+  paintBooking(col, b) {
+    const vis = this.visibleTo(b);
+    if (vis === "none") {
+      const blk = document.createElement("div");
+      blk.style.cssText = "position:absolute;left:3px;right:3px;top:" + (b.slot * SLOT_H + 1) + "px;height:" + (b.len * SLOT_H - 2) +
+        "px;border-radius:4px;background:" + this.token("--surface-alt") + ";border:1px solid " + this.token("--border") + ";z-index:2";
+      col.appendChild(blk);
+      return;
+    }
+    const req = b.status === "requested";
+    const primary = this.token("--color-primary");
+    const warn = this.token("--color-warning");
+    const el = document.createElement("div");
+    el.setAttribute("data-booking", String(b.id));
+    el.style.cssText = "position:absolute;left:3px;right:3px;top:" + (b.slot * SLOT_H + 1) + "px;height:" + (b.len * SLOT_H - 2) +
+      "px;padding:4px 6px 4px 9px;border-radius:4px;cursor:pointer;overflow:hidden;z-index:2;border-left:3px solid " +
+      (req ? warn : primary) + ";background:" + (req ? this.token("--color-warning-bg") : "rgba(79,70,229,.08)") +
+      (req ? ";background-image:repeating-linear-gradient(45deg,rgba(217,119,6,.16) 0 4px,transparent 4px 8px)" : "");
+
+    const time = document.createElement("div");
+    time.textContent = this.label(b.slot) + "–" + this.label(b.slot + b.len);
+    time.style.cssText = "font-size:11px;font-weight:700;color:" + (req ? this.token("--color-warning-text") : this.token("--color-primary-hover")) +
+      ";white-space:nowrap;font-variant-numeric:tabular-nums";
+    el.appendChild(time);
+
+    if (b.len >= 2) {
+      const t = document.createElement("div");
+      t.textContent = vis === "masked" ? "예약됨" : b.title;
+      t.style.cssText = "margin-top:1px;font-size:12px;font-weight:700;color:" + this.token("--text-heading") +
+        ";white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+      el.appendChild(t);
+    }
+    if (b.len >= 3 && vis === "full") {
+      const m = document.createElement("div");
+      m.textContent = b.org + " · " + b.people + "명";
+      m.style.cssText = "margin-top:1px;font-size:11px;color:" + this.token("--text-muted") + ";white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+      el.appendChild(m);
+    }
+    if (vis === "full") {
+      const badge = document.createElement("span");
+      badge.textContent = OWNER_LABEL[b.owner];
+      const tone = b.owner === "operator"
+        ? { bg: this.token("--color-accent-bg"), fg: this.token("--color-primary-hover") }
+        : b.owner === "external"
+          ? { bg: this.token("--color-warning-bg"), fg: this.token("--color-warning-text") }
+          : { bg: this.token("--surface"), fg: this.token("--text-muted") };
+      badge.style.cssText = "position:absolute;right:4px;top:4px;height:16px;padding:0 5px;border-radius:999px;background:" + tone.bg +
+        ";color:" + tone.fg + ";font-size:10px;font-weight:700;display:flex;align-items:center;white-space:nowrap";
+      el.appendChild(badge);
+    }
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (vis !== "full") return;
+      this.setState({ modal: "form", editing: b, sel: { day: b.day, from: b.slot, to: b.slot + b.len - 1 }, people: b.people });
+    });
+    col.appendChild(el);
+  }
+
+  /* ── 드래그 선택 ── */
+  dragStart(day, slot) {
+    if (this.viewer === "external") return;
+    this.drag = { day, from: slot, to: slot };
+    this.paintGhost();
+  }
+
+  dragMove(day, slot) {
+    if (!this.drag || this.drag.day !== day) return;
+    // 예약 슬롯을 가로지르면 직전까지만
+    const from = Math.min(this.drag.from, slot);
+    const to = Math.max(this.drag.from, slot);
+    let limit = to;
+    BOOKINGS.filter((b) => b.day === day).forEach((b) => {
+      if (b.slot > this.drag.from && b.slot <= to) limit = Math.min(limit, b.slot - 1);
+    });
+    this.drag.to = Math.min(limit, this.drag.from + MAX_SLOTS_PER_BOOKING - 1);
+    this.paintGhost();
+  }
+
+  dragEnd() {
+    if (!this.drag) return;
+    const d = this.drag;
+    this.drag = null;
+    document.querySelectorAll("[data-ghost]").forEach((g) => { g.style.display = "none"; });
+    this.setState({ modal: "form", editing: null, sel: { day: d.day, from: Math.min(d.from, d.to), to: Math.max(d.from, d.to) }, people: 4 });
+  }
+
+  paintGhost() {
+    const d = this.drag;
+    document.querySelectorAll("[data-ghost]").forEach((g) => { g.style.display = "none"; });
+    if (!d) return;
+    const g = document.querySelector('[data-ghost="' + d.day + '"]');
+    if (!g) return;
+    const from = Math.min(d.from, d.to), to = Math.max(d.from, d.to);
+    const len = to - from + 1;
+    g.style.display = "flex";
+    g.style.top = (from * SLOT_H + 1) + "px";
+    g.style.height = (len * SLOT_H - 2) + "px";
+    g.textContent = "";
+    const t = document.createElement("span");
+    t.textContent = this.label(from) + "–" + this.label(to + 1) + " (" + this.duration(len) + ")";
+    t.style.cssText = "font-size:12px;font-weight:700;color:" + this.token("--color-primary-hover") + ";white-space:nowrap;font-variant-numeric:tabular-nums";
+    g.appendChild(t);
+    if (len > FREE_SLOTS) {
+      const over = len - FREE_SLOTS;
+      const strip = document.createElement("span");
+      strip.textContent = this.duration(over) + " 초과 (예상 " + this.won(over * OVER_RATE_PER_SLOT) + ")";
+      strip.style.cssText = "position:absolute;left:0;right:0;bottom:0;padding:2px 4px;background:" + this.token("--color-warning-bg") +
+        ";color:" + this.token("--color-warning-text") + ";font-size:10px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden";
+      g.appendChild(strip);
+    }
+  }
+
+  won(n) { return "₩" + (n || 0).toLocaleString("ko-KR"); }
+
+  /**
+   * 월간은 밀도 달력이다 — 30일 × 26슬롯은 한 화면에 들어가지 않으므로
+   * 시간축을 그리지 않고 날짜별 점유 밀도만 보여준다. 시간 선택은 주간에서.
+   * 셀에 조직명·회의 제목은 어떤 경우에도 넣지 않는다 (폭 부족 + 산만함).
+   */
+  paintMonth() {
+    const head = document.querySelector("[data-month-head]");
+    const grid = document.querySelector("[data-month-grid]");
+    if (!head || !grid) return;
+    const border = this.token("--border");
+    const muted = this.token("--text-muted");
+    const heading = this.token("--text-heading");
+    const surface = this.token("--surface");
+    const primary = this.token("--color-primary");
+    const a = this.anchor;
+    const year = a.getFullYear(), month = a.getMonth();
+    const first = new Date(year, month, 1);
+    // 월요일 시작 주로 정렬한다 (주간 뷰의 요일 순서와 같게).
+    const lead = (first.getDay() + 6) % 7;
+    const start = new Date(year, month, 1 - lead);
+    const today = new Date(2026, 7, 26);
+
+    head.textContent = "";
+    DAYS.forEach((d) => {
+      const c = document.createElement("div");
+      c.textContent = d;
+      c.style.cssText = "display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:" + muted;
+      head.appendChild(c);
+    });
+
+    grid.textContent = "";
+    // 주 단위로 채운다 — 후행 다음-달 날짜를 잘라내면 마지막 행이 톱니가 된다.
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const total = Math.ceil((lead + lastDay) / 7) * 7;
+    for (let i = 0; i < total; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      const outside = d.getMonth() !== month;
+      const isToday = d.toDateString() === today.toDateString();
+      const past = d < today && !isToday;
+      // 시안 데이터: 주간 예약을 요일로 반복해 밀도를 만든다.
+      const dow = (d.getDay() + 6) % 7;
+      const dayBookings = BOOKINGS.filter((b) => b.day === dow);
+      const busy = dayBookings.reduce((n, b) => n + b.len, 0);
+
+      const cell = document.createElement("button");
+      cell.disabled = outside;
+      cell.style.cssText = "position:relative;min-height:120px;display:flex;flex-direction:column;gap:8px;padding:10px;text-align:left;" +
+        "border:1px solid " + border + ";border-radius:var(--radius-md);background:" + surface +
+        ";font-family:inherit;cursor:" + (outside ? "default" : "pointer") +
+        ";opacity:" + (outside ? ".4" : past ? ".6" : "1") + ";transition:background var(--dur) var(--ease-out)";
+      if (!outside) {
+        cell.addEventListener("mouseenter", () => { cell.style.background = this.token("--surface-alt"); });
+        cell.addEventListener("mouseleave", () => { cell.style.background = surface; });
+        // 날짜를 누르면 그 주의 시간표로 내려간다.
+        cell.addEventListener("click", () => this.setState({ view: "week", anchor: d }));
+      }
+
+      const num = document.createElement("span");
+      num.textContent = String(d.getDate());
+      num.style.cssText = isToday
+        ? "width:32px;height:32px;flex:0 0 auto;display:grid;place-items:center;border-radius:999px;background:" + primary +
+          ";color:#FFFFFF;font-size:16px;font-weight:700;font-variant-numeric:tabular-nums"
+        : "font-size:16px;font-weight:700;color:" + heading + ";font-variant-numeric:tabular-nums";
+      cell.appendChild(num);
+
+      // 시간이 텍스트로 나오므로 색으로 단계를 구분하지 않는다 — 단색 + 폭.
+      const track = document.createElement("span");
+      track.style.cssText = "display:block;width:100%;height:8px;flex:0 0 auto;border-radius:4px;background:#EEF0F4;overflow:hidden";
+      if (busy) {
+        const fill = document.createElement("span");
+        fill.style.cssText = "display:block;height:8px;border-radius:4px;background:#818CF8;width:" + (busy / SLOTS * 100) + "%";
+        track.appendChild(fill);
+      }
+      cell.appendChild(track);
+
+      // 0건이면 텍스트를 두지 않는다 — 빈 셀이 대비를 만든다.
+      if (dayBookings.length) {
+        // "1시간 30분"은 셀 폭을 넘겨 두 줄이 된다 — 시간 단위를 축약한다.
+        const hours = busy / 2;
+        const hLabel = (hours % 1 ? hours.toFixed(1) : String(hours)) + "h";
+        const n = document.createElement("span");
+        n.style.cssText = "display:block;max-width:100%;font-size:20px;font-variant-numeric:tabular-nums;" +
+          "white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+        const cnt = document.createElement("span");
+        cnt.style.cssText = "font-weight:600;color:" + heading;
+        const rest = document.createElement("span");
+        rest.style.cssText = "font-weight:400;color:" + muted;
+        n.appendChild(cnt);
+        n.appendChild(rest);
+        cell.appendChild(n);
+        // 폭이 부족하면 "2건 · 3h" → "2 · 3h" → "3h" 순으로 단계 축약한다.
+        this.fitCellLabel(n, cnt, rest, dayBookings.length, hLabel);
+      }
+
+      // 운영사 전용 화면이므로 툴팁에 조직명을 함께 보여준다.
+      if (dayBookings.length) {
+        cell.title = dayBookings
+          .slice()
+          .sort((x, y) => x.slot - y.slot)
+          .map((b) => this.label(b.slot) + "–" + this.label(b.slot + b.len) + " " + b.org)
+          .join("\n");
+      }
+
+      grid.appendChild(cell);
+    }
+  }
+
+  /**
+   * 셀 하단 라벨을 폭에 맞춰 단계 축약한다. 레이아웃 후 실측이 필요하므로
+   * 다음 프레임에 한 번 더 확인한다.
+   */
+  fitCellLabel(host, cntEl, restEl, count, hLabel) {
+    const steps = [
+      [count + "건", " · " + hLabel],
+      [String(count), " · " + hLabel],
+      ["", hLabel],
+    ];
+    const apply = () => {
+      for (let i = 0; i < steps.length; i++) {
+        cntEl.textContent = steps[i][0];
+        restEl.textContent = steps[i][1];
+        if (host.scrollWidth <= host.clientWidth || i === steps.length - 1) return;
+      }
+    };
+    apply();
+    requestAnimationFrame(apply);
+  }
+
+  /** 뷰 전환 + 기간 표시. 두 뷰는 기준 날짜를 공유한다. */
+  applyView() {
+    const v = this.view;
+    document.querySelectorAll("[data-panel]").forEach((p) => {
+      p.style.display = p.getAttribute("data-panel") === v ? "flex" : "none";
+    });
+    document.querySelectorAll("[data-view-btn]").forEach((b) => {
+      const on = b.getAttribute("data-view-btn") === v;
+      b.style.background = on ? this.token("--surface") : "transparent";
+      b.style.color = on ? this.token("--text-heading") : this.token("--text-muted");
+      b.style.fontWeight = on ? "700" : "400";
+      b.style.boxShadow = on ? "0 1px 2px rgba(11,17,32,.06)" : "none";
+    });
+    const range = document.querySelector("[data-range]");
+    if (range) {
+      const a = this.anchor;
+      if (v === "month") {
+        range.textContent = a.getFullYear() + "년 " + (a.getMonth() + 1) + "월";
+      } else {
+        const mon = new Date(a.getFullYear(), a.getMonth(), a.getDate() - ((a.getDay() + 6) % 7));
+        const sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
+        range.textContent = (mon.getMonth() + 1) + "월 " + mon.getDate() + "일 – " +
+          (sun.getMonth() === mon.getMonth() ? "" : (sun.getMonth() + 1) + "월 ") + sun.getDate() + "일";
+      }
+    }
+    // 없는 기능이 비활성으로 보이면 문의가 발생한다 — 토글 자체를 걷어낸다.
+    const seg = document.querySelector("[data-view-seg]");
+    if (seg) seg.style.display = this.viewer === "operator" ? "inline-flex" : "none";
+    // 주간 그리드도 기준 날짜를 따라 다시 그린다.
+    if (v === "month") this.paintMonth();
+    else this.buildGrid();
+  }
+
+  /* ── 권한별 표시 ── */
+  applyViewer() {
+    const v = this.viewer;
+    const note = document.querySelector("[data-role-note]");
+    const NOTES = {
+      operator: "운영 관리자 · 전체 예약 내용 표시",
+      tenant: "입주사 · 타사 예약은 시간만 표시됩니다",
+      external: "외부 조회 · 점유 시간만 표시됩니다",
+    };
+    if (note) note.textContent = NOTES[v];
+    const NAMES = { operator: ["최현수", "운영 관리자", "최"], tenant: ["김도현", "브릿지랩 주식회사", "김"], external: ["방문자", "외부 조회", "외"] };
+    const [nm, org, initial] = NAMES[v];
+    const nEl = document.querySelector("[data-user-name]");
+    const oEl = document.querySelector("[data-user-org]");
+    const aEl = document.querySelector("[data-user-avatar]");
+    if (nEl) nEl.textContent = nm;
+    if (oEl) oEl.textContent = org;
+    if (aEl) aEl.textContent = initial;
+    // 외부 조회는 예약을 만들 수 없다
+    const add = document.querySelector("[data-new]");
+    if (add) add.style.display = v === "external" ? "none" : "inline-flex";
+    const quota = document.querySelector("[data-free-quota]");
+    if (quota) quota.style.display = v === "tenant" ? "flex" : "none";
+    const legend = document.querySelector("[data-legend-req]");
+    if (legend) legend.style.background = this.token("--color-warning-bg");
+  }
+
+  bindStatic() {
+    const add = document.querySelector("[data-new]");
+    if (this.once(add, "new")) {
+      add.addEventListener("click", () => this.setState({ modal: "form", editing: null, sel: { day: this.today, from: 10, to: 11 }, people: 4 }));
+    }
+    // 이전·다음은 현재 뷰의 단위로 움직인다 — 월간은 한 달, 주간은 한 주.
+    document.querySelectorAll("[data-step]").forEach((b) => {
+      if (!this.once(b, "step")) return;
+      b.addEventListener("click", () => {
+        const dir = Number(b.getAttribute("data-step"));
+        if (!dir) { this.setState({ anchor: new Date(2026, 7, 26) }); return; }
+        const d = new Date(this.anchor);
+        if (this.view === "month") d.setMonth(d.getMonth() + dir);
+        else d.setDate(d.getDate() + dir * 7);
+        this.setState({ anchor: d });
+      });
+    });
+    document.querySelectorAll("[data-view-btn]").forEach((b) => {
+      if (!this.once(b, "viewbtn")) return;
+      b.addEventListener("click", () => this.setState({ view: b.getAttribute("data-view-btn") }));
+    });
+  }
+
+  /* ── 등록·수정 모달 ── */
+  bindForm() {
+    if (this.modal !== "form") return;
+    const sel = this.state.sel || { day: this.today, from: 10, to: 11 };
+    const editing = this.state.editing;
+
+    const title = document.querySelector("[data-form-title]");
+    if (title) title.textContent = editing ? "예약 수정" : "회의실 예약";
+    const del = document.querySelector("[data-delete]");
+    if (del) {
+      del.style.display = editing ? "inline-flex" : "none";
+      if (this.once(del, "del")) del.addEventListener("click", () => this.setState({ modal: "none" }));
+    }
+    const submit = document.querySelector("[data-submit]");
+    if (submit) {
+      submit.textContent = editing ? "저장" : "예약하기";
+      if (this.once(submit, "submit")) submit.addEventListener("click", () => this.setState({ modal: "none" }));
+    }
+    document.querySelectorAll("[data-close]").forEach((b) => {
+      if (this.once(b, "close")) b.addEventListener("click", () => this.setState({ modal: "none" }));
+    });
+    const ov = document.querySelector("[data-overlay]");
+    if (this.once(ov, "ov")) ov.addEventListener("click", (e) => { if (e.target === ov) this.setState({ modal: "none" }); });
+
+    // 날짜·시간
+    const dateEl = document.querySelector('[data-bf="date"]');
+    if (dateEl && !dateEl.value) dateEl.value = "2026-08-" + String(24 + sel.day).padStart(2, "0");
+    const startSel = document.querySelector('[data-bf="start"]');
+    const endSel = document.querySelector('[data-bf="end"]');
+    const fill = (el, first, last, value) => {
+      if (!el || el.options.length) { if (el) el.value = String(value); return; }
+      for (let s = first; s <= last; s++) {
+        const o = document.createElement("option");
+        o.value = String(s);
+        o.textContent = this.label(s);
+        el.appendChild(o);
+      }
+      el.value = String(value);
+    };
+    fill(startSel, 0, SLOTS - 1, sel.from);
+    fill(endSel, 1, SLOTS, sel.to + 1);
+
+    // 제목·인원·메모
+    const titleEl = document.querySelector('[data-bf="title"]');
+    if (titleEl && editing && !titleEl.value) titleEl.value = editing.title;
+    const people = document.querySelector("[data-bf-people]");
+    if (people) people.textContent = String(this.state.people);
+    document.querySelectorAll("[data-step]").forEach((b) => {
+      if (!this.once(b, "step")) return;
+      b.addEventListener("click", () => {
+        const d = parseInt(b.getAttribute("data-step"), 10);
+        this.setState({ people: Math.max(1, Math.min(5, this.state.people + d)) });
+      });
+    });
+
+    // 예약자 정보 — 로그인/외부 전환
+    const isExternal = this.viewer === "external";
+    const locked = document.querySelector("[data-booker-locked]");
+    const input = document.querySelector("[data-booker-input]");
+    const bnote = document.querySelector("[data-booker-note]");
+    if (locked) locked.style.display = isExternal ? "none" : "block";
+    if (input) input.style.display = isExternal ? "flex" : "none";
+    if (bnote) bnote.textContent = isExternal ? "외부 방문 예약은 직접 입력합니다" : "로그인 정보로 자동 입력됩니다";
+    if (!isExternal) {
+      const ORG = this.viewer === "operator"
+        ? ["에스원테크", "최현수", "070-4355-2312"]
+        : ["브릿지랩 주식회사", "김도현", "010-2345-6789"];
+      const set = (k, v) => { const el = document.querySelector('[data-booker="' + k + '"]'); if (el) el.textContent = v; };
+      set("org", ORG[0]); set("name", ORG[1]); set("phone", ORG[2]);
+    }
+
+    // 연락처 마스크
+    const phone = document.querySelector('[data-mask="phone"]');
+    if (this.once(phone, "mask")) {
+      phone.addEventListener("input", () => {
+        const d = phone.value.replace(/\D/g, "").slice(0, 11);
+        const mid = d.startsWith("010") || d.length > 10 ? 7 : 6;
+        phone.value = d.length > mid ? d.slice(0, 3) + "-" + d.slice(3, mid) + "-" + d.slice(mid)
+          : d.length > 3 ? d.slice(0, 3) + "-" + d.slice(3) : d;
+      });
+    }
+
+    const recalc = () => this.recalcFee();
+    [startSel, endSel].forEach((el) => {
+      if (!this.once(el, "time")) return;
+      el.addEventListener("change", recalc);
+    });
+    recalc();
+  }
+
+  /** 충돌 검사 + 무료 잔여 대비 초과 계산. 절대 차단하지 않는다. */
+  recalcFee() {
+    const startSel = document.querySelector('[data-bf="start"]');
+    const endSel = document.querySelector('[data-bf="end"]');
+    if (!startSel || !endSel) return;
+    const from = parseInt(startSel.value, 10);
+    const to = parseInt(endSel.value, 10);
+    const len = Math.max(0, to - from);
+    const day = this.state.sel ? this.state.sel.day : this.today;
+
+    const conflict = BOOKINGS.some((b) => b.day === day && (!this.state.editing || b.id !== this.state.editing.id) &&
+      from < b.slot + b.len && to > b.slot);
+    const cWrap = document.querySelector("[data-conflict]");
+    const cText = document.querySelector("[data-conflict-text]");
+    if (cWrap) cWrap.style.display = conflict || len <= 0 ? "flex" : "none";
+    if (cText) cText.textContent = len <= 0 ? "종료 시각이 시작보다 빠릅니다" : "이미 예약된 시간과 겹칩니다";
+    if (endSel) endSel.style.borderColor = conflict || len <= 0 ? this.token("--color-danger") : this.token("--border");
+
+    // 오늘 사용한 무료 슬롯 (같은 조직, 데모: 브릿지랩 1슬롯 사용)
+    const used = 1;
+    const remain = Math.max(0, FREE_SLOTS - used);
+    const over = Math.max(0, len - remain);
+    const set = (k, v) => { const el = document.querySelector('[data-fee="' + k + '"]'); if (el) el.textContent = v; };
+    set("remain", remain ? this.duration(remain) : "없음");
+    set("length", len ? this.duration(len) : "-");
+    set("over", over ? this.duration(over) : "없음");
+    set("amount", this.won(over * OVER_RATE_PER_SLOT));
+
+    const box = document.querySelector("[data-fee-box]");
+    if (box) box.style.background = over ? this.token("--color-warning-bg") : this.token("--surface-alt");
+    const overLabel = document.querySelector("[data-fee-over-label]");
+    const overVal = document.querySelector('[data-fee="over"]');
+    if (overLabel) overLabel.style.color = over ? this.token("--color-warning-text") : this.token("--text-body");
+    if (overVal) overVal.style.color = over ? this.token("--color-warning-text") : this.token("--text-heading");
+
+    const left = document.querySelector("[data-free-left]");
+    if (left) left.textContent = remain ? this.duration(remain) : "없음";
+  }
+}
+
+</script>
+</body>
+</html>

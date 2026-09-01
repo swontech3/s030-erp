@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="ERP · 회의실 예약 비교" description="시간별 주간 현황과 벽면 현황판을 한 화면에서 전환·나란히 비교" -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>body{margin:0;background:#F1F5F9}iframe{border:0;display:block}</style>
+</helmet>
+<div style="min-width:1500px;min-height:100vh;font-family:var(--font-core)">
+<div style="position:sticky;top:0;z-index:10;height:64px;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 28px;background:var(--surface);border-bottom:1px solid var(--border)">
+<div style="display:flex;align-items:center;gap:12px">
+<img src="../../assets/swonbiz-logo.png" alt="" style="height:24px;width:auto;flex:0 0 auto">
+<span style="font-size:17px;font-weight:700;letter-spacing:-.015em;color:var(--text-heading);white-space:nowrap">회의실 예약 · 화면 비교</span>
+</div>
+<div style="display:inline-flex;gap:4px;padding:4px;background:var(--surface-alt);border-radius:var(--radius-md)">
+<button data-cmp="grid" style="height:32px;padding:0 16px;border:0;border-radius:var(--radius-sm);background:var(--surface);color:var(--text-heading);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 3px rgba(11,17,32,.08);white-space:nowrap">시간별 현황</button>
+<button data-cmp="kiosk" style="height:32px;padding:0 16px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:400;cursor:pointer;white-space:nowrap">벽면 현황판</button>
+<button data-cmp="both" style="height:32px;padding:0 16px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:400;cursor:pointer;white-space:nowrap">나란히 보기</button>
+</div>
+<span style="font-size:12px;color:var(--text-muted);white-space:nowrap">각 화면은 실제 템플릿을 그대로 불러옵니다</span>
+</div>
+
+<div data-pane="grid" style="padding:24px 28px">
+<div style="width:1442px;margin:0 auto">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="height:22px;padding:0 9px;border-radius:var(--radius-pill);background:var(--color-accent-bg);color:var(--color-primary-hover);font-size:12px;font-weight:700;display:inline-flex;align-items:center;white-space:nowrap">ERP · 1440px</span>
+<span style="font-size:14px;color:var(--text-muted)">주간 7열 × 30분 슬롯 · 드래그로 예약, 블록 클릭으로 수정</span>
+</div>
+<div style="border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);overflow:hidden">
+<iframe src="../erp-booking/ErpBooking.dc.html" title="시간별 주간 현황" style="width:1440px;height:900px"></iframe>
+</div>
+</div>
+</div>
+
+<div data-pane="kiosk" style="display:none;padding:24px 28px">
+<div style="max-width:1280px;margin:0 auto">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="height:22px;padding:0 9px;border-radius:var(--radius-pill);background:var(--color-warning-bg);color:var(--color-warning-text);font-size:12px;font-weight:700;display:inline-flex;align-items:center;white-space:nowrap">벽면 태블릿 · 1280×800</span>
+<span style="font-size:14px;color:var(--text-muted)">오늘 하루 가로 타임라인 · 내용 전면 마스킹, 스크롤 없음</span>
+</div>
+<div style="border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);overflow:hidden">
+<iframe src="../erp-booking-kiosk/ErpBookingKiosk.dc.html" title="벽면 현황판" style="width:1280px;height:800px"></iframe>
+</div>
+</div>
+</div>
+
+<div data-pane="both" style="display:none;padding:24px 28px">
+<div style="display:flex;gap:20px;align-items:flex-start;justify-content:center">
+<div>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+<span style="height:22px;padding:0 9px;border-radius:var(--radius-pill);background:var(--color-accent-bg);color:var(--color-primary-hover);font-size:12px;font-weight:700;display:inline-flex;align-items:center;white-space:nowrap">ERP · 1440px</span>
+<span style="font-size:12px;color:var(--text-muted);white-space:nowrap">65% 축소 표시</span>
+</div>
+<div style="width:936px;height:585px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);overflow:hidden">
+<iframe src="../erp-booking/ErpBooking.dc.html" title="시간별 주간 현황 (축소)" style="width:1440px;height:900px;transform:scale(.65);transform-origin:0 0"></iframe>
+</div>
+</div>
+<div>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+<span style="height:22px;padding:0 9px;border-radius:var(--radius-pill);background:var(--color-warning-bg);color:var(--color-warning-text);font-size:12px;font-weight:700;display:inline-flex;align-items:center;white-space:nowrap">벽면 태블릿 · 1280×800</span>
+<span style="font-size:12px;color:var(--text-muted);white-space:nowrap">33% 축소 표시</span>
+</div>
+<div style="width:422px;height:264px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);overflow:hidden">
+<iframe src="../erp-booking-kiosk/ErpBookingKiosk.dc.html" title="벽면 현황판 (축소)" style="width:1280px;height:800px;transform:scale(.33);transform-origin:0 0"></iframe>
+</div>
+<div style="margin-top:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);width:422px">
+<div style="font-size:14px;font-weight:700;color:var(--text-heading)">두 화면을 나눈 이유</div>
+<div style="margin-top:6px;font-size:12px;line-height:1.7;color:var(--text-muted);text-wrap:pretty">현황판은 800px에 스크롤 없이 들어가야 하므로 시간축을 가로로 눕혔고, 공용 화면이라 제목·조직명을 표시하지 않습니다. ERP 그리드는 주간 비교와 편집이 목적이라 세로 그리드를 유지합니다.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1040},&quot;pane&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;grid&quot;,&quot;kiosk&quot;,&quot;both&quot;],&quot;default&quot;:&quot;grid&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;보기&quot;}}">
+class Component extends DCLogic {
+  state = { pane: undefined };
+
+  get pane() {
+    if (this.state.pane !== undefined) return this.state.pane;
+    return this.props.pane || "grid";
+  }
+
+  componentDidMount() { this.paint(); }
+
+  componentDidUpdate(prev) {
+    if (prev && prev.pane !== this.props.pane && this.state.pane !== undefined) {
+      this.setState({ pane: undefined });
+      return;
+    }
+    this.paint();
+  }
+
+  token(name, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+
+  paint() {
+    const active = this.pane;
+    document.querySelectorAll("[data-cmp]").forEach((btn) => {
+      const on = btn.getAttribute("data-cmp") === active;
+      btn.style.background = on ? this.token("--surface", "#FFFFFF") : "transparent";
+      btn.style.color = on ? this.token("--text-heading", "#0B1120") : this.token("--text-muted", "#64748B");
+      btn.style.fontWeight = on ? "700" : "400";
+      btn.style.boxShadow = on ? "0 1px 3px rgba(11,17,32,.08)" : "none";
+      if (btn.getAttribute("data-bound")) return;
+      btn.setAttribute("data-bound", "1");
+      btn.addEventListener("click", () => this.setState({ pane: btn.getAttribute("data-cmp") }));
+    });
+    document.querySelectorAll("[data-pane]").forEach((p) => {
+      p.style.display = p.getAttribute("data-pane") === active ? "block" : "none";
+    });
+  }
+}
+
+</script>
+</body>
+</html>
