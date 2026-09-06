@@ -8,7 +8,10 @@
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
     "check:grants": "node scripts/check-grants.js .env",
-    "verify:db": "node scripts/verify-001-003.js .env"
+    "verify:db": "node scripts/verify-001-003.js .env",
+    "lint:green": "node scripts/lint-no-green.js",
+    "tokens:check": "node scripts/build-tokens.js",
+    "design:links": "node scripts/check-design-links.js"
   },
   "devDependencies": {
     "typescript": "5.9.3"

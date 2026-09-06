@@ -1,6 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
+  // ★ noUncheckedIndexedAccess 는 여기서만 켠다.
+  //   base 에서 끈 이유는 S-WonERP 에서 파일째 옮겨온 shared/src/domain/* 4종이
+  //   이 플래그 없이 작성됐고, 켜면 원본을 고쳐야 해서 대조가 깨지기 때문이다.
+  //   세션·스코프 코드는 이 플래그가 잡아주는 실수가 많으므로 api·web 은 켠다.
+  //   ※ 훗날 이 패키지가 shared/domain/* 를 import 하면 그 파일들도 이 설정으로
+  //     검사된다(shared 는 TS 소스를 그대로 내보낸다). 페이즈 4·5 에서 Prisma shim 을
+  //     Drizzle 타입으로 바꿀 때 함께 정리한다.
   "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
     "types": ["node"],
     "baseUrl": ".",
     "paths": {

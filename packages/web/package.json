@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node ../../scripts/lint-no-green.js && next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint:green": "node ../../scripts/lint-no-green.js"
   },
   "dependencies": {
     "@swonbiz/shared": "^0.1.0",

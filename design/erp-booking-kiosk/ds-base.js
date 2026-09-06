@@ -1,5 +1,5 @@
 (() => {
-  const base = '../..';
+  const base = '../_ds/swonbiz';
   for (const p of ['styles.css']) {
     const l = document.createElement('link');
     l.rel = 'stylesheet'; l.href = base + '/' + p;
