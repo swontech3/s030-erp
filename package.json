@@ -11,9 +11,12 @@
     "verify:db": "node scripts/verify-001-003.js .env",
     "lint:green": "node scripts/lint-no-green.js",
     "tokens:check": "node scripts/build-tokens.js",
-    "design:links": "node scripts/check-design-links.js"
+    "design:links": "node scripts/check-design-links.js",
+    "icons:check": "node scripts/build-icons.js",
+    "ds:compare": "tsx scripts/compare-ds.tsx"
   },
   "devDependencies": {
+    "tsx": "^4.23.13",
     "typescript": "5.9.3"
   },
   "dependencies": {
