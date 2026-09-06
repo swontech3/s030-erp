@@ -1,0 +1,20 @@
+:root{
+  --font-core:"Pretendard Variable",Pretendard,Inter,-apple-system,"Segoe UI","Malgun Gothic",sans-serif;
+  --font-mono:ui-monospace,"SFMono-Regular",Menlo,monospace;
+
+  --weight-regular:400;
+  --weight-semibold:600;
+  --weight-bold:700;
+  --weight-black:800;
+
+  --text-display-size:60px;   --text-display-lh:1.12; --text-display-ls:-.03em; --text-display-weight:800;
+  --text-h1-size:40px;        --text-h1-lh:1.2;       --text-h1-ls:-.022em;    --text-h1-weight:700;
+  --text-h2-size:30px;        --text-h2-lh:1.3;       --text-h2-ls:-.018em;    --text-h2-weight:700;
+  --text-h3-size:22px;        --text-h3-lh:1.4;       --text-h3-ls:-.012em;    --text-h3-weight:600;
+  --text-body-lg-size:19px;   --text-body-lg-lh:1.65;
+  --text-body-size:16px;      --text-body-lh:1.7;
+  --text-caption-size:14px;   --text-caption-lh:1.55;
+  --text-micro-size:12px;     --text-micro-lh:1.5;
+  --text-eyebrow-ls:.08em;
+}
+html{font-family:var(--font-core);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}

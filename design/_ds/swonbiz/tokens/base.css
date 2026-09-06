@@ -1,0 +1,12 @@
+/* Minimal element defaults so specimen cards, kits and consumer pages agree. */
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface);color:var(--text-body);font-family:var(--font-core);font-size:var(--text-body-size);line-height:var(--text-body-lh);font-weight:var(--weight-regular)}
+h1,h2,h3,h4{color:var(--text-heading);margin:0;font-weight:var(--weight-bold);letter-spacing:-.02em}
+h1{font-size:var(--text-h1-size);line-height:var(--text-h1-lh);letter-spacing:var(--text-h1-ls)}
+h2{font-size:var(--text-h2-size);line-height:var(--text-h2-lh);letter-spacing:var(--text-h2-ls)}
+h3{font-size:var(--text-h3-size);line-height:var(--text-h3-lh);letter-spacing:var(--text-h3-ls);font-weight:var(--weight-semibold)}
+p{margin:0}
+a{color:var(--text-link);text-decoration:none;transition:color var(--dur) var(--ease-out)}
+a:hover{color:var(--text-link-hover);text-decoration:underline;text-underline-offset:3px}
+:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px;border-radius:var(--radius-xs)}
+::selection{background:var(--color-accent-bg);color:var(--text-heading)}

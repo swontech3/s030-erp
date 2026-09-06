@@ -1,0 +1,16 @@
+<!-- @dsCard group="Components" viewport="700x230" name="Buttons" subtitle="Primary, ghost, subtle, inverse — 54px and 40px" -->
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{padding:20px;background:var(--surface)}.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}.stack{display:flex;flex-direction:column;gap:16px}.lbl{font-size:12px;color:var(--text-caption);letter-spacing:.06em;text-transform:uppercase;font-weight:700}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const { Button, Icon, IconButton } = window.SwonBizDesignSystem_9f2a02;
+function Demo(){return <div className="stack">
+<div className="row"><Button>무료로 시작하기</Button><Button variant="ghost">상담 예약</Button><Button variant="subtle">요금 보기</Button><Button variant="link">자세히 보기 →</Button></div>
+<div className="row"><Button size="sm">저장</Button><Button size="sm" variant="ghost" iconLeft={<Icon name="download" size={16}/>}>내보내기</Button><Button size="sm" disabled>발행 완료</Button><IconButton label="더보기" size={40}><Icon name="more-horizontal" size={18}/></IconButton><IconButton label="검색" variant="primary" size={40}><Icon name="search" size={18}/></IconButton></div>
+<div className="row" style={{background:"var(--surface-inverse)",padding:16,borderRadius:12}}><Button variant="inverse">데모 신청</Button><Button variant="inverse" iconRight={<Icon name="arrow-right" size={18}/>}>입주 문의</Button></div>
+</div>;}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+</script></body></html>

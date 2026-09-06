@@ -1,0 +1,18 @@
+/* 4px base scale. Every gap, pad and stack offset is a multiple of 4. */
+:root{
+  --space-1:4px;  --space-2:8px;  --space-3:12px; --space-4:16px;
+  --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px;
+  --space-12:48px;--space-16:64px;--space-20:80px;--space-24:96px;
+  --space-30:120px;
+
+  --section-y:96px;        /* vertical rhythm of a marketing section */
+  --section-y-lg:120px;
+  --container:1200px;      /* marketing max width */
+  --container-narrow:760px;/* prose max width */
+  --gutter:24px;
+
+  /* Breakpoints — introduced for the booking templates (T5). Not applied
+     retroactively to earlier templates, which stay fixed-width. */
+  --bp-tablet:768px;
+  --bp-desktop:1280px;
+}
