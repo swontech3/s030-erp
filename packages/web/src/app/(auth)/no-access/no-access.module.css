@@ -1,0 +1,15 @@
+/*
+ * 접근권한없음 화면의 상태 스타일.
+ *
+ * 원본(ErpAuth.dc.html sent 블록 90행)의 `style-hover="background:var(--surface-alt)"` 를
+ * 실제 CSS 로 옮긴 것. 디자인 도구 전용 속성이라 그대로 두면 브라우저가 무시한다.
+ */
+
+.logout:hover {
+  background: var(--surface-alt);
+}
+
+.logout:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
