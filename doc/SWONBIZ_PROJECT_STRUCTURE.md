@@ -338,3 +338,8 @@ SQL 예약어다. (2) `SET`은 `$1` 바인딩을 못 받아 값을 문자열로 
 `anon`·`authenticated` 권한이 하나라도 생기면 실패한다. Supabase 대시보드·Studio로 테이블을
 만들면 생성자가 `supabase_admin`이 되고 그 테이블은 즉시 `anon` 키로 밖에서 읽히기 때문이다.
 위의 "항상 `postgres` 역할로 적용한다"가 그걸 막는 규약이고, 이 스크립트가 그 규약을 검사한다.
+
+**★ `GRANT <role> TO <role> WITH SET TRUE` 를 이 DB 에서 실행하지 않는다.**
+실행하면 **전체 세션이 끊기고 크래시 복구가 일어난다** (2026-09-06 확인, 원인 미상).
+그 순간 삐용·메일 Agent 세션도 함께 끊긴다. RLS 검증이 필요하면 `SET ROLE` 로
+우회하지 말고 **`erp_app` 으로 직접 접속한다**(`packages/api/.env` 의 `ERP_DATABASE_URL`).

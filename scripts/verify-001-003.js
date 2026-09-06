@@ -6,10 +6,16 @@
 const fs = require('fs');
 const { Client } = require('pg');
 
-const env = Object.fromEntries(
-  fs.readFileSync(process.argv[2] || '.env', 'utf8').split(/\r?\n/)
-    .filter(l => l.includes('=') && !l.trim().startsWith('#'))
-    .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }));
+const readEnv = (p) => {
+  if (!fs.existsSync(p)) return {};
+  return Object.fromEntries(
+    fs.readFileSync(p, 'utf8').split(/\r?\n/)
+      .filter(l => l.includes('=') && !l.trim().startsWith('#'))
+      .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }));
+};
+// 루트 .env = postgres 접속(스크립트용), packages/api/.env = erp_app 접속(Fastify용).
+// 2-2 스캐폴딩에서 갈렸으므로 둘 다 읽는다.
+const env = { ...readEnv(process.argv[2] || '.env'), ...readEnv('packages/api/.env') };
 
 const c = new Client({
   host: env.DB_HOST, port: +env.DB_PORT, user: env.DB_USER,

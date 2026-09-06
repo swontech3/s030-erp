@@ -1,0 +1,23 @@
+// 공통 컴파일러 설정. 각 패키지 tsconfig 가 extends 한다.
+//
+// ★ noUncheckedIndexedAccess 는 켜지 않는다 — S-WonERP 에서 파일째 옮겨온
+//   packages/shared/src/domain/* 4종이 그 플래그 없이 작성됐고, 켜면 원본을
+//   고쳐야 해서 "파일째 복사"가 깨진다(지시서 2-2). 기존 앱 tsconfig 와 같은
+//   수준(strict: true)으로 맞춘다.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleDetection": "force",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true
+  }
+}

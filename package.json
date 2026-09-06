@@ -1,4 +1,18 @@
 {
+  "name": "swonbiz-erp",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check:grants": "node scripts/check-grants.js .env",
+    "verify:db": "node scripts/verify-001-003.js .env"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
   "dependencies": {
     "pg": "^8.23.0"
   }

@@ -4,3 +4,5 @@ S-WonERP.zip
 S-WonERP/
 .env
 node_modules/
+.next/
+*.tsbuildinfo
