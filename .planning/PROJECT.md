@@ -67,7 +67,7 @@
 ## Constraints
 
 - **Tech stack**: Next.js (App Router) + Fastify + PostgreSQL(Supabase) — 확정. 삐용과 다른 스택이지만 신규 시스템이고 프런트 생산성을 우선함
-- **Tech stack**: 테이블 접두어 `s030_*` 필수 — 삐용(`s020_*`)·법무세무(`s040_*`)와 같은 DB 네임스페이스를 공유하기 위함
+- **Tech stack**: ERP 테이블은 `tb_s030_t001` 스키마의 `tb_s030_*` — 삐용 `tb_s020_t001`·메일 `tb_s090_t001`과 같은 규칙. `public` 사용 금지 (D1, 2026-09-06)
 - **Security**: JWT 시크릿·DB 접속 정보는 `.env`에만. 코드에 하드코딩 금지
 - **Security**: 멀티테넌트 격리 — 입주사끼리 데이터가 노출되면 안 됨. 타사 예약은 "예약됨"으로만 표시하고 제목·조직명·인원을 마스킹
 - **Dependencies**: 인증이 삐용 시스템에 종속된다. 삐용 JWT TTL·리프레시 정책과 세션 만료를 일치시켜야 함
@@ -88,6 +88,8 @@
 | 순차 실행(Sequential), Standard granularity | 계층이 서로 의존해 병렬 이득이 적음 | — Pending |
 | 품질 게이트: Researcher + Verifier (Plan Checker 제외) | 외부 JWT 검증·Supabase 멀티테넌트는 조사 가치가 큼. 플랜 검증은 Interactive 모드의 사람 확인으로 대체 | — Pending |
 | 참조 문서 경로는 `doc/` (지시문의 `design/`이 아님) | 실제 파일 위치 확인 결과 | ✓ Good |
+| **D1: 기존 ERP 32테이블을 `tb_s030_t001` 스키마로 이동·리네임** (2026-09-06) | `public.tb_s080_*`가 이미 존재하고 Prisma 앱이 단독 소유. 이름에 걸린 DB 객체는 FK 1건뿐이고 데이터는 시드 370행이라 이동 비용이 사실상 없다. 신규 구축(중복)도 tb_s080 유지(접두어 혼재)도 더 비싸다 | ✓ Decided — 실행은 Prisma 앱 소스 grep 확인 후 |
+| 접두어 제약을 `s030_*` → `tb_s030_t001.tb_s030_*`로 구체화 | 삐용 `tb_s020_t001`·메일 `tb_s090_t001`이 이미 `tb_sXXX_t001` 스키마 규칙을 쓴다. `public` 공유를 끊으면 Supabase PostgREST 노출도 함께 끊긴다 | ✓ Decided |
 
 ## Evolution
 
