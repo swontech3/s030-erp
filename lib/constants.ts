@@ -2,9 +2,9 @@
  * ERP 전역 상수 — 미확정·하드코딩 값을 이 파일 한 곳으로 모은다.
  *
  * ★ 배치 안내: 이 파일은 Next.js 앱 스캐폴딩 전에 먼저 작성됐다(SPEC.md 참조 —
- * 현재 저장소에는 아직 src/app이 없다). 스캐폴딩 시 이 파일을 그대로
- * `src/lib/constants.ts`로 옮긴다. import 경로(`@/lib/constants`)는
- * SWONBIZ_PROJECT_STRUCTURE.md의 `lib/constants.ts` 규약과 동일하게 유지한다.
+ * 현재 저장소에는 아직 앱이 없다). 스캐폴딩 시 이 파일을 그대로
+ * `packages/shared/src/constants.ts`로 옮긴다 (2026-09-06 D-3 모노레포 결정 —
+ * web·api 양쪽이 쓰므로 shared다). import 경로는 `@swonbiz/shared`.
  *
  * 값이 확정되면 이 파일만 고친다. 화면·API 코드에 값을 직접 적지 않는다.
  */

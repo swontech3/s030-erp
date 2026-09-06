@@ -29,122 +29,112 @@ URL로 직접 진입할 필요가 있는 경우에만 예외적으로 라우트�
 ## 2. 디렉터리 구조
 
 ```
-swonbiz-erp/
-├─ app/
-│  ├─ (public)/                    # 050 · 인증 불필요
-│  │  ├─ page.tsx                  # s0300500010 랜딩
-│  │  ├─ apply/                    # s0300500020 온라인 신청 (보류)
-│  │  ├─ booking/                  # s0300500040 외부 예약 (보류)
-│  │  └─ kiosk/page.tsx            # s0300500060 회의실 현황판
+SwonBiz-erp/                             ← 모노레포 루트 · npm workspaces
+├─ packages/
+│  ├─ web/                               Next.js 16 · App Router
+│  │  ├─ src/
+│  │  │  ├─ app/
+│  │  │  │  ├─ (public)/                 # 050 · 인증 불필요
+│  │  │  │  │  ├─ page.tsx                  # s0300500010 랜딩
+│  │  │  │  │  ├─ apply/                    # s0300500020 온라인 신청 (보류)
+│  │  │  │  │  ├─ booking/                  # s0300500040 외부 예약 (보류)
+│  │  │  │  │  └─ kiosk/page.tsx            # s0300500060 회의실 현황판
+│  │  │  │  ├─ (auth)/                   # 000 · 인증 화면
+│  │  │  │  │  ├─ login/page.tsx            # s0300000010
+│  │  │  │  │  └─ no-access/page.tsx        # s0300000080 접근 권한 없음
+│  │  │  │  ├─ (erp)/                    # 인증 필요 · ERP 셸 적용
+│  │  │  │  │  ├─ layout.tsx                # s0300000050 셸 (사이드바·헤더)
+│  │  │  │  │  ├─ dashboard/page.tsx        # s0300000060
+│  │  │  │  │  ├─ settings/page.tsx         # s0300000070
+│  │  │  │  │  ├─ facility/page.tsx         # s0300100010 센터 관리
+│  │  │  │  │  ├─ tenants/
+│  │  │  │  │  │  ├─ page.tsx               # s0300200010 목록
+│  │  │  │  │  │  ├─ [id]/page.tsx          # s0300200020 상세
+│  │  │  │  │  │  └─ contracts/page.tsx     # s0300200030 마스터-디테일
+│  │  │  │  │  ├─ contracts/[id]/page.tsx   # s0300200040 계약 폼
+│  │  │  │  │  ├─ applications/page.tsx     # s0300200060 신청 대기
+│  │  │  │  │  ├─ billing/page.tsx          # s0300200070 월별 청구 (3차)
+│  │  │  │  │  └─ booking/
+│  │  │  │  │     ├─ page.tsx               # s0300600010 예약 현황
+│  │  │  │  │     └─ approvals/page.tsx     # s0300600020 승인 큐
+│  │  │  │  └─ layout.tsx                # 루트 · 폰트(next/font/local) · 전역 토큰
+│  │  │  ├─ components/
+│  │  │  │  ├─ ds/                       # 디자인 시스템 15종 이관
+│  │  │  │  ├─ icons/                    # ★ lucide 로컬 SVG 11종 (CDN 안 씀)
+│  │  │  │  ├─ patterns/                 # 템플릿에서 추출한 재사용 패턴
+│  │  │  │  └─ shell/                    # Sidebar · Header · Breadcrumb
+│  │  │  ├─ features/                    # 화면별 도메인 로직 · 팝업
+│  │  │  ├─ lib/                         # api 호출 래퍼 · format.ts
+│  │  │  └─ styles/                      # tokens.css · globals.css
+│  │  └─ proxy.ts                        # 미들웨어 = UX 게이트 (Next 16: middleware.ts 대체)
 │  │
-│  ├─ (auth)/                      # 000 · 인증 화면
-│  │  ├─ login/page.tsx            # s0300000010
-│  │  ├─ password-reset/page.tsx   # s0300000020
-│  │  ├─ password-sent/page.tsx    # s0300000030
-│  │  └─ invite/[token]/page.tsx   # s0300000040
+│  ├─ api/                               Fastify — ★ DB에 붙는 유일한 클라이언트
+│  │  ├─ src/
+│  │  │  ├─ db/
+│  │  │  │  ├─ schema/*.ts               ★ Drizzle 스키마 (스키마 소유는 여기)
+│  │  │  │  └─ withCompanyScope.ts       ★ SET LOCAL 트랜잭션 래퍼 (RLS 짝 코드)
+│  │  │  ├─ auth/                        삐용 로그인 호출 · erp_sid 발급 · crypto
+│  │  │  ├─ acl/BbiyongAcl.ts            권한 판정 위임 어댑터 (Mock / Http)
+│  │  │  ├─ hooks/session.ts             onRequest 세션 미들웨어
+│  │  │  └─ routes/
+│  │  └─ drizzle.config.ts               out → ../../supabase/migrations
 │  │
-│  ├─ (erp)/                       # 인증 필요 · ERP 셸 적용
-│  │  ├─ layout.tsx                # s0300000050 셸 (사이드바·헤더)
-│  │  ├─ dashboard/page.tsx        # s0300000060 (운영사 전용)
-│  │  ├─ settings/page.tsx         # s0300000070
-│  │  ├─ facility/page.tsx         # s0300100010 센터 관리
-│  │  ├─ tenants/
-│  │  │  ├─ page.tsx               # s0300200010 목록
-│  │  │  ├─ [id]/page.tsx          # s0300200020 상세
-│  │  │  └─ contracts/page.tsx     # s0300200030 마스터-디테일
-│  │  ├─ contracts/[id]/page.tsx   # s0300200040 계약 폼
-│  │  ├─ applications/page.tsx     # s0300200060 신청 대기
-│  │  ├─ billing/page.tsx          # s0300200070 월별 청구 (3차)
-│  │  └─ booking/
-│  │     ├─ page.tsx               # s0300600010 예약 현황
-│  │     └─ approvals/page.tsx     # s0300600020 승인 큐
-│  │
-│  ├─ api/                         # BFF 라우트 (Fastify 프록시 또는 직접)
-│  └─ layout.tsx                   # 루트 · 폰트 · 전역 토큰
+│  └─ shared/                            web·api 공용 — ★ 복사하지 않는다
+│     └─ src/
+│        ├─ screens.ts                   ★ 화면 ID ↔ 라우트 중앙 매핑 (role 필드 없음)
+│        ├─ constants.ts                 미확정 상수 집중 관리
+│        ├─ session.ts                   세션 타입 (memberId·orgId·orgTp·companyId)
+│        └─ domain/                      S-WonERP 순수함수 이관분 (테스트 동반)
+│           ├─ contract-settlement.ts
+│           ├─ contract-invoices.ts
+│           └─ reservation-validation.ts
 │
-├─ components/
-│  ├─ ds/                          # 디자인 시스템 15종 이관
-│  │  ├─ Button.tsx  IconButton.tsx  Icon.tsx  Card.tsx  Badge.tsx  Tag.tsx
-│  │  ├─ Input.tsx  Select.tsx  Checkbox.tsx  Radio.tsx  Switch.tsx
-│  │  ├─ Tabs.tsx  Dialog.tsx  Toast.tsx  Tooltip.tsx
-│  │  └─ index.ts
-│  ├─ patterns/                    # 템플릿에서 추출한 재사용 패턴
-│  │  ├─ SaveBar.tsx               # T6 설정 저장 바
-│  │  ├─ DangerZone.tsx            # T6 위험 구역
-│  │  ├─ StatStrip.tsx             # T1 요약 지표
-│  │  ├─ Chart.tsx                 # T1 SVG 차트 (3차 전 DS 승격 예정)
-│  │  ├─ TimeGrid.tsx              # T5 타임그리드
-│  │  ├─ DensityCalendar.tsx       # T5 월간 밀도 달력
-│  │  ├─ MasterDetail.tsx          # 좌 리스트 + 우 상세 셸
-│  │  ├─ DataTable.tsx             # 목록형 공통 테이블
-│  │  └─ FormSection.tsx           # 폼 섹션 래퍼
-│  └─ shell/
-│     ├─ Sidebar.tsx  Header.tsx  Breadcrumb.tsx
+├─ supabase/
+│  ├─ migrations/                        001~003 + Drizzle generate 산출물(005~)
+│  └─ migrations_hold/                   004 — ★ 자동 적용 금지 (페이즈 G 앱 정지 창)
 │
-├─ features/                       # 화면별 도메인 로직 · 팝업
-│  ├─ contracts/
-│  │  ├─ ContractForm.tsx          # s0300200040 본문
-│  │  ├─ ContractPreviewModal.tsx  # s0300200040p1 계약서 미리보기
-│  │  ├─ StateChangeModal.tsx      # s0300200040p2 상태 전이 확인
-│  │  ├─ ContractItemsTable.tsx    # 계약 항목 최대 10행
-│  │  ├─ useContractForm.ts
-│  │  └─ types.ts
-│  ├─ tenants/  facility/  booking/  settings/  dashboard/
+├─ design/                               ★ Claude Design 산출물 (읽기 전용 · 개발이 고치지 않음)
+│  ├─ _ds/swonbiz/                       디자인 시스템 — tokens 6파일(119변수) · 컴포넌트 15종
+│  │  └─ tokens/ components/ assets/ styles.css
+│  ├─ erp-auth/ErpAuth.dc.html           # s0300000010 · s0300000080(sent 블록 재사용)
+│  ├─ erp-tenants/                       # ★ 셸 기준(접기·툴팁·상태저장) + s0300200010·020
+│  ├─ erp-master-detail/ erp-contract-form/ erp-dashboard/ erp-settings/
+│  ├─ erp-booking/ erp-booking-compare/ erp-booking-kiosk/
+│  └─ landing-hero/ erp-apply-form/
 │
-├─ lib/
-│  ├─ screens.ts                   # ★ 화면 ID ↔ 라우트 중앙 매핑
-│  ├─ auth/                        # 삐용 JWT API 연동
-│  ├─ api/                         # 서버 호출 래퍼
-│  ├─ permissions.ts               # 운영사/입주사 분기
-│  ├─ format.ts                    # 금액 마스크·사업자번호·전화번호
-│  └─ constants.ts                 # 미확정 상수 집중 관리
-│
-├─ styles/
-│  ├─ tokens.css                   # 템플릿 CSS 변수 이관
-│  └─ globals.css
-│
-├─ design/                         # ★ Claude Design 산출물 (읽기 전용 참조)
-│  ├─ LandingHero.dc.html
-│  ├─ ErpAuth.dc.html
-│  ├─ ErpTenants.dc.html
-│  ├─ ErpMasterDetail.dc.html
-│  ├─ ErpContractForm.dc.html
-│  ├─ ErpBooking.dc.html
-│  ├─ ErpBookingKiosk.dc.html
-│  ├─ ErpSettings.dc.html
-│  ├─ ErpDashboard.dc.html
-│  └─ SWONBIZ_SCREEN_LIST.md
-│
-└─ docs/
-   ├─ HANDOVER_T7_ErpApplyForm.md  # 보류 중인 신청 폼
-   └─ decisions.md                 # 결정 사항 기록
+├─ doc/                                  설계·분석 문서 (이 파일 포함)
+├─ .planning/                            SPEC · ROADMAP · REQUIREMENTS · 페이즈 지시서
+├─ scripts/                              DB 점검 스크립트 (pg)
+└─ package.json                          npm workspaces 루트
 ```
 
 ---
 
-## 3. 화면 ID 매핑 (`lib/screens.ts`)
+## 3. 화면 ID 매핑 (`packages/shared/src/screens.ts`)
 
 화면 ID와 라우트의 단일 진실 공급원. 화면이 추가되면 여기만 수정한다.
 
 ```ts
 export const SCREENS = {
-  s0300000010: { route: '/login',              name: '로그인',        group: '000' },
-  s0300000060: { route: '/dashboard',          name: '대시보드',      group: '000', role: 'operator' },
-  s0300000070: { route: '/settings',           name: '설정',          group: '000' },
-  s0300100010: { route: '/facility',           name: '센터 관리',      group: '010', role: 'operator' },
-  s0300200010: { route: '/tenants',            name: '입주사 목록',    group: '020', role: 'operator' },
-  s0300200040: { route: '/contracts/[id]',     name: '계약 폼',        group: '020', role: 'operator' },
-  s0300500010: { route: '/',                   name: '랜딩',          group: '050', public: true },
-  s0300500060: { route: '/kiosk',              name: '회의실 현황판',   group: '050', public: true },
-  s0300600010: { route: '/booking',            name: '예약 현황',      group: '060' },
-  // ... 전체 목록은 design/SWONBIZ_SCREEN_LIST.md 참조
+  s0300000010: { route: '/login',              name: '로그인',         group: '000' },
+  s0300000050: { route: null,                  name: 'ERP 셸',        group: '000' },  // layout · 라우트 없음
+  s0300000060: { route: '/dashboard',          name: '대시보드',       group: '000' },
+  s0300000070: { route: '/settings',           name: '설정',           group: '000' },
+  s0300000080: { route: '/no-access',          name: '접근 권한 없음',  group: '000' },
+  s0300100010: { route: '/facility',           name: '센터 관리',       group: '010' },
+  s0300200010: { route: '/tenants',            name: '입주사 목록',     group: '020' },
+  s0300200040: { route: '/contracts/[id]',     name: '계약 폼',         group: '020' },
+  s0300500010: { route: '/',                   name: '랜딩',           group: '050', public: true },
+  s0300500060: { route: '/kiosk',              name: '회의실 현황판',    group: '050', public: true },
+  s0300600010: { route: '/booking',            name: '예약 현황',       group: '060' },
+  // ... 전체 목록은 doc/SWONBIZ_SCREEN_LIST.md 참조
 } as const;
 ```
 
 **활용**
 
 - 미들웨어에서 `group === '050'` 또는 `public: true` 를 인증 제외로 처리
-- `role: 'operator'` 화면에 입주사 접근 시 리다이렉트
+- **`role` 필드를 두지 않는다.** 사이드바 렌더와 접근 판정은 삐용이 준 화면 목록만 쓴다(ACL-07′). 이 필드가 있으면 ERP가 역할로 판정하게 되어 `지시_ERP_로그인_권한관리.md` 1-6 위반이다
 - 에러 리포트·로그에 화면 ID를 함께 남겨 이슈 추적에 사용
 
 **각 page.tsx 상단에 화면 ID를 주석으로 명시한다.**
@@ -166,9 +156,21 @@ export const SCREENS = {
 **미들웨어 처리**
 
 - `(erp)` 진입 시 세션 검증. 실패하면 `/login?redirect=` 로 이동
-- `role: 'operator'` 화면에 입주사 접근 시 `/booking` 으로 리다이렉트
-- 로그인 후 홈 분기: 운영사 `/dashboard` / 입주사 `/booking`
+- **미들웨어는 UX 게이트일 뿐이다**(CVE-2025-29927). 실제 차단은 Fastify가 한다
+- 접근 판정은 역할이 아니라 **삐용이 준 화면 목록**으로 한다
+- 로그인 후 홈 분기도 같은 기준이다 — `org_tp`로 분기하지 않는다
+
+```ts
+const screens = await bbiyongAcl.listScreens(session.s020MemberId)
+
+if (screens.length === 0)        return '/no-access'   // s0300000080 · AUTH-13
+if (has(screens, 's0300000060')) return '/dashboard'   // 대시보드 권한 = 운영사
+if (has(screens, 's0300600010')) return '/booking'     // 예약 권한 = 입주사
+return routeOf(screens[0])
+```
+
   ※ 입주사 대시보드는 존재하지 않는다. 사이드바에도 렌더링하지 않는다
+  ※ `org_tp`는 헤더 이름 표시("홍길동 (에스원테크)")에만 쓰는 **표시 전용** 값이다
 
 **인증은 삐용 JWT API를 호출한다.** ERP는 자체 계정 테이블을 두지 않는다.
 토큰 갱신·세션 만료 정책을 삐용 설정과 일치시킬 것 (`SESSION_TTL` 확인 필요).
@@ -177,12 +179,14 @@ export const SCREENS = {
 
 ## 5. 템플릿 이관 규칙
 
-`design/*.dc.html` 이 각 화면의 시각 기준이다. **새로 설계하지 말고 이관한다.**
+`design/<템플릿폴더>/*.dc.html` 이 각 화면의 시각 기준이다. **새로 설계하지 말고 이관한다.**
+
+`style-hover`·`style-focus`는 디자인 도구 전용 속성이라 브라우저가 무시한다 — React에서는 실제 CSS(`:hover`·`:focus-visible`)로 다시 쓴다.
 
 **이관 순서**
 
-1. `styles/tokens.css` 에 CSS 변수 전량 이관 (색·타이포·간격·shape)
-2. `components/ds/` 15종 구현 — 템플릿 안의 마크업과 클래스를 그대로 옮김
+1. `packages/web/src/styles/tokens.css` 에 CSS 변수 전량 이관 — `design/_ds/swonbiz/tokens/` 6파일을 **파일째 이어붙인다**(손으로 옮겨 적지 않는다)
+2. `packages/web/src/components/ds/` 15종 구현 — 이관 전 같은 폴더의 `.prompt.md`를 먼저 읽고, `.d.ts`의 props 시그니처와 컴포넌트 이름을 그대로 유지한다(템플릿 11개가 그 이름으로 호출한다)
 3. `components/patterns/` 추출 — 여러 화면에 걸치는 것만
 4. 화면별 `page.tsx` 조립
 
@@ -193,7 +197,7 @@ export const SCREENS = {
 - **녹색 계열 금지** — 완료·성공도 인디고로 표현
 - 오렌지는 로고 전용
 - 아이콘은 반드시 DS `Icon` 컴포넌트. JS 생성 행의 셀렉트 캐럿은 CSS
-- 금액 필드는 커서 보존 마스크 (`lib/format.ts` 로 일원화)
+- 금액 필드는 커서 보존 마스크 (`packages/web/src/lib/format.ts` 로 일원화)
 - `prefers-reduced-motion` 대응
 
 **반응형**
@@ -213,7 +217,7 @@ export const SCREENS = {
 1. 프로젝트 스캐폴딩 + tokens.css 이관
 2. components/ds 15종
 3. lib/auth 삐용 JWT 연동 + 미들웨어
-4. (auth) 화면 4종
+4. (auth) 로그인 + 접근권한없음 2종
 5. (erp) layout.tsx 셸
 6. tenants 목록 → 상세
 7. tenants/contracts 마스터-디테일
@@ -235,7 +239,7 @@ create → draft → confirmed → terminated
 
 ---
 
-## 7. 상수 집중 관리 (`lib/constants.ts`)
+## 7. 상수 집중 관리 (`packages/shared/src/constants.ts`)
 
 템플릿에서 플레이스홀더로 남긴 값들. 확정되는 대로 여기서만 수정한다.
 
@@ -270,14 +274,40 @@ export const URLS = {
 
 **스키마 확정 전 결정 필요**
 
-1. 공통 직원 계정을 삐용 `s020_*` 에 둘지, ERP `s030_*` 에 별도로 둘지
-2. 한 입주사가 동시에 복수 계약을 가질 수 있는지
-3. 계약 항목 10행이 호실만인지, 주차·사물함 등 이질적 항목이 섞이는지
+1. 한 입주사가 동시에 복수 계약을 가질 수 있는지
+2. 계약 항목 10행이 호실만인지, 주차·사물함 등 이질적 항목이 섞이는지
    → 섞이면 항목 유형 구분 컬럼이 필요
 
 **기타**
 
 - `BOOKING_QR_URL` 및 인증 화면 `redirect` 파라미터 처리
-- 권한 관리 화면 — 별도 권한 시스템(13테이블·모듈 구독·역할 템플릿)과의 경계
+- ~~권한 관리 화면~~ — **해소.** ERP에 권한 관리 화면을 만들지 않는다(권한 판정은 삐용)
 - 세션 만료 기본값이 삐용 JWT TTL과 일치하는지
 - T7 온라인 신청 폼 — 계약 폼 정책 3건 결정 후 재개 (`docs/HANDOVER_T7_ErpApplyForm.md`)
+
+---
+
+## 9. 모노레포 규약 *(2026-09-06 결정 · 페이즈 1 D-3)*
+
+Fastify를 별도 저장소로 빼지 않고 **현 저장소 안 `packages/api`** 로 둔다.
+
+**근거**
+- `screens.ts`를 web·api 양쪽이 쓴다. 저장소가 갈리면 복사본이 생기고, 화면 ID가 두 곳에서 어긋나면 추적이 어렵다
+- 페이즈 1의 완료 기준이 web·api·마이그레이션을 한 번에 넘나든다(홈 분기·401·`companyId` 해석). 한 커밋으로 묶이지 않으면 리뷰와 롤백이 갈라진다
+- 설계 문서·디자인·마이그레이션이 이미 이 저장소에 있다
+- 나중에 떼어내는 것(`git subtree split`)이 나중에 합치는 것보다 싸다
+
+**규약**
+
+| 항목 | 결정 |
+|---|---|
+| 패키지 매니저 | **npm workspaces** (pnpm 미설치 · 추가 설치 없이 시작) |
+| 워크스페이스 | `packages/web` · `packages/api` · `packages/shared` |
+| TypeScript | **5.9.3 고정.** `latest`는 Go 네이티브 TS 7.x로 해석된다 (PLAT-08) |
+| ORM | **Drizzle.** 스키마는 `packages/api/src/db/schema/`. `drizzle-kit generate`로 SQL을 뽑아 `supabase/migrations/`에 넣고 적용한다. **`drizzle-kit push` 금지** |
+| 기존 앱 | S-WonERP는 Prisma 유지. 같은 DB를 두 ORM이 각자 봐도 무방하다 — 스키마 소유가 갈려 있다 |
+| DB 접속 | 신규 Fastify는 `erp_app`(BYPASSRLS 없음). 기존 S-WonERP는 `postgres` 그대로 |
+| 마이그레이션 적용 | **항상 `postgres` 역할로 적용한다.** `ALTER DEFAULT PRIVILEGES`는 그 구문을 실행한 역할이 만든 테이블에만 적용되므로, 적용 역할이 섞이면 `erp_app` 권한이 새 테이블에 안 붙는다 |
+| 자동 적용 금지 | `supabase/migrations_hold/` — 앱 정지 창이 필요한 파일만 둔다 |
+
+**공용 코드가 아닌 것을 `shared`에 넣지 않는다.** 판단 기준은 "web과 api 둘 다 import 하는가" 하나다. 한쪽만 쓰면 그 패키지 안에 둔다.

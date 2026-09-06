@@ -622,7 +622,7 @@ if (!allowedScreens.has(id))     return redirect(homeOf(allowedScreens))
 ## 3-5. 로그아웃
 
 ```
-1. tb_s030_auth_session.revoked_at = now()     ← 즉시 무효화. 캐시 우회
+1. tb_s080_auth_session.revoked_at = now()     ← 즉시 무효화. 캐시 우회
 2. POST 삐용 /rest/v1/s021200010/sign-out
    헤더: refresh-token: <복호화한 삐용 refresh>
 3. erp_sid 쿠키 삭제

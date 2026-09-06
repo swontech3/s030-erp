@@ -199,7 +199,7 @@ ERP는 자체 계정·자체 토큰·자체 권한 판정을 갖지 않고, 삐�
 - [ ] `lib/constants.ts`가 TypeScript 컴파일 통과 (`tsc --noEmit`)
 - [ ] BbiyongAcl 인터페이스에 대해 `MockBbiyongAcl`이 타입 에러 없이 구현됨
 - [ ] 75개 기존 라우트 전량이 [A]/[B]/[C] 표(요구사항 17~19)에서 정확히 1회씩 등장 (합계 75)
-- [ ] `004_rename_tenant.sql` 파일 최상단에 "단독 적용 금지" 경고 주석 존재
+- [ ] `004_rename_tenant.sql`이 `supabase/migrations_hold/`에 있고(자동 적용 경로 밖), 파일 최상단에 "단독 적용 금지" 경고 주석 존재
 
 ## Ambiguity Report
 
@@ -241,7 +241,7 @@ ERP는 자체 계정·자체 토큰·자체 권한 판정을 갖지 않고, 삐�
 | 5 | `MockBbiyongAuth`·`MockBbiyongAcl` 구현 (요구사항 13·15) | 신규 저장소 | 없음 |
 | 6 | `getAuthContext()` 브리지 구현 (요구사항 17) | S-WonERP 앱 | 1번(`tb_s080_auth_session` 필요) |
 | 7 | Fastify [B] 4개 도메인 스캐폴딩 착수 (요구사항 18) | 신규 저장소 | 4·5번 |
-| 8 | `lib/constants.ts` → 스캐폴드된 앱의 `src/lib/`로 이동 | 신규 저장소 | Next.js 스캐폴딩 |
+| 8 | `lib/constants.ts`·`lib/screens.ts` → `packages/shared/src/`로 이동 | 현 저장소(모노레포, 2026-09-06 D-3) | 워크스페이스 스캐폴딩 |
 | 9 | `004_rename_tenant.sql` 초안을 두고 앱 정지 창 일정 조율 | 운영 절차 | 6번 완료 후가 안전(브리지가 먼저 붙어 있어야 전환 중 회귀를 즉시 감지) |
 
 **1~3번이 가장 급하다.** anon 키가 이미 클라이언트 번들에 있고 테이블 전권이 열려 있다 — 운영 데이터 투입 전에 반드시 닫는다.

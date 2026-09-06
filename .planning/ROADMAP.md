@@ -64,7 +64,7 @@
 1. Next.js(App Router) + Fastify 프로젝트 스캐폴딩
 2. `styles/tokens.css`에 `.dc.html` 디자인 토큰 이관 (PLAT-03)
 3. DS 15종 구현 (PLAT-04) + 녹색 계열 lint 규칙 (PLAT-05)
-4. `lib/screens.ts` 중앙 매핑 + `lib/constants.ts`(작성 완료, `supabase/migrations`와 같은 커밋) 이동
+4. `lib/screens.ts`·`lib/constants.ts`(둘 다 작성 완료) → `packages/shared/src/`로 이동
 5. `contract-settlement.ts`·`contract-invoices.ts`·`reservation-validation.ts` 파일째 복사 + 테스트 동반 이관
 6. `tb_s080_auth_session` 기반 세션 스토어 + Fastify `onRequest` 훅(SPEC.md 요구사항 14)
 7. `MockBbiyongAuth`·`MockBbiyongAcl` 구현
@@ -86,7 +86,7 @@
 **절차** (`SPEC.md`·`BACKEND_ANALYSIS.md` §5 순서 6번 그대로):
 1. 기존 S-WonERP 앱 정지
 2. `pg_dump` 백업
-3. `004_rename_tenant.sql` 적용
+3. `supabase/migrations_hold/004_rename_tenant.sql` 적용 (적용 직전에만 이 폴더에서 꺼낸다)
 4. S-WonERP `schema.prisma`의 `@map("tenant_id")` → `@map("operator_id")` 전량 수정
 5. 앱 재기동 → 계약 목록·상세·등록, 청구 목록, 예약 등록 스모크 테스트
 
@@ -157,7 +157,7 @@
 
 **DB 마이그레이션**: `001`이 만든 4컬럼(`billing_start_date`·`deposit_return_status`·`biz_info_snapshot`·`renewed_from_contract_id`)과 `tb_s080_contract_status_history`를 이 페이즈에서 처음 실사용한다.
 
-**★ 이 페이즈에서 새로 작성해야 하는 마이그레이션이 하나 있다 — `005_billing_schema.sql`(미작성).** `CSCH-05`(청구 스키마를 append-only 원장으로 1차에 테이블만 생성)가 `.planning/SPEC.md`의 마이그레이션 4종에 포함되지 않았다. 이전 SPEC 작업이 사용자가 지정한 컬럼 목록만 반영했기 때문이다. `s030_billing`/`s030_billing_item`(로직·화면 없이 테이블만, 외부 세금계산서 참조번호 필드 포함)을 이 페이즈 착수 시 작성한다.
+**★ 이 페이즈에서 새로 작성해야 하는 마이그레이션이 하나 있다 — `005_billing_schema.sql`(미작성).** `CSCH-05`(청구 스키마를 append-only 원장으로 1차에 테이블만 생성)가 `.planning/SPEC.md`의 마이그레이션 4종에 포함되지 않았다. 이전 SPEC 작업이 사용자가 지정한 컬럼 목록만 반영했기 때문이다. `tb_s080_billing`/`tb_s080_billing_item`(로직·화면 없이 테이블만, 외부 세금계산서 참조번호 필드 포함)을 이 페이즈 착수 시 작성한다.
 
 **화면 ID 매핑**
 
@@ -352,7 +352,7 @@ MockBbiyongAuth + MockBbiyongAcl (shadow)
 
 | # | 갭 | 원인 | 조치 |
 |---|---|---|---|
-| 1 | `CSCH-05`(청구 스키마, `s030_billing`/`s030_billing_item`) 마이그레이션 미작성 | 이전 SPEC 작업이 사용자가 지정한 컬럼 목록(4개)만 반영, CSCH-05는 REQUIREMENTS.md에는 있었으나 그 목록에 없었음 | 페이즈 4 착수 시 `005_billing_schema.sql` 작성 (작업 목록 1번) |
+| 1 | `CSCH-05`(청구 스키마, `tb_s080_billing`/`tb_s080_billing_item`) 마이그레이션 미작성 | 이전 SPEC 작업이 사용자가 지정한 컬럼 목록(4개)만 반영, CSCH-05는 REQUIREMENTS.md에는 있었으나 그 목록에 없었음 | 페이즈 4 착수 시 `005_billing_schema.sql` 작성 (작업 목록 1번) |
 | 2 | `contract_type`(CONT-12) 컬럼 미작성 | 동일 — SPEC 1 요청 목록에 없었음(`ORG_ARCHITECTURE.md`가 이전에 제안했던 항목) | 페이즈 4 착수 시 `006_contract_type.sql` 작성 (작업 목록 8번) |
 
 두 갭 모두 로드맵을 막지는 않는다 — 페이즈 4가 시작되는 시점에 필요한 만큼, 그 전 페이즈 3개(1·2·3)를 진행하는 동안 마이그레이션 파일만 미리 작성해 두면 지연이 없다.
