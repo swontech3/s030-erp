@@ -192,6 +192,19 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
   }
   const eq = (s, p) => ec.query(s, p).then(r => r.rows);
 
+  /**
+   * 트랜잭션 스코프 GUC 설정.
+   * ★ `SET LOCAL app.current_role = '...'` 은 쓸 수 없다 — current_role 이 예약어라
+   *   파서가 거부한다(syntax error). 게다가 SET 은 $1 바인딩도 못 받는다.
+   *   set_config(name, value, is_local=true) 가 둘 다 해결한다. Fastify 도 이 형태로 쓴다.
+   */
+  const setScope = async (role, companyId) => {
+    await ec.query(`SELECT set_config('app.current_role', $1, true)`, [role]);
+    if (companyId !== undefined) {
+      await ec.query(`SELECT set_config('app.current_company_id', $1, true)`, [companyId]);
+    }
+  };
+
   // 원본(스코프 없는) 수치는 postgres 로 재고, 비교 대상만 erp_app 으로 잰다
   const target = (await q(`SELECT company_id, count(*)::int n FROM public.tb_s080_contracts
     WHERE company_id IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 1`))[0];
@@ -210,8 +223,7 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
 
     // A3 tenant 스코프
     await ec.query('BEGIN');
-    await ec.query(`SET LOCAL app.current_role='tenant'`);
-    await ec.query(`SET LOCAL app.current_company_id='${target.company_id}'`);
+    await setScope('tenant', target.company_id);
     const a3 = (await eq(`SELECT count(*)::int n FROM public.tb_s080_contracts`))[0].n;
     const a3other = (await eq(`SELECT count(*)::int n FROM public.tb_s080_contracts
       WHERE company_id <> '${target.company_id}'`))[0].n;
@@ -222,7 +234,7 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
 
     // A4 operator 전체
     await ec.query('BEGIN');
-    await ec.query(`SET LOCAL app.current_role='operator'`);
+    await setScope('operator');
     const a4 = (await eq(`SELECT count(*)::int n FROM public.tb_s080_contracts`))[0].n;
     await ec.query('ROLLBACK');
     a4 === totalContracts
@@ -239,8 +251,7 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
     await ec.query('BEGIN');
     let a6;
     try {
-      await ec.query(`SET LOCAL app.current_role='tenant'`);
-      await ec.query(`SET LOCAL app.current_company_id='${target.company_id}'`);
+      await setScope('tenant', target.company_id);
       await ec.query(`UPDATE public.tb_s080_contracts SET company_id='남의회사'
         WHERE company_id='${target.company_id}'`);
       a6 = null;
@@ -249,6 +260,70 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
     a6 === '42501'
       ? ok('A6', 'tenant 가 남의 company_id 로 UPDATE → WITH CHECK 위반', '42501')
       : ng('A6', 'tenant 가 남의 company_id 로 UPDATE → WITH CHECK 위반', `기대 42501, 실제 ${a6 || '성공(막히지 않음)'}`);
+
+    // ---- A7. erp_app 으로 INSERT 가 실제로 되는가 -------------------------
+    // 테이블 GRANT 와 시퀀스 GRANT 는 별개다. 시퀀스 USAGE 가 없으면
+    // SELECT 는 다 되고 INSERT 만 막혀서, 세션 행을 만드는 2-8 에서야 터진다.
+    const seqs = await q(`SELECT sequencename FROM pg_sequences WHERE schemaname='public' ORDER BY 1`);
+    const seqPriv = [];
+    for (const s of seqs) {
+      seqPriv.push({
+        시퀀스: s.sequencename,
+        USAGE: (await q(`SELECT has_sequence_privilege('erp_app',$1,'USAGE') u`, [`public."${s.sequencename}"`]))[0].u,
+        SELECT: (await q(`SELECT has_sequence_privilege('erp_app',$1,'SELECT') u`, [`public."${s.sequencename}"`]))[0].u,
+      });
+    }
+    console.table(seqPriv);
+    seqPriv.length && seqPriv.every(s => s.USAGE)
+      ? ok('A7a', 'erp_app 시퀀스 USAGE 권한', `${seqPriv.length}개 전부 USAGE 있음`)
+      : ng('A7a', 'erp_app 시퀀스 USAGE 권한', seqPriv.filter(s => !s.USAGE).map(s => s.시퀀스).join(', ') || '시퀀스 없음');
+
+    // A7b — nextval 을 쓰는 테이블에 실제 INSERT (RLS 비대상)
+    await ec.query('BEGIN');
+    let a7b, a7bId = null;
+    try {
+      const r = await ec.query(`INSERT INTO public.tb_s080_tenant010(name, slug, updated_at)
+        VALUES ('vtest-운영사','vtest-slug-'||floor(random()*1e9)::text, now()) RETURNING tenant_id`);
+      a7bId = r.rows[0].tenant_id; a7b = null;
+    } catch (e) { a7b = e.code; }
+    await ec.query('ROLLBACK');
+    a7b === null
+      ? ok('A7b', 'nextval 쓰는 테이블 INSERT (tenant010)', `tenant_id=${a7bId} 발급됨 → 시퀀스 권한 정상`)
+      : ng('A7b', 'nextval 쓰는 테이블 INSERT (tenant010)', `${a7b} — 시퀀스 GRANT 확인 필요`);
+
+    // A7c — 2-8 이 실제로 쓸 경로: 세션 행 INSERT
+    await ec.query('BEGIN');
+    let a7c;
+    try {
+      await ec.query(`INSERT INTO public.tb_s080_auth_session
+        (erp_sid, bbiyong_member_id, org_tp, org_id, bbiyong_access_encrypted, bbiyong_refresh_encrypted, expires_at)
+        VALUES ('vtest-sid-hash', 1, 'S', 1, 'enc-a', 'enc-r', now() + interval '7 days')`);
+      a7c = null;
+    } catch (e) { a7c = e.code; }
+    await ec.query('ROLLBACK');
+    a7c === null
+      ? ok('A7c', '세션 행 INSERT (tb_s080_auth_session)', '2-8 이 쓸 경로 통과')
+      : ng('A7c', '세션 행 INSERT (tb_s080_auth_session)', a7c);
+
+    // A7d — RLS 대상 테이블 INSERT: 자기 회사는 되고 남의 회사는 막히는가
+    const rbase = (await q(`SELECT build_id, facility_id FROM public.tb_s080_reservations LIMIT 1`))[0];
+    // 시간대를 서로 다르게 준다 — 같은 시간이면 EXCLUDE 제약(23P01)이 먼저 걸려
+    // RLS 의 WITH CHECK 를 시험하지 못한다.
+    const insRes = (companyId, day) => `INSERT INTO public.tb_s080_reservations
+      (reservation_id, build_id, facility_id, company_id, title, start_at, end_at, status, updated_at)
+      VALUES ('vtest-res-${Math.random().toString(36).slice(2, 8)}', '${rbase.build_id}', '${rbase.facility_id}',
+              '${companyId}', 'vtest', '2098-03-${day} 10:00', '2098-03-${day} 11:00', 'confirmed', now())`;
+    await ec.query('BEGIN');
+    let a7dOwn, a7dOther;
+    try {
+      await setScope('tenant', target.company_id);
+      try { await ec.query(insRes(target.company_id, '01')); a7dOwn = null; } catch (e) { a7dOwn = e.code; }
+      try { await ec.query(insRes('남의회사', '02')); a7dOther = null; } catch (e) { a7dOther = e.code; }
+    } finally { await ec.query('ROLLBACK'); }
+    (a7dOwn === null && a7dOther === '42501')
+      ? ok('A7d', 'RLS 테이블 INSERT — 자기 회사 성공 / 남의 회사 차단', '42501 (WITH CHECK)')
+      : ng('A7d', 'RLS 테이블 INSERT — 자기 회사 성공 / 남의 회사 차단',
+           `자기회사=${a7dOwn || '성공'} 남의회사=${a7dOther || '★성공(막히지 않음)'}`);
   }
 
   // ===== 교차 스키마 =====================================================

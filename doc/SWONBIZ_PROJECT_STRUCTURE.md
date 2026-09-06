@@ -311,3 +311,30 @@ Fastify를 별도 저장소로 빼지 않고 **현 저장소 안 `packages/api`*
 | 자동 적용 금지 | `supabase/migrations_hold/` — 앱 정지 창이 필요한 파일만 둔다 |
 
 **공용 코드가 아닌 것을 `shared`에 넣지 않는다.** 판단 기준은 "web과 api 둘 다 import 하는가" 하나다. 한쪽만 쓰면 그 패키지 안에 둔다.
+
+### 9-1. DB 쪽 확정 사항 — 건드리지 않는다
+
+**`btree_gist` · `vector` 확장은 `public` 스키마에 있다.** Supabase 관례(`extensions` 스키마)와
+다르지만 **옮기지 않는다** — `tb_s080_reservations`의 겹침 방지 제약(`EXCLUDE USING gist`)이
+`btree_gist`에 의존한다. 옮기거나 지우면 그 제약이 깨진다.
+
+**RLS 세션 변수는 `set_config()`로 설정한다. `SET LOCAL`을 쓰지 않는다.**
+
+```ts
+// packages/api — 트랜잭션마다
+await client.query(`SELECT set_config('app.current_role', $1, true)`, [session.role])
+if (session.role !== 'operator') {
+  await client.query(`SELECT set_config('app.current_company_id', $1, true)`, [session.companyId])
+}
+```
+
+이유 둘. (1) `SET LOCAL app.current_role = '...'` 은 **파서가 거부한다** — `current_role`이
+SQL 예약어다. (2) `SET`은 `$1` 바인딩을 못 받아 값을 문자열로 이어 붙여야 하고, 그러면
+그 자리가 곧 SQL 인젝션 지점이 된다. `set_config(name, value, is_local := true)`가 둘 다 해결한다.
+세 번째 인자 `true`가 `SET LOCAL`과 같은 트랜잭션 범위를 뜻한다 — **`false`를 쓰면 커넥션에
+값이 남아 다음 요청(다른 회사)으로 새어나간다.**
+
+**권한 점검은 `node scripts/check-grants.js`로 페이즈마다 돌린다.** `public`에
+`anon`·`authenticated` 권한이 하나라도 생기면 실패한다. Supabase 대시보드·Studio로 테이블을
+만들면 생성자가 `supabase_admin`이 되고 그 테이블은 즉시 `anon` 키로 밖에서 읽히기 때문이다.
+위의 "항상 `postgres` 역할로 적용한다"가 그걸 막는 규약이고, 이 스크립트가 그 규약을 검사한다.

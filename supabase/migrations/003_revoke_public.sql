@@ -10,8 +10,8 @@
 -- 그래서 이 마이그레이션은 Fastify 전용의 **BYPASSRLS 없는 새 역할**
 -- (erp_app)을 만든다. Fastify는 앞으로 service_role이 아니라 erp_app으로
 -- 접속하고, 매 요청 트랜잭션 시작 시 세션 GUC 두 개를 세팅한다:
---   SET LOCAL app.current_company_id = '<company_id>';   -- 입주사 세션
---   SET LOCAL app.current_role       = 'operator' | 'tenant';
+--   SELECT set_config('app.current_company_id', '<company_id>', true);  -- 입주사 세션
+--   SELECT set_config('app.current_role',       'operator'|'tenant', true);
 -- RLS 정책은 이 GUC를 읽어 판정한다. 이렇게 해야 "DB 자체가 격리를 강제"
 -- 한다는 지시의 취지(company_id 기반 RLS)가 실제로 성립한다.
 --
@@ -133,26 +133,32 @@ COMMIT;
 -- Fastify 쪽 짝 코드 (참고 — 이 파일이 만드는 것은 DB 쪽 절반뿐)
 -- =============================================================================
 -- await client.query('BEGIN');
--- await client.query('SET LOCAL app.current_role = $1', [session.role]);       -- 'operator' | 'tenant'
+-- await client.query("SELECT set_config('app.current_role', $1, true)", [session.role]);
 -- if (session.role !== 'operator') {
---   await client.query('SET LOCAL app.current_company_id = $1', [session.companyId]);
+--   await client.query("SELECT set_config('app.current_company_id', $1, true)", [session.companyId]);
 -- }
 -- -- ... 쿼리 실행 ...
 -- await client.query('COMMIT');
 --
--- ★ 커넥션 풀을 쓰면 SET LOCAL은 트랜잭션 범위에서만 유효하므로 커넥션이
--- 반납돼도 다음 요청에 값이 새지 않는다. SET(LOCAL 없이)은 절대 쓰지 않는다
--- — 커넥션에 영구히 남아 다음 요청(다른 회사)에 새어나간다.
+-- ★★ 2026-09-06 정정 — `SET LOCAL app.current_role = ...` 은 실행되지 않는다.
+-- current_role 이 SQL 예약어라 파서가 거부한다(syntax error at or near "current_role").
+-- 게다가 SET 은 $1 바인딩을 못 받아 값을 문자열로 이어 붙여야 하고 그 자리가 곧
+-- 인젝션 지점이 된다. set_config(name, value, is_local) 로 쓴다.
+--
+-- ★ 세 번째 인자 true 가 SET LOCAL 과 같은 트랜잭션 범위를 뜻한다. 커넥션 풀에서
+-- 커넥션이 반납돼도 값이 남지 않는다. false 는 절대 쓰지 않는다 — 커넥션에
+-- 영구히 남아 다음 요청(다른 회사)에 새어나간다.
 
 -- =============================================================================
 -- 검증
 -- =============================================================================
 -- -- anon으로 접속해 아무 테이블이나 SELECT — permission denied 나와야 정상
 -- -- erp_app으로 접속 후 GUC 없이 SELECT — 0건이어야 정상(fail-closed)
--- SET app.current_role = 'tenant';
--- SET app.current_company_id = '<실제 company_id>';
+-- (아래 두 줄은 psql 수동 확인용이라 세션 범위 false 를 쓴다. 애플리케이션 코드는 반드시 true.)
+-- SELECT set_config('app.current_role', 'tenant', false);
+-- SELECT set_config('app.current_company_id', '<실제 company_id>', false);
 -- SELECT count(*) FROM tb_s080_contracts;  -- 그 회사 것만 나와야 함
--- SET app.current_role = 'operator';
+-- SELECT set_config('app.current_role', 'operator', false);
 -- SELECT count(*) FROM tb_s080_contracts;  -- 전체가 나와야 함
 
 -- =============================================================================
