@@ -1,2 +1,4 @@
 s02-back.zip
 s02-back/
+.env
+node_modules/
