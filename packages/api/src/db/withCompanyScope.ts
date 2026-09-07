@@ -6,9 +6,6 @@
  * 애플리케이션 쪽 절반이 이 파일이다. 이 래퍼를 거치지 않은 쿼리는 GUC 가 없어
  * **0건을 본다**(fail-closed). 그게 정상이고, 그래서 이 래퍼가 유일한 통로여야 한다.
  *
- * ★ 구현은 페이즈 1의 2-8(세션 미들웨어)에서 채운다. 지금 박아두는 것은
- *   GUC 를 세팅하는 **형태** 하나다. 여기서 틀리면 격리가 전 페이즈에서 동시에 샌다.
- *
  * =============================================================================
  * ★★ 왜 set_config 인가 — SET LOCAL 은 쓸 수 없다
  * =============================================================================
@@ -34,6 +31,7 @@
  * 테스트로도 잘 안 잡힌다 — 부하가 있어야 재현되기 때문이다.
  * 이 시스템에서 가장 위험한 버그 형태다. `true` 외의 값을 쓰지 않는다.
  */
+import { pool } from './pool.ts';
 
 /** 이 래퍼 안에서 쓸 수 있는 최소한의 클라이언트. pg.PoolClient 가 이 모양이다. */
 export interface ScopedClient {
@@ -68,12 +66,29 @@ export async function applyCompanyScope(client: ScopedClient, scope: CompanyScop
 /**
  * 트랜잭션을 열고 스코프를 건 뒤 콜백을 실행한다. **DB 접근은 전부 이 함수를 거친다.**
  *
- * TODO(페이즈 1 · 2-8): 풀 획득 → BEGIN → applyCompanyScope → fn → COMMIT/ROLLBACK.
- * 지금은 형태만 있고 호출되지 않는다.
+ * ★ 콜백이 던지면 ROLLBACK 하고 예외를 그대로 올린다. 커넥션은 어느 경로로 끝나든
+ *   반드시 반납한다 — 반납을 빠뜨리면 풀이 말라 서버 전체가 멎는다.
  */
 export async function withCompanyScope<T>(
-  _scope: CompanyScope,
-  _fn: (client: ScopedClient) => Promise<T>,
+  scope: CompanyScope,
+  fn: (client: ScopedClient) => Promise<T>,
 ): Promise<T> {
-  throw new Error('withCompanyScope: 미구현 — 페이즈 1의 2-8(세션 미들웨어)에서 채운다');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await applyCompanyScope(client, scope);
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    // ROLLBACK 자체가 실패할 수 있다(커넥션이 이미 죽은 경우). 원래 예외를 덮지 않는다.
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      /* 무시 — 아래에서 원래 예외를 던진다 */
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 }

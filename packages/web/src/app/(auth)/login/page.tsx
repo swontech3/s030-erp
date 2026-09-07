@@ -11,8 +11,8 @@
  *   isReset(70~81) · isSent(83~92) · isInvite(94~137)  — 화면 3종 폐기
  *   bindStrength()                                      — 초대 화면 전용 비밀번호 강도 막대
  *
- * ★ 이번 범위가 아닌 것: 실제 로그인 동작 · 삐용 API 호출 · 세션 발급 (전부 2-8).
- *   폼은 제출해도 아무 일도 하지 않는다.
+ * 2-8 에서 붙인 것: 실제 제출 → `/api/auth/login` → (서버끼리) Fastify → 삐용 어댑터.
+ * 이 화면은 세션을 스스로 만들지 않는다. 쿠키를 굽는 것도 route handler 쪽이다.
  *
  * ★ DS 컴포넌트를 쓰지 않은 이유 — 원본이 쓰지 않는다.
  *   템플릿의 입력은 48px·15px, 버튼은 52px 인데 DS 는 --control-h:54px 다.
@@ -46,15 +46,49 @@ export default function LoginPage() {
    *      }
    *
    *    res.ok 만 보고 성공 처리하면 실패한 로그인이 통과한다.
-   *    지금은 호출이 없으므로 표시 구조만 만들어 둔다.
+   *
+   *    ★ 그 검사를 하는 자리는 **삐용 어댑터**다(packages/api/src/bbiyong/). 화면까지
+   *      body.status 를 들고 오면 삐용 응답 모양이 프론트로 새어나간다. 어댑터가
+   *      실패를 예외로 번역하고 → Fastify 가 401 로 → route handler 가 message 로
+   *      바꿔 준다. 이 화면은 그 message 만 띄운다.
    */
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  /** 2-8 에서 실제 호출로 채운다. 지금은 아무것도 하지 않는다. */
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // TODO(2-8): 삐용 로그인 호출 → erp_sid 발급 → homeRouteFor(screens) 로 이동
+    if (loading) return;
+
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get('email') ?? '');
+    const password = String(form.get('password') ?? '');
+
     setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const body = await res.json().catch(() => null);
+
+      // ★ 여기서 res.ok 만 보고 통과시키지 않는다. 삐용 응답의 함정(위 주석)은
+      //   route handler 와 Fastify 가 이미 걸러 상태코드로 번역해 주지만,
+      //   화면도 body 를 확인해서 홈 경로가 실제로 왔을 때만 이동한다.
+      if (!res.ok || !body?.home) {
+        setError(body?.message ?? '이메일 또는 비밀번호가 올바르지 않습니다');
+        return;
+      }
+
+      // ★ router.push 가 아니라 전체 이동이다. 방금 구운 세션 쿠키를 서버가
+      //   첫 렌더부터 보게 하려는 것이고, 클라이언트에 남은 로그인 화면 상태도 함께 버린다.
+      window.location.assign(body.home as string);
+    } catch {
+      setError('서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -215,6 +249,8 @@ export default function LoginPage() {
             <div style={{ marginTop: 28 }}>
               <button
                 type="submit"
+                disabled={loading}
+                aria-busy={loading}
                 className={styles.submit}
                 style={{
                   width: '100%',
@@ -234,13 +270,16 @@ export default function LoginPage() {
                   transition: 'background var(--dur) var(--ease-out)',
                 }}
               >
-                로그인
+                {/* 원본의 isLoading 블록. 스피너 애니메이션(swonSpin)은 login.module.css 에 있다. */}
+                {loading ? (
+                  <>
+                    <span className={styles.spinner} aria-hidden="true" />
+                    로그인 중…
+                  </>
+                ) : (
+                  '로그인'
+                )}
               </button>
-              {/*
-                원본에는 isLoading 블록(스피너 + "로그인 중...")이 따로 있다.
-                호출이 붙는 2-8 에서 되살린다 — 스피너 애니메이션(swonSpin)은
-                login.module.css 에 옮겨 뒀다.
-              */}
             </div>
           </form>
 
