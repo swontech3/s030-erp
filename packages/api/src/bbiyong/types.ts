@@ -34,10 +34,30 @@ export class BbiyongAuthError extends Error {
   }
 }
 
+/**
+ * 헤더에 찍는 표시값. **표시 전용이다** — 이 값으로 메뉴를 열고 닫지 않는다(지시문 1-6).
+ */
+export interface BbiyongProfile {
+  memberName: string;
+  orgName: string;
+  orgTp: string;
+}
+
 export interface BbiyongAuth {
   signIn(email: string, password: string): Promise<BbiyongLoginResult>;
   /** 삐용 세션 1건 삭제. 실패해도 ERP 로그아웃은 계속 진행한다(ORG §3-5). */
   signOut(refreshToken: string): Promise<void>;
+  /**
+   * 회원 표시정보 조회.
+   *
+   * ★ 이 값을 ERP DB 에 복사해 두지 않는다. 삐용에서 이름이 바뀌면 ERP 만 옛 이름을
+   *   들고 있게 되고, 그건 추적이 안 되는 종류의 어긋남이다. 매번 물어보고, 비용이
+   *   문제가 되면 그때 캐시한다.
+   *
+   * TODO(회신 ⑦): 삐용 회원조회 엔드포인트 규격 미확정. HttpBbiyongAuth 를 쓸 때
+   *   이 메서드가 무엇을 부를지 정해야 한다 — 없으면 로그인 응답을 세션에 얹는 쪽으로 간다.
+   */
+  getProfile(memberId: number): Promise<BbiyongProfile | null>;
 }
 
 export type AclAction = 'VIEW' | 'CREATE' | 'UPDATE' | 'DELETE';

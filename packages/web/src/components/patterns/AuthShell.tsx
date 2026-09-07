@@ -46,8 +46,9 @@ export function AuthShell({ children }: { children: ReactNode }) {
           <Image
             src="/brand/swonbiz-logo.png"
             alt="SwonBiz"
-            width={28}
-            height={28}
+            /* ★ 원본 32x51. 정사각으로 주면 next/image 비율 경고가 난다. */
+            width={32}
+            height={51}
             style={{ height: 28, width: 'auto', display: 'block' }}
           />
           <span

@@ -104,10 +104,9 @@ export function registerAuthRoutes(app: FastifyInstance): void {
    * GET /auth/me — 현재 세션 + 접근 가능 화면 목록.
    * 셸(2-7)의 사이드바가 이 응답만 보고 그린다.
    *
-   * ★ TODO(2-7): 헤더의 "홍길동 (에스원테크)" 표시값이 여기 없다. 이름은 삐용 로그인
-   *   응답에만 있고 tb_s080_auth_session 에 컬럼이 없다 — 저장하면 삐용 회원정보의
-   *   사본을 ERP 가 갖게 되고 그건 변경 추적이 안 된다. 회신 ⑦(로그인 API 규격)에
-   *   회원 조회가 포함되는지 확인한 뒤, 없으면 그때 캐시 방식을 정한다.
+   * ★ display(헤더의 "홍길동 (에스원테크)")는 어댑터의 getProfile 로 매번 가져온다.
+   *   세션 테이블에 이름을 복사해 두지 않는다 — 삐용에서 이름이 바뀌면 ERP 만 옛
+   *   이름을 들고 있게 되고, 그 어긋남은 추적이 안 된다. **표시 전용 값이다.**
    */
   app.get('/auth/me', async (req, reply) => {
     const session = requireSession(req);
@@ -116,10 +115,15 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       s020OrgId: session.s020OrgId,
       orgTp: session.orgTp,
     };
-    const screens = await bbiyongAcl.listScreens(subject);
+    const [screens, profile] = await Promise.all([
+      bbiyongAcl.listScreens(subject),
+      bbiyongAuth.getProfile(session.s020MemberId),
+    ]);
     return reply.send({
       screens,
       home: homeRouteFor(screens),
+      /** ★ 표시 전용. 사이드바·메뉴 판정에 쓰지 않는다. */
+      display: profile,
       companyId: session.companyId,
       role: session.role,
       orgTp: session.orgTp,

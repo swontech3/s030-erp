@@ -9,7 +9,7 @@
  *   로그인 화면의 에러 표시(showError)를 실제로 띄워 볼 수 있어야 하기 때문이다.
  *   비밀번호가 무엇이든 통과시키면 그 경로가 죽은 코드로 남는다.
  */
-import { BbiyongAuthError, type BbiyongAuth, type BbiyongLoginResult } from './types.ts';
+import { BbiyongAuthError, type BbiyongAuth, type BbiyongLoginResult, type BbiyongProfile } from './types.ts';
 
 /** 개발용 고정 비밀번호. 실제 삐용 연동으로 바뀌면 사라진다. */
 export const MOCK_PASSWORD = 'erp1234!';
@@ -91,6 +91,12 @@ export class MockBbiyongAuth implements BbiyongAuth {
       accessToken: `mock-access.${account.memberId}.${Date.now()}`,
       refreshToken: `mock-refresh.${account.memberId}.${Date.now()}`,
     };
+  }
+
+  async getProfile(memberId: number): Promise<BbiyongProfile | null> {
+    const account = findMockAccount(memberId);
+    if (!account) return null;
+    return { memberName: account.memberName, orgName: account.orgName, orgTp: account.orgTp };
   }
 
   async signOut(_refreshToken: string): Promise<void> {

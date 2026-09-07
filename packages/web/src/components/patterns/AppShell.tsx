@@ -1,0 +1,169 @@
+'use client';
+
+/**
+ * ERP 셸 s0300000050 — 원본: design/erp-tenants/ErpTenants.dc.html 의 <aside> + 헤더.
+ *
+ * ★ erp-dashboard · erp-settings 의 셸은 정적이라 참고하지 않았다. 접기·툴팁·상태 저장이
+ *   온전한 것은 erp-tenants 뿐이다(지시서 2-7).
+ *
+ * 원본에서 옮긴 것
+ *   <aside> 마크업 + 토글 버튼 + bindSidebar() / applySidebar() 의 동작
+ *
+ * 옮기면서 바뀐 것 세 가지 (전부 이유가 있다)
+ *
+ * 1. **접힘 상태의 저장소가 localStorage → 쿠키다.** 아래 onToggle 주석 참조.
+ *    이 컴포넌트는 초기값을 **서버가 준 prop 으로만** 받는다 — 마운트 후에 읽어
+ *    고치는 코드가 없어야 깜빡임이 사라진다.
+ *
+ * 2. **applySidebar() 의 인라인 스타일 조작이 전부 CSS 클래스 하나로 바뀌었다.**
+ *    원본은 querySelector 로 DOM 을 직접 만진다. React 에서 그러면 서버가 그린
+ *    첫 화면과 어긋나고, 그 어긋남이 곧 깜빡임이다. 상태는 `.collapsed` 하나뿐이고
+ *    폭·패딩·라벨·툴팁·토글 위치는 AppShell.module.css 가 판단한다.
+ *
+ * 3. **항목을 하드코딩하지 않는다.** 원본의 입주사·청구·세무·호실·설정 5개는
+ *    템플릿 예시다. 실제 항목은 삐용이 준 화면 목록에서 나온다(ACL-07′) —
+ *    ERP 가 역할을 보고 거르지 않는다.
+ */
+
+import { useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Icon } from '@/components/ds';
+import { SIDEBAR_COOKIE, SIDEBAR_COOKIE_MAX_AGE, screenNameForPath, type NavItem } from '@/lib/sidebar';
+import styles from './AppShell.module.css';
+
+export interface AppShellDisplay {
+  memberName: string;
+  orgName: string;
+}
+
+export interface AppShellProps {
+  /** ★ 서버가 쿠키에서 읽어 넘긴 값. 클라이언트가 다시 읽지 않는다. */
+  initialCollapsed: boolean;
+  /** 삐용이 준 화면 목록에서 만들어진 항목. 여기서 더 거르지 않는다. */
+  items: NavItem[];
+  /** 로고를 눌렀을 때 가는 곳. 홈 분기 결과(/dashboard · /booking …)다. */
+  homeRoute: string;
+  /** 헤더 표시값. **표시 전용** — 이 값으로 메뉴를 열고 닫지 않는다(지시문 1-6). */
+  display: AppShellDisplay | null;
+  children: React.ReactNode;
+}
+
+export function AppShell({ initialCollapsed, items, homeRoute, display, children }: AppShellProps) {
+  /*
+   * ★★ 초기값이 서버가 준 prop 그대로다 — 이것이 깜빡임 없음의 전부다.
+   *    useEffect 로 마운트 후에 고치거나, 여기서 document.cookie 를 다시 읽으면
+   *    첫 페인트가 한 번 틀렸다가 고쳐지고, 그게 눈에 보이는 깜빡임이 된다.
+   */
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
+  const pathname = usePathname();
+
+  /*
+   * 헤더 제목은 경로에서 끌어온다. 서버 컴포넌트인 layout 은 현재 경로를 알 수 없고
+   * (usePathname 은 클라이언트 훅이다), 페이지마다 title 을 넘기게 하면 화면 이름이
+   * screens.ts 와 페이지 두 곳에 생겨 어긋난다.
+   */
+  const title = screenNameForPath(pathname);
+
+  function onToggle() {
+    const next = !collapsed;
+    setCollapsed(next);
+
+    /*
+     * ★★ 원본은 localStorage 에 저장한다. App Router 에서는 서버가 localStorage 를
+     *    읽지 못해 첫 렌더가 항상 "펼침"으로 나가고, 브라우저가 붙으면서 "접힘"으로
+     *    바뀐다 — 새로고침할 때마다 사이드바가 한 번 깜빡인다.
+     *    쿠키는 요청에 실려 가므로 서버가 첫 렌더부터 맞게 그린다.
+     *
+     * ★ HttpOnly 를 걸 수 없다 — 이 줄이 바로 클라이언트가 쓰는 자리다.
+     *   세션이 아니라 화면 상태값이라 노출돼도 잃을 것이 없다.
+     * ★ SameSite=Lax — 외부 사이트에서 넘어온 요청에는 실리지 않는다. 그래도
+     *   최악의 경우가 "사이드바가 펼쳐진 채로 뜬다"라 위험이 없다.
+     */
+    document.cookie = `${SIDEBAR_COOKIE}=${next ? '1' : '0'}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}; SameSite=Lax`;
+  }
+
+  const toggleLabel = collapsed ? '사이드바 펼치기' : '사이드바 접기';
+
+  return (
+    <div className={`${styles.shell}${collapsed ? ` ${styles.collapsed}` : ''}`}>
+      <aside className={styles.aside}>
+        <div className={styles.logoWrap}>
+          {/* 원본에서도 로고가 곧 홈 진입점이다(data-nav="dashboard"). */}
+          <Link href={homeRoute} className={styles.logo}>
+            <Image
+              src="/brand/swonbiz-logo.png"
+              alt="SwonBiz"
+              /* ★ 로고 원본은 32x51 이다. 정사각(24x24)으로 주면 next/image 가 비율이
+                 어긋났다고 경고한다 — 원본 비율을 주고 높이만 CSS 로 맞춘다. */
+              width={32}
+              height={51}
+              className={styles.logoImg}
+              style={{ height: 24, width: 'auto' }}
+              priority
+            />
+            <span className={`${styles.wordmark} ${styles.label}`}>
+              S<span className={styles.wordmarkDot}>·</span>won<span className={styles.wordmarkSuffix}>Biz</span>
+            </span>
+            <span className={styles.tip}>홈</span>
+          </Link>
+        </div>
+
+        <nav className={styles.nav}>
+          {items.map((item) => {
+            // 상세 화면(/tenants/123)에서도 목록 항목이 켜져 있어야 한다.
+            const active = pathname === item.route || pathname.startsWith(`${item.route}/`);
+            return (
+              <Link
+                key={item.screenId}
+                href={item.route}
+                className={`${styles.item}${active ? ` ${styles.itemActive}` : ''}`}
+                aria-current={active ? 'page' : undefined}
+              >
+                <Icon name={item.icon} size={18} />
+                <span className={styles.label}>{item.name}</span>
+                {/* 접힌 레일에서는 라벨이 없으므로 툴팁이 이름을 대신한다. */}
+                <span className={styles.tip}>{item.name}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+
+      <button type="button" className={styles.toggle} onClick={onToggle} aria-label={toggleLabel}>
+        <Icon name={collapsed ? 'chevron-right' : 'chevron-left'} size={14} />
+        <span className={styles.toggleTip}>{toggleLabel}</span>
+      </button>
+
+      <div className={styles.column}>
+        <header className={styles.header}>
+          <div>
+            {/* TODO(페이즈 3): 지점명은 기준설정(s0300100010)이 생기면 실제 값으로 바꾼다. */}
+            <div className={styles.crumb}>{display ? display.orgName : ''}</div>
+            <div className={styles.title}>{title}</div>
+          </div>
+          <div className={styles.spacer} />
+          {/* TODO(페이즈 3·6): 도움말·알림은 자리만 있다. 동작은 해당 페이즈에서. */}
+          <button type="button" className={styles.iconBtn} aria-label="도움">
+            <Icon name="circle-help" size={18} />
+          </button>
+          <button type="button" className={styles.iconBtn} aria-label="알림">
+            <Icon name="bell" size={18} />
+          </button>
+          <div className={styles.user}>
+            <span className={styles.avatar} aria-hidden="true">
+              {display?.memberName.slice(0, 1) ?? ''}
+            </span>
+            <div className={styles.userText}>
+              <div className={styles.userName}>{display?.memberName ?? ''}</div>
+              <div className={styles.userOrg}>{display?.orgName ?? ''}</div>
+            </div>
+          </div>
+        </header>
+
+        <main className={styles.main}>{children}</main>
+      </div>
+    </div>
+  );
+}
