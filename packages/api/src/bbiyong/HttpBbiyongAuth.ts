@@ -53,15 +53,31 @@ function asRecord(v: unknown): Record<string, unknown> | null {
   return v as Record<string, unknown>;
 }
 
-/** `massage` — 오타가 아니라 실제 필드명이다. `message` 는 보지 않는다. */
-function readMassage(root: Record<string, unknown> | null): string | null {
-  const v = root?.massage;
+function str(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 ? v : null;
 }
 
+/**
+ * 로그에 남길 실패 사유.
+ *
+ * `massage` 는 오타가 아니라 실제 필드명이다 — 최상위 `message` 는 보지 않는다.
+ * ★ 다만 **`data.message` 는 본다.** 2026-09-08 개발계 실물 응답이 이랬다:
+ *     { massage: '로그인 실패', data: { code: 'A005', message: '가입된 이메일 정보가 없습니다.' } }
+ *   `massage` 만 읽으면 로그에 "로그인 실패"만 남아 원인을 알 수 없다.
+ *   ★★ 이 값은 **로그 전용**이다. 사용자에게는 어느 쪽도 보여주지 않는다 —
+ *      "가입된 이메일 정보가 없습니다"는 계정 존재 여부를 그대로 알려주는 문구다.
+ */
+function readMassage(root: Record<string, unknown> | null): string | null {
+  const parts = [str(root?.massage), str(asRecord(root?.data)?.message)].filter((v): v is string => v !== null);
+  return parts.length > 0 ? parts.join(' / ') : null;
+}
+
+/**
+ * 오류 코드. 회신 예시는 최상위 `error` 였지만 실물은 `data.code` 였고, 최상위 `error` 는
+ * **빈 배열**이었다. 둘 다 본다.
+ */
 function readErrorCode(root: Record<string, unknown> | null): string | null {
-  const v = root?.error;
-  return typeof v === 'string' && v.length > 0 ? v : null;
+  return str(root?.error) ?? str(asRecord(root?.data)?.code);
 }
 
 function failOf(root: Record<string, unknown> | null): { kind: 'fail'; errorCode: string | null; serverMessage: string | null } {
@@ -79,10 +95,6 @@ function toInt(v: unknown): number | null {
   if (typeof v !== 'number' && typeof v !== 'string') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
-}
-
-function toRequiredString(v: unknown): string | null {
-  return typeof v === 'string' && v.length > 0 ? v : null;
 }
 
 /** 표시용 값. 없어도 로그인은 된다 — 헤더에 이름이 안 뜰 뿐이다. */
@@ -118,9 +130,9 @@ export function parseSignIn(body: unknown): SignInOutcome {
 
   const memberId = toInt(data.memberId);
   const orgId = toInt(data.orgId);
-  const orgTp = toRequiredString(data.orgTp);
-  const accessToken = toRequiredString(data.accessToken);
-  const refreshToken = toRequiredString(data.refreshToken);
+  const orgTp = str(data.orgTp);
+  const accessToken = str(data.accessToken);
+  const refreshToken = str(data.refreshToken);
 
   // 하나라도 없으면 반쪽 세션이 된다. orgId 가 없으면 스코프를 해석할 수 없고,
   // orgTp 가 없으면 운영사·입주사를 가를 수 없다. 만들다 만 세션보다 실패가 낫다.
@@ -154,7 +166,7 @@ export function parseReIssue(body: unknown): ReIssueOutcome {
   if (root.result !== 'success' || root.status !== 200) return failOf(root);
 
   const data = asRecord(root.data);
-  const accessToken = toRequiredString(data?.accessToken);
+  const accessToken = str(data?.accessToken);
   if (accessToken === null) return failOf(root);
   return { kind: 'success', accessToken };
 }

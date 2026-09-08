@@ -8,10 +8,15 @@
  */
 import Fastify, { type FastifyError, type FastifyReply, type FastifyRequest } from 'fastify';
 import { env } from './env.ts';
+import { bbiyongBanner } from './lib/bbiyongBanner.ts';
 import { registerSessionHook } from './session/hook.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerAclRoutes } from './routes/acl.ts';
 import { closePool } from './db/pool.ts';
+
+// ★★ 어느 삐용에 붙었는지를 **가장 먼저** 찍는다. pino 의 JSON 한 줄에 섞으면 눈에 안 띄어서
+//    일부러 평문으로 낸다 — 8080(가동계)과 8082(개발계)를 눈으로 가르는 것이 목적이다.
+for (const line of bbiyongBanner({ mock: env.bbiyongMock, baseUrl: env.bbiyongBaseUrl })) console.log(line);
 
 const app = Fastify({ logger: true });
 

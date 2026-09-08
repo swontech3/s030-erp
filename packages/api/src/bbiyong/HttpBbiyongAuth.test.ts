@@ -63,6 +63,19 @@ const FAIL_BODY = {
   error: 'A005',
 };
 
+/**
+ * ★ 2026-09-08 개발계(192.168.0.14:8082)에서 **실제로 받은** 실패 응답.
+ *   회신의 예시와 모양이 다르다 — 오류 코드가 `data.code` 에 있고 최상위 `error` 는 빈 배열이다.
+ *   회신 문서만 보고 짠 파서는 조용히 `code=-` 만 남긴다. 실물로 고정해 둔다.
+ */
+const REAL_FAIL_BODY = {
+  status: 403,
+  result: 'fail',
+  massage: '로그인 실패',
+  data: { status: 403, code: 'A005', message: '가입된 이메일 정보가 없습니다.' },
+  error: [],
+};
+
 /** 응답을 통째로 만드는 대신, 예시에서 한 필드만 바꿔 본다. */
 function withData(patch: Record<string, unknown>) {
   return { ...SUCCESS_BODY, data: { ...SUCCESS_BODY.data, ...patch } };
@@ -115,6 +128,27 @@ describe('parseSignIn — massage 필드', () => {
     if (out.kind !== 'fail') throw new Error('실패로 판정되어야 한다');
     expect(out.serverMessage).toBe('이메일 또는 비밀번호를 확인해 주세요.');
     expect(out.errorCode).toBe('A005');
+  });
+
+  it('★ 실물 응답 — data 가 채워진 실패도 실패다', () => {
+    expect(parseSignIn(REAL_FAIL_BODY).kind).toBe('fail');
+  });
+
+  it('★ 실물 응답 — 오류 코드가 data.code 에 있어도 줍는다 (최상위 error 는 빈 배열이었다)', () => {
+    const out = parseSignIn(REAL_FAIL_BODY);
+    if (out.kind !== 'fail') throw new Error('실패로 판정되어야 한다');
+    expect(out.errorCode).toBe('A005');
+    // 로그에 남길 사유. massage 만으로는 "로그인 실패" 뿐이라 원인을 알 수 없다.
+    expect(out.serverMessage).toContain('가입된 이메일 정보가 없습니다.');
+  });
+
+  it('★ 그 사유를 사용자에게 보여주지는 않는다 — 계정 존재 여부가 새면 안 된다', async () => {
+    const { impl } = stubFetch(json(REAL_FAIL_BODY));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+
+    const err = await auth.signIn('nobody@example.com', 'x').catch((e: unknown) => e);
+    expect((err as Error).message).toBe(INVALID_CREDENTIALS_MESSAGE);
+    expect((err as Error).message).not.toContain('가입된 이메일');
   });
 
   it('★ message(정상 철자) 로 읽지 않는다 — massage 가 없으면 사유는 null 이다', () => {
