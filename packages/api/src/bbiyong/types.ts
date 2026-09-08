@@ -24,6 +24,20 @@ export interface BbiyongLoginResult {
 }
 
 /**
+ * 로그인 실패 시 화면에 뜨는 문구. **하나뿐이다.**
+ *
+ * ★ 삐용은 "이메일 없음"과 "비밀번호 틀림"을 둘 다 A005 로 준다(회신 ⑦ §7) —
+ *   계정 존재 여부를 노출하지 않으려는 의도다. ERP 도 구분하려 하지 않는다.
+ *   삐용의 `massage` 를 그대로 화면에 흘리지도 않는다: 삐용 문구가 바뀌면 ERP 화면이
+ *   같이 바뀌고, 언젠가 내부 사정이 적힌 문구가 사용자에게 간다.
+ */
+export const INVALID_CREDENTIALS_MESSAGE = '이메일 또는 비밀번호가 올바르지 않습니다';
+
+/** 겸직 계정 안내. 2단계 로그인 팝업을 만들기 전까지 이 문구가 유일한 출구다. */
+export const ORG_SELECT_MESSAGE =
+  '이 계정은 여러 단체에 소속되어 있습니다. 삐용에서 로그인한 뒤 다시 시도해 주세요.';
+
+/**
  * 로그인 실패. **삐용은 실패해도 HTTP 200 을 준다**(BBIYONG-AUTH.md §2.4 함정 1) —
  * `body.status !== 200` 을 검사하는 책임은 어댑터 구현체에 있고, 바깥은 이 예외만 본다.
  */
@@ -31,6 +45,41 @@ export class BbiyongAuthError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'BbiyongAuthError';
+  }
+}
+
+/**
+ * 겸직 계정 — 같은 이메일이 여러 단체에 있어 삐용이 토큰 대신 **단체 선택 목록**을 준 경우.
+ *
+ * ★ 조용히 실패하면 안 된다(회신 ⑦ §4). 자격 증명은 맞았는데 단체를 못 고른 상태이므로
+ *   "이메일 또는 비밀번호가 올바르지 않습니다"로 뭉개면 사용자는 영원히 못 들어온다.
+ *   `BbiyongAuthError` 를 상속하므로 라우트의 401 번역은 그대로 타고, 메시지만 다르다.
+ *
+ * 2단계 로그인 팝업(s0300000010p1)은 아직 만들지 않는다 — 겸직 계정이 실제로 없다.
+ * 이 예외가 서버 로그에 찍히면 그때가 팝업을 만들 때다.
+ */
+export class BbiyongOrgSelectRequiredError extends BbiyongAuthError {
+  constructor(
+    message: string,
+    /** 후보 개수만 남긴다. ★ selectToken 은 3분 유효이고 보관하지 않는다. */
+    readonly candidateCount: number,
+  ) {
+    super(message);
+    this.name = 'BbiyongOrgSelectRequiredError';
+  }
+}
+
+/**
+ * 삐용에 못 붙었거나 응답이 규격이 아니다. **인증 실패가 아니다** —
+ * 이것을 401 로 번역하면 삐용 장애가 "비밀번호가 틀렸습니다"로 보인다.
+ *
+ * ★ 이 예외의 message 에는 URL·토큰·비밀번호가 들어가지 않는다. undici 는 실패한 요청
+ *   URL 을 그대로 붙여 던지고, `/re-issue` 의 URL 에는 토큰 2개가 쿼리스트링으로 실려 있다.
+ */
+export class BbiyongUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BbiyongUnavailableError';
   }
 }
 

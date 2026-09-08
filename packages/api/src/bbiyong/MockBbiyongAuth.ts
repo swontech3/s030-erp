@@ -9,7 +9,13 @@
  *   로그인 화면의 에러 표시(showError)를 실제로 띄워 볼 수 있어야 하기 때문이다.
  *   비밀번호가 무엇이든 통과시키면 그 경로가 죽은 코드로 남는다.
  */
-import { BbiyongAuthError, type BbiyongAuth, type BbiyongLoginResult, type BbiyongProfile } from './types.ts';
+import {
+  BbiyongAuthError,
+  INVALID_CREDENTIALS_MESSAGE,
+  type BbiyongAuth,
+  type BbiyongLoginResult,
+  type BbiyongProfile,
+} from './types.ts';
 
 /** 개발용 고정 비밀번호. 실제 삐용 연동으로 바뀌면 사라진다. */
 export const MOCK_PASSWORD = 'erp1234!';
@@ -77,7 +83,7 @@ export class MockBbiyongAuth implements BbiyongAuth {
     // ★ 계정이 없는 경우와 비밀번호가 틀린 경우의 메시지를 구분하지 않는다.
     //   구분하면 어떤 이메일이 가입돼 있는지 밖에서 확인할 수 있다(계정 열거).
     if (!account || password !== MOCK_PASSWORD) {
-      throw new BbiyongAuthError('이메일 또는 비밀번호가 올바르지 않습니다');
+      throw new BbiyongAuthError(INVALID_CREDENTIALS_MESSAGE);
     }
 
     return {

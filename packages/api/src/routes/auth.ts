@@ -11,7 +11,13 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { homeRouteFor } from '@swonbiz/shared';
-import { bbiyongAcl, bbiyongAuth, BbiyongAuthError } from '../bbiyong/index.ts';
+import {
+  bbiyongAcl,
+  bbiyongAuth,
+  BbiyongAuthError,
+  BbiyongOrgSelectRequiredError,
+  BbiyongUnavailableError,
+} from '../bbiyong/index.ts';
 import { createSession, readRefreshToken, revokeSession } from '../session/store.ts';
 import { requireRawSid, requireSession } from '../session/hook.ts';
 
@@ -55,9 +61,25 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     try {
       login = await bbiyongAuth.signIn(email, password);
     } catch (err) {
+      // ★ 겸직 계정 — 자격 증명은 맞았고 단체를 못 고른 것뿐이다. 조용히 실패시키지 않는다.
+      //   이 줄이 로그에 찍히면 2단계 로그인 팝업(s0300000010p1)을 만들 때가 된 것이다(회신 ⑦ §4).
+      if (err instanceof BbiyongOrgSelectRequiredError) {
+        req.log.warn(
+          { candidateCount: err.candidateCount },
+          '겸직 계정 로그인 시도 — needOrgSelect. 2단계 로그인 팝업 s0300000010p1 이 필요하다',
+        );
+        return reply.code(401).send({ error: 'org_select_required', message: err.message });
+      }
       if (err instanceof BbiyongAuthError) {
         // 401 이지만 메시지는 계정 존재 여부를 흘리지 않는다(어댑터가 이미 합쳐서 준다).
         return reply.code(401).send({ error: 'invalid_credentials', message: err.message });
+      }
+      // ★ 삐용에 못 붙은 것은 인증 실패가 아니다. 401 로 내려보내면 삐용 장애가
+      //   "비밀번호가 틀렸습니다"로 보이고, 사용자는 멀쩡한 비밀번호를 계속 다시 친다.
+      //   (web 은 5xx 문구를 자기 문구로 가린다 — 여기 문구는 로그·개발용이다.)
+      if (err instanceof BbiyongUnavailableError) {
+        req.log.error({ err }, '삐용 인증 서버 연결 실패');
+        return reply.code(503).send({ error: 'bbiyong_unavailable', message: '인증 서버에 연결할 수 없습니다' });
       }
       throw err;
     }
