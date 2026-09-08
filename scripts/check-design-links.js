@@ -13,6 +13,38 @@ const path = require('path');
 const DESIGN = 'design';
 const only = process.argv[2];
 
+// =============================================================================
+// 알려진 누락 — 경고로 낮춘다. **영구 무시가 아니다.**
+// =============================================================================
+// 규칙 셋:
+//   1) 여기 있는 자원이 없으면 WARN (검사는 통과)
+//   2) 여기 **없는** 자원이 없으면 NG (검사 실패) — 기존 동작 그대로
+//   3) ★ 여기 있는 자원이 **생기면 STALE 로 실패한다** — 디자인이 전달한 순간 이 목록은
+//      낡은 것이 되고, 지우지 않으면 다음 누락을 이 항목이 가려 버린다.
+//      "회신이 오면 자동으로 다시 빨개진다"는 것이 3번이다.
+const KNOWN_MISSING = [
+  {
+    folder: 'landing-hero',
+    urls: [
+      '../_ds/swonbiz/assets/spaces/lounge.png',
+      '../_ds/swonbiz/assets/spaces/single-room.png',
+      '../_ds/swonbiz/assets/spaces/two-person-room.png',
+      '../_ds/swonbiz/assets/spaces/dedicated-desk.png',
+      '../_ds/swonbiz/assets/spaces/team-office.png',
+      '../_ds/swonbiz/assets/spaces/meeting-room.png',
+      '../_ds/swonbiz/assets/spaces/pantry.png',
+    ],
+    since: '2026-09-08',
+    reason: '공간 사진 7장이 디자인 전달분에 없다. 랜딩(0차)에서만 쓰고 1차 화면은 막지 않는다.',
+    recover:
+      '디자인 회신 ②(doc/DESIGN_QUESTIONS.md). 파일이 도착하면 이 항목을 지운다 — ' +
+      '지우지 않아도 이 스크립트가 STALE 로 실패시킨다.',
+  },
+];
+
+const knownFor = (folder, url) =>
+  KNOWN_MISSING.find((k) => k.folder === folder && k.urls.includes(url));
+
 const folders = fs.readdirSync(DESIGN, { withFileTypes: true })
   .filter((d) => d.isDirectory() && d.name !== '_ds')
   .map((d) => d.name)
@@ -20,6 +52,8 @@ const folders = fs.readdirSync(DESIGN, { withFileTypes: true })
 
 let missing = 0;
 let checked = 0;
+let warned = 0;
+const stale = [];
 
 for (const folder of folders) {
   const dir = path.join(DESIGN, folder);
@@ -51,14 +85,21 @@ for (const folder of folders) {
 
   const bad = [];
   const expected = [];
+  const known = [];
   for (const r of refs) {
     checked++;
     const abs = path.resolve(dir, r.url);
-    if (fs.existsSync(abs)) continue;
+    if (fs.existsSync(abs)) {
+      // ★ 알려진 누락으로 등록해 둔 자원이 생겼다 = 디자인이 전달했다. 목록을 지워야 한다.
+      const k = knownFor(folder, r.url);
+      if (k) stale.push({ folder, url: r.url, recover: k.recover });
+      continue;
+    }
     // _ds_bundle.js 는 디자인이 "요청대로 제외"한 파일이다(design/_ds/swonbiz/README.md).
     // 없는 게 정상이고, 없으면 DS 컴포넌트(<x-import>)만 렌더되지 않는다 —
     // 토큰 CSS·인라인 스타일로 만들어진 색·글꼴·간격은 영향을 받지 않는다.
     if (r.url.endsWith('_ds_bundle.js')) { expected.push(r); continue; }
+    if (knownFor(folder, r.url)) { known.push(r); continue; }
     bad.push(r);
     missing++;
   }
@@ -70,7 +111,19 @@ for (const folder of folders) {
     console.log(`NG  ${folder.padEnd(20)} 참조 ${refs.length}건 중 ${bad.length}건 없음${note}`);
     for (const b of bad) console.log(`      ${b.from} → ${b.url}`);
   }
+  if (known.length) {
+    const k = knownFor(folder, known[0].url);
+    console.log(`    WARN 알려진 누락 ${known.length}건 (${k.since} 등록) — ${k.reason}`);
+    for (const w of known) console.log(`      ${w.from} → ${w.url}`);
+    console.log(`    복구 조건: ${k.recover}`);
+    warned += known.length;
+  }
 }
 
-console.log(`\n총 ${checked}건 확인 · 없는 자원 ${missing}건`);
-process.exit(missing > 0 ? 1 : 0);
+for (const s of stale) {
+  console.log(`STALE ${s.folder} → ${s.url} 이(가) 이제 존재한다. KNOWN_MISSING 에서 지울 것.`);
+  console.log(`      ${s.recover}`);
+}
+
+console.log(`\n총 ${checked}건 확인 · 없는 자원 ${missing}건 · 알려진 누락(경고) ${warned}건 · 낡은 예외 ${stale.length}건`);
+process.exit(missing > 0 || stale.length > 0 ? 1 : 0);

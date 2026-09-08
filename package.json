@@ -11,6 +11,7 @@
     "verify:db": "node scripts/verify-001-003.js .env",
     "verify:2-8": "node scripts/verify-2-8.js .env",
     "verify:scope": "tsx packages/api/scripts/verify-scope.mts",
+    "verify:006": "tsx packages/api/scripts/verify-006.mts",
     "seed:mock-link": "node scripts/seed-mock-link.js .env",
     "lint:green": "node scripts/lint-no-green.js",
     "tokens:check": "node scripts/build-tokens.js",

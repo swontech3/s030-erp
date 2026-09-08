@@ -35,9 +35,10 @@
 
 > **✅ 완료 — 2026-09-07.** 커밋 `679d52d`(스캐폴딩) ~ 페이즈 1 리뷰 커밋. 완료 기준 전 항목을
 > 한 번에 재실행해 통과: `scripts/verify-001-003.js`(22건) · `scripts/verify-2-8.js`(17건) ·
-> `packages/api/scripts/verify-scope.mts` · 점검 5종(design:links 는 landing-hero 사진 7장
-> 누락으로 실패 — 디자인 회신 대기, 페이즈 1 무관) · tsc 3패키지 · next build · 헤드리스
-> Chrome 깜빡임 0건 · 레거시 S-WonERP 스모크(3011). 보류 1건: `s0300000010p1`(회신 ⑩).
+> `verify-scope.mts` · `verify-006.mts` · **점검 5종 전부 초록** · tsc 3패키지 · next build ·
+> 헤드리스 Chrome 깜빡임 0건 · 레거시 S-WonERP 스모크(3011). landing-hero 사진 7장은
+> "알려진 누락"(경고)으로 낮췄고, 디자인이 전달하면 점검이 STALE 로 자동 실패한다.
+> 보류 1건: `s0300000010p1`(회신 ⑩).
 > 삐용 회신 초안: `doc/BBIYONG_REPLY_PHASE1.md`.
 
 **목표**: 이후 모든 페이즈가 딛고 설 뼈대. 화면은 3개뿐이지만 여기서 정한 패턴(세션 미들웨어·스코프 헬퍼·ACL 어댑터·DS)을 이후 페이즈가 그대로 재사용한다.
