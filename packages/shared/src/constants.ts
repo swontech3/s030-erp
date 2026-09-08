@@ -1,12 +1,10 @@
 /**
  * ERP 전역 상수 — 미확정·하드코딩 값을 이 파일 한 곳으로 모은다.
- *
- * ★ 배치 안내: 이 파일은 Next.js 앱 스캐폴딩 전에 먼저 작성됐다(SPEC.md 참조 —
- * 현재 저장소에는 아직 앱이 없다). 스캐폴딩 시 이 파일을 그대로
- * `packages/shared/src/constants.ts`로 옮긴다 (2026-09-06 D-3 모노레포 결정 —
- * web·api 양쪽이 쓰므로 shared다). import 경로는 `@swonbiz/shared`.
+ * web·api 양쪽이 쓰므로 shared 에 있다. import 경로는 `@swonbiz/shared`.
  *
  * 값이 확정되면 이 파일만 고친다. 화면·API 코드에 값을 직접 적지 않는다.
+ * ★ 이 파일은 클라이언트 번들에도 들어간다 — 서버 환경변수를 여기서 읽지 않는다
+ *   (api 의 환경변수는 packages/api/src/env.ts 한 곳이 읽는다).
  */
 
 // =============================================================================
@@ -14,7 +12,7 @@
 // =============================================================================
 // ★ 아래 URL·경로는 전부 placeholder다. 삐용 팀 회신(⑦ 로그인 API 규격) 전까지
 // 확정값이 아니다 — BBIYONG_MOCK=true일 때는 실제로 호출되지 않는다
-// (lib/bbiyong/MockBbiyongAuth.ts가 대신 응답한다).
+// (packages/api/src/bbiyong/MockBbiyongAuth.ts 가 대신 응답한다).
 
 export const BBIYONG = {
   /** 삐용 백엔드 베이스 URL. 회신 전 placeholder. */
@@ -49,11 +47,8 @@ export const BBIYONG = {
   AUTH_SCREENS_PATH: "/rest/v1/acl/screens",
 } as const;
 
-/** BbiyongAcl 어댑터 선택 스위치. 'mock' | 'http'. 기본은 mock(개발 안전). */
-export const BBIYONG_ACL_MODE = (process.env.BBIYONG_ACL_MODE ?? "mock") as "mock" | "http";
-
-/** true면 실제 삐용 로그인 API를 호출하지 않고 MockBbiyongAuth로 응답한다. */
-export const BBIYONG_MOCK = process.env.BBIYONG_MOCK === "true";
+// BBIYONG_ACL_MODE · BBIYONG_MOCK 은 여기 두지 않는다 — api/env.ts 가 검증해서 읽는다(리뷰 2026-09-07).
+// 두 곳이 같은 변수를 다르게 해석하는 것이 사고의 형태다.
 
 // =============================================================================
 // 회의실 예약 — 전사 기본값. 회의실별 override는 tb_s080_facilities 레코드가 우선

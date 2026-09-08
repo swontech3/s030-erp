@@ -9,6 +9,7 @@
  */
 import { pool } from './pool.ts';
 
+/** ALLOW_STALE 은 아직 만드는 코드가 없다 — HttpBbiyongAcl 이 목록을 캐시하는 시점을 위해 예약. */
 export type ShadowVerdict = 'DENY' | 'ALLOW_STALE' | 'NO_GRANT_LIST';
 
 export interface ShadowLogEntry {

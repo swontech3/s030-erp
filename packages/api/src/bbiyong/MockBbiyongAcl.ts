@@ -47,7 +47,9 @@ export class MockBbiyongAcl implements BbiyongAcl {
   ): Promise<boolean> {
     const screens = await this.listScreens(subject);
     if (!screens.includes(screenCode)) {
-      await writeShadowLog({
+      // 기록은 기다리지 않는다(리뷰 L6) — writeShadowLog 가 스스로 실패를 삼키고, 화면 렌더가
+      // 로그 INSERT 지연을 떠안을 이유가 없다.
+      void writeShadowLog({
         s020MemberId: subject.s020MemberId,
         s020OrgId: subject.s020OrgId,
         screenCode,

@@ -1,8 +1,6 @@
 /**
  * 화면 ID ↔ 라우트 중앙 매핑 — 단일 진실 공급원.
  *
- * ★ 배치 안내: `lib/constants.ts`와 같은 이유로 스캐폴딩 전에 먼저 작성됐다.
- * 스캐폴딩 시 이 파일을 `packages/shared/src/screens.ts`로 옮긴다(2026-09-06 D-3).
  * web(라우팅·사이드바)과 api(화면코드 판정)가 둘 다 쓴다 — 복사본을 만들지 않는다.
  *
  * 규칙 (doc/SWONBIZ_PROJECT_STRUCTURE.md §1·§3)
@@ -20,7 +18,11 @@ export interface ScreenMeta {
   route: string | null;
   name: string;
   group: ScreenGroup;
-  /** 인증 없이 접근 가능한 화면(050). 미들웨어가 인증 제외로 처리한다. */
+  /**
+   * 인증 없이 접근 가능한 화면(050). **정보용 표시다** — 실제 제외 목록은
+   * web/proxy.ts 의 matcher 와 api 의 라우트별 `config.public` 이고, 이 플래그를 읽는 코드는 없다.
+   * 화면이 늘면 셋을 함께 고친다.
+   */
   public?: true;
 }
 
@@ -51,11 +53,6 @@ export const SCREENS = {
 
 export type ScreenId = keyof typeof SCREENS;
 
-/** 화면 ID → 라우트. 라우트가 없는 화면이면 null. */
-export function routeOf(id: ScreenId): string | null {
-  return SCREENS[id].route;
-}
-
 /** 삐용이 준 화면 목록에 특정 화면이 있는가. */
 export function has(screens: readonly string[], id: ScreenId): boolean {
   return screens.includes(id);
@@ -69,6 +66,19 @@ export function homeRouteFor(screens: readonly string[]): string {
   if (screens.length === 0) return '/no-access';        // AUTH-13
   if (has(screens, 's0300000060')) return '/dashboard'; // 대시보드 권한 = 운영사
   if (has(screens, 's0300600010')) return '/booking';   // 예약 권한 = 입주사
-  const first = screens.find((s): s is ScreenId => s in SCREENS && SCREENS[s as ScreenId].route !== null);
+  // 폴백 — 목록의 첫 "홈이 될 수 있는" 화면. (리뷰 2026-09-07)
+  //   · `in` 이 아니라 hasOwn: 'toString' 같은 프로토타입 키가 화면으로 잡혀 undefined 를 돌려줬다
+  //   · 인증 화면(000 로그인·접근권한없음)·공개 화면(050)·동적 세그먼트('/tenants/[id]')는 홈이 아니다
+  const first = screens.find((s): s is ScreenId => Object.hasOwn(SCREENS, s) && isHomeCandidate(s as ScreenId));
   return first ? (SCREENS[first].route as string) : '/no-access';
+}
+
+function isHomeCandidate(id: ScreenId): boolean {
+  // ★ SCREENS 는 `as const satisfies` 라 각 항목의 타입이 리터럴이고, public 을 쓰지 않은
+  //   화면에는 그 키 자체가 없다. ScreenMeta 로 한 번 좁혀서 읽는다.
+  const meta: ScreenMeta = SCREENS[id];
+  if (meta.route === null || meta.route.includes('[')) return false;
+  if (meta.public) return false;
+  if (id === 's0300000010' || id === 's0300000080') return false;
+  return true;
 }

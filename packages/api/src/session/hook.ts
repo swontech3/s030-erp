@@ -19,19 +19,24 @@ declare module 'fastify' {
     /** 쿠키 원문. 로그아웃이 삐용 토큰을 꺼낼 때 필요하다. DB 에는 해시만 있다. */
     rawSid?: string;
   }
+  interface FastifyContextConfig {
+    /**
+     * 인증을 요구하지 않는 라우트. **기본은 false** — 라우트를 추가하면서 인증을
+     * 빠뜨리는 사고가 조용히 나지 않게, 공개는 라우트 자신이 명시한다.
+     *
+     * (리뷰 2026-09-07: 경로 문자열 집합 매칭에서 라우트 설정으로 바꿨다. 문자열 매칭은
+     *  등록되지 않은 경로까지 401 로 뭉개서, 오타 난 URL 이 "세션 만료"로 보였다.)
+     */
+    public?: boolean;
+  }
 }
-
-/**
- * 인증을 요구하지 않는 경로.
- * ★ 화이트리스트다 — 새 라우트는 기본이 "인증 필요"여야 한다. 블랙리스트로 두면
- *   라우트를 추가하면서 인증을 빠뜨리는 사고가 조용히 난다.
- */
-const PUBLIC_PATHS = new Set(['/health', '/auth/login']);
 
 export function registerSessionHook(app: FastifyInstance): void {
   app.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
-    const path = req.url.split('?')[0] ?? '';
-    if (PUBLIC_PATHS.has(path)) return;
+    // 등록되지 않은 경로(404)는 인증보다 먼저다 — 잘못된 URL 을 세션 문제로 오해하게 두지 않는다.
+    // routeOptions.url 은 매칭된 라우트가 없으면 undefined 다.
+    if (!req.routeOptions.url) return;
+    if (req.routeOptions.config.public) return;
 
     const rawSid = readCookie(req.headers.cookie, SESSION_COOKIE);
     if (!rawSid) {
@@ -51,11 +56,18 @@ export function registerSessionHook(app: FastifyInstance): void {
 
 /**
  * 라우트 안에서 세션을 꺼낼 때 쓴다. 훅이 이미 401 로 걸렀으므로 여기 도달하면
- * 반드시 있다 — 없으면 그건 화이트리스트에 라우트를 잘못 넣은 것이다.
+ * 반드시 있다 — 없으면 그건 라우트에 `config.public` 을 잘못 붙인 것이다.
  */
 export function requireSession(req: FastifyRequest): ErpSession {
   if (!req.session) {
-    throw new Error(`세션 없이 보호 라우트에 도달했다: ${req.url} — PUBLIC_PATHS 를 확인할 것`);
+    throw new Error(`세션 없이 보호 라우트에 도달했다: ${req.url} — 라우트의 config.public 을 확인할 것`);
   }
   return req.session;
+}
+
+/** 로그아웃처럼 쿠키 원문이 필요한 라우트용. 세션과 같은 불변식이다. */
+export function requireRawSid(req: FastifyRequest): string {
+  requireSession(req);
+  if (!req.rawSid) throw new Error(`세션은 있는데 rawSid 가 없다: ${req.url}`);
+  return req.rawSid;
 }

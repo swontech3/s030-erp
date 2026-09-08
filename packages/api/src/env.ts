@@ -21,7 +21,9 @@ function required(name: string): string {
   return v;
 }
 
-const aclMode = (process.env.BBIYONG_ACL_MODE ?? 'mock') as 'mock' | 'http';
+// ★ 기본값을 두지 않는다(리뷰 2026-09-07). 변수를 빠뜨린 배포가 조용히 mock ACL(전 화면 허용)로
+//   뜨는 것이 이 파일이 막으려는 바로 그 사고다. 없으면 기동 실패.
+const aclMode = required('BBIYONG_ACL_MODE') as 'mock' | 'http';
 if (aclMode !== 'mock' && aclMode !== 'http') {
   throw new Error(`BBIYONG_ACL_MODE 는 'mock' 또는 'http' 여야 한다: ${aclMode}`);
 }
@@ -30,6 +32,12 @@ if (aclMode === 'http' && !process.env.BBIYONG_BASE_URL) {
     'BBIYONG_ACL_MODE=http 인데 BBIYONG_BASE_URL 이 없다. mock 으로 폴백하지 않고 기동을 중단한다 — ' +
       '폴백하면 운영에 mock 권한(전 화면 허용)이 올라간다.',
   );
+}
+
+// ★ 운영에서 mock 은 기동 자체를 막는다(리뷰 2026-09-07 M3). 환경변수 하나 빠진 배포가
+//   "전 화면 허용 + 고정 비밀번호" 로 뜨는 것이 이 파일이 막아야 할 가장 큰 사고다.
+if (process.env.NODE_ENV === 'production' && (aclMode === 'mock' || process.env.BBIYONG_MOCK === 'true')) {
+  throw new Error('NODE_ENV=production 에서 BBIYONG_MOCK=true 또는 BBIYONG_ACL_MODE=mock 은 허용하지 않는다.');
 }
 
 const key = Buffer.from(required('ERP_ENCRYPTION_KEY'), 'base64');

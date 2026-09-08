@@ -18,6 +18,12 @@ c.on('notice', n => console.log('  [notice]', n.message));
   const who = await c.query('SELECT current_user, current_database()');
   console.log(`적용: ${file}`);
   console.log(`접속: ${who.rows[0].current_user}@${env.DB_HOST}:${env.DB_PORT}/${who.rows[0].current_database}`);
+  // ★ 항상 postgres 로 적용한다(PROJECT_STRUCTURE §9). ALTER DEFAULT PRIVILEGES 는 실행한 역할이 만든
+  //   객체에만 붙으므로, 다른 역할로 적용하면 erp_app 이 못 보거나 anon 이 읽는 테이블이 조용히 생긴다.
+  if (who.rows[0].current_user !== 'postgres' && !process.argv.includes('--as-any-role')) {
+    console.error('✘ 마이그레이션은 postgres 역할로만 적용한다 (강제하려면 --as-any-role)');
+    process.exit(2);
+  }
   const t0 = Date.now();
   await c.query(sql);
   console.log(`✔ 적용 완료 (${Date.now() - t0}ms)`);

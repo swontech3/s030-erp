@@ -13,7 +13,7 @@ import type { FastifyInstance } from 'fastify';
 import { homeRouteFor } from '@swonbiz/shared';
 import { bbiyongAcl, bbiyongAuth, BbiyongAuthError } from '../bbiyong/index.ts';
 import { createSession, readRefreshToken, revokeSession } from '../session/store.ts';
-import { requireSession } from '../session/hook.ts';
+import { requireRawSid, requireSession } from '../session/hook.ts';
 
 interface LoginBody {
   email?: string;
@@ -29,7 +29,22 @@ export function registerAuthRoutes(app: FastifyInstance): void {
    *   → SHA-256 해시만 tb_s080_auth_session 저장 → 원문을 web 에 반환
    *   → 삐용 토큰은 서버에만 암호화 보관
    */
-  app.post<{ Body: LoginBody }>('/auth/login', async (req, reply) => {
+  app.post<{ Body: LoginBody }>('/auth/login', {
+    config: { public: true }, // 로그인은 세션 없이 들어온다 — 유일하게 공개된 쓰기 라우트
+    // 본문 형식은 스키마가 거른다 — 비문자열 email 이 .trim() 에서 500 을 내지 않게(리뷰 2026-09-07).
+    // 길이 상한은 삐용 규격(회신 ⑦)이 오면 맞춘다. 지금은 상식선.
+    schema: {
+      body: {
+        type: 'object',
+        required: ['email', 'password'],
+        additionalProperties: false,
+        properties: {
+          email: { type: 'string', minLength: 1, maxLength: 254 },
+          password: { type: 'string', minLength: 1, maxLength: 128 },
+        },
+      },
+    },
+  }, async (req, reply) => {
     const email = req.body?.email?.trim();
     const password = req.body?.password;
     if (!email || !password) {
@@ -50,11 +65,8 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     const { rawSid, session } = await createSession(login);
 
     // 화면 목록은 삐용이 준 것만 쓴다. ERP 가 역할로 거르지 않는다(ACL-07′).
-    const screens = await bbiyongAcl.listScreens({
-      s020MemberId: session.s020MemberId,
-      s020OrgId: session.s020OrgId,
-      orgTp: session.orgTp,
-    });
+    // ErpSession 은 AclSubject(memberId·orgId·orgTp)의 상위집합이라 그대로 넘긴다.
+    const screens = await bbiyongAcl.listScreens(session);
 
     return reply.send({
       erpSid: rawSid,
@@ -82,8 +94,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
    *   3. 쿠키 삭제                            ← web 쪽에서 한다
    */
   app.post('/auth/logout', async (req, reply) => {
-    const rawSid = req.rawSid;
-    if (!rawSid) return reply.code(401).send({ error: 'unauthenticated' });
+    const rawSid = requireRawSid(req); // 훅이 이미 401 을 냈으므로 여기서는 불변식 검사만
 
     const refresh = await readRefreshToken(rawSid);
     await revokeSession(rawSid); // ① 먼저 끊는다. 삐용 호출이 느려도 ERP 세션은 이미 죽는다
@@ -110,13 +121,8 @@ export function registerAuthRoutes(app: FastifyInstance): void {
    */
   app.get('/auth/me', async (req, reply) => {
     const session = requireSession(req);
-    const subject = {
-      s020MemberId: session.s020MemberId,
-      s020OrgId: session.s020OrgId,
-      orgTp: session.orgTp,
-    };
     const [screens, profile] = await Promise.all([
-      bbiyongAcl.listScreens(subject),
+      bbiyongAcl.listScreens(session),
       bbiyongAuth.getProfile(session.s020MemberId),
     ]);
     return reply.send({

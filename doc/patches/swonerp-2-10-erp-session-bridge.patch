@@ -1,6 +1,6 @@
 # S-WonERP 2-10 브리지 패치 — 원본(S-WonERP.zip, 2026-09-06) 대비
-# 적용: S-WonERP 저장소 루트에서  git apply doc/patches/swonerp-2-10-erp-session-bridge.patch
-# 신규 파일 2 + 테스트 1, 수정 파일 2. 2-10 검증 결과는 SwonBiz-erp 커밋 메시지 참조.
+# 적용: S-WonERP 저장소 루트에서  git apply swonerp-2-10-erp-session-bridge.patch
+# 신규 파일 2 + 테스트 1, 수정 파일 2. 검증 결과는 SwonBiz-erp 커밋 6ebc73a 메시지 참조.
 diff --git a/src/lib/auth-context.ts b/src/lib/auth-context.ts
 index 3328c66..0cd5083 100644
 --- a/src/lib/auth-context.ts
@@ -97,10 +97,10 @@ index 0000000..362dacf
 +}
 diff --git a/src/lib/erp-session-map.ts b/src/lib/erp-session-map.ts
 new file mode 100644
-index 0000000..79f5af6
+index 0000000..0bedad2
 --- /dev/null
 +++ b/src/lib/erp-session-map.ts
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,58 @@
 +import type { AuthContext } from "./auth-context";
 +
 +/**
@@ -110,10 +110,12 @@ index 0000000..79f5af6
 + * 요청을 기존 AuthContext 모양으로 번역한다. 반환 타입은 그대로 둔다 — 76개 호출부를
 + * 건드리지 않기 위해서다.
 + *
-+ * ★ role · isAdmin 은 **표시용으로 강등된 값**이다. 이 브리지는 판정을 하지 않는다 —
-+ *   org_tp 를 기존 코드값으로 옮겨 적을 뿐이고, 진짜 권한 판정은 삐용이 준 화면 목록으로
-+ *   신규 ERP 쪽(Fastify)이 한다. 기존 호출부가 isAdmin 을 읽는 것은 레거시 동작이며,
-+ *   그 호출부를 정리하는 일은 이 브리지의 범위가 아니다.
++ * ★ role · isAdmin — 이 브리지는 스스로 판정하지 않고 org_tp 를 기존 코드값으로 옮겨 적는다
++ *   ('S' 운영사 → A/isAdmin=true, 그 외 → C/false). **그러나 이 값은 실제로 판정에 쓰인다** —
++ *   기존 호출부 53곳이 isAdmin·role 을 읽어 화면·API 를 열고 닫는다. 즉 이 매핑은
++ *   "운영사 = 관리자"라는 현재 S-WonERP 동작을 **그대로 유지**하는 것이지 표시 전용이 아니다.
++ *   신규 ERP(Fastify)에서는 판정이 삐용 화면 목록으로 이뤄지고, 이 앱의 role 기반 판정은
++ *   페이즈 2(게이트 이관)에서 정리한다 — ROADMAP.md 페이즈 2 항목 참조.
 + *
 + * ★ 만료·폐기 판정은 여기서 한다(DB 가 아니라). 쿼리에서 거르면 "왜 null 인지"를
 + *   테스트할 수 없다.

@@ -14,12 +14,12 @@
  * 30초 캐시하면 로그아웃한 사용자가 30초 동안 계속 들어온다 — 그 30초가
  * "로그아웃했는데 왜 아직 보이냐"는 사고의 형태다.
  */
-import type { ErpSession } from '@swonbiz/shared';
+import type { ErpSession, ScopeRole } from '@swonbiz/shared';
 import { pool } from '../db/pool.ts';
 import { decrypt, encrypt, hashSessionId, newSessionId } from '../lib/crypto.ts';
 import { resolveCompanyId } from '../scope/resolveCompany.ts';
 import { env } from '../env.ts';
-import type { BbiyongLoginResult } from '../bbiyong/types.ts';
+import { bbiyongAcl, type BbiyongLoginResult } from '../bbiyong/index.ts';
 
 /** 캐시에 담는 것 — 자주 바뀌지 않는 정체성만. 만료·폐기는 여기 넣지 않는다. */
 interface CachedIdentity {
@@ -27,12 +27,21 @@ interface CachedIdentity {
   s020OrgId: number;
   orgTp: string;
   companyId: string | null;
-  role: 'operator' | 'tenant';
+  role: ScopeRole;
   cachedAt: number;
 }
 
 const IDENTITY_TTL_MS = 30_000;
 const identityCache = new Map<string, CachedIdentity>();
+/** 이 크기를 넘으면 만료된 항목을 한 번 훑어 버린다. 안 하면 방치된 세션만큼 메모리가 자란다. */
+const IDENTITY_SWEEP_AT = 1_000;
+
+function sweepExpired(now: number): void {
+  if (identityCache.size < IDENTITY_SWEEP_AT) return;
+  for (const [key, v] of identityCache) {
+    if (now - v.cachedAt > IDENTITY_TTL_MS) identityCache.delete(key);
+  }
+}
 
 /** 로그아웃·강제만료 시 즉시 버린다. 캐시가 남아 있으면 companyId 가 되살아난다. */
 export function dropCached(erpSidHash: string): void {
@@ -49,8 +58,12 @@ export async function createSession(login: BbiyongLoginResult): Promise<CreatedS
   const rawSid = newSessionId();
   const erpSid = hashSessionId(rawSid);
   const companyId = await resolveCompanyId(login.orgId);
-  // orgTp 는 여기서 스코프 역할로만 번역한다. 화면 접근 판정에는 쓰지 않는다(지시문 1-6).
-  const role: 'operator' | 'tenant' = login.orgTp === 'S' ? 'operator' : 'tenant';
+  // ★ 스코프 역할은 어댑터(getScope)가 정한다 — 여기서 org_tp 를 직접 보지 않는다.
+  //   판정 자리가 둘이 되면 어느 날 하나만 고쳐진다.
+  const { role } = bbiyongAcl.getScope(
+    { s020MemberId: login.memberId, s020OrgId: login.orgId, orgTp: login.orgTp },
+    companyId,
+  );
   const expiresAt = new Date(Date.now() + env.sessionTtlMs);
 
   await pool.query(
@@ -80,7 +93,6 @@ export async function createSession(login: BbiyongLoginResult): Promise<CreatedS
       role,
       expiresAt,
       lastActiveAt: null,
-      revokedAt: null,
     },
   };
 }
@@ -118,13 +130,19 @@ export async function lookupSession(rawSid: string): Promise<ErpSession | null> 
   let cached = identityCache.get(erpSid);
   if (!cached || Date.now() - cached.cachedAt > IDENTITY_TTL_MS) {
     const companyId = await resolveCompanyId(row.org_id);
+    const { role } = bbiyongAcl.getScope(
+      { s020MemberId: row.bbiyong_member_id, s020OrgId: row.org_id, orgTp: row.org_tp },
+      companyId,
+    );
+    const now = Date.now();
+    sweepExpired(now);
     cached = {
       s020MemberId: row.bbiyong_member_id,
       s020OrgId: row.org_id,
       orgTp: row.org_tp,
       companyId,
-      role: row.org_tp === 'S' ? 'operator' : 'tenant',
-      cachedAt: Date.now(),
+      role,
+      cachedAt: now,
     };
     identityCache.set(erpSid, cached);
     // 마지막 활동 시각도 이때만 갱신한다 — 요청마다 UPDATE 하면 세션 테이블이 쓰기로 뜨겁다.
@@ -142,7 +160,6 @@ export async function lookupSession(rawSid: string): Promise<ErpSession | null> 
     role: cached.role,
     expiresAt: row.expires_at,
     lastActiveAt: row.last_active_at,
-    revokedAt: null,
   };
 }
 

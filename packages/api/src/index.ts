@@ -6,7 +6,7 @@
  *    들어 있고, 쿠키를 굽는 것은 web(Next.js)이다. 밖에서 직접 부를 수 있으면
  *    세션을 아무나 받아간다. 배포 시 내부망·loopback 에만 바인딩한다.
  */
-import Fastify from 'fastify';
+import Fastify, { type FastifyError, type FastifyReply, type FastifyRequest } from 'fastify';
 import { env } from './env.ts';
 import { registerSessionHook } from './session/hook.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
@@ -15,13 +15,29 @@ import { closePool } from './db/pool.ts';
 
 const app = Fastify({ logger: true });
 
+// ★ 에러 응답 모양을 한 가지로 — { error: <기계용 코드>, message }.
+//   Fastify 기본값은 { statusCode, error: 'Bad Request', message } 라 우리 라우트가 내는 모양과
+//   달랐고, 5xx 에서는 pg 예외 문구(호스트·역할명)가 그대로 브라우저까지 갔다(리뷰 2026-09-07 H3).
+app.setErrorHandler((err: FastifyError, req: FastifyRequest, reply: FastifyReply) => {
+  const status = err.statusCode ?? 500;
+  if (status >= 500) {
+    req.log.error({ err }, '처리되지 않은 오류');
+    return reply.code(500).send({ error: 'internal_error', message: '서버 오류가 났습니다' });
+  }
+  const code = err.code === 'FST_ERR_VALIDATION' ? 'invalid_request' : 'bad_request';
+  return reply.code(status).send({ error: code, message: err.message });
+});
+app.setNotFoundHandler((req: FastifyRequest, reply: FastifyReply) => {
+  reply.code(404).send({ error: 'not_found', message: `${req.method} ${req.url} 은 없는 경로입니다` });
+});
+
 // ★ 순서가 중요하다 — 훅을 먼저 걸어야 이후 등록되는 모든 라우트가 인증을 거친다.
 //   라우트를 먼저 등록해도 onRequest 훅은 전역이라 걸리지만, 읽는 사람이 헷갈린다.
 registerSessionHook(app);
 registerAuthRoutes(app);
 registerAclRoutes(app);
 
-app.get('/health', async () => ({
+app.get('/health', { config: { public: true } }, async () => ({
   ok: true,
   service: 'swonbiz-erp-api',
   bbiyong: { mock: env.bbiyongMock, aclMode: env.aclMode },

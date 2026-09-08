@@ -1,4 +1,5 @@
 import 'server-only';
+import { SESSION_COOKIE } from '@swonbiz/shared';
 
 /**
  * Fastify 호출 — **서버에서만** 부른다.
@@ -13,6 +14,7 @@ import 'server-only';
  * 주석으로 "서버 전용"이라고 적어두는 것과 달리 실제로 막는다.
  */
 const API_BASE_URL = process.env.API_BASE_URL ?? 'http://127.0.0.1:3001';
+const API_TIMEOUT_MS = 5_000;
 
 export interface ApiResult<T> {
   ok: boolean;
@@ -30,7 +32,7 @@ export async function callApi<T>(
   //   실패했다(쿠키는 지워지고 서버 세션은 살아 있는 상태). 2026-09-07 확인.
   if (init.body !== undefined) headers['content-type'] = 'application/json';
   // 세션은 쿠키 헤더로 넘긴다 — Fastify 쪽 훅이 읽는 것과 같은 형식이다.
-  if (init.erpSid) headers.cookie = `erp_sid=${encodeURIComponent(init.erpSid)}`;
+  if (init.erpSid) headers.cookie = `${SESSION_COOKIE}=${encodeURIComponent(init.erpSid)}`;
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: init.method ?? 'GET',
@@ -38,6 +40,9 @@ export async function callApi<T>(
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
     // 인증 응답은 절대 캐시하지 않는다. 캐시되면 다른 사용자에게 남의 세션이 간다.
     cache: 'no-store',
+    // ★ 상한 없는 대기가 서버 컴포넌트 렌더를 통째로 멈추게 둔다(리뷰 2026-09-07).
+    //   DB 가 잠기면 Fastify 가 응답을 못 하고, 그 동안 Next 워커가 하나씩 묶인다.
+    signal: AbortSignal.timeout(API_TIMEOUT_MS),
   });
 
   const text = await res.text();

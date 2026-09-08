@@ -27,12 +27,20 @@ export interface MeResponse {
   expiresAt: string;
 }
 
-/** 세션이 없거나 만료면 null. 호출자가 /login 으로 보낸다. */
+/**
+ * 세션이 없거나 만료(401)면 null — 호출자가 /login 으로 보낸다.
+ *
+ * ★ 401 **만** null 이다(리뷰 2026-09-07). Fastify 가 5xx 를 내거나 아예 안 붙으면 던진다 —
+ *   그걸 null 로 뭉개면 DB 가 잠깐 흔들릴 때마다 전원이 로그인 화면으로 튕기고,
+ *   다시 로그인하면 멀쩡한 세션이 하나 더 생긴다. 장애는 (erp)/error.tsx 가 장애로 보여준다.
+ */
 export async function getMe(): Promise<MeResponse | null> {
   const sid = await readSid();
   if (!sid) return null;
-  const res = await callApi<MeResponse>('/auth/me', { erpSid: sid });
-  return res.ok ? res.body : null;
+  const res = await callApi<MeResponse & { message?: string }>('/auth/me', { erpSid: sid });
+  if (res.ok) return res.body;
+  if (res.status === 401) return null;
+  throw new Error(`세션 조회 실패(${res.status}): ${res.body?.message ?? ''}`);
 }
 
 /**
@@ -45,9 +53,14 @@ export async function getMe(): Promise<MeResponse | null> {
 export async function verifyScreen(screenCode: string, route: string): Promise<void> {
   const sid = await readSid();
   if (!sid) return;
-  await callApi('/acl/verify', {
-    method: 'POST',
-    erpSid: sid,
-    body: { screenCode, action: 'VIEW', route },
-  });
+  try {
+    await callApi('/acl/verify', {
+      method: 'POST',
+      erpSid: sid,
+      body: { screenCode, action: 'VIEW', route },
+    });
+  } catch (err) {
+    // 기록 실패가 화면을 깨뜨리지 않는다 — api 쪽 writeShadowLog 와 같은 원칙을 이 홉에도 적용한다.
+    console.error('[acl] verify 호출 실패(기록만 누락):', (err as Error).message);
+  }
 }

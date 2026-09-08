@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { SESSION_COOKIE } from '@swonbiz/shared';
 import { callApi } from '@/lib/api';
 import { readSid } from '@/lib/session';
+import { rejectCrossSite } from '@/lib/csrf';
 
 /**
  * 로그아웃 — 세션을 끊고 쿠키를 지우고 /login 으로 보낸다.
@@ -17,9 +18,13 @@ import { readSid } from '@/lib/session';
  *   서버 세션이 남더라도 이 브라우저에서는 로그아웃된 상태여야 한다.
  *
  * ★ POST 로만 받는다. GET 으로 두면 링크 프리페치나 이미지 태그만으로도 로그아웃이
- *   일어난다(CSRF 의 고전적 형태).
+ *   일어난다. 그런데 POST 만으로는 부족하다 — 다른 사이트의 자동 제출 폼도 POST 다
+ *   (리뷰 2026-09-07 H2). 출처를 본다. 접근권한없음 화면의 <form> 은 같은 오리진이라 통과한다.
  */
 export async function POST(request: Request) {
+  const blocked = rejectCrossSite(request);
+  if (blocked) return blocked;
+
   const sid = await readSid();
 
   if (sid) {

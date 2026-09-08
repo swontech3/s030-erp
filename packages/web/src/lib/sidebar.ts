@@ -41,8 +41,6 @@ export interface NavItem {
   icon: IconName;
 }
 
-const isScreenId = (id: string): id is ScreenId => id in SCREENS;
-
 /**
  * 삐용 화면 목록 → 사이드바 항목.
  *
@@ -55,7 +53,7 @@ export function buildNavItems(screens: readonly string[]): NavItem[] {
   const items: NavItem[] = [];
 
   for (const [id, meta] of Object.entries(SCREENS) as [ScreenId, ScreenMeta][]) {
-    if (!granted.has(id)) continue;
+    if (!granted.has(id)) continue; // Set 이라 프로토타입 키('toString')는 애초에 못 들어온다
     const icon = SIDEBAR_ICONS[id];
     if (!icon || meta.route === null) continue;
     items.push({ screenId: id, route: meta.route, name: meta.name, icon });
@@ -70,8 +68,6 @@ export function screenNameForPath(pathname: string): string {
   }
   return '';
 }
-
-export { isScreenId };
 
 /**
  * 사이드바 접힘 상태 쿠키.

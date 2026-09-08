@@ -18,6 +18,8 @@ export function proxy(request: NextRequest) {
   if (hasSession) return NextResponse.next();
 
   // 로그인 후 원래 가려던 곳으로 되돌려 보낸다.
+  // ★ 아직 읽는 쪽이 없다(AUTH-08 후반부, 페이즈 2). 읽을 때는 반드시 '/' 로 시작하고 '//' 로
+  //   시작하지 않는 상대경로만 허용할 것 — 그대로 assign 하면 오픈 리다이렉트다(리뷰 L5).
   const url = new URL('/login', request.url);
   const from = request.nextUrl.pathname + request.nextUrl.search;
   if (from && from !== '/') url.searchParams.set('redirect', from);
@@ -29,7 +31,7 @@ export function proxy(request: NextRequest) {
  *
  * ★ 화이트리스트가 아니라 명시 목록이다 — `(erp)` 라우트 그룹은 URL 에 나타나지
  *   않으므로 matcher 로는 그룹을 가리킬 수 없다. 화면이 늘어나면 여기와
- *   `lib/screens.ts` 를 함께 고친다.
+ *   `@swonbiz/shared` 의 screens.ts 를 함께 고친다.
  */
 export const config = {
   matcher: ['/dashboard/:path*', '/booking/:path*', '/tenants/:path*', '/contracts/:path*', '/settings/:path*', '/facility/:path*'],

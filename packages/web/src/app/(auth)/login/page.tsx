@@ -34,23 +34,11 @@ export default function LoginPage() {
   /**
    * 에러 표시 상태.
    *
-   * ★★ 삐용 응답의 함정(BBIYONG-AUTH.md §2.4 함정 1):
-   *    로그인 API 는 **HTTP 200 이어도 body.status !== 200 이면 실패**다.
-   *    그래서 2-8 에서 붙일 호출부는 이렇게 되어야 한다:
-   *
-   *      const res = await fetch(...);           // res.ok 를 믿지 않는다
-   *      const body = await res.json();
-   *      if (!res.ok || body.status !== 200) {   // 두 조건 모두 확인
-   *        setError(body.message ?? '이메일 또는 비밀번호가 올바르지 않습니다');
-   *        return;
-   *      }
-   *
-   *    res.ok 만 보고 성공 처리하면 실패한 로그인이 통과한다.
-   *
-   *    ★ 그 검사를 하는 자리는 **삐용 어댑터**다(packages/api/src/bbiyong/). 화면까지
-   *      body.status 를 들고 오면 삐용 응답 모양이 프론트로 새어나간다. 어댑터가
-   *      실패를 예외로 번역하고 → Fastify 가 401 로 → route handler 가 message 로
-   *      바꿔 준다. 이 화면은 그 message 만 띄운다.
+   * ★★ 삐용 응답의 함정(BBIYONG-AUTH.md §2.4 함정 1) — 로그인 API 는 **HTTP 200 이어도
+   *    body.status !== 200 이면 실패**다. 그 검사는 이 화면이 아니라 **삐용 어댑터**가 한다
+   *    (packages/api/src/bbiyong/). 어댑터가 실패를 예외로 번역 → Fastify 401 → route handler 가
+   *    message 로 바꿔 준다. 화면까지 body.status 를 들고 오면 삐용 응답 모양이 프론트로 샌다.
+   *    이 화면은 상태코드와 message 만 본다.
    */
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -77,7 +65,9 @@ export default function LoginPage() {
       //   route handler 와 Fastify 가 이미 걸러 상태코드로 번역해 주지만,
       //   화면도 body 를 확인해서 홈 경로가 실제로 왔을 때만 이동한다.
       if (!res.ok || !body?.home) {
-        setError(body?.message ?? '이메일 또는 비밀번호가 올바르지 않습니다');
+        // 401 만 자격 증명 문제다. 나머지(503 등)는 서버가 준 문구를 쓰고, 없으면 사용자 잘못으로 돌리지 않는다.
+        const fallback = res.status === 401 ? '이메일 또는 비밀번호가 올바르지 않습니다' : '로그인 처리 중 오류가 났습니다';
+        setError(body?.message ?? fallback);
         return;
       }
 

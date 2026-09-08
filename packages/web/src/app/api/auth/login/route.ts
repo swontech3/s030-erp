@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { SESSION_COOKIE } from '@swonbiz/shared';
 import { callApi } from '@/lib/api';
+import { rejectCrossSite } from '@/lib/csrf';
 
 /**
  * 로그인 — 브라우저와 Fastify 사이의 유일한 통로.
@@ -26,29 +27,54 @@ interface ApiLoginResponse {
 }
 
 export async function POST(request: Request) {
-  let payload: { email?: string; password?: string };
+  // ★ 로그인 CSRF(리뷰 2026-09-07 H1): 다른 사이트의 <form enctype=text/plain> 이 JSON 모양 본문을
+  //   보내 피해자 브라우저에 공격자 세션을 심을 수 있다. 출처와 content-type 을 먼저 본다.
+  const blocked = rejectCrossSite(request, { requireJson: true });
+  if (blocked) return blocked;
+
+  let payload: { email?: unknown; password?: unknown } | null;
   try {
     payload = await request.json();
   } catch {
     return NextResponse.json({ message: '요청 형식이 올바르지 않습니다' }, { status: 400 });
   }
-
-  const res = await callApi<ApiLoginResponse>('/auth/login', {
-    method: 'POST',
-    body: { email: payload.email, password: payload.password },
-  });
-
-  if (!res.ok) {
-    // ★ 실패 사유를 그대로 통과시키되 상태코드는 유지한다. 화면은 message 만 읽는다.
-    return NextResponse.json(
-      { message: res.body?.message ?? '로그인에 실패했습니다' },
-      { status: res.status },
-    );
+  // null · 비문자열도 400 이다 — payload.email 에서 500 이 나지 않게(리뷰 M6).
+  if (!payload || typeof payload.email !== 'string' || typeof payload.password !== 'string') {
+    return NextResponse.json({ message: '이메일과 비밀번호를 입력하세요' }, { status: 400 });
   }
 
-  const { erpSid, expiresAt, ...safe } = res.body;
+  let res;
+  try {
+    res = await callApi<ApiLoginResponse>('/auth/login', {
+      method: 'POST',
+      body: { email: payload.email, password: payload.password },
+    });
+  } catch (err) {
+    // ★ Fastify 에 못 붙은 것(기동 전·죽음)은 인증 실패가 아니다. 여기서 잡지 않으면
+    //   Next 가 500 을 내고, 화면은 본문이 없어 기본 문구 "이메일 또는 비밀번호가 올바르지
+    //   않습니다"를 띄운다 — 서버 장애를 사용자 잘못으로 돌리는 셈이다.
+    console.error('[login] api 연결 실패:', (err as Error).message);
+    return NextResponse.json({ message: '서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요' }, { status: 503 });
+  }
 
-  const response = NextResponse.json(safe);
+  if (!res.ok) {
+    // 4xx 의 message 는 사용자용이라 통과시킨다. 5xx 는 Fastify 가 이미 가리지만(setErrorHandler),
+    // 여기서도 한 번 더 — 내부 문구가 브라우저까지 오는 경로를 둘 다 막는다(리뷰 H3).
+    const message = res.status < 500 ? (res.body?.message ?? '로그인에 실패했습니다') : '서버 오류가 났습니다. 잠시 후 다시 시도해 주세요';
+    return NextResponse.json({ message }, { status: res.status });
+  }
+
+  const { erpSid, expiresAt, home } = res.body;
+  // 200 인데 sid 가 없으면 계약 위반이다. 쿠키에 "undefined" 를 굽고 넘어가지 않는다.
+  const expires = new Date(expiresAt);
+  if (typeof erpSid !== 'string' || !erpSid || Number.isNaN(expires.getTime()) || !home) {
+    console.error('[login] api 응답에 erpSid/expiresAt/home 없음');
+    return NextResponse.json({ message: '로그인 처리 중 오류가 났습니다' }, { status: 502 });
+  }
+
+  // ★ 브라우저에는 화면이 쓰는 것만 준다(리뷰 2026-09-07). Fastify 응답을 그대로 펼치면
+  //   companyId·screens 같은 서버 판정값이 공개 계약이 된다. 화면은 home 하나만 쓴다.
+  const response = NextResponse.json({ home });
   response.cookies.set({
     name: SESSION_COOKIE,
     value: erpSid,
@@ -58,7 +84,7 @@ export async function POST(request: Request) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    expires: new Date(expiresAt),
+    expires,
   });
   return response;
 }

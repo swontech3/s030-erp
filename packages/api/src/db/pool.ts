@@ -16,6 +16,10 @@ export const pool = new pg.Pool({
   max: 10,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
+  // ★ 상한 없는 쿼리가 풀(10개)을 하나씩 물고 늘어지면 서버 전체가 멎는다(리뷰 2026-09-07 M2).
+  //   세션 조회·스코프 쿼리는 전부 PK/인덱스 단건이라 5초면 이미 비정상이다.
+  statement_timeout: 5_000,
+  query_timeout: 5_000,
 });
 
 pool.on('error', (err) => {

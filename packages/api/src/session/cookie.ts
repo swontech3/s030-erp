@@ -11,7 +11,14 @@ export function readCookie(header: string | undefined, name: string): string | n
     if (eq === -1) continue;
     if (part.slice(0, eq).trim() !== name) continue;
     const value = part.slice(eq + 1).trim();
-    return value.length > 0 ? decodeURIComponent(value) : null;
+    if (value.length === 0) return null;
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      // 잘못된 %-인코딩(%E0 등)은 던진다. 여기서 안 잡으면 세션 훅이 500 을 내고,
+      // 그건 "쿠키가 이상하면 401" 이어야 할 자리다.
+      return null;
+    }
   }
   return null;
 }

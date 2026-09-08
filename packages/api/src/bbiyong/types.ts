@@ -60,7 +60,9 @@ export interface BbiyongAuth {
   getProfile(memberId: number): Promise<BbiyongProfile | null>;
 }
 
-export type AclAction = 'VIEW' | 'CREATE' | 'UPDATE' | 'DELETE';
+/** 동작 어휘 4종 — ACL-10. APPROVE·EXPORT 는 쓰지 않는다. 런타임 검사와 타입이 한 원천이다. */
+export const ACL_ACTIONS = ['VIEW', 'CREATE', 'UPDATE', 'DELETE'] as const;
+export type AclAction = (typeof ACL_ACTIONS)[number];
 
 /** 권한 판정의 입력. 세션 전체가 아니라 삐용이 아는 식별자만 넘긴다. */
 export interface AclSubject {

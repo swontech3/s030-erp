@@ -31,6 +31,7 @@
  * 테스트로도 잘 안 잡힌다 — 부하가 있어야 재현되기 때문이다.
  * 이 시스템에서 가장 위험한 버그 형태다. `true` 외의 값을 쓰지 않는다.
  */
+import type { ScopeRole } from '@swonbiz/shared';
 import { pool } from './pool.ts';
 
 /** 이 래퍼 안에서 쓸 수 있는 최소한의 클라이언트. pg.PoolClient 가 이 모양이다. */
@@ -40,7 +41,7 @@ export interface ScopedClient {
 
 export interface CompanyScope {
   /** 'operator' 는 전체, 'tenant' 는 자기 company_id 만 본다. */
-  role: 'operator' | 'tenant';
+  role: ScopeRole;
   /**
    * 입주사 식별자. 삐용 조직 연결이 없으면 null 이고, 그건 **빈 스코프**다 —
    * 예외가 아니라 0건이다(ORG_ARCHITECTURE.md §1-2).
@@ -74,6 +75,9 @@ export async function withCompanyScope<T>(
   fn: (client: ScopedClient) => Promise<T>,
 ): Promise<T> {
   const client = await pool.connect();
+  // ROLLBACK 이 실패한 커넥션은 트랜잭션이 열린 채일 수 있다 — 그걸 풀에 돌려주면 다음 요청이
+  // 이 요청의 GUC(회사 스코프)를 물려받는다. release(err) 로 폐기한다(리뷰 2026-09-07).
+  let broken: unknown = undefined;
   try {
     await client.query('BEGIN');
     await applyCompanyScope(client, scope);
@@ -84,11 +88,11 @@ export async function withCompanyScope<T>(
     // ROLLBACK 자체가 실패할 수 있다(커넥션이 이미 죽은 경우). 원래 예외를 덮지 않는다.
     try {
       await client.query('ROLLBACK');
-    } catch {
-      /* 무시 — 아래에서 원래 예외를 던진다 */
+    } catch (rollbackErr) {
+      broken = rollbackErr instanceof Error ? rollbackErr : new Error(String(rollbackErr));
     }
     throw err;
   } finally {
-    client.release();
+    client.release(broken as Error | undefined);
   }
 }

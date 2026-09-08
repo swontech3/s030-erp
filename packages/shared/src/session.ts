@@ -4,7 +4,7 @@
  * 출처는 `tb_s080_auth_session` 한 곳이다(002 마이그레이션). 브라우저에는 불투명한
  * `erp_sid` 쿠키만 내려가고, 삐용 access·refresh 토큰은 서버에만 암호화 보관한다.
  *
- * 구현은 페이즈 1의 2-8에서 채운다. 여기 있는 것은 모양뿐이다.
+ * 구현은 packages/api/src/session/store.ts (createSession · lookupSession · revokeSession).
  */
 
 /** 삐용 조직 구분. 'S' = 운영사(에스원비즈), 그 외 = 입주사. */
@@ -27,7 +27,11 @@ export interface ErpSession {
   /** 삐용 orgId — 조직 식별자. JWT에는 없고 로그인 응답 본문에만 있다. */
   s020OrgId: number;
 
-  /** 삐용 orgTp. **표시 전용**(헤더의 "홍길동 (에스원테크)")으로만 쓴다. */
+  /**
+   * 삐용 orgTp. 두 가지에 쓴다 — (1) 헤더 표시, (2) **스코프 역할(role) 결정의 입력**
+   * (BbiyongAcl.getScope 가 'S' → operator 로 번역한다). 화면 접근 판정에는 쓰지 않는다.
+   * 보안 관련 값이다 — "표시 전용"으로 읽지 말 것(리뷰 2026-09-07).
+   */
   orgTp: OrgTp;
 
   /**
@@ -43,10 +47,6 @@ export interface ErpSession {
 
   expiresAt: Date;
   lastActiveAt: Date | null;
-  revokedAt: Date | null;
-}
-
-/** 세션이 지금 쓸 수 있는 상태인가. */
-export function isSessionUsable(s: ErpSession, now: Date = new Date()): boolean {
-  return s.revokedAt === null && s.expiresAt.getTime() > now.getTime();
+  // revokedAt 은 두지 않는다 — 폐기된 세션은 lookupSession 이 null 을 돌려주므로
+  // 이 타입의 값이 존재하는 시점에는 언제나 "폐기되지 않음"이다.
 }

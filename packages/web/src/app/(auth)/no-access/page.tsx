@@ -78,7 +78,7 @@ export default function NoAccessPage() {
 
         {/*
           로그아웃 — 실제로 동작한다. 쿠키를 지우고 /login 으로 보낸다.
-          세션 revoked_at 처리는 2-8 에서 route handler 안에 채운다.
+          revoked_at 은 /api/auth/logout → Fastify /auth/logout 이 처리한다.
 
           ★ GET 링크가 아니라 form POST 다. 링크로 두면 프리페치만으로 로그아웃된다.
         */}

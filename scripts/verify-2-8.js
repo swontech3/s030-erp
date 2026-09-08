@@ -53,7 +53,7 @@ async function apiLogin(email) {
   for (const [email, home] of Object.entries(expected)) {
     const r = await apiLogin(email);
     sessions[email] = r.body;
-    check(r.body.home === home, 'A1', `홈 분기 ${email}`, `${r.body.home} (기대 ${home})`);
+    check(r.status === 200 && r.body.home === home, 'A1', `홈 분기 ${email}`, `[${r.status}] ${r.body.home} (기대 ${home})`);
   }
 
   // --- A2 잘못된 비밀번호는 401 -------------------------------------------
@@ -113,17 +113,22 @@ async function apiLogin(email) {
       'A7', 'DB 직접 revoke 직후 즉시 401 (30초 캐시 우회)', `${before.status} -> ${after.status}`);
   }
 
-  // --- A8 shadow 로그 -----------------------------------------------------
+  // --- A8 shadow 로그 — 이 호출로 정확히 1건 늘어야 한다(전체 건수는 한 번 쌓이면 영원히 통과한다) ---
   {
     const raw = sessions['tenant@test.com'].erpSid;
+    const countDeny = async () => (await c.query(
+      `SELECT count(*)::int n FROM tb_s080_acl_shadow_log WHERE s020_member_id = 2001 AND screen_code = 's0300000060' AND verdict = 'DENY' AND enforced = false`)).rows[0].n;
+    const before = await countDeny();
     await fetch(`${API}/acl/verify`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: `erp_sid=${raw}` },
       body: JSON.stringify({ screenCode: 's0300000060', action: 'VIEW', route: '/dashboard' }),
     });
-    const n = (await c.query(
-      `SELECT count(*)::int n FROM tb_s080_acl_shadow_log WHERE verdict = 'DENY' AND enforced = false`)).rows[0].n;
-    check(n >= 1, 'A8', 'shadow 로그에 DENY 기록 (enforced=false)', `${n}건`);
+    await new Promise((r) => setTimeout(r, 300)); // 기록은 fire-and-forget 이라 잠깐 기다린다
+    const after = await countDeny();
+    check(after === before + 1, 'A8', 'shadow 로그에 이 호출의 DENY 1건 기록', `${before} -> ${after}`);
+    const canDelete = (await c.query("SELECT has_table_privilege('erp_app','public.tb_s080_acl_shadow_log','DELETE') AS d")).rows[0].d;
+    check(canDelete === false, 'A8b', 'shadow 로그는 erp_app 에게 append-only (DELETE 권한 없음)', String(canDelete));
   }
 
   // --- A9·A10 web 경유 — 쿠키에 삐용 토큰이 없어야 한다 -------------------
@@ -132,11 +137,18 @@ async function apiLogin(email) {
   if (!webUp) {
     console.log('--  A9·A10 건너뜀 — web(3000) 미기동');
   } else {
+    // ★ 웹 라우트는 출처를 본다(CSRF). 브라우저처럼 Origin 을 실어 보낸다.
     const res = await fetch(`${WEB}/api/auth/login`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: { 'content-type': 'application/json', origin: WEB },
       body: JSON.stringify({ email: 'tenant@test.com', password: PASSWORD }),
     });
+    const csrf = await fetch(`${WEB}/api/auth/login`, {
+      method: 'POST', headers: { 'content-type': 'text/plain', origin: 'https://evil.example' },
+      body: JSON.stringify({ email: 'tenant@test.com', password: PASSWORD }),
+    });
+    check(csrf.status === 403 && !csrf.headers.getSetCookie().length, 'A11', '교차 출처 text/plain 로그인 → 403, 쿠키 없음', String(csrf.status));
     const setCookies = res.headers.getSetCookie();
+    check(res.status === 200, 'A9', 'web 로그인 200', String(res.status));
     const body = await res.json();
     check(!('erpSid' in body), 'A9a', '응답 본문에 세션 원문 없음');
     check(setCookies.length === 1 && setCookies[0].startsWith('erp_sid='),
@@ -145,8 +157,12 @@ async function apiLogin(email) {
       'A9c', '쿠키는 HttpOnly · SameSite=Lax');
 
     const sid = (setCookies[0] || '').split(';')[0].split('=')[1];
+    const csrfLogout = await fetch(`${WEB}/api/auth/logout`, {
+      method: 'POST', headers: { cookie: `erp_sid=${sid}`, origin: 'https://evil.example' }, redirect: 'manual',
+    });
+    check(csrfLogout.status === 403, 'A12', '교차 출처 로그아웃 → 403 (세션 유지)', String(csrfLogout.status));
     const logout = await fetch(`${WEB}/api/auth/logout`, {
-      method: 'POST', headers: { cookie: `erp_sid=${sid}` }, redirect: 'manual',
+      method: 'POST', headers: { cookie: `erp_sid=${sid}`, origin: WEB }, redirect: 'manual',
     });
     const gone = (await c.query(
       'SELECT revoked_at FROM tb_s080_auth_session WHERE erp_sid = $1', [sha(decodeURIComponent(sid))])).rows[0];
