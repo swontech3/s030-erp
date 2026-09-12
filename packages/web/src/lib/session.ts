@@ -1,6 +1,7 @@
 import 'server-only';
 import { cookies } from 'next/headers';
-import { SESSION_COOKIE } from '@swonbiz/shared';
+import { redirect } from 'next/navigation';
+import { SESSION_COOKIE, type ScreenId } from '@swonbiz/shared';
 import { callApi } from './api';
 
 /**
@@ -62,4 +63,29 @@ export async function verifyScreen(screenCode: string, route: string): Promise<v
     // 기록 실패가 화면을 깨뜨리지 않는다 — api 쪽 writeShadowLog 와 같은 원칙을 이 홉에도 적용한다.
     console.error('[acl] verify 호출 실패(기록만 누락):', (err as Error).message);
   }
+}
+
+/**
+ * ★ 화면 목록에 없으면 들여보내지 않는다 — 사이드바에서 감추는 것만으로는 부족하다.
+ *
+ * `verifyScreen` 은 1단계 shadow 라 **막지 않는다**(기록만 남긴다). 운영사 전용
+ * 화면은 그걸로 부족하다: 사이드바에 항목이 없어도 URL 을 직접 치면 열린다.
+ * 옆 호실의 계약 조건이 걸린 자리에서 "메뉴에 없으니 안 들어오겠지"는 방어가 아니다.
+ *
+ * ★ 판정 근거는 **삐용이 준 화면 목록 하나뿐**이다. org_tp 도 member_tp 도 role 도
+ *   보지 않는다(회신 2026-09-12 §1·§5).
+ *
+ * ★★ 이것도 여전히 web 쪽 게이트다. 이 화면에는 아직 데이터 API 가 하나도 없어
+ *    새어 나갈 것이 없지만, 3-4 에서 입주사 조회 API 가 붙는 순간 **Fastify 쪽에서
+ *    같은 판정을 해야 한다.** 여기서 막았다고 그쪽을 생략하면 API 를 직접 부르는
+ *    경로가 그대로 열린다.
+ */
+export async function requireScreen(screenCode: ScreenId, route: string): Promise<void> {
+  const me = await getMe();
+  if (!me) redirect('/login');
+
+  // 기록이 먼저다 — 막힌 접근도 shadow 로그에 남아야 누가 어디를 두드렸는지 보인다.
+  await verifyScreen(screenCode, route);
+
+  if (!me.screens.includes(screenCode)) redirect('/no-access');
 }

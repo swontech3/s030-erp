@@ -1,0 +1,171 @@
+/*
+ * s0300200030 마스터-디테일 자리 화면.
+ * 값은 design/erp-master-detail/ErpMasterDetail.dc.html 의 인라인 스타일 그대로다.
+ * 개발이 새 토큰을 만들지 않는다 — 원본에 없는 값은 여기에도 없다.
+ *
+ * ★ 원본의 바깥 래퍼는 padding:28px 32px 인데 여기서는 뺐다. 셸(AppShell .main)이
+ *   이미 padding:32px 를 준다 — 원본은 셸까지 한 파일에 그린 통짜 미리보기라서
+ *   그 패딩을 자기가 들고 있었다. 겹쳐 넣으면 64px 이 된다.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  /* 셸의 .main 이 overflow:auto 라 높이를 물려받지 못한다. 원본 미리보기(900px)에서
+     본문이 차지하던 높이를 하한으로 둔다 — 작아지면 셸이 스크롤한다. */
+  min-height: 520px;
+}
+
+.head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-h2-size);
+  font-weight: var(--weight-bold);
+  line-height: var(--text-h2-lh);
+  letter-spacing: var(--text-h2-ls);
+  color: var(--text-heading);
+}
+
+/* 원본 41행 data-open="new-tenant" */
+.newTenant {
+  height: 40px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: var(--shadow-primary);
+  transition: background var(--dur) var(--ease-out);
+}
+
+.newTenant:hover {
+  background: var(--color-primary-hover);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 20px;
+}
+
+/* 좌 — 입주사 목록 (원본 44행) */
+.list {
+  width: 420px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.listHead {
+  flex: 0 0 auto;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+}
+
+.searchWrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  display: flex;
+  color: var(--text-caption);
+  pointer-events: none;
+}
+
+.search {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px 0 40px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-heading);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+
+.search:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.count {
+  margin-left: 12px;
+  flex: 0 0 auto;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+/* 우 — 상세 (원본 107행) */
+.detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/*
+ * 빈 상태 — 원본 158행(noSelection) 그대로.
+ * 목록에도 같은 모양을 쓴다. 원본에 "입주사가 0곳"인 상태가 없어(24곳 고정)
+ * 새 모양을 만드는 대신 이미 있는 빈 상태를 재사용했다.
+ */
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+}
+
+.emptyIcon {
+  display: flex;
+  color: var(--text-caption);
+}
+
+.emptyText {
+  margin: 14px 0 0;
+  font-size: 16px;
+  color: var(--text-muted);
+}

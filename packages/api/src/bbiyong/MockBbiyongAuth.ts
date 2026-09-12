@@ -53,7 +53,8 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     memberName: '김대표',
     orgName: '에스원비즈',
     scope: 'operator',
-    screens: ['s0300000050', 's0300000060', 's0300600010'],
+    // ★ s0300200030 은 운영사 전용(audience_tp='P')이다. 입주사 계정에는 넣지 않는다.
+    screens: ['s0300000050', 's0300000060', 's0300200030', 's0300600010'],
   },
   {
     email: 'operator@s-wontech.co.kr',
@@ -63,7 +64,8 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     memberName: '박운영',
     orgName: '에스원비즈',
     scope: 'operator',
-    screens: ['s0300000050', 's0300000060', 's0300600010'],
+    // ★ s0300200030 은 운영사 전용(audience_tp='P')이다. 입주사 계정에는 넣지 않는다.
+    screens: ['s0300000050', 's0300000060', 's0300200030', 's0300600010'],
   },
   {
     email: 'tenant@test.com',
