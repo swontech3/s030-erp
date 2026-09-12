@@ -67,12 +67,19 @@ export class MockBbiyongAcl implements BbiyongAcl {
   /**
    * ★★★ 데이터 스코프 — **shadow 대상이 아니다.**
    *
-   * 운영사('S')는 전체, 그 외는 자기 company_id 만 본다. 연결이 없어 companyId 가
-   * null 이면 그건 예외가 아니라 **빈 스코프**다 — 목록 API 가 0건을 반환한다.
-   * 여기서 "null 이면 전체"로 처리하는 순간 8월 명부 유출이 그대로 재현된다.
+   * ★★ scope 는 ERP 가 판정하지 않는다. 삐용 권한 조회 응답이 준다(회신 ⑫).
+   *    orgTp 로 유도하던 코드가 2026-09-12 제거됐다 — **RLS 전체열람 스위치였다**
+   *    (org_tp='S' → role 'operator' → app.current_role → erp_is_operator() → 6테이블 전체 행).
+   *    Mock 은 그 자리를 계정표의 `scope` 필드로 대신한다 — 유도하지 않고 계정마다 박아 둔다.
+   *
+   * ★ operator 는 companyId 를 갖지 않는다(전체 스코프). tenant 는 넘어온 companyId 그대로이고,
+   *   연결이 없어 null 이면 그건 예외가 아니라 **빈 스코프**다 — 목록 API 가 0건을 반환한다.
+   *   여기서 "null 이면 전체"로 처리하는 순간 8월 명부 유출이 그대로 재현된다.
+   * ★ 계정표에 없는 주체는 tenant 로 닫는다(fail-closed).
    */
   getScope(subject: AclSubject, companyId: string | null): AclScope {
-    if (subject.orgTp === 'S') return { role: 'operator', companyId: null };
+    const account = findMockAccount(subject.s020MemberId);
+    if (account?.scope === 'operator') return { role: 'operator', companyId: null };
     return { role: 'tenant', companyId };
   }
 }

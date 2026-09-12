@@ -212,7 +212,7 @@ describe('parseSignIn — 깨진 응답은 실패다 (예외를 던지지 않는
     expect(parseSignIn(withData({ memberId: null })).kind).toBe('fail');
   });
 
-  it('orgTp 가 없으면 실패다 — 운영사/입주사 스코프를 정할 수 없다', () => {
+  it('orgTp 가 없으면 실패다 — 레거시 브리지가 읽는 org_tp 컬럼이 비게 된다', () => {
     expect(parseSignIn(withData({ orgTp: undefined })).kind).toBe('fail');
   });
 

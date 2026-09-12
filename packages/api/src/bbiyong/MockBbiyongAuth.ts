@@ -5,10 +5,16 @@
  * 홈 분기(admin·operator → /dashboard, tenant → /booking, noaccess → /no-access)를
  * 전부 확인할 수 있다.
  *
+ * ★ org_tp 어휘는 **'S'(시스템운영사) · 'N'(일반)** 두 값뿐이다(회신 2026-09-12).
+ *   운영사는 에스원테크 한 곳(orgId=1)이고, ERP 입주사는 org_tp 로 표현하지 않는다 —
+ *   입주 여부는 ERP 입주계약의 기간으로 계산한다. 같은 회사가 상담→서비스→입주→퇴실로
+ *   옮겨다니므로 유형으로 두면 값을 계속 바꿔야 하고 이력이 끊긴다.
+ *
  * ★ 비밀번호는 계정마다 다르지 않다. `MOCK_PASSWORD` 하나이고, 틀리면 실패한다 —
  *   로그인 화면의 에러 표시(showError)를 실제로 띄워 볼 수 있어야 하기 때문이다.
  *   비밀번호가 무엇이든 통과시키면 그 경로가 죽은 코드로 남는다.
  */
+import type { ScopeRole } from '@swonbiz/shared';
 import {
   BbiyongAuthError,
   INVALID_CREDENTIALS_MESSAGE,
@@ -24,6 +30,11 @@ interface MockAccount extends Omit<BbiyongLoginResult, 'accessToken' | 'refreshT
   email: string;
   /** 이 계정이 접근 가능한 화면. MockBbiyongAcl 이 같은 표를 본다. */
   screens: string[];
+  /**
+   * 데이터 스코프. ★ **orgTp 에서 유도하지 않는다 — 계정마다 명시한다**(회신 2026-09-12 §1).
+   * 실연동에서는 삐용 권한 조회 응답이 이 값을 준다. Mock 은 그 자리를 이 필드로 대신한다.
+   */
+  scope: ScopeRole;
 }
 
 /**
@@ -41,6 +52,7 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     orgTp: 'S',
     memberName: '김대표',
     orgName: '에스원비즈',
+    scope: 'operator',
     screens: ['s0300000050', 's0300000060', 's0300600010'],
   },
   {
@@ -50,24 +62,28 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     orgTp: 'S',
     memberName: '박운영',
     orgName: '에스원비즈',
+    scope: 'operator',
     screens: ['s0300000050', 's0300000060', 's0300600010'],
   },
   {
     email: 'tenant@test.com',
     memberId: 2001,
     orgId: 9001,
-    orgTp: 'C',
+    orgTp: 'N',
     memberName: '홍길동',
     orgName: '주식회사 비앤케이넷',
+    scope: 'tenant',
     screens: ['s0300000050', 's0300600010'],
   },
   {
     email: 'noaccess@test.com',
     memberId: 2002,
     orgId: 9002,
-    orgTp: 'C',
+    orgTp: 'N',
     memberName: '무권한',
     orgName: '미구독 회사',
+    // 연결(link_s020_org_id)이 없어 companyId 가 null 로 해석된다 = 빈 스코프.
+    scope: 'tenant',
     screens: [],
   },
 ];

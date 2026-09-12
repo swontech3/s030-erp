@@ -87,7 +87,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     const { rawSid, session } = await createSession(login);
 
     // 화면 목록은 삐용이 준 것만 쓴다. ERP 가 역할로 거르지 않는다(ACL-07′).
-    // ErpSession 은 AclSubject(memberId·orgId·orgTp)의 상위집합이라 그대로 넘긴다.
+    // ErpSession 은 AclSubject(memberId·orgId)의 상위집합이라 그대로 넘긴다.
     const screens = await bbiyongAcl.listScreens(session);
 
     return reply.send({
@@ -154,7 +154,8 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       display: profile,
       companyId: session.companyId,
       role: session.role,
-      orgTp: session.orgTp,
+      // ★ 최상위 orgTp 는 내려보내지 않는다(회신 2026-09-12 §4). web 에서 읽는 코드가 0건이었고
+      //   판정 유혹만 남는 필드였다. 표시가 필요하면 display(삐용 getProfile)에 있다.
       expiresAt: session.expiresAt.toISOString(),
     });
   });

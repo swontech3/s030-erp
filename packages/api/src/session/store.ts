@@ -7,7 +7,7 @@
  * =============================================================================
  * ★★ 캐시 설계 — 30초 캐시를 두되 `revoked_at` 은 캐시를 우회한다
  * =============================================================================
- * 요청마다 캐시하는 것: 정체성(memberId·orgId·orgTp)과 **companyId 역조회 결과**.
+ * 요청마다 캐시하는 것: 정체성(memberId·orgId)과 **companyId 역조회 결과**.
  * 요청마다 매번 DB 를 보는 것: `revoked_at` · `expires_at` 두 컬럼뿐.
  *
  * 후자는 PK 단건 조회라 싸고, 이렇게 해야 로그아웃이 **즉시** 먹는다. 세션 전체를
@@ -25,7 +25,6 @@ import { bbiyongAcl, type BbiyongLoginResult } from '../bbiyong/index.ts';
 interface CachedIdentity {
   s020MemberId: number;
   s020OrgId: number;
-  orgTp: string;
   companyId: string | null;
   role: ScopeRole;
   cachedAt: number;
@@ -58,12 +57,9 @@ export async function createSession(login: BbiyongLoginResult): Promise<CreatedS
   const rawSid = newSessionId();
   const erpSid = hashSessionId(rawSid);
   const companyId = await resolveCompanyId(login.orgId);
-  // ★ 스코프 역할은 어댑터(getScope)가 정한다 — 여기서 org_tp 를 직접 보지 않는다.
-  //   판정 자리가 둘이 되면 어느 날 하나만 고쳐진다.
-  const { role } = bbiyongAcl.getScope(
-    { s020MemberId: login.memberId, s020OrgId: login.orgId, orgTp: login.orgTp },
-    companyId,
-  );
+  // ★ 스코프 역할은 어댑터(getScope)가 정한다 — 판정 자리가 둘이 되면 어느 날 하나만 고쳐진다.
+  //   넘기는 것은 식별자뿐이다. org_tp 는 판정 입력이 아니다(회신 2026-09-12 §1·§2).
+  const { role } = bbiyongAcl.getScope({ s020MemberId: login.memberId, s020OrgId: login.orgId }, companyId);
   const expiresAt = new Date(Date.now() + env.sessionTtlMs);
 
   await pool.query(
@@ -74,6 +70,8 @@ export async function createSession(login: BbiyongLoginResult): Promise<CreatedS
     [
       erpSid,
       login.memberId,
+      // ★ org_tp 는 ERP 판정에 쓰지 않지만 컬럼에는 계속 넣는다 —
+      //   S-WonERP 레거시 브리지(erp-session-map.ts)가 이 컬럼을 읽는다.
       login.orgTp,
       login.orgId,
       encrypt(login.accessToken),
@@ -88,7 +86,6 @@ export async function createSession(login: BbiyongLoginResult): Promise<CreatedS
       erpSid,
       s020MemberId: login.memberId,
       s020OrgId: login.orgId,
-      orgTp: login.orgTp,
       companyId,
       role,
       expiresAt,
@@ -107,13 +104,12 @@ export async function lookupSession(rawSid: string): Promise<ErpSession | null> 
   // ① 살아 있는지 — **항상 DB 를 본다.** 캐시 우회.
   const { rows } = await pool.query<{
     bbiyong_member_id: number;
-    org_tp: string;
     org_id: number;
     expires_at: Date;
     last_active_at: Date | null;
     revoked_at: Date | null;
   }>(
-    `SELECT bbiyong_member_id, org_tp, org_id, expires_at, last_active_at, revoked_at
+    `SELECT bbiyong_member_id, org_id, expires_at, last_active_at, revoked_at
        FROM public.tb_s080_auth_session
       WHERE erp_sid = $1`,
     [erpSid],
@@ -131,7 +127,7 @@ export async function lookupSession(rawSid: string): Promise<ErpSession | null> 
   if (!cached || Date.now() - cached.cachedAt > IDENTITY_TTL_MS) {
     const companyId = await resolveCompanyId(row.org_id);
     const { role } = bbiyongAcl.getScope(
-      { s020MemberId: row.bbiyong_member_id, s020OrgId: row.org_id, orgTp: row.org_tp },
+      { s020MemberId: row.bbiyong_member_id, s020OrgId: row.org_id },
       companyId,
     );
     const now = Date.now();
@@ -139,7 +135,6 @@ export async function lookupSession(rawSid: string): Promise<ErpSession | null> 
     cached = {
       s020MemberId: row.bbiyong_member_id,
       s020OrgId: row.org_id,
-      orgTp: row.org_tp,
       companyId,
       role,
       cachedAt: now,
@@ -155,7 +150,6 @@ export async function lookupSession(rawSid: string): Promise<ErpSession | null> 
     erpSid,
     s020MemberId: cached.s020MemberId,
     s020OrgId: cached.s020OrgId,
-    orgTp: cached.orgTp,
     companyId: cached.companyId,
     role: cached.role,
     expiresAt: row.expires_at,

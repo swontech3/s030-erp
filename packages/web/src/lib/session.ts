@@ -23,7 +23,6 @@ export interface MeResponse {
   display: { memberName: string; orgName: string; orgTp: string } | null;
   companyId: string | null;
   role: 'operator' | 'tenant';
-  orgTp: string;
   expiresAt: string;
 }
 

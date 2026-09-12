@@ -7,9 +7,6 @@
  * 구현은 packages/api/src/session/store.ts (createSession · lookupSession · revokeSession).
  */
 
-/** 삐용 조직 구분. 'S' = 운영사(에스원비즈), 그 외 = 입주사. */
-export type OrgTp = 'S' | (string & {});
-
 /**
  * 스코프 판정용 역할. **ERP가 스스로 정하는 권한이 아니다** —
  * 데이터 소유자 축(`company_id`)을 어떻게 적용할지만 가른다.
@@ -27,12 +24,10 @@ export interface ErpSession {
   /** 삐용 orgId — 조직 식별자. JWT에는 없고 로그인 응답 본문에만 있다. */
   s020OrgId: number;
 
-  /**
-   * 삐용 orgTp. 두 가지에 쓴다 — (1) 헤더 표시, (2) **스코프 역할(role) 결정의 입력**
-   * (BbiyongAcl.getScope 가 'S' → operator 로 번역한다). 화면 접근 판정에는 쓰지 않는다.
-   * 보안 관련 값이다 — "표시 전용"으로 읽지 말 것(리뷰 2026-09-07).
-   */
-  orgTp: OrgTp;
+  // ★ orgTp 는 여기 없다(회신 2026-09-12 §2). 이 타입은 그대로 AclSubject 로 넘어가므로,
+  //   필드가 남아 있으면 판정 코드가 런타임으로 그것을 읽을 수 있다. 표시용 orgTp 는
+  //   `/auth/me` 의 display(삐용 getProfile 응답)에 있다. org_tp 컬럼 자체는
+  //   tb_s080_auth_session 에 계속 저장한다 — S-WonERP 레거시 브리지가 읽는다.
 
   /**
    * ERP 입주사 식별자. `tb_s080_companies.link_s020_org_id = s020OrgId` 역조회 결과.

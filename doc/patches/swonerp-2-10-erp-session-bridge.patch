@@ -1,6 +1,18 @@
 # S-WonERP 2-10 브리지 패치 — 원본(S-WonERP.zip, 2026-09-06) 대비
 # 적용: S-WonERP 저장소 루트에서  git apply swonerp-2-10-erp-session-bridge.patch
 # 신규 파일 2 + 테스트 1, 수정 파일 2. 검증 결과는 SwonBiz-erp 커밋 6ebc73a 메시지 참조.
+#
+# ★★ 2026-09-12 회신 §5 반영 — 아래 3건은 **아직 S-WonERP 적용본에 반영되지 않았다.**
+#    페이즈 2(게이트 이관) 때 이 패치와 함께 적용한다. 지금 적용본을 건드리지 않는다.
+#      ① erp-session-map.ts 인라인 주석 "표시 전용 매핑" → 정정.
+#         같은 파일 헤더는 "판정에 실제로 쓰인다"인데 그 줄만 읽으면 정반대로 읽힌다
+#      ② auth-context.ts 인라인 주석 "표시용이다. 판정에 쓰지 않는다" → 같은 이유로 정정.
+#         (적용본은 이미 정정돼 있었다. 문구는 다르지만 내용은 이제 일치한다)
+#
+#    검증(2026-09-12): hunk 6개 전부 선언 줄 수 = 실제 줄 수. 신규 파일 3종을 적용본과
+#    전량 대조한 결과 차이는 위 ①③ **2줄뿐**이고 줄 수는 같다(58/58 · 56/56) —
+#    @@ 헤더가 그대로 유효하므로 git apply 가 깨지지 않는다.
+#      ③ 테스트 픽스처 org_tp "C" → "N". org_tp 어휘는 S(시스템운영사)·N(일반) 두 값뿐이다
 diff --git a/src/lib/auth-context.ts b/src/lib/auth-context.ts
 index 3328c66..0cd5083 100644
 --- a/src/lib/auth-context.ts
@@ -20,7 +32,7 @@ index 3328c66..0cd5083 100644
 +  // ── 페이즈 1 · 2-10 브리지 (전환 기간 한정) ──
 +  // 신규 ERP 가 굽는 erp_sid 쿠키가 있으면 tb_s080_auth_session 으로 해석한다.
 +  // 쿠키가 없으면 아래 기존 경로 그대로다 — Supabase 세션만 있는 요청은 이 줄의 영향을 받지 않는다.
-+  // ★ 여기서 나온 role·isAdmin 은 표시용이다. 판정에 쓰지 않는다(erp-session-map.ts).
++  // ★ role·isAdmin 은 org_tp 를 기존 코드값으로 옮긴 것이고, 호출부가 그 값으로 판정한다(erp-session-map.ts).
 +  const erp = await resolveErpSessionContext();
 +  if (erp) return erp;
 +
@@ -139,7 +151,7 @@ index 0000000..0bedad2
 +  if (row.revoked_at !== null) return null;
 +  if (row.expires_at.getTime() <= now.getTime()) return null;
 +
-+  // 표시 전용 매핑. 'S' = 운영사 → 기존 코드의 관리자(A), 그 외 = 입주사(C).
++  // ★ 표시 전용이 아니다 — 이 role·isAdmin 을 호출부 53곳이 판정에 쓴다(헤더 참조). 'S'=운영사→A, 그 외→C.
 +  const isOperator = row.org_tp === "S";
 +
 +  return {
@@ -171,7 +183,7 @@ index 0000000..735e345
 +const now = new Date("2026-09-07T12:00:00Z");
 +const live = (over: Partial<ErpSessionRow> = {}): ErpSessionRow => ({
 +  bbiyong_member_id: 2001,
-+  org_tp: "C",
++  org_tp: "N",
 +  org_id: 9001,
 +  expires_at: new Date("2026-09-14T12:00:00Z"),
 +  revoked_at: null,

@@ -120,6 +120,13 @@ export function parseSignIn(body: unknown): SignInOutcome {
   //   틀렸습니다"로 뭉개진다 — 회신 §4 가 "조용히 실패하면 안 된다"고 못박은 바로 그 경우다.
   //   이 가지는 토큰을 만들지 않으므로 순서를 앞당겨도 인증이 느슨해지지 않는다.
   //   판정은 값이 아니라 **존재 여부**로 한다(회신 §4).
+  //
+  //   ★★ **1단계 응답에는 orgTp 가 없다**(회신 2026-09-12 §4). 겸직 계정이 이 가지를
+  //      타면 후보 목록만으로는 어느 후보가 운영사인지 알 수 없다 — orgTp 는 2단계
+  //      `/sign-in-org` 응답에서 비로소 나온다. 2단계 로그인 팝업(s0300000010p1)을
+  //      만들 때 orgTp 는 **반드시 2단계 응답에서** 읽어야 하고, 후보에 붙은 조직
+  //      이름이나 목록 순서로 운영사를 추측해서는 안 된다(같은 회신 §3② — '에스원3DP'
+  //      · '에스원BD' 는 org_tp='N' 인 고객사다).
   if (data && Object.hasOwn(data, 'needOrgSelect')) {
     return { kind: 'orgSelect', candidateCount: Array.isArray(data.candidates) ? data.candidates.length : 0 };
   }
@@ -134,8 +141,10 @@ export function parseSignIn(body: unknown): SignInOutcome {
   const accessToken = str(data.accessToken);
   const refreshToken = str(data.refreshToken);
 
-  // 하나라도 없으면 반쪽 세션이 된다. orgId 가 없으면 스코프를 해석할 수 없고,
-  // orgTp 가 없으면 운영사·입주사를 가를 수 없다. 만들다 만 세션보다 실패가 낫다.
+  // 하나라도 없으면 반쪽 세션이 된다. orgId 가 없으면 스코프를 해석할 수 없다.
+  // ★ orgTp 는 ERP 판정에 더는 쓰지 않지만(2026-09-12 §1) tb_s080_auth_session.org_tp 컬럼에
+  //   들어가고, S-WonERP 레거시 브리지가 그 컬럼으로 role·isAdmin 을 정한다. 비어 있으면
+  //   레거시 쪽에서 조용히 권한이 낮아진다. 만들다 만 세션보다 실패가 낫다.
   if (memberId === null || orgId === null || orgTp === null || accessToken === null || refreshToken === null) {
     return failOf(root);
   }

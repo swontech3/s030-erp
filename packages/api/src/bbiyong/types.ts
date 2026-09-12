@@ -113,11 +113,24 @@ export interface BbiyongAuth {
 export const ACL_ACTIONS = ['VIEW', 'CREATE', 'UPDATE', 'DELETE'] as const;
 export type AclAction = (typeof ACL_ACTIONS)[number];
 
-/** 권한 판정의 입력. 세션 전체가 아니라 삐용이 아는 식별자만 넘긴다. */
+/**
+ * 권한 판정의 입력. 세션 전체가 아니라 삐용이 아는 식별자만 넘긴다.
+ *
+ * ★★ `orgTp` 도 `memberTp` 도 **일부러 없다.** 판정 입력에 없으면 구현체가 그 값으로
+ *    판정하는 코드를 **물리적으로 쓸 수 없다**(회신 2026-09-12 §2). orgTp 는 2026-09-12
+ *    제거됐다 — getScope 가 'S' 를 보고 operator 로 올려 주던 RLS 전체열람 스위치였다.
+ *    표시용 orgTp 가 필요하면 `BbiyongProfile` 에 있다. 판정 입력과 표시 입력을 같은
+ *    타입에 두지 않는다.
+ *
+ * ★★ ERP 는 member_tp 로도 판정하지 않는다 —
+ *    org_tp 와 같은 이유다(회신 2026-09-12 §5). 운영사 안에서 대표만 볼 화면(보증금 정산
+ *    등)이 있으면 **삐용이 그 화면을 '사원' 역할의 목록에서 빼는 것**으로 처리하고,
+ *    ERP 는 받은 화면 목록만 본다. 이 필드를 여기에 추가하는 순간 판정 자리가 둘이 되고,
+ *    어느 날 하나만 고쳐진다.
+ */
 export interface AclSubject {
   s020MemberId: number;
   s020OrgId: number;
-  orgTp: string;
 }
 
 export interface AclScope {
@@ -141,6 +154,14 @@ export interface BbiyongAcl {
   /**
    * 데이터 스코프. ★ **shadow 대상이 아니다** — 1단계부터 예외 없이 강제한다.
    * shadow 로 두면 8월 명부 유출이 그대로 재현된다(지시서 1장).
+   *
+   * ★★ **scope 는 ERP 가 판정하지 않는다. 삐용 권한 조회 응답이 준다**(회신 ⑫).
+   *    구현체가 하는 일은 받은 scope 를 그대로 돌려주는 것뿐이다 — `HttpBbiyongAcl` 은
+   *    응답의 scope 를 그대로 쓰고, `MockBbiyongAcl` 은 계정표에 박아 둔 값을 쓴다.
+   *    orgTp 로 유도하던 코드가 2026-09-12 제거됐다 — RLS 전체열람 스위치였다.
+   *
+   * `companyId` 는 `link_s020_org_id` 역조회 결과다. tenant 는 이 값으로 잠기고,
+   * null 이면 **빈 스코프**다(전체가 아니다).
    */
   getScope(subject: AclSubject, companyId: string | null): AclScope;
 }
