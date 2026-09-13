@@ -1,0 +1,5 @@
+/* SwonBiz webfonts. Pretendard Variable (Korean + Latin) is the core family;
+   Inter is the Latin-only fallback. Both are loaded from CDN — see readme.md
+   "Fonts" for the note on shipping local binaries instead. */
+@font-face{font-family:"Pretendard Variable";font-style:normal;font-weight:400 800;font-display:swap;src:url("https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:400 800;font-display:swap;src:url("https://cdn.jsdelivr.net/fontsource/fonts/inter:vf@latest/latin-wght-normal.woff2") format("woff2-variations")}

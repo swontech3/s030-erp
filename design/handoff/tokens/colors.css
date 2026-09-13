@@ -1,0 +1,61 @@
+/* Fixed palette. These ten values are the entire SwonBiz color system —
+   no other hues, and no green under any circumstance. */
+:root{
+  --indigo-600:#4F46E5;
+  --indigo-700:#4338CA;
+  --indigo-400:#818CF8;
+  --cyan-400:#22D3EE;
+  --indigo-50:#EEF2FF;
+
+  --slate-950:#0B1120;
+  --slate-600:#475569;
+  --slate-500:#64748B;
+  --slate-400:#94A3B8;
+  --white:#FFFFFF;
+  --slate-50:#F8FAFC;
+  --slate-200:#E2E8F0;
+
+  /* Semantic aliases — prefer these in product code */
+  --color-primary:var(--indigo-600);
+  --color-primary-hover:var(--indigo-700);
+  --color-secondary:var(--indigo-400);
+  --color-accent:var(--cyan-400);
+  --color-accent-bg:var(--indigo-50);
+
+  --surface:var(--white);
+  --surface-alt:var(--slate-50);
+  --surface-inverse:var(--slate-950);
+  --surface-card:var(--white);
+  --border:var(--slate-200);
+  --border-strong:#CBD5E1;
+
+  --text-heading:var(--slate-950);
+  --text-body:var(--slate-600);
+  --text-muted:var(--slate-500);
+  --text-caption:var(--slate-400);
+  --text-on-primary:var(--white);
+  --text-on-inverse:var(--white);
+  --text-on-inverse-muted:#A8B3C7;
+  --text-link:var(--indigo-600);
+  --text-link-hover:var(--indigo-700);
+
+  /* Status colors — ERP only. Never brand, never on the landing page.
+     Success/완료 stays indigo: the no-green rule is unchanged. */
+  --amber-600:#D97706;
+  --amber-100:#FEF3C7;
+  --amber-800:#92400E;
+  --red-600:#DC2626;
+  --red-100:#FEE2E2;
+  --red-800:#991B1B;
+
+  --color-warning:var(--amber-600);
+  --color-warning-bg:var(--amber-100);
+  --color-warning-text:var(--amber-800);
+  --color-danger:var(--red-600);
+  --color-danger-bg:var(--red-100);
+  --color-danger-text:var(--red-800);
+
+  --focus-ring:rgba(79,70,229,.32);
+  --gradient-brand:linear-gradient(120deg,rgba(79,70,229,.18),rgba(34,211,238,.18)); /* @kind color */
+  --gradient-brand-line:linear-gradient(90deg,#4F46E5,#22D3EE); /* @kind color */
+}
