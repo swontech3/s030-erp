@@ -1,5 +1,11 @@
 /*
  * s0300200030p2 신규 입주사 모드.
+ *
+ * ★ 이 모달은 새 원본(design/handoff/)에 없다 — 계약 폼 페이지로 일원화됐다.
+ *   자세한 것은 NewTenantModal.tsx 머리말과 doc/DESIGN_HANDOFF_DIFF.md §A-3-2.
+ *   그래서 구조 값은 옛 시안을 그대로 두고, **필드 규격만** 새 원본의 공통 패턴
+ *   (handoff/common/05-patterns.md#3 · 03-components.md Input)에 맞췄다.
+ *
  * 값은 design/erp-master-detail/ErpMasterDetail.dc.html 216~275행 인라인 스타일 그대로다.
  * 템플릿의 style-hover / style-focus 는 디자인 도구 전용 속성이라 브라우저가 무시한다 —
  * 여기서 실제 :hover / :focus 로 다시 쓴다(지시서 2-5 와 같은 원칙).
@@ -109,10 +115,23 @@
   column-gap: 24px;
 }
 
+/*
+ * ★ 3-1b — 필드 규격은 새 핸드오프를 따른다.
+ *   design/handoff/common/05-patterns.md#3 「필드 구조」 + 03-components.md 「Input」
+ *
+ *     라벨       14px / 600 / --text-heading   (필수는 뒤에 * --color-danger)
+ *     입력       라벨 하단 6px, 높이 44px
+ *     도움말     입력 하단 4px, 12px
+ *
+ *   3-1 은 옛 시안(ErpMasterDetail.dc.html)의 인라인 값 12px --text-muted 를 그대로
+ *   옮겼었다. 새 원본이 라벨 규격을 바꿨고, 05-patterns.md 는 "화면별 문서보다 이
+ *   파일이 우선한다"고 명시돼 있다.
+ *
+ *   간격을 gap 하나로 주지 않는 이유 — 라벨↔입력(6px)과 입력↔도움말(4px)이 다르다.
+ */
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
 
 .wide {
@@ -120,8 +139,16 @@
 }
 
 .label {
-  font-size: 12px;
-  color: var(--text-muted);
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-heading);
+}
+
+/* 라벨 문자열에 이어붙이지 않는다 — 색을 따로 줄 수 없다. */
+.req {
+  margin-left: 2px;
+  color: var(--color-danger);
 }
 
 .input {
@@ -142,8 +169,12 @@
   box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
-/* 원본 89행(apply-form)의 필드 밑 안내와 같은 자리. 로그인 아이디 안내에 쓴다. */
+/*
+ * 필드 밑 안내. 새 원본 05-patterns.md#3 「도움말/오류 하단 4px, 12px」.
+ * 대표 성명("ERP 계정을 받을 사람입니다")과 대표 이메일·대표자명 안내가 여기 뜬다.
+ */
 .hint {
+  margin-top: 4px;
   font-size: 12px;
   color: var(--text-muted);
 }

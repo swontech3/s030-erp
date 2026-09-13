@@ -1,5 +1,10 @@
 /*
  * s0300200030 마스터-디테일 자리 화면.
+ *
+ * 원본: design/handoff/tenant-contract/02-master-detail.md  ← ★ 정본(2026-09-13 인계)
+ *       새 원본의 레이아웃 값(좌 420px 고정 · 간격 20px · --surface + 1px --border +
+ *       --radius-lg + overflow:hidden)은 옛 시안과 같다. 대조는 DESIGN_HANDOFF_DIFF.md A-3-1.
+ *
  * 값은 design/erp-master-detail/ErpMasterDetail.dc.html 의 인라인 스타일 그대로다.
  * 개발이 새 토큰을 만들지 않는다 — 원본에 없는 값은 여기에도 없다.
  *

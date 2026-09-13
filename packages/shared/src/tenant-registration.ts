@@ -39,7 +39,7 @@ export interface RegistrationField {
    * 화면에 입력란이 있는가.
    *
    * `false` 는 "아직 안 만들었다"가 아니라 **"사람이 넣는 값이 아니다"** 라는 뜻이다.
-   * 지금은 `orgCode` 하나뿐이다.
+   * 지금은 `countryCode`(항상 KR)와 `orgCode`(Z01 부터 자동 채번) 둘이다.
    */
   onScreen: boolean;
   /** 숫자만 보낸다 — 하이픈·공백은 전송 전에 제거한다. */
@@ -68,10 +68,6 @@ export const COMPANY_FIELDS = {
   detailAddress: {
     label: '상세주소', sink: 'bbiyong', wire: 'detailAddress', required: false, maxLength: 300, onScreen: true,
   },
-  countryCode: {
-    label: '국가', sink: 'bbiyong', wire: 'countryCode', required: false, maxLength: 2, onScreen: true,
-    note: '기본 KR. 삐용 org010.COUNTRY_CODE.',
-  },
 
   // ── 여기서부터 ERP 에만 남는다 ──────────────────────────────────────────────
   bizNumber: {
@@ -97,6 +93,13 @@ export const COMPANY_FIELDS = {
   },
 
   // ── 화면에 없다 ────────────────────────────────────────────────────────────
+  // 삐용에 **보내는** 값이지만 사람이 넣지 않는다. 자동으로 정해진다.
+  countryCode: {
+    label: '국가', sink: 'bbiyong', wire: 'countryCode', required: false, maxLength: 2, onScreen: false,
+    note: '★ 항상 KR 로 자동 설정한다 — 운영자가 볼 이유가 없으므로 입력란도 안내도 두지 않는다. '
+      + '삐용 org010.COUNTRY_CODE. 새 디자인 핸드오프의 계약 폼 섹션 1 에도 국가 칸이 없다 '
+      + '(doc/DESIGN_HANDOFF_DIFF.md A-3-2). 3-1 에서는 화면에 있었고 3-1b 에서 뺐다.',
+  },
   orgCode: {
     label: '단체코드', sink: 'bbiyong', wire: 'orgCode', required: true, maxLength: 3, onScreen: false,
     note: '★ ERP 가 Z01 부터 순번으로 자동 생성한다(회신 6). 운영자가 정하는 값이 아니므로 '
@@ -113,7 +116,9 @@ export const COMPANY_FIELDS = {
 export const OWNER_FIELDS = {
   memberName: {
     label: '대표 성명', sink: 'bbiyong', wire: 'memberName', required: true, maxLength: 50, onScreen: true,
-    note: '★★ 회사 정보의 ceoName(사업자등록증 대표자)과 다른 칸이다.',
+    hint: 'ERP 계정을 받을 사람입니다',
+    note: '★★ 회사 정보의 ceoName(사업자등록증 대표자)과 다른 칸이다. 한 화면에서 거의 같은 말로 '
+      + '읽히므로 안내가 없으면 운영자가 바꿔 넣는다 — 그러면 엉뚱한 사람 이메일로 계정이 만들어진다.',
   },
   hpNo: {
     label: '대표 휴대전화', sink: 'bbiyong', wire: 'hpNo', required: true, maxLength: 20,

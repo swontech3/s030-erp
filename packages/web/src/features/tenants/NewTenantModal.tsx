@@ -3,8 +3,26 @@
 /** @screen s0300200030p2 계약 등록 — 신규 입주사 모드 · 020 입주사관리 · 1차 */
 
 /**
- * 신규 입주사 등록 모달 — **골격이다**(3-1).
- * 원본: design/erp-master-detail/ErpMasterDetail.dc.html 216~275행 (modal="new-tenant").
+ * 신규 입주사 등록 모달 — **골격이다**(3-1). 시각 규격만 3-1b 에서 새 원본에 맞췄다.
+ *
+ * =============================================================================
+ * ★★★ 이 화면은 새 디자인 원본에 없다 — 읽고 시작할 것
+ * =============================================================================
+ * 새 원본 `design/handoff/tenant-contract/02-master-detail.md` 마지막 문단:
+ *
+ *   "계약 등록 모달(new-tenant / new-contract / renew)은 **제거되었습니다.**
+ *    같은 기능을 모달과 페이지 두 곳에서 관리하면 계속 어긋나므로
+ *    계약 폼 페이지로 일원화했습니다."
+ *
+ * 회사·대표 입력 항목은 계약 폼(s0300200040) 섹션 1 로 이사했고 그 화면은 페이즈 4 다.
+ * **그래서 이 모달은 지금 대체 화면이 없다.** 지우면 입주사를 등록할 방법이 사라진다.
+ *
+ * 3-1b 에서는 **섹션·항목 구성을 손대지 않았다** — 맞출 원본이 없기 때문이다.
+ * 고친 것은 (1) 국가 칸 제거 (2) 대표 성명 안내 (3) 라벨 규격뿐이다.
+ * 존폐 판단은 doc/DESIGN_HANDOFF_DIFF.md §C-1 에 미결로 올려 두었다.
+ *
+ * 옛 원본: design/erp-master-detail/ErpMasterDetail.dc.html 216~275행 (modal="new-tenant").
+ * 새 원본: design/handoff/  ← 시각 기준은 이제 이쪽이다
  *
  * ERP 에 회사 등록 화면·직원 등록 화면을 따로 두지 않는다. 운영사가 신규 계약을
  * 등록하는 이 자리에서 회사와 대표를 함께 만든다 — 그래서 이 팝업이 회사·대표
@@ -20,6 +38,8 @@
  * - **단체코드(orgCode)를 다루지 않는다.** 입력란도 안내 문구도 없다 — 운영자가
  *   정하는 값이 아니다. ERP 가 Z01 부터 자동 발급하며 그 규칙은 3-2 에서 만든다
  * - **비밀번호를 다루지 않는다.** ERP 는 계정을 발급하지 않는다
+ * - **국가(countryCode)를 다루지 않는다.** 항상 KR 이다 — 운영자가 볼 이유가 없다.
+ *   3-1 에는 입력란이 있었고 3-1b 에서 뺐다
  *
  * 입력 항목은 한 군데서 온다 — `@swonbiz/shared` 의 tenant-registration.ts.
  * 항목마다 삐용에 보내는 값인지 ERP 만 보관하는 값인지(`sink`)가 거기 적혀 있다.
@@ -54,16 +74,24 @@ const PLACEHOLDERS: Record<string, string> = {
 function Field({ name, field }: { name: string; field: RegistrationField }) {
   return (
     <label className={`${styles.field} ${FULL_WIDTH.has(name) ? styles.wide : ''}`}>
+      {/*
+        라벨 규격은 새 핸드오프(common/05-patterns.md#3 · 03-components.md Input)를 따른다 —
+        14px/600 --text-heading, 필수 별표는 --color-danger. 05-patterns 는 "화면별 문서보다
+        이 파일이 우선한다"고 못박혀 있다. 3-1 은 옛 시안의 인라인 값(12px --text-muted)을
+        그대로 옮겼었다.
+        ★ 별표를 라벨 문자열에 이어붙이지 않는다 — 색을 따로 줄 수 없고 읽어 주는 기계가
+          "회사명 별표"로 읽는다.
+      */}
       <span className={styles.label}>
         {field.label}
-        {field.required ? ' *' : ''}
+        {field.required ? <span className={styles.req} aria-hidden="true">*</span> : null}
       </span>
       <input
         className={styles.input}
         name={name}
         placeholder={PLACEHOLDERS[name] ?? ''}
         maxLength={field.maxLength ?? undefined}
-        defaultValue={name === 'countryCode' ? 'KR' : undefined}
+        required={field.required}
         inputMode={field.digitsOnly ? 'numeric' : undefined}
       />
       {field.hint ? <span className={styles.hint}>{field.hint}</span> : null}
