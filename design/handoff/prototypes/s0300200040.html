@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>s0300200040 계약 폼 — SwonBiz ERP 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<script src="https://unpkg.com/lucide@0.414.0/dist/umd/lucide.js"></script>
+<style>
+/* ── 디자인 토큰 ── handoff/tokens/*.css 와 동일한 값 ── */
+:root{
+  --indigo-600:#4F46E5; --indigo-700:#4338CA; --indigo-400:#818CF8;
+  --cyan-400:#22D3EE; --indigo-50:#EEF2FF;
+  --slate-950:#0B1120; --slate-600:#475569; --slate-500:#64748B;
+  --slate-400:#94A3B8; --white:#FFFFFF; --slate-50:#F8FAFC; --slate-200:#E2E8F0;
+  --amber-600:#D97706; --amber-100:#FEF3C7; --amber-800:#92400E;
+  --red-600:#DC2626; --red-100:#FEE2E2; --red-800:#991B1B;
+
+  --color-primary:var(--indigo-600); --color-primary-hover:var(--indigo-700);
+  --color-secondary:var(--indigo-400); --color-accent:var(--cyan-400);
+  --color-accent-bg:var(--indigo-50);
+  --color-warning:var(--amber-600); --color-warning-bg:var(--amber-100); --color-warning-text:var(--amber-800);
+  --color-danger:var(--red-600); --color-danger-bg:var(--red-100); --color-danger-text:var(--red-800);
+
+  --surface:var(--white); --surface-alt:var(--slate-50); --surface-inverse:var(--slate-950);
+  --border:var(--slate-200); --border-strong:#CBD5E1;
+  --text-heading:var(--slate-950); --text-body:var(--slate-600);
+  --text-muted:var(--slate-500); --text-caption:var(--slate-400);
+  --text-on-primary:var(--white);
+  --focus-ring:rgba(79,70,229,.32);
+
+  --font-core:"Pretendard Variable",Pretendard,Inter,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:ui-monospace,"SFMono-Regular",Menlo,monospace;
+
+  --radius-xs:4px; --radius-sm:6px; --radius-md:8px; --radius-lg:12px; --radius-pill:999px;
+  --shadow-primary:0 4px 16px rgba(79,70,229,.22);
+  --shadow-float:0 8px 24px rgba(11,17,32,.10);
+  --shadow-overlay:0 20px 48px rgba(11,17,32,.18);
+
+  --ease-out:cubic-bezier(.22,.61,.36,1);
+  --dur-fast:120ms; --dur:180ms; --dur-slow:280ms;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface-alt);color:var(--text-body);
+     font-family:var(--font-core);font-size:16px;line-height:1.7}
+h1,h2,h3{margin:0;color:var(--text-heading);letter-spacing:-.02em}
+button,input,select,textarea{font-family:inherit}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ── 확인 컨트롤 바 ── ★ 개발 확인용. 실서비스에는 포함되지 않습니다 ── */
+.devbar{position:sticky;top:0;z-index:90;display:flex;align-items:center;gap:14px;
+        flex-wrap:wrap;padding:10px 20px;background:var(--surface-inverse);color:#fff;
+        font-size:13px}
+.devbar strong{font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.6}
+.devbar label{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.devbar select{height:30px;padding:0 10px;border:1px solid rgba(255,255,255,.22);
+        border-radius:var(--radius-sm);background:rgba(255,255,255,.08);color:#fff;font-size:13px}
+.devbar select option{color:#0B1120}
+.devbar .spacer{flex:1}
+
+/* ── ERP 셸 ── */
+/* 고정 1440px 제작 — 좁은 창에서는 클리핑이 아니라 가로 스크롤이 생겨야 합니다.
+   이 가드가 없으면 .contract-item-table 의 overflow:hidden 이 우측 열을 잘라냅니다. */
+.shell{display:flex;min-width:1440px;min-height:calc(100vh - 50px);background:var(--surface-alt)}
+.sidebar{width:248px;flex:0 0 auto;background:var(--surface);border-right:1px solid var(--border);
+         display:flex;flex-direction:column;padding:20px 16px;
+         transition:width 240ms var(--ease-out),padding 240ms var(--ease-out)}
+.sidebar.is-collapsed{width:64px;padding:20px 12px}
+.brand{display:flex;align-items:center;gap:10px;height:40px;padding:0 8px;margin-bottom:24px;
+       border:0;background:transparent;cursor:pointer;border-radius:var(--radius-md);width:100%}
+.brand:hover{background:var(--surface-alt)}
+.sidebar.is-collapsed .brand{justify-content:center;padding:0;gap:0}
+.brand img{height:24px;width:auto;flex:0 0 auto}
+.brand .wordmark{font-size:17px;font-weight:800;letter-spacing:-.03em;color:var(--text-heading);white-space:nowrap}
+.brand .wordmark .dot{opacity:.55}
+.brand .wordmark .suffix{color:var(--color-primary)}
+.sidebar.is-collapsed .side-label{display:none}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;
+          border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);
+          font-size:15px;text-align:left;cursor:pointer;white-space:nowrap}
+.nav-item:hover{background:var(--surface-alt)}
+.nav-item.is-active{background:var(--color-accent-bg);color:var(--color-primary-hover);font-weight:700}
+.sidebar.is-collapsed .nav-item{justify-content:center;padding:0;gap:0}
+.nav-item .tip{position:absolute;left:calc(100% + 22px);top:50%;transform:translateY(-50%);
+     display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);
+     background:var(--surface-inverse);color:#fff;font-size:14px;font-weight:400;white-space:nowrap;
+     box-shadow:var(--shadow-float);pointer-events:none;z-index:40}
+.sidebar.is-collapsed .nav-item:hover .tip{display:flex}
+.sidebar-toggle{position:fixed;left:248px;top:50%;transform:translateX(-50%) translateY(-50%);
+     z-index:50;width:24px;height:24px;display:grid;place-items:center;border:1px solid var(--border);
+     border-radius:999px;background:var(--surface);color:var(--text-muted);cursor:pointer;padding:0;
+     opacity:.45;transition:left 240ms var(--ease-out),opacity 180ms var(--ease-out)}
+.sidebar-toggle:hover,.shell:hover .sidebar-toggle{opacity:1}
+.sidebar-toggle.is-collapsed{left:64px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{flex:0 0 auto;height:64px;border-bottom:1px solid var(--border);background:var(--surface);
+        display:flex;align-items:center;gap:16px;padding:0 28px}
+.topbar .crumb{font-size:12px;color:var(--text-caption)}
+.topbar .title{font-size:17px;font-weight:700;letter-spacing:-.015em;color:var(--text-heading)}
+.topbar .spacer{flex:1}
+.account{display:flex;align-items:center;gap:10px;padding-left:16px;border-left:1px solid var(--border)}
+.account .avatar{width:32px;height:32px;border-radius:var(--radius-sm);background:var(--color-accent-bg);
+        color:var(--color-primary-hover);display:grid;place-items:center;font-size:13px;font-weight:700}
+.account .who{line-height:1.3}
+.account .who b{display:block;font-size:14px;color:var(--text-heading)}
+.account .who span{font-size:12px;color:var(--text-muted)}
+
+/* ── 버튼 ── */
+.btn{height:40px;padding:0 16px;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+     border-radius:var(--radius-md);font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;
+     border:1px solid transparent;transition:background var(--dur) var(--ease-out)}
+.btn--primary{background:var(--color-primary);color:var(--text-on-primary);box-shadow:var(--shadow-primary)}
+.btn--primary:hover{background:var(--color-primary-hover)}
+.btn--ghost{background:var(--surface);color:var(--text-heading);border-color:var(--border)}
+.btn--ghost:hover{background:var(--surface-alt)}
+.btn--danger{background:var(--surface);color:var(--color-danger);border-color:var(--border)}
+.btn--danger:hover{background:var(--color-danger-bg)}
+.btn--sm{height:36px;padding:0 14px}
+.btn--xs{height:32px;padding:0 10px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.link-btn{border:0;background:transparent;padding:0;color:var(--color-primary);
+          font-size:14px;font-weight:700;cursor:pointer}
+
+/* ── 폼 ── */
+.field{display:flex;flex-direction:column;gap:6px}
+.field > .label{font-size:14px;font-weight:600;color:var(--text-heading)}
+.field > .label .req{color:var(--color-danger)}
+.field > .hint{font-size:13px;color:var(--text-muted);margin-top:-2px}
+.field > .err{font-size:12px;color:var(--color-danger)}
+.input,.select,.textarea{width:100%;height:44px;padding:0 14px;font-size:14px;color:var(--text-heading);
+     background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;
+     transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)}
+.input:focus,.select:focus,.textarea:focus{border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)}
+.input[readonly]{background:var(--surface-alt);cursor:default}
+.input:disabled,.select:disabled{background:var(--surface-alt);opacity:.5;cursor:not-allowed}
+.input--money{text-align:right;font-variant-numeric:tabular-nums}
+.textarea{height:auto;padding:12px 14px;line-height:1.6;resize:vertical}
+.select-wrap{position:relative;display:flex}
+.select{appearance:none;padding-right:34px;cursor:pointer}
+/* Select 캐럿 — 정적 표기, 클릭 시 회전하지 않습니다 */
+.select-wrap::after{content:"";position:absolute;right:14px;top:50%;
+     transform:translateY(-60%) rotate(45deg);width:6px;height:6px;
+     border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);pointer-events:none}
+.checkbox{width:18px;height:18px;accent-color:var(--color-primary)}
+
+/* ── 뱃지 ── */
+.badge{height:24px;padding:0 10px;display:inline-flex;align-items:center;gap:5px;
+       border-radius:var(--radius-pill);font-size:12px;font-weight:700;white-space:nowrap}
+.badge--indigo{background:var(--color-accent-bg);color:var(--color-primary-hover)}
+.badge--warning{background:var(--color-warning-bg);color:var(--color-warning-text)}
+.badge--danger{background:var(--color-danger-bg);color:var(--color-danger-text)}
+.badge--neutral{background:var(--surface-alt);border:1px solid var(--border);color:var(--text-muted)}
+
+/* ── 섹션 ── */
+.section{background:var(--surface);border:1px solid var(--border);
+         border-radius:var(--radius-lg);padding:24px 28px}
+.section-header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.section-header h2{font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em}
+.section-rule{margin:16px 0;height:1px;background:var(--border)}
+.section-note{margin:0 0 16px;font-size:13px;line-height:1.6;color:var(--text-muted)}
+
+/* ── 모달 ── */
+.overlay{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;
+         padding:24px;background:rgba(11,17,32,.45)}
+.overlay.is-open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+       box-shadow:var(--shadow-overlay);display:flex;flex-direction:column;
+       max-height:calc(100vh - 48px);overflow:hidden}
+.modal--sm{width:480px;padding:28px}
+.modal--md{width:720px}
+.modal-head{flex:0 0 auto;display:flex;align-items:flex-start;justify-content:space-between;
+            gap:16px;padding:24px;border-bottom:1px solid var(--border)}
+.modal-body{flex:1;min-height:0;overflow-y:auto;padding:24px}
+.modal-foot{flex:0 0 auto;display:flex;justify-content:flex-end;gap:8px;
+            padding:20px 24px;border-top:1px solid var(--border)}
+.icon-btn{width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:var(--radius-sm);
+          background:transparent;color:var(--text-caption);cursor:pointer;padding:0}
+.icon-btn:hover{background:var(--surface-alt)}
+
+/* ── 유틸 ── */
+.money{font-variant-numeric:tabular-nums;text-align:right}
+.muted{color:var(--text-muted)}
+.empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:48px 24px;text-align:center}
+.empty .icon{color:var(--text-caption)}
+.empty p{margin:0;font-size:16px;color:var(--text-muted)}
+[data-scroll]::-webkit-scrollbar{width:8px}
+[data-scroll]::-webkit-scrollbar-track{background:transparent}
+[data-scroll]::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+
+/* ── 계약 폼 전용 ── */
+.page-head{position:sticky;top:50px;z-index:30;flex:0 0 auto;height:72px;background:var(--surface);
+           border-bottom:1px solid var(--border);display:flex;align-items:center}
+.page-head .inner{width:100%;max-width:1120px;margin:0 auto;padding:0 32px;
+           display:flex;align-items:center;justify-content:space-between;gap:16px}
+.page-head h1{font-size:30px;font-weight:700;line-height:1.1;letter-spacing:-.018em}
+.page-note{margin-top:2px;display:flex;align-items:center;gap:5px;font-size:12px}
+.page-note.is-warning{color:var(--color-warning)}
+.page-note.is-ok{color:var(--color-primary)}
+.head-actions{display:flex;gap:8px}
+.head-actions .btn{position:relative}
+.btn .tip{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);
+     display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);
+     background:var(--surface-inverse);color:#fff;font-size:14px;font-weight:400;white-space:nowrap;
+     box-shadow:var(--shadow-float);pointer-events:none;z-index:40}
+.btn:hover .tip{display:flex}
+
+.form-scroll{flex:1;min-height:0;overflow-y:auto;padding:24px 32px 32px}
+.form-wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+
+/* 4열 그리드 — 필드는 col-span 으로 폭을 조절합니다 */
+.grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:20px;row-gap:18px}
+.span-2{grid-column:span 2}
+.span-4{grid-column:span 4}
+.inline-row{display:flex;gap:8px;align-items:center}
+
+/* 계약 항목 테이블 — 10열 */
+.contract-item-table{border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
+.contract-item-head,.contract-item-row{
+  display:grid;
+  grid-template-columns:40px minmax(120px,.8fr) minmax(130px,.9fr) minmax(110px,.75fr)
+                        minmax(110px,.75fr) minmax(110px,.75fr) 70px minmax(100px,.7fr)
+                        minmax(110px,.8fr) 48px;
+  align-items:center}
+.contract-item-table.is-locked .contract-item-head,
+.contract-item-table.is-locked .contract-item-row{
+  grid-template-columns:40px minmax(120px,.8fr) minmax(130px,.9fr) minmax(110px,.75fr)
+                        minmax(110px,.75fr) minmax(110px,.75fr) 70px minmax(100px,.7fr)
+                        minmax(110px,.8fr)}
+.contract-item-head{padding:10px 0;background:var(--surface-alt);border-bottom:1px solid var(--border)}
+.contract-item-head span{padding:0 6px;text-align:center;font-size:12px;font-weight:700;color:var(--text-muted)}
+.contract-item-row{padding:10px 0;border-bottom:1px solid var(--border)}
+.contract-item-row:last-child{border-bottom:0}
+.contract-item-row .cell{min-width:0;padding:0 6px}
+.contract-item-row .no{text-align:center;font-size:14px;color:var(--text-muted)}
+.contract-item-row .center{display:flex;justify-content:center}
+.contract-item-row .ro-text{display:block;font-size:14px;color:var(--text-heading);
+     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.contract-item-row .ro-text.right{text-align:right}
+.contract-item-row .input,.contract-item-row .select{height:38px;padding:0 10px;border-radius:var(--radius-sm)}
+.contract-item-row .select{padding-right:28px}
+.contract-item-row .select-wrap::after{right:11px}
+.contract-item-row .diff{display:block;margin-top:2px;text-align:right;font-size:12px;
+     font-weight:700;color:var(--color-primary)}
+.contract-item-row .pay{font-weight:700}
+.trash{width:30px;height:30px;margin:0 auto;display:grid;place-items:center;border:0;
+       border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);cursor:pointer}
+.trash:hover{background:var(--color-danger-bg);color:var(--color-danger)}
+.trash:disabled{opacity:.45;cursor:not-allowed}
+.trash:disabled:hover{background:transparent;color:var(--text-muted)}
+
+/* 금액 합계 — 5등분 */
+.summary-bar{position:relative;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;
+     padding:16px 20px 16px 24px;background:var(--surface-alt);border-radius:var(--radius-md);overflow:hidden}
+.summary-bar::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--color-primary)}
+.summary-bar .k{font-size:12px;color:var(--text-muted)}
+.summary-bar .v{margin-top:4px;font-size:16px;font-weight:700;color:var(--text-heading);
+     font-variant-numeric:tabular-nums}
+.summary-bar .v.is-accent{color:var(--color-primary)}
+.summary-bar .discount{margin-top:2px;font-size:12px;font-weight:700;color:var(--color-primary)}
+
+.first-pay .input{background:var(--color-accent-bg);border-color:var(--color-primary);
+     color:var(--color-primary);font-weight:700}
+.first-pay .formula{margin-top:4px;font-size:12px;color:var(--text-muted)}
+
+/* 사용자 테이블 — 8열 */
+.user-table-head,.user-row{
+  display:grid;
+  grid-template-columns:48px 48px minmax(150px,.9fr) minmax(180px,1fr)
+                        minmax(300px,1.7fr) 80px minmax(160px,1fr) 56px;
+  align-items:center}
+.user-table-head{padding:10px 0;background:var(--surface-alt);border-radius:var(--radius-sm)}
+.user-table-head span{text-align:center;font-size:12px;font-weight:700;color:var(--text-muted)}
+.user-table-head span.pad{padding:0 10px}
+.user-row{padding:10px 0;border-bottom:1px solid var(--border)}
+.user-row.is-off{background:var(--surface-alt)}
+.user-row.is-off .input,.user-row.is-off .select-wrap{opacity:.5}
+.user-row .cell{min-width:0;padding:0 10px}
+.user-row .center{display:flex;justify-content:center}
+.user-row .no{text-align:center;font-size:14px;color:var(--text-muted)}
+.user-row .input,.user-row .select{height:40px;padding:0 12px;border-radius:var(--radius-sm)}
+.user-row .mail{display:flex;align-items:center;gap:6px;min-width:0;padding:0 10px}
+.user-row .mail .at{flex:0 0 auto;font-size:14px;color:var(--text-muted)}
+.user-row .mail .select-wrap{width:140px;flex:0 0 auto}
+.add-row{margin-top:12px;width:100%;height:44px;display:flex;align-items:center;justify-content:center;
+     gap:6px;border:1px dashed var(--border);border-radius:var(--radius-md);background:transparent;
+     color:var(--text-muted);font-size:14px;cursor:pointer}
+.add-row:hover:not(:disabled){border-color:var(--color-primary);color:var(--color-primary)}
+.add-row:disabled{opacity:.45;cursor:not-allowed}
+
+/* 첨부 서류 */
+.doc-card{display:flex;align-items:center;justify-content:space-between;gap:20px;
+     background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px 20px}
+.doc-card .name{font-size:16px;font-weight:700;color:var(--text-heading)}
+.doc-card .desc{margin-top:4px;font-size:14px;color:var(--text-muted)}
+.doc-card .file{display:flex;align-items:center;gap:8px}
+.doc-card .file .fname{max-width:200px;font-size:14px;color:var(--text-body);
+     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc-card .file .fsize{font-size:12px;color:var(--text-caption);white-space:nowrap}
+.notice{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-radius:var(--radius-md);
+     font-size:14px;line-height:1.6;color:var(--text-body)}
+.notice--warning{background:var(--color-warning-bg);border:1px solid rgba(217,119,6,.3)}
+.notice--warning .icon{color:var(--color-warning)}
+
+/* 잠금 표시 */
+.lock-badge{height:24px;padding:0 10px;display:none;align-items:center;gap:5px;
+     border-radius:var(--radius-pill);background:var(--surface-alt);color:var(--text-muted);
+     font-size:12px;font-weight:700;white-space:nowrap}
+.is-locked-section .lock-badge{display:inline-flex}
+
+.toast{position:fixed;right:32px;bottom:32px;z-index:60;display:none;align-items:center;gap:10px;
+     width:380px;padding:16px;background:var(--surface);border:1px solid var(--border);
+     border-radius:var(--radius-lg);box-shadow:var(--shadow-float)}
+.toast.is-open{display:flex}
+.toast .dot{width:8px;height:8px;flex:0 0 auto;border-radius:999px;background:var(--color-primary)}
+
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════
+     확인 컨트롤 바
+     ★ 개발 확인용입니다. 실서비스 화면에는 포함되지 않습니다.
+     ══════════════════════════════════════════════════════════════ -->
+<div class="devbar">
+  <strong>확인용</strong>
+  <label>mode
+    <select id="c-mode">
+      <option value="create">create · 신규 작성</option>
+      <option value="draft" selected>draft · 계약 대기</option>
+      <option value="confirmed">confirmed · 계약 확정</option>
+      <option value="terminated">terminated · 종료</option>
+      <option value="cancelled">cancelled · 취소</option>
+    </select>
+  </label>
+  <label>memberType
+    <select id="c-member"><option>프리랜서</option><option>개인사업자</option><option selected>법인</option></select>
+  </label>
+  <label>docUploaded
+    <select id="c-docs"><option value="none">none</option><option value="partial" selected>partial</option><option value="all">all</option></select>
+  </label>
+  <label>contractItemCount
+    <select id="c-items"><option>1</option><option>2</option><option selected>3</option></select>
+  </label>
+  <label>userCount
+    <select id="c-users"><option>1</option><option selected>3</option></select>
+  </label>
+  <label>bizCheckState
+    <select id="c-biz">
+      <option value="none" selected>none</option><option value="success">success</option>
+      <option value="duplicate">duplicate</option><option value="invalid">invalid</option>
+    </select>
+  </label>
+  <span class="spacer"></span>
+  <span style="opacity:.6">s0300200040 · 계약 폼</span>
+</div>
+
+<div class="shell">
+
+  <!-- ── ERP 셸 · 사이드바 ── 기준: erp-tenants ── -->
+  <aside class="sidebar" id="sidebar">
+    <button class="brand" type="button">
+      <img src="../assets/swonbiz-logo.png" alt="" onerror="this.style.visibility='hidden'">
+      <span class="wordmark side-label">S<span class="dot">·</span>won<span class="suffix">Biz</span></span>
+    </button>
+    <nav class="nav" id="nav"></nav>
+  </aside>
+  <button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-label="사이드바 접기">
+    <i data-lucide="chevron-left" style="width:14px;height:14px"></i>
+  </button>
+
+  <div class="main">
+    <!-- ── ERP 셸 · 헤더 ── -->
+    <header class="topbar">
+      <div>
+        <div class="crumb">운영 · 강남 삼성점</div>
+        <div class="title">계약</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="account">
+        <span class="avatar">최</span>
+        <span class="who"><b>최현수</b><span>운영 관리자</span></span>
+      </div>
+    </header>
+
+    <!-- ── 페이지 헤더 ── 상태별 액션 버튼이 여기 모입니다 ── -->
+    <div class="page-head">
+      <div class="inner">
+        <div>
+          <h1 id="page-title">계약 수정</h1>
+          <div class="page-note is-warning" id="page-note"></div>
+        </div>
+        <div class="head-actions" id="head-actions"></div>
+      </div>
+    </div>
+
+    <div class="form-scroll" data-scroll>
+      <div class="form-wrap">
+
+        <!-- ══════════ 섹션 1 · 회사 기본정보 ══════════
+             모든 상태에서 수정 가능 (terminated / cancelled 제외) -->
+        <section class="section" id="sec-company">
+          <div class="section-header"><h2>회사 기본정보</h2></div>
+          <div class="section-rule"></div>
+          <div class="grid-4">
+            <label class="field">
+              <span class="label">회사명 <span class="req">*</span></span>
+              <input class="input" data-f="company">
+            </label>
+
+            <div class="field span-2">
+              <span class="label">사업자등록번호 <span class="req">*</span></span>
+              <div class="inline-row">
+                <input class="input" data-f="bizno" data-mask="bizno" placeholder="000-00-00000 (사업자등록 전이면 비워두세요)" style="flex:1;min-width:0">
+                <button class="btn btn--ghost" type="button" style="width:72px;height:44px">확인</button>
+                <span id="biz-icon" style="position:relative;display:none;flex:0 0 auto"></span>
+              </div>
+              <span class="err" id="biz-msg" style="display:none"></span>
+            </div>
+
+            <label class="field">
+              <span class="label">회원구분 <span class="req">*</span></span>
+              <span class="select-wrap"><select class="select" data-f="memberType" id="f-memberType"></select></span>
+            </label>
+
+            <label class="field">
+              <span class="label">법인등록번호</span>
+              <input class="input" data-f="corpno" data-mask="corpno" id="f-corpno" placeholder="000000-0000000">
+            </label>
+            <label class="field"><span class="label">업종</span><input class="input" data-f="industry"></label>
+            <label class="field"><span class="label">업태</span><input class="input" data-f="bizKind"></label>
+            <label class="field"><span class="label">대표자 <span class="req">*</span></span><input class="input" data-f="ceo"></label>
+
+            <label class="field">
+              <span class="label">연락처 <span class="req">*</span></span>
+              <input class="input" data-f="phone" data-mask="phone" placeholder="010-0000-0000" style="font-variant-numeric:tabular-nums">
+            </label>
+
+            <div class="field span-2">
+              <span class="label">이메일 <span class="req">*</span></span>
+              <div class="inline-row">
+                <input class="input" data-f="emailId" style="flex:1;min-width:0">
+                <span class="muted" style="flex:0 0 auto">@</span>
+                <span class="select-wrap" style="width:160px;flex:0 0 auto">
+                  <select class="select" data-f="emailDomain" id="f-domain"></select>
+                </span>
+                <input class="input" id="f-domain-custom" placeholder="도메인 직접입력" style="width:160px;flex:0 0 auto;display:none">
+              </div>
+            </div>
+            <div></div>
+
+            <div class="field span-4">
+              <span class="label">대표자 주소</span>
+              <div class="inline-row">
+                <input class="input" data-f="zip" readonly style="width:140px;flex:0 0 auto;font-variant-numeric:tabular-nums">
+                <button class="btn btn--ghost" type="button" style="width:100px;height:44px">주소 검색</button>
+                <input class="input" data-f="addr1" readonly style="flex:1;min-width:0">
+                <input class="input" data-f="addr2" placeholder="동·호수 등" style="width:320px;flex:0 0 auto">
+              </div>
+            </div>
+
+            <label class="field span-4">
+              <span class="label">특기사항</span>
+              <textarea class="textarea" rows="2" data-f="note1"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <!-- ══════════ 섹션 2 · 계약정보 ══════════
+             create / draft 에서만 수정 가능. confirmed 이후 전체 잠금.
+             계약 항목은 N개, 계약 조건은 계약당 1세트입니다. -->
+        <section class="section" id="sec-contract">
+          <div class="section-header">
+            <div style="display:flex;align-items:center;gap:10px">
+              <h2>계약정보</h2>
+              <span class="lock-badge"><i data-lucide="lock" style="width:12px;height:12px"></i>확정됨</span>
+            </div>
+            <div class="inline-row" id="c2-picker">
+              <span class="select-wrap" style="width:160px"><select class="select btn--sm" style="height:36px"><option>삼성센터</option></select></span>
+              <span class="select-wrap" style="width:120px"><select class="select btn--sm" style="height:36px"><option>3층</option><option>2층</option></select></span>
+            </div>
+          </div>
+          <div class="section-rule"></div>
+          <p class="section-note" id="lock-note" style="display:none">계약 조건은 확정 후 변경할 수 없습니다. 변경이 필요하면 종료 후 재계약해 주세요.</p>
+
+          <!-- ─ 1블록 · 계약 항목 테이블 ─ -->
+          <div class="section-header" style="margin-bottom:10px">
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="font-size:14px;font-weight:700;color:var(--text-heading)">계약 항목</span>
+              <span class="muted" style="font-size:12px" id="item-count">3건</span>
+            </div>
+            <button class="btn btn--ghost btn--xs" type="button" id="item-add">
+              <i data-lucide="plus" style="width:14px;height:14px"></i>항목 추가
+            </button>
+          </div>
+          <div class="contract-item-table" id="item-table">
+            <div class="contract-item-head">
+              <span>No</span><span>계약구분</span><span>호실</span><span>월회비</span><span>예치금</span>
+              <span>월이용료</span><span>계산서</span><span>부가세액</span><span>납부액</span>
+              <span class="del-col">삭제</span>
+            </div>
+            <div id="item-rows"></div>
+          </div>
+
+          <!-- ─ 2블록 · 금액 합계 ─ 각 행의 합입니다 ─ -->
+          <div class="summary-bar" style="margin-top:12px">
+            <div><div class="k">예치금 합계</div><div class="v" id="sum-deposit">0</div></div>
+            <div><div class="k">월회비 합계</div><div class="v" id="sum-base">0</div></div>
+            <div><div class="k">월이용료 합계</div><div class="v" id="sum-fee">0</div><div class="discount" id="sum-discount" style="display:none"></div></div>
+            <div><div class="k">부가세액 합계</div><div class="v" id="sum-vat">0</div></div>
+            <div><div class="k">월납부액 합계</div><div class="v is-accent" id="sum-monthly">0</div></div>
+          </div>
+
+          <!-- ─ 3블록 · 계약 조건 ─ 전부 계약당 1개 값 ─ -->
+          <div class="grid-4" style="margin-top:18px">
+            <div class="field">
+              <span class="label">계약호실</span>
+              <div class="inline-row">
+                <input class="input" data-f="roomNo" readonly style="flex:1;min-width:0">
+                <button class="btn btn--ghost" type="button" aria-label="호실 조회" style="width:44px;height:44px;padding:0">
+                  <i data-lucide="search" style="width:16px;height:16px"></i>
+                </button>
+              </div>
+            </div>
+            <label class="field">
+              <span class="label">납부방법 <span class="req">*</span></span>
+              <span class="select-wrap"><select class="select" data-f="payMethod" id="f-payMethod"><option>월납</option><option>일시불</option></select></span>
+            </label>
+            <div class="field first-pay">
+              <span class="label">첫달납부액</span>
+              <input class="input input--money" id="f-first" readonly>
+              <span class="formula" id="first-formula" style="display:none"></span>
+            </div>
+            <label class="field">
+              <span class="label">접근경로</span>
+              <span class="select-wrap"><select class="select" data-f="channel"><option>검색</option><option>지인소개</option><option>광고</option><option>방문</option></select></span>
+            </label>
+
+            <label class="field"><span class="label">계약일자 <span class="req">*</span></span><input class="input" type="date" data-f="signDate"></label>
+            <div class="field">
+              <span class="label">기간(월) <span class="req">*</span></span>
+              <span style="position:relative;display:flex;align-items:center">
+                <input class="input input--money" data-f="months" data-num="3" id="f-months" style="padding-right:44px">
+                <span class="muted" style="position:absolute;right:14px;font-size:12px;pointer-events:none">개월</span>
+              </span>
+            </div>
+            <label class="field"><span class="label">시작일 <span class="req">*</span></span><input class="input" type="date" data-f="startDate" id="f-start"></label>
+            <label class="field"><span class="label">종료일</span><input class="input" data-f="endDate" id="f-end" readonly style="font-variant-numeric:tabular-nums"></label>
+
+            <div class="field span-4">
+              <span class="label">특기사항</span>
+              <span class="hint">할인이 있으면 첫 줄에 자동 기재됩니다</span>
+              <textarea class="textarea" rows="2" data-f="note2" id="f-note2"></textarea>
+            </div>
+          </div>
+        </section>
+
+        <!-- ══════════ 섹션 3 · 입주자 사용자 정보 ══════════
+             계약 항목과 연동하지 않습니다. 1행은 섹션 1 대표자 자동 반영. -->
+        <section class="section" id="sec-users">
+          <div class="section-header">
+            <h2>입주자 사용자 정보</h2>
+            <span class="muted" style="font-size:14px" id="user-count">3명 등록</span>
+          </div>
+          <div class="section-rule"></div>
+          <div class="user-table-head">
+            <span><input type="checkbox" class="checkbox" id="user-all"></span>
+            <span>No</span><span class="pad">성명</span><span class="pad">연락처</span>
+            <span class="pad">이메일</span><span>대표자</span><span class="pad">비고</span><span>삭제</span>
+          </div>
+          <div id="user-rows"></div>
+          <button class="add-row" type="button" id="user-add">
+            <i data-lucide="plus" style="width:16px;height:16px"></i>사용자 추가
+          </button>
+        </section>
+
+        <!-- ══════════ 섹션 4 · 첨부 서류 ══════════
+             회원구분에 따라 필수·선택 뱃지가 바뀌고, 법인등기부등본은 법인일 때만 표시 -->
+        <section class="section" id="sec-docs">
+          <div class="section-header">
+            <h2>첨부 서류</h2>
+            <span class="muted" style="font-size:14px" id="doc-count">0 / 2 등록</span>
+          </div>
+          <div class="section-rule"></div>
+          <div style="display:flex;flex-direction:column;gap:12px" id="doc-cards"></div>
+          <div style="margin-top:12px;font-size:12px;color:var(--text-caption)">JPG, PNG, PDF 형식 · 파일당 최대 10MB</div>
+          <div class="notice notice--warning" id="doc-warning" style="display:none;margin-top:12px">
+            <span class="icon" style="flex:0 0 auto;margin-top:1px"><i data-lucide="circle-alert" style="width:16px;height:16px"></i></span>
+            <span>사업자등록증이 없으면 가등록 상태로 계약이 진행됩니다. 발급 후 반드시 제출해 주세요.</span>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 확인 모달 3종 ══════════ 계약확정 / 계약취소 / 종료 -->
+<div class="overlay" id="confirm-overlay">
+  <div class="modal modal--sm">
+    <div style="display:flex;justify-content:center">
+      <span id="confirm-icon" style="width:56px;height:56px;border-radius:999px;display:grid;place-items:center"></span>
+    </div>
+    <h3 id="confirm-title" style="margin:16px 0 0;font-size:22px;font-weight:600;text-align:center"></h3>
+    <p id="confirm-desc" style="margin:8px 0 0;font-size:14px;line-height:1.6;color:var(--text-body);text-align:center"></p>
+    <div id="confirm-extra" style="display:none;margin-top:16px"></div>
+    <div style="margin-top:24px;display:flex;gap:8px">
+      <button class="btn btn--ghost" style="flex:1;height:44px" id="confirm-cancel">취소</button>
+      <button class="btn btn--primary" style="flex:1;height:44px" id="confirm-ok">확정</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span class="dot"></span>
+  <span style="flex:1;font-size:14px;font-weight:700;color:var(--text-heading)" id="toast-msg"></span>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   시안 데이터 — 값만 바꿔 확인하실 수 있습니다
+   ══════════════════════════════════════════════════════════════ */
+
+/** 회원구분별 필수 서류. 프리랜서는 사업자등록증이 선택입니다. */
+const MEMBER_TYPES = ["프리랜서", "개인사업자", "법인"];
+
+/** 호실 기준 월회비. 호실을 고르면 예치금·월이용료가 이 값으로 채워집니다. */
+const ROOMS = [
+  { name: "Room-1",  base: 450000 },
+  { name: "Room-2",  base: 450000 },
+  { name: "Room-5",  base: 880000 },
+  { name: "Room-15", base: 90000  },
+];
+
+const CONTRACT_TYPES = ["비상주", "고정석", "1인실", "2인실", "팀오피스"];
+const EMAIL_DOMAINS = ["bridgelab.co.kr", "naver.com", "gmail.com", "daum.net", "hanmail.net", "nate.com"];
+
+/** 계약 항목 시안 3건. contractItemCount 컨트롤로 1~3건을 전환합니다. */
+const DEMO_ITEMS = [
+  { type: "1인실",  room: "Room-1",  deposit: 450000, fee: 400000, invoice: true },
+  { type: "1인실",  room: "Room-2",  deposit: 450000, fee: 400000, invoice: true },
+  { type: "비상주", room: "Room-15", deposit: 90000,  fee: 80000,  invoice: true },
+];
+
+/** 섹션 3 사용자 시안. 1행은 섹션 1 대표자를 자동으로 따라갑니다. */
+const DEMO_USERS = [
+  { name: "김도현", phone: "010-2345-6789", mailId: "kim",  domain: "bridgelab.co.kr", memo: "" },
+  { name: "이서준", phone: "010-3456-7890", mailId: "lee",  domain: "bridgelab.co.kr", memo: "" },
+  { name: "박민지", phone: "010-4567-8901", mailId: "park", domain: "bridgelab.co.kr", memo: "" },
+];
+
+/** 회사 기본정보 시안. mode=create 에서는 전부 빈 값으로 시작합니다. */
+const DEMO_COMPANY = {
+  company: "브릿지랩 주식회사", bizno: "211-88-05567", memberType: "법인",
+  corpno: "110111-1234567", industry: "정보통신업", bizKind: "서비스",
+  ceo: "김도현", phone: "010-2345-6789", emailId: "kim", emailDomain: "bridgelab.co.kr",
+  zip: "06158", addr1: "서울특별시 강남구 봉은사로 55길 19", addr2: "3층 301호", note1: "",
+};
+
+/** 계약 조건 시안. 계약당 1세트입니다. */
+const DEMO_TERMS = {
+  roomNo: "1-10", payMethod: "월납", signDate: "2026-01-10", months: "6",
+  startDate: "2026-01-15", endDate: "2026.07.14", channel: "검색", note2: "",
+};
+
+/** 첨부 서류 시안 파일명. docUploaded 컨트롤로 none/partial/all 을 전환합니다. */
+const DEMO_FILES = {
+  id:   { name: "신분증_김도현.jpg",           size: "1.2MB" },
+  biz:  { name: "사업자등록증_브릿지랩.pdf",    size: "324KB" },
+  corp: { name: "법인등기부등본_브릿지랩.pdf",  size: "512KB" },
+};
+
+const MAX_ITEMS = 10;
+const MAX_USERS = 20;
+const VAT_RATE = 0.1;
+
+
+/* ══════════════════════════════════════════════════════════════
+   상태
+   ══════════════════════════════════════════════════════════════ */
+const state = {
+  mode: "draft",          // create / draft / confirmed / terminated / cancelled
+  memberType: "법인",
+  docUploaded: "partial", // none / partial / all
+  bizCheck: "none",       // none / success / duplicate / invalid
+  items: [],              // 계약 항목 N개
+  users: [],              // 입주자 사용자
+  userOn: [],             // 행별 저장 대상 여부
+  repIndex: 0,            // 대표자 행
+  sidebarCollapsed: false,
+  confirmKind: null,
+};
+
+/* 잠금 판정 — 계약 조건은 확정 후 바꿀 수 없고, 종료·취소는 전 섹션이 읽기 전용입니다. */
+const isContractLocked = () => state.mode !== "create" && state.mode !== "draft";
+const isFrozen = () => state.mode === "terminated" || state.mode === "cancelled";
+
+/* ══════════════════════════════════════════════════════════════
+   계산 로직
+   ══════════════════════════════════════════════════════════════ */
+const toNumber = (v) => parseInt(String(v ?? "").replace(/[^\d]/g, ""), 10) || 0;
+const comma = (n) => (n || 0).toLocaleString("ko-KR");
+const baseFeeOf = (roomName) => (ROOMS.find((r) => r.name === roomName) || {}).base || 0;
+
+/** 행 단위 부가세 — 계산서발행을 끈 행은 0입니다. */
+function rowVat(item) {
+  return item.invoice === false ? 0 : Math.round((item.fee || 0) * VAT_RATE);
+}
+function rowPayment(item) {
+  return (item.fee || 0) + rowVat(item);
+}
+
+/** 합계는 전부 행별 값의 합입니다. */
+function calcTotals(items) {
+  return items.reduce((acc, it) => ({
+    deposit: acc.deposit + (it.deposit || 0),
+    base: acc.base + baseFeeOf(it.room),
+    fee: acc.fee + (it.fee || 0),
+    vat: acc.vat + rowVat(it),
+    monthly: acc.monthly + rowPayment(it),
+  }), { deposit: 0, base: 0, fee: 0, vat: 0, monthly: 0 });
+}
+
+/** 첫달납부액 — 월납은 1개월치, 일시불은 기간 전체입니다. */
+function calcFirstPayment(totals, payMethod, months) {
+  return payMethod === "일시불"
+    ? totals.deposit + months * totals.monthly
+    : totals.deposit + totals.monthly;
+}
+
+/** 종료일 = 시작일 + 기간(월) - 1일 */
+function calcEndDate(startISO, months) {
+  if (!startISO || !months) return "";
+  const d = new Date(startISO);
+  d.setMonth(d.getMonth() + months);
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10).replace(/-/g, ".");
+}
+
+/** 기준가 대비 할인 문구. 차액이 없으면 빈 문자열입니다. */
+function discountLabel(base, fee) {
+  if (!base || !fee || base === fee) return "";
+  const diff = fee - base;
+  const pct = Math.abs((diff / base) * 100).toFixed(1);
+  return "기준가 대비 " + (diff < 0 ? "-" : "+") + comma(Math.abs(diff)) +
+         "원 (" + pct + (diff < 0 ? "% 할인)" : "% 추가)");
+}
+
+/* ══════════════════════════════════════════════════════════════
+   입력 마스크 — 숫자만 받고 하이픈을 자동으로 넣습니다
+   ══════════════════════════════════════════════════════════════ */
+function maskValue(kind, raw) {
+  const d = String(raw).replace(/\D/g, "").slice(0, kind === "corpno" ? 13 : kind === "phone" ? 11 : 10);
+  if (kind === "bizno") {
+    return d.length > 5 ? d.slice(0, 3) + "-" + d.slice(3, 5) + "-" + d.slice(5)
+         : d.length > 3 ? d.slice(0, 3) + "-" + d.slice(3) : d;
+  }
+  if (kind === "corpno") return d.length > 6 ? d.slice(0, 6) + "-" + d.slice(6) : d;
+  const mid = d.startsWith("010") || d.length > 10 ? 7 : 6;      // 010 은 3-4-4, 그 외 3-3-4
+  return d.length > mid ? d.slice(0, 3) + "-" + d.slice(3, mid) + "-" + d.slice(mid)
+       : d.length > 3 ? d.slice(0, 3) + "-" + d.slice(3) : d;
+}
+
+/** 콤마를 다시 넣으면 커서가 앞으로 튀므로 길이 차이만큼 보정합니다. */
+function applyCaretSafeFormat(el, format) {
+  const prevLen = el.value.length;
+  const prevPos = el.selectionStart;
+  const out = format(el.value);
+  el.value = out;
+  const pos = Math.max(0, Math.min(out.length, prevPos + (out.length - prevLen)));
+  try { el.setSelectionRange(pos, pos); } catch (err) { /* detached */ }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   렌더 — 반복 요소는 전부 JS 로 그립니다
+   ══════════════════════════════════════════════════════════════ */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+};
+const icon = (name, size) =>
+  '<i data-lucide="' + name + '" style="width:' + size + 'px;height:' + size + 'px"></i>';
+
+/* ── ERP 셸 사이드바 ── */
+const NAV_ITEMS = [
+  ["tenants", "building-2", "입주사", true],
+  ["billing", "receipt", "청구", false],
+  ["tax", "calculator", "세무", false],
+  ["rooms", "calendar-check", "회의실", false],
+  ["spaces", "door-open", "호실", false],
+  ["settings", "settings", "설정", false],
+];
+function renderNav() {
+  const nav = $("#nav");
+  nav.innerHTML = NAV_ITEMS.map(([key, ic, label, active]) =>
+    '<button class="nav-item' + (active ? " is-active" : "") + '" type="button" data-nav="' + key + '">' +
+      icon(ic, 18) + '<span class="side-label">' + label + '</span>' +
+      '<span class="tip">' + label + '</span>' +
+    '</button>').join("");
+}
+
+/* ── 계약 항목 행 ── */
+function renderItems() {
+  const host = $("#item-rows");
+  const locked = isContractLocked();
+  $("#item-table").classList.toggle("is-locked", locked);
+  $$(".del-col").forEach((c) => { c.style.display = locked ? "none" : "block"; });
+  host.innerHTML = "";
+
+  state.items.forEach((item, i) => {
+    const row = el("div", "contract-item-row");
+    const base = baseFeeOf(item.room);
+    const vat = rowVat(item);
+    const pay = rowPayment(item);
+
+    row.appendChild(el("span", "no", String(i + 1)));
+
+    if (locked) {
+      /* 확정 이후에는 같은 테이블을 읽기 전용으로 렌더합니다 — 열 정렬을 유지합니다. */
+      const ro = (v, right) => {
+        const c = el("span", "cell");
+        c.appendChild(el("span", "ro-text" + (right ? " right" : ""), v || "—"));
+        return c;
+      };
+      row.appendChild(ro(item.type));
+      row.appendChild(ro(item.room));
+      row.appendChild(ro(base ? comma(base) : "", true));
+      row.appendChild(ro(item.deposit ? comma(item.deposit) : "", true));
+      row.appendChild(ro(item.fee ? comma(item.fee) : "", true));
+      const mark = el("span", "cell center");
+      mark.innerHTML = item.invoice === false
+        ? '<span style="color:var(--text-caption)">' + icon("circle", 16) + '</span>'
+        : '<span style="color:var(--color-primary)">' + icon("circle-check", 16) + '</span>';
+      row.appendChild(mark);
+      row.appendChild(ro(comma(vat), true));
+      const payCell = ro(comma(pay), true);
+      payCell.firstChild.classList.add("pay");
+      row.appendChild(payCell);
+      host.appendChild(row);
+      return;
+    }
+
+    /* 계약구분 */
+    row.appendChild(selectCell(CONTRACT_TYPES, item.type, (v) => {
+      state.items[i].type = v; renderAll();
+    }));
+
+    /* 호실 — 고르면 그 행의 월회비·예치금·월이용료가 함께 채워집니다 */
+    row.appendChild(selectCell(
+      [{ v: "", t: "선택" }].concat(ROOMS.map((r) => ({ v: r.name, t: r.name }))),
+      item.room,
+      (v) => {
+        state.items[i].room = v;
+        state.items[i].deposit = baseFeeOf(v);
+        state.items[i].fee = baseFeeOf(v);
+        renderAll();
+      }
+    ));
+
+    /* 월회비 — 읽기 전용 */
+    row.appendChild(inputCell(base ? comma(base) : "", { readonly: true }));
+
+    /* 예치금 */
+    row.appendChild(moneyCell(item.deposit, (n) => { state.items[i].deposit = n; }));
+
+    /* 월이용료 + 차액 */
+    const feeCell = moneyCell(item.fee, (n) => { state.items[i].fee = n; });
+    if (base && item.fee && base !== item.fee) {
+      feeCell.appendChild(el("span", "diff",
+        (item.fee - base > 0 ? "+" : "-") + comma(Math.abs(item.fee - base))));
+    }
+    row.appendChild(feeCell);
+
+    /* 계산서발행 — 행 단위 */
+    const inv = el("span", "cell center");
+    const cb = el("input", "checkbox");
+    cb.type = "checkbox";
+    cb.checked = item.invoice !== false;
+    cb.addEventListener("change", () => { state.items[i].invoice = cb.checked; renderAll(); });
+    inv.appendChild(cb);
+    row.appendChild(inv);
+
+    row.appendChild(inputCell(comma(vat), { readonly: true }));
+    row.appendChild(inputCell(comma(pay), { readonly: true, bold: true }));
+
+    const del = el("span", "cell center");
+    const btn = el("button", "trash");
+    btn.type = "button";
+    btn.setAttribute("aria-label", "삭제");
+    btn.innerHTML = icon("trash-2", 16);
+    btn.disabled = state.items.length < 2;
+    btn.addEventListener("click", () => {
+      if (state.items.length < 2) return;
+      state.items.splice(i, 1);
+      renderAll();
+    });
+    del.appendChild(btn);
+    row.appendChild(del);
+
+    host.appendChild(row);
+  });
+
+  $("#item-count").textContent = state.items.length + "건";
+  const add = $("#item-add");
+  add.style.display = locked ? "none" : "inline-flex";
+  add.disabled = state.items.length >= MAX_ITEMS;
+  add.title = state.items.length >= MAX_ITEMS ? "최대 " + MAX_ITEMS + "개까지 등록 가능" : "";
+}
+
+function inputCell(value, opts) {
+  const cell = el("span", "cell");
+  const input = el("input", "input input--money");
+  input.value = value;
+  if (opts && opts.readonly) input.readOnly = true;
+  if (opts && opts.bold) input.style.fontWeight = "700";
+  cell.appendChild(input);
+  return cell;
+}
+function moneyCell(value, onChange) {
+  const cell = el("span", "cell");
+  const input = el("input", "input input--money");
+  input.value = value ? comma(value) : "";
+  input.setAttribute("inputmode", "numeric");
+  const handle = () => {
+    applyCaretSafeFormat(input, (raw) => {
+      const digits = raw.replace(/[^0-9]/g, "");
+      return digits ? Number(digits).toLocaleString("ko-KR") : "";
+    });
+    onChange(toNumber(input.value));
+    renderDerived();   // 입력 중에는 행을 다시 그리지 않고 파생값만 갱신합니다
+  };
+  input.addEventListener("input", handle);
+  input.addEventListener("paste", () => setTimeout(handle, 0));
+  input.addEventListener("blur", renderAll);
+  cell.appendChild(input);
+  return cell;
+}
+function selectCell(options, value, onChange) {
+  const cell = el("span", "cell");
+  const wrap = el("span", "select-wrap");
+  const sel = el("select", "select");
+  options.forEach((o) => {
+    const opt = el("option", null, typeof o === "string" ? o : o.t);
+    opt.value = typeof o === "string" ? o : o.v;
+    sel.appendChild(opt);
+  });
+  sel.value = value || "";
+  sel.addEventListener("change", () => onChange(sel.value));
+  wrap.appendChild(sel);
+  cell.appendChild(wrap);
+  return cell;
+}
+
+/* ── 입주자 사용자 행 ── */
+function renderUsers() {
+  const host = $("#user-rows");
+  const frozen = isFrozen();
+  host.innerHTML = "";
+
+  state.users.forEach((user, i) => {
+    const isFirst = i === 0;
+    const on = isFirst ? true : state.userOn[i] !== false;
+    const row = el("div", "user-row" + (on ? "" : " is-off"));
+
+    /* 저장 대상 선택 — 1행은 항상 포함이고 해제할 수 없습니다 */
+    const selCell = el("span", "cell center");
+    const sel = el("input", "checkbox");
+    sel.type = "checkbox";
+    sel.checked = on;
+    sel.disabled = isFirst || frozen;
+    sel.addEventListener("change", () => { state.userOn[i] = sel.checked; renderUsers(); });
+    selCell.appendChild(sel);
+    row.appendChild(selCell);
+
+    row.appendChild(el("span", "no", String(i + 1)));
+
+    /* 1행은 섹션 1 대표자·연락처·이메일을 그대로 따라갑니다 (읽기 전용) */
+    row.appendChild(userInput(isFirst ? readField("ceo") : user.name, isFirst || frozen,
+      (v) => { state.users[i].name = v; }));
+    row.appendChild(userInput(isFirst ? readField("phone") : user.phone, isFirst || frozen,
+      (v) => { state.users[i].phone = v; }, "phone"));
+
+    const mail = el("span", "mail");
+    mail.appendChild(userInputRaw(isFirst ? readField("emailId") : user.mailId, isFirst || frozen,
+      (v) => { state.users[i].mailId = v; }, "flex:1;min-width:0"));
+    mail.appendChild(el("span", "at", "@"));
+    if (isFirst) {
+      mail.appendChild(userInputRaw(currentDomain(), true, () => {}, "width:140px;flex:0 0 auto"));
+    } else {
+      const wrap = el("span", "select-wrap");
+      const dom = el("select", "select");
+      EMAIL_DOMAINS.forEach((d) => { const o = el("option", null, d); o.value = d; dom.appendChild(o); });
+      dom.value = user.domain || EMAIL_DOMAINS[0];
+      dom.disabled = frozen;
+      dom.addEventListener("change", () => { state.users[i].domain = dom.value; });
+      wrap.appendChild(dom);
+      mail.appendChild(wrap);
+    }
+    row.appendChild(mail);
+
+    /* 대표자 — 1명만 선택됩니다 */
+    const repCell = el("span", "cell center");
+    const rep = el("input", "checkbox");
+    rep.type = "checkbox";
+    rep.checked = state.repIndex === i;
+    rep.disabled = frozen || !on;
+    rep.addEventListener("change", () => { if (rep.checked) { state.repIndex = i; renderUsers(); } });
+    repCell.appendChild(rep);
+    row.appendChild(repCell);
+
+    row.appendChild(userInput(user.memo, frozen, (v) => { state.users[i].memo = v; }));
+
+    const del = el("span", "cell center");
+    const btn = el("button", "trash");
+    btn.type = "button";
+    btn.setAttribute("aria-label", "삭제");
+    btn.innerHTML = icon("trash-2", 16);
+    btn.disabled = isFirst || frozen;
+    btn.addEventListener("click", () => {
+      if (isFirst) return;
+      state.users.splice(i, 1);
+      state.userOn.splice(i, 1);
+      if (state.repIndex >= state.users.length) state.repIndex = 0;
+      renderUsers();
+    });
+    del.appendChild(btn);
+    row.appendChild(del);
+
+    host.appendChild(row);
+  });
+
+  $("#user-count").textContent = state.users.length + "명 등록";
+  const add = $("#user-add");
+  add.disabled = frozen || state.users.length >= MAX_USERS;
+  add.title = state.users.length >= MAX_USERS ? "최대 " + MAX_USERS + "명까지 등록 가능" : "";
+  const all = $("#user-all");
+  all.disabled = frozen || state.users.length < 2;
+  lucide.createIcons();
+}
+
+function userInput(value, readonly, onChange, mask) {
+  const cell = el("span", "cell");
+  cell.appendChild(userInputRaw(value, readonly, onChange, "", mask));
+  return cell;
+}
+function userInputRaw(value, readonly, onChange, style, mask) {
+  const input = el("input", "input");
+  input.value = value || "";
+  input.readOnly = !!readonly;
+  if (readonly) input.style.background = "var(--surface-alt)";
+  if (style) input.style.cssText += style;
+  if (mask === "phone") {
+    input.placeholder = "010-0000-0000";
+    input.style.fontVariantNumeric = "tabular-nums";
+  }
+  input.addEventListener("input", () => {
+    if (mask) input.value = maskValue(mask, input.value);
+    onChange(input.value);
+  });
+  return input;
+}
+const readField = (key) => { const n = $('[data-f="' + key + '"]'); return n ? n.value : ""; };
+function currentDomain() {
+  const sel = $("#f-domain");
+  return sel && sel.value === "custom" ? ($("#f-domain-custom").value || "") : (sel ? sel.value : "");
+}
+
+/* ── 첨부 서류 ── */
+const DOC_DEFS = [
+  { key: "id", name: "대표자 신분증", desc: "주민등록증 또는 운전면허증 사본" },
+  { key: "biz", name: "사업자등록증", desc: "사업자등록 전이면 발급 후 제출해 주세요" },
+  { key: "corp", name: "법인등기부등본", desc: "최근 3개월 이내 발급본" },
+];
+/** 회원구분이 필수 여부와 표시 여부를 결정합니다. */
+function docRule(key) {
+  if (key === "id") return { show: true, required: true };
+  if (key === "biz") return { show: true, required: state.memberType !== "프리랜서" };
+  return { show: state.memberType === "법인", required: false };
+}
+function renderDocs() {
+  const filled = { none: [], partial: ["id"], all: ["id", "biz", "corp"] }[state.docUploaded] || [];
+  const host = $("#doc-cards");
+  host.innerHTML = "";
+  let shown = 0, done = 0, bizMissing = false;
+
+  DOC_DEFS.forEach((def) => {
+    const rule = docRule(def.key);
+    if (!rule.show) return;
+    shown += 1;
+    const has = filled.indexOf(def.key) > -1;
+    if (has) done += 1;
+    if (def.key === "biz" && !has && state.memberType !== "프리랜서") bizMissing = true;
+
+    const card = el("div", "doc-card");
+    card.innerHTML =
+      '<div style="min-width:0">' +
+        '<div style="display:flex;align-items:center">' +
+          '<span class="name">' + def.name + '</span>' +
+          '<span class="badge ' + (rule.required ? "badge--danger" : "badge--neutral") +
+            '" style="margin-left:8px">' + (rule.required ? "필수" : "선택") + '</span>' +
+        '</div>' +
+        '<div class="desc">' + def.desc + '</div>' +
+      '</div>' +
+      (has
+        ? '<div class="file">' +
+            '<span style="color:var(--color-primary);display:flex">' + icon("file-text", 16) + '</span>' +
+            '<span class="fname">' + DEMO_FILES[def.key].name + '</span>' +
+            '<span class="fsize">' + DEMO_FILES[def.key].size + '</span>' +
+            '<button class="icon-btn" type="button" aria-label="미리보기">' + icon("eye", 16) + '</button>' +
+            '<button class="icon-btn" type="button" aria-label="삭제">' + icon("trash-2", 16) + '</button>' +
+          '</div>'
+        : '<button class="btn btn--ghost" type="button">' + icon("upload", 16) + '파일 선택</button>');
+    host.appendChild(card);
+  });
+
+  $("#doc-count").textContent = done + " / " + shown + " 등록";
+  $("#doc-warning").style.display = bizMissing ? "flex" : "none";
+  lucide.createIcons();
+}
+
+/* ── 상태별 헤더 액션 ── */
+const TITLES = { create: "계약 등록", draft: "계약 수정" };
+const ACTIONS = {
+  create:     ["back", "draftSave", "confirm"],
+  draft:      ["back", "cancel", "draftSave", "confirm"],
+  confirmed:  ["back", "docs", "terminate", "save"],
+  terminated: ["back", "docs"],
+  cancelled:  ["back", "docs"],
+};
+const ACTION_DEFS = {
+  back:      { label: "이전", cls: "btn--ghost" },
+  cancel:    { label: "계약취소", cls: "btn--danger", modal: "cancel" },
+  draftSave: { label: "임시저장", cls: "btn--ghost", icon: "save" },
+  confirm:   { label: "계약확정", cls: "btn--primary", icon: "circle-check", modal: "confirm" },
+  docs:      { label: "계약서 출력", cls: "btn--ghost", icon: "file-text", tip: "계약서 미리보기 (s0300200040p1)" },
+  terminate: { label: "종료", cls: "btn--danger", modal: "terminate" },
+  save:      { label: "저장", cls: "btn--primary", icon: "save" },
+};
+function renderHeader() {
+  $("#page-title").textContent = TITLES[state.mode] || "계약 상세";
+
+  const note = $("#page-note");
+  const missing = state.mode === "create" ? 3 : 0;
+  note.className = "page-note " + (missing ? "is-warning" : "is-ok");
+  note.innerHTML = missing
+    ? "필수 항목 " + missing + "개 미입력"
+    : icon("circle-check", 12) + "입력 완료";
+
+  const host = $("#head-actions");
+  host.innerHTML = "";
+  (ACTIONS[state.mode] || []).forEach((key) => {
+    const def = ACTION_DEFS[key];
+    const btn = el("button", "btn " + def.cls);
+    btn.type = "button";
+    btn.innerHTML = (def.icon ? icon(def.icon, 16) : "") + def.label +
+      (def.tip ? '<span class="tip">' + def.tip + "</span>" : "");
+    if (def.modal) btn.addEventListener("click", () => openConfirm(def.modal));
+    host.appendChild(btn);
+  });
+  lucide.createIcons();
+}
+
+/* ── 파생값만 갱신 ── 입력 중 포커스를 잃지 않도록 행은 다시 그리지 않습니다 ── */
+function renderDerived() {
+  const totals = calcTotals(state.items);
+  $("#sum-deposit").textContent = comma(totals.deposit);
+  $("#sum-base").textContent = comma(totals.base);
+  $("#sum-fee").textContent = comma(totals.fee);
+  $("#sum-vat").textContent = comma(totals.vat);
+  $("#sum-monthly").textContent = comma(totals.monthly);
+
+  const discount = discountLabel(totals.base, totals.fee);
+  const dEl = $("#sum-discount");
+  dEl.style.display = discount ? "block" : "none";
+  dEl.textContent = discount;
+
+  const months = toNumber($("#f-months").value);
+  const payMethod = $("#f-payMethod").value;
+  $("#f-first").value = comma(calcFirstPayment(totals, payMethod, months));
+
+  const formula = $("#first-formula");
+  const showFormula = payMethod === "일시불" && months && totals.monthly;
+  formula.style.display = showFormula ? "block" : "none";
+  if (showFormula) formula.textContent = "예치금 + " + months + "개월 × " + comma(totals.monthly) + "원";
+
+  $("#f-end").value = calcEndDate($("#f-start").value, months);
+  syncDiscountNote(discount);
+}
+
+/** 할인 문구는 특기사항 첫 줄에 자동 기재하고, 사용자 입력분은 유지합니다. */
+function syncDiscountNote(line) {
+  const box = $("#f-note2");
+  const lines = box.value.split("\n");
+  const hasAuto = lines[0] && lines[0].startsWith("기준가 대비 ");
+  const rest = hasAuto ? lines.slice(1) : lines;
+  const next = line ? [line].concat(rest).join("\n") : rest.join("\n");
+  if (box.value !== next) box.value = next;
+}
+
+/* ── 상태 적용 ── */
+function applyMode() {
+  const locked = isContractLocked();
+  const frozen = isFrozen();
+
+  $("#sec-contract").classList.toggle("is-locked-section", locked);
+  $("#lock-note").style.display = locked ? "block" : "none";
+  $("#c2-picker").style.display = locked ? "none" : "flex";
+
+  /* 계약 조건 3블록은 확정 이후 읽기 전용. 회사·사용자 정보는 계속 수정 가능합니다. */
+  $$("#sec-contract .grid-4 .input, #sec-contract .grid-4 .select, #sec-contract .grid-4 .textarea")
+    .forEach((n) => { n.disabled = locked; });
+
+  /* 종료·취소는 전 섹션 읽기 전용 */
+  $$("#sec-company .input, #sec-company .select, #sec-company .textarea")
+    .forEach((n) => { n.disabled = frozen; });
+
+  /* 법인등록번호는 회원구분이 법인일 때만 활성 */
+  const corp = $("#f-corpno");
+  const corpOn = state.memberType === "법인" && !frozen;
+  corp.disabled = !corpOn;
+  if (!corpOn) corp.value = "";
+
+  /* 사업자번호 확인 결과 — 인라인 아이콘 + 툴팁, 실패 시에만 아래 짧은 문구 */
+  const RESULTS = {
+    success:   { ic: "circle-check", color: "var(--color-primary)", tip: "등록 가능한 사업자입니다", short: "" },
+    duplicate: { ic: "circle-alert", color: "var(--color-danger)",  tip: "이미 등록된 사업자번호입니다", short: "이미 등록된 번호" },
+    invalid:   { ic: "circle-alert", color: "var(--color-warning)", tip: "국세청에 등록되지 않은 번호입니다", short: "국세청 미등록" },
+  };
+  const r = RESULTS[state.bizCheck];
+  const iconBox = $("#biz-icon");
+  const msg = $("#biz-msg");
+  iconBox.style.display = r ? "block" : "none";
+  if (r) {
+    iconBox.innerHTML = '<span style="color:' + r.color + ';display:flex" title="' + r.tip + '">' + icon(r.ic, 20) + "</span>";
+  }
+  msg.style.display = r && r.short ? "block" : "none";
+  if (r && r.short) { msg.textContent = r.short; msg.style.color = r.color; }
+}
+
+/* ── 확인 모달 ── */
+const CONFIRM_DEFS = {
+  confirm: {
+    ic: "circle-check", bg: "var(--color-accent-bg)", fg: "var(--color-primary)",
+    title: "계약을 확정하시겠습니까?",
+    desc: "확정 후에는 계약 조건을 변경할 수 없습니다. 회사 정보와 사용자 정보는 계속 수정할 수 있습니다.",
+    cancel: "취소", ok: "확정", danger: false, next: "confirmed",
+  },
+  cancel: {
+    ic: "circle-x", bg: "var(--color-danger-bg)", fg: "var(--color-danger)",
+    title: "계약을 취소하시겠습니까?",
+    desc: "임시저장된 계약 정보가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+    cancel: "돌아가기", ok: "계약취소", danger: true, next: "cancelled",
+  },
+  terminate: {
+    ic: "triangle-alert", bg: "var(--color-warning-bg)", fg: "var(--color-warning)",
+    title: "계약을 종료하시겠습니까?",
+    desc: "종료 후 해당 호실은 예약 가능 상태가 됩니다.",
+    cancel: "취소", ok: "종료 처리", danger: true, next: "terminated", extra: true,
+  },
+};
+function openConfirm(kind) {
+  const def = CONFIRM_DEFS[kind];
+  if (!def) return;
+  state.confirmKind = kind;
+  const box = $("#confirm-icon");
+  box.style.background = def.bg;
+  box.style.color = def.fg;
+  box.innerHTML = icon(def.ic, 24);
+  $("#confirm-title").textContent = def.title;
+  $("#confirm-desc").textContent = def.desc;
+  $("#confirm-cancel").textContent = def.cancel;
+  const ok = $("#confirm-ok");
+  ok.textContent = def.ok;
+  ok.style.background = def.danger ? "var(--color-danger)" : "var(--color-primary)";
+  ok.style.boxShadow = def.danger ? "none" : "var(--shadow-primary)";
+
+  const extra = $("#confirm-extra");
+  extra.style.display = def.extra ? "block" : "none";
+  extra.innerHTML = def.extra
+    ? '<label class="field"><span class="label">종료일</span>' +
+      '<input class="input" type="date" value="2026-09-06"></label>' +
+      '<textarea class="textarea" rows="2" placeholder="종료 사유를 입력해 주세요" style="margin-top:12px"></textarea>'
+    : "";
+
+  $("#confirm-overlay").classList.add("is-open");
+  lucide.createIcons();
+}
+function closeConfirm() {
+  $("#confirm-overlay").classList.remove("is-open");
+  state.confirmKind = null;
+}
+function showToast(message) {
+  $("#toast-msg").textContent = message;
+  $("#toast").classList.add("is-open");
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => $("#toast").classList.remove("is-open"), 2800);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   시안 데이터 주입 · 초기화
+   ══════════════════════════════════════════════════════════════ */
+function seedForm() {
+  const blank = state.mode === "create";
+  const src = Object.assign({}, DEMO_COMPANY, DEMO_TERMS);
+  $$("[data-f]").forEach((node) => {
+    const key = node.getAttribute("data-f");
+    if (key === "memberType") { node.value = state.memberType; return; }
+    node.value = blank ? "" : (src[key] ?? "");
+  });
+  state.items = blank
+    ? [{ type: "1인실", room: "", deposit: 0, fee: 0, invoice: true }]
+    : DEMO_ITEMS.slice(0, toNumber($("#c-items").value) || 3).map((it) => Object.assign({}, it));
+  const userCount = blank ? 1 : (toNumber($("#c-users").value) || 3);
+  state.users = DEMO_USERS.slice(0, userCount).map((u) => Object.assign({}, u, blank ? { name: "", phone: "", mailId: "", memo: "" } : {}));
+  state.userOn = state.users.map(() => true);
+  state.repIndex = 0;
+}
+
+function renderAll() {
+  applyMode();
+  renderItems();
+  renderUsers();
+  renderDocs();
+  renderHeader();
+  renderDerived();
+  lucide.createIcons();
+}
+
+function bindOnce() {
+  renderNav();
+
+  /* 사이드바 접기 — localStorage 없이 화면 상태로만 유지합니다 */
+  $("#sidebar-toggle").addEventListener("click", () => {
+    state.sidebarCollapsed = !state.sidebarCollapsed;
+    $("#sidebar").classList.toggle("is-collapsed", state.sidebarCollapsed);
+    const toggle = $("#sidebar-toggle");
+    toggle.classList.toggle("is-collapsed", state.sidebarCollapsed);
+    toggle.innerHTML = icon(state.sidebarCollapsed ? "chevron-right" : "chevron-left", 14);
+    toggle.setAttribute("aria-label", state.sidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기");
+    lucide.createIcons();
+  });
+
+  /* 회원구분 · 이메일 도메인 */
+  const member = $("#f-memberType");
+  MEMBER_TYPES.forEach((t) => { const o = el("option", null, t); o.value = t; member.appendChild(o); });
+  member.value = state.memberType;
+  member.addEventListener("change", () => {
+    state.memberType = member.value;
+    $("#c-member").value = member.value;
+    renderAll();
+  });
+
+  const domain = $("#f-domain");
+  EMAIL_DOMAINS.forEach((d) => { const o = el("option", null, d); o.value = d; domain.appendChild(o); });
+  const custom = el("option", null, "직접입력");
+  custom.value = "custom";
+  domain.appendChild(custom);
+  domain.addEventListener("change", () => {
+    $("#f-domain-custom").style.display = domain.value === "custom" ? "block" : "none";
+    renderUsers();
+  });
+  $("#f-domain-custom").addEventListener("input", renderUsers);
+
+  /* 마스크 · 숫자 입력 */
+  $$("[data-mask]").forEach((node) => {
+    node.addEventListener("input", () => {
+      node.value = maskValue(node.getAttribute("data-mask"), node.value);
+      if (node.getAttribute("data-f") === "phone") renderUsers();
+    });
+  });
+  $('[data-f="ceo"]').addEventListener("input", renderUsers);
+  $('[data-f="emailId"]').addEventListener("input", renderUsers);
+  $("#f-months").addEventListener("input", () => {
+    $("#f-months").value = $("#f-months").value.replace(/\D/g, "").slice(0, 3);
+    renderDerived();
+  });
+  $("#f-start").addEventListener("change", renderDerived);
+  $("#f-payMethod").addEventListener("change", renderDerived);
+
+  /* 항목·사용자 추가 */
+  $("#item-add").addEventListener("click", () => {
+    if (state.items.length >= MAX_ITEMS) return;
+    state.items.push({ type: "1인실", room: "", deposit: 0, fee: 0, invoice: true });
+    renderAll();
+  });
+  $("#user-add").addEventListener("click", () => {
+    if (state.users.length >= MAX_USERS) return;
+    state.users.push({ name: "", phone: "", mailId: "", domain: EMAIL_DOMAINS[0], memo: "" });
+    state.userOn.push(true);
+    renderUsers();
+  });
+  $("#user-all").addEventListener("change", (e) => {
+    state.users.forEach((_, i) => { if (i > 0) state.userOn[i] = e.target.checked; });
+    renderUsers();
+  });
+
+  /* 확인 모달 */
+  $("#confirm-cancel").addEventListener("click", closeConfirm);
+  $("#confirm-overlay").addEventListener("click", (e) => {
+    if (e.target === $("#confirm-overlay")) closeConfirm();
+  });
+  $("#confirm-ok").addEventListener("click", () => {
+    const def = CONFIRM_DEFS[state.confirmKind];
+    closeConfirm();
+    if (!def) return;
+    state.mode = def.next;
+    $("#c-mode").value = def.next;
+    renderAll();
+    showToast(def.ok + " 처리했습니다");
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeConfirm(); });
+
+  /* 확인 컨트롤 바 — 실서비스 제외 영역 */
+  $("#c-mode").addEventListener("change", (e) => { state.mode = e.target.value; seedForm(); renderAll(); });
+  $("#c-member").addEventListener("change", (e) => {
+    state.memberType = e.target.value;
+    $("#f-memberType").value = e.target.value;
+    renderAll();
+  });
+  $("#c-docs").addEventListener("change", (e) => { state.docUploaded = e.target.value; renderDocs(); });
+  $("#c-items").addEventListener("change", () => { seedForm(); renderAll(); });
+  $("#c-users").addEventListener("change", () => { seedForm(); renderUsers(); });
+  $("#c-biz").addEventListener("change", (e) => { state.bizCheck = e.target.value; applyMode(); lucide.createIcons(); });
+}
+
+bindOnce();
+seedForm();
+renderAll();
+
+lucide.createIcons();
+</script>
+</body>
+</html>
