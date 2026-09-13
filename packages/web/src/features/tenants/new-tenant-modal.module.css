@@ -127,11 +127,17 @@
  *   옮겼었다. 새 원본이 라벨 규격을 바꿨고, 05-patterns.md 는 "화면별 문서보다 이
  *   파일이 우선한다"고 명시돼 있다.
  *
- *   간격을 gap 하나로 주지 않는 이유 — 라벨↔입력(6px)과 입력↔도움말(4px)이 다르다.
+ *   ★ 3-1c — 새 시안 s0300200040.html 의 `.field` 를 그대로 따른다:
+ *     .field{display:flex;flex-direction:column;gap:6px}
+ *     .field > .label{font-size:14px;font-weight:600;color:var(--text-heading)}
+ *     .field > .label .req{color:var(--color-danger)}
+ *     .field > .hint{font-size:13px;color:var(--text-muted);margin-top:-2px}
+ *   gap 6px 에 hint 만 -2px 을 얹어 라벨↔설명 4px · 설명↔입력 6px 이 된다.
  */
 .field {
   display: flex;
   flex-direction: column;
+  gap: 6px;
 }
 
 .wide {
@@ -139,7 +145,6 @@
 }
 
 .label {
-  margin-bottom: 6px;
   font-size: 14px;
   font-weight: var(--weight-semibold);
   color: var(--text-heading);
@@ -170,12 +175,16 @@
 }
 
 /*
- * 필드 밑 안내. 새 원본 05-patterns.md#3 「도움말/오류 하단 4px, 12px」.
- * 대표 성명("ERP 계정을 받을 사람입니다")과 대표 이메일·대표자명 안내가 여기 뜬다.
+ * 필드 설명 — **라벨과 입력칸 사이**다. 05-patterns.md#3 「설명 13px --text-muted (라벨 하단)」.
+ * 새 시안 s0300200040.html 의 `.field > .hint{font-size:13px;margin-top:-2px}` 와 같은 값이다
+ * (.field gap 6px 에서 -2px → 라벨과 4px, 입력칸과 6px).
+ *
+ * ★ 3-1b 는 이걸 입력칸 아래 12px 로 뒀다. 05-patterns 의 「설명」과 「도움말/오류」를 한
+ *   요소로 읽은 탓이다. 입력칸 아래 12px 자리는 오류 메시지(--color-danger)용으로 비워 둔다.
  */
 .hint {
-  margin-top: 4px;
-  font-size: 12px;
+  margin-top: -2px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 

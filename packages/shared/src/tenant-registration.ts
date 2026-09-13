@@ -23,7 +23,17 @@ export type FieldSink =
   /** 삐용 회사·대표 등록 요청 본문에 실려 나간다. */
   | 'bbiyong'
   /** ERP 테이블(`tb_s080_*`)에만 남는다. **삐용에 보내지 않는다.** */
-  | 'erp';
+  | 'erp'
+  /**
+   * 삐용에 보내고 ERP 에도 보관한다 — **양쪽 다**.
+   *
+   * 지금은 `memberName`(대표자명) 하나뿐이다. 같은 값이 두 곳에 생기는 것은 원칙적으로
+   * 피하지만(→ `bizNumber` 주석) 이 값만은 예외다. 삐용은 계정을 만들려고 이 이름을
+   * 요구하고, ERP 는 세금계산서·계약서에 찍으려고 같은 이름을 필요로 한다. 둘 중 하나를
+   * 포기하면 다른 쪽 기능이 죽는다. **삐용 값이 정본이고 ERP 쪽은 사본이다** — 어긋나면
+   * 삐용을 믿는다.
+   */
+  | 'both';
 
 export interface RegistrationField {
   /** 화면 라벨. 화면에 없는 항목(`orgCode`)도 사람이 부르는 이름은 둔다. */
@@ -74,12 +84,7 @@ export const COMPANY_FIELDS = {
     label: '사업자등록번호', sink: 'erp', wire: null, required: false, maxLength: null, onScreen: true,
     note: '★ 삐용에 보내지 않는다(회신 4 §4). tb_s080_companies.biz_number — UNIQUE 다.',
   },
-  ceoName: {
-    label: '대표자명', sink: 'erp', wire: null, required: false, maxLength: null, onScreen: true,
-    hint: '사업자등록증에 적힌 대표자입니다',
-    note: '★★ 아래 대표 정보의 memberName 과 다른 값이다. 이쪽은 세금계산서용 법적 대표자이고, '
-      + 'memberName 은 삐용 계정을 받는 사람이다. 같은 사람인 경우가 많지만 같은 칸이 아니다.',
-  },
+  // ★ ceoName(대표자명)은 여기 없다. OWNER_FIELDS.memberName 으로 합쳤다 — 그쪽 주석 참조.
   bizKind: {
     label: '업태', sink: 'erp', wire: null, required: false, maxLength: null, onScreen: true,
     note: '세금계산서 발행에 필요하다. 삐용에는 없는 개념이다.',
@@ -114,11 +119,34 @@ export const COMPANY_FIELDS = {
  * ★ 페이즈 3 에서는 대표 1명만 등록한다. 직원 등록은 삐용 메일 발송(2단계)이 열린 뒤다.
  */
 export const OWNER_FIELDS = {
+  /**
+   * ★★★ 대표자명 — 3-1c 에서 두 칸을 **하나로 합친 자리**다.
+   *
+   * 합치기 전에는 이랬다:
+   *   ceoName    「입주사 정보」 "대표자명"   sink:erp      사업자등록증상 법적 대표
+   *   memberName 「대표 정보」   "대표 성명"  sink:bbiyong  삐용 계정을 받는 사람
+   *
+   * 나눠 둔 이유는 "세금계산서에 찍는 사람과 로그인하는 사람이 다를 수 있다"였다.
+   * 실제로는 다음 두 가지가 그 구분을 무너뜨렸다.
+   *
+   *   1. 한 화면에서 「대표자명」과 「대표 성명」은 거의 같은 말로 읽힌다. 운영자가 두 칸에
+   *      다른 사람을 넣을 이유를 찾지 못하고, 바꿔 넣으면 **엉뚱한 사람 이메일로 계정이
+   *      만들어진다.** 안내 문구를 각각 붙여도 이 위험은 남는다
+   *   2. 새 디자인 원본(계약 폼 s0300200040 섹션 1)에도 대표자 칸은 **하나뿐**이고,
+   *      섹션 3 입주자 사용자 1행이 그 값을 그대로 미러링한다. 설계가 이미 하나로 갔다
+   *
+   * 그래서 **사업자등록증상 대표가 곧 ERP 계정을 받는 사람**으로 못 박는다.
+   * 실무자가 대표와 다른 경우는 칸을 나누지 말고 **직원 등록으로 푼다** — 삐용 메일 발송
+   * (2단계)이 열린 뒤 대표가 직원을 초대하면 된다. 그때까지는 대표 1명만 등록한다.
+   *
+   * ★ 이 판단을 적어 두지 않으면 나중에 누가 "법적 대표와 계정 주인은 다를 수 있는데요"
+   *   하며 다시 나눈다. 다시 나누려면 위 1번의 오등록 위험을 먼저 해결해야 한다.
+   */
   memberName: {
-    label: '대표 성명', sink: 'bbiyong', wire: 'memberName', required: true, maxLength: 50, onScreen: true,
-    hint: 'ERP 계정을 받을 사람입니다',
-    note: '★★ 회사 정보의 ceoName(사업자등록증 대표자)과 다른 칸이다. 한 화면에서 거의 같은 말로 '
-      + '읽히므로 안내가 없으면 운영자가 바꿔 넣는다 — 그러면 엉뚱한 사람 이메일로 계정이 만들어진다.',
+    label: '대표자명', sink: 'both', wire: 'memberName', required: true, maxLength: 50, onScreen: true,
+    hint: '사업자등록증상 대표이며, 이 분이 ERP 계정을 받습니다',
+    note: '삐용 member010 으로 나가고 ERP tb_s080_* 에도 보관한다. 세금계산서·계약서에 찍는 이름이 '
+      + '이 값이다. 삐용 쪽이 정본이다.',
   },
   hpNo: {
     label: '대표 휴대전화', sink: 'bbiyong', wire: 'hpNo', required: true, maxLength: 20,

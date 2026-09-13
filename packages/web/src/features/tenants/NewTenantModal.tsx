@@ -17,9 +17,14 @@
  * 회사·대표 입력 항목은 계약 폼(s0300200040) 섹션 1 로 이사했고 그 화면은 페이즈 4 다.
  * **그래서 이 모달은 지금 대체 화면이 없다.** 지우면 입주사를 등록할 방법이 사라진다.
  *
- * 3-1b 에서는 **섹션·항목 구성을 손대지 않았다** — 맞출 원본이 없기 때문이다.
- * 고친 것은 (1) 국가 칸 제거 (2) 대표 성명 안내 (3) 라벨 규격뿐이다.
- * 존폐 판단은 doc/DESIGN_HANDOFF_DIFF.md §C-1 에 미결로 올려 두었다.
+ * ★★ 결정 (2026-09-13) — **페이즈 4 에서 걷어낸다.** 지금은 남긴다.
+ *    계약 폼이 만들어지는 페이즈 4 에서 이 모달을 제거하고 `[+ 신규 입주사 등록]` 을
+ *    계약 폼(mode: create)으로 연결한다. `.planning/ROADMAP.md` 페이즈 4 작업 15 번에
+ *    적어 두었다 — 거기 없으면 이 임시 진입점이 그대로 남는다.
+ *    그때까지 3-2~3-5(삐용 포트·Mock 어댑터·실호출)가 이 화면에 붙는다.
+ *
+ * 3-1b/3-1c 에서 **섹션·항목 구성은 손대지 않았다** — 맞출 원본이 없기 때문이다.
+ * 고친 것은 (1) 국가 칸 제거 (2) 라벨·설명 규격 (3) 대표자 칸 단일화뿐이다.
  *
  * 옛 원본: design/erp-master-detail/ErpMasterDetail.dc.html 216~275행 (modal="new-tenant").
  * 새 원본: design/handoff/  ← 시각 기준은 이제 이쪽이다
@@ -63,7 +68,7 @@ const PLACEHOLDERS: Record<string, string> = {
   // 원본 236행이 쓰던 값 그대로.
   orgName: '주식회사 오피스테크',
   bizNumber: '000-00-00000',
-  ceoName: '홍길동',
+  memberName: '홍길동',
   // 원본에 없는 항목은 자리 표시를 비워 둔다 — 예시를 지어내지 않는다.
   telNo: '02-0000-0000',
   hpNo: '010-0000-0000',
@@ -86,6 +91,14 @@ function Field({ name, field }: { name: string; field: RegistrationField }) {
         {field.label}
         {field.required ? <span className={styles.req} aria-hidden="true">*</span> : null}
       </span>
+      {/*
+        ★ 3-1c — 안내 문구는 **라벨과 입력칸 사이**다. 3-1b 에서는 입력칸 아래에 뒀는데
+          새 시안(s0300200040.html 551~554행)을 열어 보니 `.hint` 가 라벨 바로 밑에 있다.
+          05-patterns.md#3 의 「설명 13px (라벨 하단)」과 「도움말/오류 하단 4px, 12px」은
+          서로 다른 두 요소였다 — 3-1b 가 둘을 하나로 읽었다.
+          여기 문구는 전부 설명(무엇을 넣는 칸인지)이지 입력 결과에 대한 도움말이 아니다.
+      */}
+      {field.hint ? <span className={styles.hint}>{field.hint}</span> : null}
       <input
         className={styles.input}
         name={name}
@@ -94,7 +107,6 @@ function Field({ name, field }: { name: string; field: RegistrationField }) {
         required={field.required}
         inputMode={field.digitsOnly ? 'numeric' : undefined}
       />
-      {field.hint ? <span className={styles.hint}>{field.hint}</span> : null}
     </label>
   );
 }
@@ -141,10 +153,14 @@ export function NewTenantModal({ onClose }: { onClose: () => void }) {
           </div>
 
           {/*
-            ★ 대표 정보를 회사 정보와 나눈 이유 — 원본은 대표자명·연락처·이메일을
-              「입주사 정보」 안에 섞어 두었지만, 이 셋은 삐용에서 **회사가 아니라
-              사람**으로 만들어진다(member010). 같은 상자에 두면 회사 정보의
-              「대표자명」(사업자등록증상 대표자, ERP 만 보관)과 구분이 사라진다.
+            ★ 대표 정보를 회사 정보와 나눈 이유 — 이 셋(대표자명·휴대전화·이메일)은 삐용에서
+              **회사가 아니라 사람**으로 만들어진다(member010). 한 덩어리로 보여야 운영자가
+              "계정을 만드는 값"임을 안다.
+
+            ★ 새 시안(계약 폼 s0300200040)은 이 셋을 섹션 1「회사 기본정보」안에 둔다 —
+              별도 「대표 정보」 섹션이 없다. 그쪽이 맞는 배치일 수 있지만, 이 모달은
+              페이즈 4 에서 계약 폼으로 걷어낼 임시 진입점이라 지금 재배치하지 않는다.
+              doc/DESIGN_REVIEW_1.md 에 차이로 기록했다.
           */}
           <div className={styles.sectionTitle} style={{ marginTop: 24 }}>
             대표 정보
