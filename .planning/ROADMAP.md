@@ -100,6 +100,21 @@
 
 **이 게이트가 페이즈 1 안에 있지 않은 이유**: 페이즈 1의 신규 코드(Fastify·Mock 인증)는 `tenant_id`/`operator_id`를 전혀 참조하지 않는다. 반면 이 게이트는 **신규 코드와 무관하게 기존 앱만 건드리는 별도 배포 창**이다. 페이즈 1이 끝나기 전에 실행해도 무방하지만, 실행 시점과 페이즈 1의 완료 시점을 억지로 묶을 이유가 없어 별도로 뺐다. **다만 페이즈 2 착수 전에는 반드시 끝나 있어야 한다.**
 
+> **★ 2026-09-13 정정 — 게이트의 정지 창 부담이 크게 줄었다.**
+> **레거시 S-WonERP 는 지금 쓰이지 않는다.** 위 절차 1번(앱 정지)·5번(재기동 후
+> 스모크 테스트)은 **아무도 쓰지 않는 앱을 세웠다 켜는 일**이다. 사용자 통보도,
+> 시간 조율도, 업무 중단도 없다. 남는 실질 작업은 2번(백업) · 3번(적용) ·
+> 4번(`schema.prisma` 수정)뿐이다.
+>
+> 2번도 이미 쉬워졌다 — 4-1 에서 PostgreSQL 17 클라이언트를 설치했다(`pg_dump 17.11`).
+> WSL 을 따로 준비할 필요가 없다.
+>
+> 덧붙여, 4-1(커밋 `94f411c`)이 `tb_s080_contracts` 에서 컬럼 11개를 드롭했다.
+> **레거시 계약 화면은 지금 오류가 난다.** 쓰지 않으므로 되돌리지 않는다. 5번 스모크
+> 테스트의 「계약 목록·상세·등록」은 그래서 더 이상 성립하지 않는다 — 이 게이트를
+> 실행할 때 `schema.prisma` 의 계약 모델도 함께 정리하거나, 레거시 계약 화면을
+> 검사 대상에서 뺀다.
+
 ---
 
 ### 페이즈 2 — 기준관리
@@ -216,6 +231,18 @@ UNIQUE 중복 차단(DB가 이미 강제, API는 409로 변환). 마스터-디�
 > 삐용에 보고한다. 그 목록은 엔드포인트에서 뽑은 것이 아니라 **설계 기준**이라
 > 실제와 다를 수 있다(회신 5 §3). 문서상의 약속으로 두면 대조는 잊힌다.
 
+> **★ 3-4 완료 기준에 포함 — Mock 시드 정리.**
+> 4-1 이 `tb_s080_companies` 에 개발용 회사 **1건**을 넣었다 —
+> `MOCK_TENANT_9001` / `주식회사 비앤케이넷` / `link_s020_org_id = 9001`.
+> 007(시험 데이터 정리)이 테이블을 비워 `tenant@test.com` 의 `companyId` 가 풀리지
+> 않게 된 것을 메우려고 `scripts/seed-mock-link.js` 가 만든다. **업무 데이터가 아니다.**
+>
+> 3-4 에서 실제 입주사를 등록하기 시작하면 **지운다.** 남겨 두면 입주사 목록에
+> 가짜 회사가 섞이고, 나중에 그게 시드인지 실데이터인지 판단이 필요해진다.
+> 되돌리기: `DELETE FROM tb_s080_companies WHERE company_id = 'MOCK_TENANT_9001';`
+> — 지우고 나면 `tenant@test.com` 은 `companyId = null`(빈 스코프)이 되므로,
+> 그 계정을 계속 쓰려면 실제 입주사 하나에 `link_s020_org_id = 9001` 을 붙인다.
+
 **3-5** — 신규 등록 플로우 조립(삐용 실호출). 삐용에 실제로 쓰는 첫 작업이므로
 `verification-before-completion` 을 붙인다.
 
@@ -235,7 +262,7 @@ UNIQUE 중복 차단(DB가 이미 강제, API는 409로 변환). 마스터-디�
 
 **DB 마이그레이션**: `001`이 만든 4컬럼(`billing_start_date`·`deposit_return_status`·`biz_info_snapshot`·`renewed_from_contract_id`)과 `tb_s080_contract_status_history`를 이 페이즈에서 처음 실사용한다.
 
-**★ 이 페이즈에서 새로 작성해야 하는 마이그레이션이 하나 있다 — `005_billing_schema.sql`(미작성).** `CSCH-05`(청구 스키마를 append-only 원장으로 1차에 테이블만 생성)가 `.planning/SPEC.md`의 마이그레이션 4종에 포함되지 않았다. 이전 SPEC 작업이 사용자가 지정한 컬럼 목록만 반영했기 때문이다. `tb_s080_billing`/`tb_s080_billing_item`(로직·화면 없이 테이블만, 외부 세금계산서 참조번호 필드 포함)을 이 페이즈 착수 시 작성한다.
+**★ 이 페이즈에서 새로 작성해야 하는 마이그레이션이 하나 있다 — `009_billing_schema.sql`(미작성).** `CSCH-05`(청구 스키마를 append-only 원장으로 1차에 테이블만 생성)가 `.planning/SPEC.md`의 마이그레이션 4종에 포함되지 않았다. 이전 SPEC 작업이 사용자가 지정한 컬럼 목록만 반영했기 때문이다. `tb_s080_billing`/`tb_s080_billing_item`(로직·화면 없이 테이블만, 외부 세금계산서 참조번호 필드 포함)을 이 페이즈 착수 시 작성한다.
 
 **화면 ID 매핑**
 
@@ -257,14 +284,14 @@ UNIQUE 중복 차단(DB가 이미 강제, API는 409로 변환). 마스터-디�
 
 **작업 목록**
 
-1. `005_billing_schema.sql` 작성·적용
+1. `009_billing_schema.sql` 작성·적용
 2. 계약 등록 3모드(`CONT-01`) — 재계약 시 항목·조건·사용자 복사(`CONT-02`, 첨부 제외)
 3. 계약 폼 4섹션(`CONT-03`), 계약 항목 최대 10행 + 유형 구분자(`CONT-04/05`), 계약 사용자 최대 20명(`CONT-06`)
 4. 상태 전이 API — `draft→confirmed→terminated`, `draft→cancelled`(`CONT-07`), 서버 측 화이트리스트 검증(`CONT-08`)
 5. `confirmed` 이후 섹션2 잠금을 **서버가** 강제(`CONT-09`) — 프런트 비활성화가 아니라 API가 섹션2 필드 변경 요청을 거부
 6. 총액 서버 재계산(`CONT-10`)
 7. `tb_s080_contract_status_history` 기록 — 상태 전이마다 INSERT(`CONT-11`)
-8. `contract_type` 필드(`CONT-12`) — **주의**: `.planning/SPEC.md`의 마이그레이션 4종에 이 컬럼이 없다(요청 목록에서 제외됨). 이 페이즈 착수 시 `006_contract_type.sql`로 추가 필요
+8. `contract_type` 필드(`CONT-12`) — **주의**: `.planning/SPEC.md`의 마이그레이션 4종에 이 컬럼이 없다(요청 목록에서 제외됨). 이 페이즈 착수 시 `010_contract_type.sql`로 추가 필요
 9. 계약서 출력 2종 + `@media print`(`CONT-13/15`), 담당자·센터명 폴백 체인(`CONT-14`, `lib/constants.ts` 이미 정의됨 → `CONTRACT_DEFAULTS`)
 10. 만료 임박 필터·정렬(`CONT-16`, `001`의 `end_date` 인덱스 사용)
 11. 첨부파일(`CONT-17`) — 기존 `tb_cm_file` polymorphic 패턴 재사용하되 **부모 경유 검증 강제**(`BACKEND_ANALYSIS.md` §4-2 — `company_id` 컬럼이 없어 ID만으로 조회하면 뚫린다)
@@ -368,7 +395,7 @@ MockBbiyongAuth + MockBbiyongAcl (shadow)
 로그인 화면 + 셸  ═══════════════════ 페이즈 1 완료
         │
         ▼
-004_rename_tenant.sql 게이트 (앱 정지 창, S-WonERP schema.prisma 동시 수정)
+004_rename_tenant.sql 게이트 (S-WonERP schema.prisma 동시 수정 — 정지 창 부담 없음)
         │
         ▼
 기준관리(건물→층→호실→회의실) ══════ 페이즈 2 완료
@@ -440,10 +467,19 @@ MockBbiyongAuth + MockBbiyongAcl (shadow)
 
 | # | 갭 | 원인 | 조치 |
 |---|---|---|---|
-| 1 | `CSCH-05`(청구 스키마, `tb_s080_billing`/`tb_s080_billing_item`) 마이그레이션 미작성 | 이전 SPEC 작업이 사용자가 지정한 컬럼 목록(4개)만 반영, CSCH-05는 REQUIREMENTS.md에는 있었으나 그 목록에 없었음 | 페이즈 4 착수 시 `005_billing_schema.sql` 작성 (작업 목록 1번) |
-| 2 | `contract_type`(CONT-12) 컬럼 미작성 | 동일 — SPEC 1 요청 목록에 없었음(`ORG_ARCHITECTURE.md`가 이전에 제안했던 항목) | 페이즈 4 착수 시 `006_contract_type.sql` 작성 (작업 목록 8번) |
+| 1 | `CSCH-05`(청구 스키마, `tb_s080_billing`/`tb_s080_billing_item`) 마이그레이션 미작성 | 이전 SPEC 작업이 사용자가 지정한 컬럼 목록(4개)만 반영, CSCH-05는 REQUIREMENTS.md에는 있었으나 그 목록에 없었음 | 페이즈 4 착수 시 `009_billing_schema.sql` 작성 (작업 목록 1번) |
+| 2 | `contract_type`(CONT-12) 컬럼 미작성 | 동일 — SPEC 1 요청 목록에 없었음(`ORG_ARCHITECTURE.md`가 이전에 제안했던 항목) | 페이즈 4 착수 시 `010_contract_type.sql` 작성 (작업 목록 8번) |
+| 3 | `scripts/verify-001-003.js` 가 빈 DB 에서 `TypeError` | 스크립트가 `companies` 2행 · `contracts` 1행 · `reservations` 1행이 **이미 있다고 가정**한다(V2 가 UNIQUE 를 시험하려고 두 행을 같은 값으로 UPDATE). 4-1 의 007(시험 데이터 정리)이 그 데이터를 비웠다 | **스크립트가 스스로 픽스처를 만들고 끝나면 걷어내도록 고친다.** 4-1 에서는 임시 픽스처를 넣어 22/22 통과를 확인한 뒤 걷어냈다 — 검사 자체는 살아 있다. 착수 시점 미정 |
 
-두 갭 모두 로드맵을 막지는 않는다 — 페이즈 4가 시작되는 시점에 필요한 만큼, 그 전 페이즈 3개(1·2·3)를 진행하는 동안 마이그레이션 파일만 미리 작성해 두면 지연이 없다.
+1·2 는 로드맵을 막지 않는다 — 페이즈 4가 시작되는 시점에 필요한 만큼, 그 전 페이즈 3개(1·2·3)를 진행하는 동안 마이그레이션 파일만 미리 작성해 두면 지연이 없다.
+
+3 도 막지 않지만, **고치기 전까지 `npm run verify:db` 는 빈 DB 에서 통과를 증명하지 못한다.** 결과를 「실패」로 읽지 말고 「픽스처 없음」으로 읽어야 한다.
+
+> **★ 마이그레이션 번호 정정 (2026-09-13).** 이 표와 페이즈 4 본문이 원래 예고한
+> `005_billing_schema.sql` · `006_contract_type.sql` 은 **이름이 이미 쓰였다** —
+> `005_acl_shadow_log.sql` · `006_review_hardening.sql`. 4-1 이 `008` 까지 갔으므로
+> **`009` · `010` 으로 옮겼다.** 착수 시점에 `supabase/migrations/` 를 먼저 보고
+> 다음 번호를 확인한다.
 
 ---
 

@@ -219,9 +219,9 @@
 | TNNT-01, 02, 04, 05 | 3 | 계획됨 |
 | TNNT-03 | 4 (종결) | 계획됨 — 계약 데이터가 있어야 완전히 검증됨 |
 | CONT-01~11, 13~19 | 4 | 계획됨 |
-| CONT-12 | 4 | ⚠️ 컬럼 미작성 — 착수 시 `006_contract_type.sql` 추가 필요 |
+| CONT-12 | 4 | ⚠️ 컬럼 미작성 — 착수 시 `010_contract_type.sql` 추가 필요 |
 | CSCH-01, 02, 03, 04 | 4 | 계획됨 (`supabase/migrations/001_add_columns.sql`에 이미 반영) |
-| CSCH-05 | 4 | ⚠️ 테이블 미작성 — 착수 시 `005_billing_schema.sql` 추가 필요 |
+| CSCH-05 | 4 | ⚠️ 테이블 미작성 — 착수 시 `009_billing_schema.sql` 추가 필요 |
 | BOOK-01~11 | 5 | 계획됨 |
 | BOOK-07 | 5 | ⚠️ 현재 EXCLUDE 제약은 `timestamp` 기준(`tsrange`) — `timestamptz` 전환 시 재생성 필요 |
 | BOOK-12, 13, 14 | — | 실질 2차 (지시서 2-11 결정, 본문에 "2차" 표기됨에도 v1 섹션에 남아 있던 것 — 로드맵에서 제외 확인) |
