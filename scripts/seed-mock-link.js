@@ -35,12 +35,27 @@ const c = new Client({ host: env.DB_HOST, port: +env.DB_PORT, user: env.DB_USER,
     return c.end();
   }
 
-  const target = await c.query(
+  let target = await c.query(
     'SELECT company_id, company_name FROM tb_s080_companies WHERE company_name = $1 LIMIT 1', [TARGET_COMPANY_NAME]);
+
+  // ★ 007(시험 데이터 정리)로 tb_s080_companies 가 비었다. 그전에는 레거시 데이터에
+  //   이 회사가 있어서 "링크만" 하면 됐지만, 이제는 없으면 만들어야 한다.
+  //   개발 DB 전용 시드다 — 업무 데이터가 아니라 Mock 계정을 띄우기 위한 자리다.
   if (target.rowCount === 0) {
-    console.error(`✘ 대상 회사가 없다: ${TARGET_COMPANY_NAME}`);
-    process.exitCode = 1;
-    return c.end();
+    const build = await c.query('SELECT build_id FROM tb_s080_buildings LIMIT 1');
+    if (build.rowCount === 0) {
+      console.error('✘ 건물이 없다 — 건물·호실 데이터부터 있어야 한다');
+      process.exitCode = 1;
+      return c.end();
+    }
+    await c.query(
+      `INSERT INTO tb_s080_companies
+         (company_id, build_id, company_name, status, is_non_tenant, created_at, updated_at, created_by)
+       VALUES ($1, $2, $3, 'O', false, now(), now(), 'seed-mock-link')`,
+      ['MOCK_TENANT_9001', build.rows[0].build_id, TARGET_COMPANY_NAME]);
+    console.log(`＋ 대상 회사가 없어 만들었다: ${TARGET_COMPANY_NAME} (MOCK_TENANT_9001)`);
+    target = await c.query(
+      'SELECT company_id, company_name FROM tb_s080_companies WHERE company_name = $1 LIMIT 1', [TARGET_COMPANY_NAME]);
   }
 
   const { company_id, company_name } = target.rows[0];
