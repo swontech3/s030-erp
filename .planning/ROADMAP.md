@@ -242,7 +242,7 @@ UNIQUE 중복 차단(DB가 이미 강제, API는 409로 변환). 마스터-디�
 | 화면ID | 이름 | 출처 | 성격 |
 |---|---|---|---|
 | `s0300200030p1` | 계약 상세 | `ErpMasterDetail.dc.html`(이미 구현됨 — 추출만) | 팝업, 읽기 전용 |
-| `s0300200030p2` | 계약 등록(3모드) | `ErpMasterDetail.dc.html`(이미 구현됨) | 팝업. `new-tenant`/`new-contract`/`renew` |
+| `s0300200030p2` | ~~계약 등록(3모드)~~ | — | **제거 대상.** 새 디자인이 모달 3종을 없애고 계약 폼으로 일원화했다(작업 15) |
 | `s0300200040` | 계약 폼 | `ErpContractForm.dc.html` | 사이드바 진입 없음, `/contracts/[id]` 라우트 |
 | `s0300200040p1` | 계약서 미리보기 | `ErpContractForm.dc.html`(이미 구현됨) | 팝업. 이용/전대차 2종 탭 |
 | `s0300200040p2` | 상태 전이 확인 | `Dialog.tsx`+`ErpContractForm.dc.html` | 팝업. 확정/취소/종료 3종을 컴포넌트 1개로 |
@@ -271,6 +271,16 @@ UNIQUE 중복 차단(DB가 이미 강제, API는 409로 변환). 마스터-디�
 12. 입주사 조회 전용 뷰(`CONT-18`) — 수정 버튼 숨김이 아니라 API가 UPDATE 자체를 거부
 13. 입력 마스킹(`CONT-19`)
 14. `MockBbiyongAcl` 화면 목록에 5개 추가
+15. **★ `s0300200030p2` 신규 입주사 모달 제거** — 새 디자인 원본(2026-09-13 인계)이 계약 등록
+    모달 3종(`new-tenant`/`new-contract`/`renew`)을 없애고 계약 폼 페이지로 일원화했다
+    (`design/handoff/tenant-contract/02-master-detail.md` 최종 문단).
+    페이즈 3 이 임시 진입점으로 남겨 둔 것이므로 **이 페이즈에서 반드시 걷어낸다.**
+    - `packages/web/src/features/tenants/NewTenantModal.tsx` + `.module.css` 삭제
+    - `s0300200030` 의 `[+ 신규 입주사 등록]` → 계약 폼(`mode: create`, 전부 빈 값)으로 연결
+    - 3-2~3-5 가 모달에 붙여 둔 삐용 회사·대표 등록 호출을 계약 폼 저장 경로로 옮긴다
+    - 위 2번 "계약 등록 3모드"도 모달이 아니라 **계약 폼의 진입 모드 3종**(신규 입주사 /
+      신규 계약 / 재계약)으로 읽는다 — prefill 규칙은 `01-flow.md` 「진입 시 prefill 규칙」
+    - 근거·대조: `doc/DESIGN_HANDOFF_DIFF.md` §A-3-2, `doc/DESIGN_REVIEW_1.md`
 
 **완료 기준(재확인)**: 신규 입주사 계약을 등록 → `draft` 저장 → `confirmed` 전이(섹션2 잠김 확인) → 계약서 2종 미리보기 인쇄 → 상태 이력 3행 이상 조회(생성·확정 각 1행 이상) → **페이즈 2로 돌아가 그 계약이 참조하는 호실 삭제 시도 → 거부 확인(MAST-06 회귀 통과)** → 입주사 상세(`s0300200030`)에서 이 계약이 실제로 보임(`TNNT-03` 종결).
 
