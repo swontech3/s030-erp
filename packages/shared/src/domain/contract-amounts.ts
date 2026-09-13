@@ -1,0 +1,250 @@
+/**
+ * 계약 금액 계산 — 순수 함수.
+ *
+ * 정본은 `doc/CONTRACT_DATA_MODEL.md` 다. 이 파일과 어긋나면 그 문서를 따른다.
+ * 규칙의 기록은 `contract-amounts.test.ts` 다.
+ *
+ * =============================================================================
+ * ★ 화면 값을 믿지 않는다
+ * =============================================================================
+ * 세금계산서에 찍히는 값이다. 화면에서 올라온 `vat_amount` · `payment_amount` 를
+ * 그대로 저장하지 않고, 서버가 `monthly_fee` 로부터 다시 계산한다.
+ * 어긋나면 **서버 값을 쓰고** 어긋난 칸을 남긴다 — `reconcileRowAmounts`.
+ *
+ * 지금 시안(`s0300200040.html` 708행)은 `Math.round`(반올림)를 쓴다. 여기는 **버림**이다.
+ * 시안 데이터가 만원 단위라 아직 드러나지 않지만 **할인이 들어가면 갈린다.**
+ * 프런트에 맞춰 달라고 요청해 둔 상태다(`doc/DESIGN_REVIEW_1.md`).
+ *
+ * =============================================================================
+ * ★ 순수 함수다
+ * =============================================================================
+ * DB · 현재 시각 · 전역 상태를 참조하지 않는다. 인자를 변형하지도 않는다.
+ * 그래서 DB 없이 시험할 수 있고, 화면과 서버가 같은 함수를 쓸 수 있다.
+ *
+ * 날짜는 **UTC 로만 다룬다.** 로컬 표준시대 접근자(`getMonth` 등)를 쓰면 같은 입력이
+ * 실행 머신에 따라 다른 답을 낸다 — 그건 순수 함수가 아니다.
+ *
+ * =============================================================================
+ * ★ 부동소수점을 쓰지 않는다
+ * =============================================================================
+ * `0.1` 을 곱하면 `99999 * 0.1 === 9999.900000000001` 이 된다. 이번 세율(10%)에서는
+ * `Math.floor` 가 우연히 다 가려 주지만, **우연에 기대지 않는다.**
+ *
+ * 세율을 정수 두 개(`numerator` / `denominator`)로 두고 이렇게 계산한다.
+ *
+ *     const product = fee * numerator;                      // 정수 × 정수 — 정확
+ *     return (product - (product % denominator)) / denominator;
+ *
+ * `%` 는 정수끼리 정확하고, 빼고 나면 `denominator` 의 배수라 나눗셈 결과가 정확히
+ * 표현되는 정수다. 중간에 소수가 한 번도 생기지 않는다. 세율이 바뀌어도 그대로 맞는다.
+ */
+
+/**
+ * 부가가치세율 — **정수 두 개**다. `0.1` 이라는 부동소수점 상수를 두지 않는다.
+ * 세율이 바뀌면 여기 한 곳만 고친다.
+ */
+export const VAT_RATE = { numerator: 1, denominator: 10 } as const;
+
+/** 코드 `PAYMENT_METHOD` — 화면의 "월납"/"일시불"이 아니라 저장되는 코드값이다. */
+export const PAYMENT_METHOD = {
+  /** 월납 */
+  MONTHLY: 'M',
+  /** 일시불 */
+  LUMP_SUM: 'C',
+} as const;
+
+export type PaymentMethod = (typeof PAYMENT_METHOD)[keyof typeof PAYMENT_METHOD];
+
+/** 계약 항목 한 줄 — 금액 계산에 필요한 칸만. */
+export type ContractSpaceAmounts = {
+  /** 표시 순서. 어긋남을 보고할 때 어느 줄인지 가리킨다. */
+  seq: number;
+  /** 월회비(기준가). 합계 표시용이고 부가세 계산에는 쓰지 않는다. */
+  standardFee: number;
+  /** 예치금. */
+  deposit: number;
+  /** 월이용료 — 할인 반영 실제 금액. **부가세 제외.** */
+  monthlyFee: number;
+  /** 부가세 대상 여부. `invoice_yn` 이 아니다. */
+  vatYn: boolean;
+};
+
+/** 서버가 계산해서 저장하는 두 칸. */
+export type RowAmounts = {
+  vatAmount: number;
+  paymentAmount: number;
+};
+
+export type ContractTotals = {
+  deposit: number;
+  standardFee: number;
+  /** 월이용료 합계 — **부가세 제외.** */
+  monthlyFee: number;
+  vatAmount: number;
+  /**
+   * ★ 월납부액 합계 — **부가세를 포함한다.**
+   * 제일 틀리기 쉬운 자리다. 부가세 제외로 읽으면 첫달납부액이 10% 틀린다.
+   */
+  monthlyPayment: number;
+};
+
+/** 화면 값과 서버 값이 어긋난 칸 하나. */
+export type AmountMismatch = {
+  seq: number;
+  field: 'vatAmount' | 'paymentAmount';
+  /** 화면이 올려 보낸 값. */
+  submitted: number;
+  /** 서버가 다시 계산한 값. **이 값이 저장된다.** */
+  server: number;
+};
+
+/** 원 단위 정수여야 하는 자리. 소수·음수·NaN 이 들어오면 계산을 시작하지 않는다. */
+function requireWon(value: number, name: string): number {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new RangeError(`${name} 는 0 이상의 원 단위 정수여야 한다: ${value}`);
+  }
+  return value;
+}
+
+/**
+ * 호실 줄 하나의 부가세액과 납부액.
+ *
+ *     부가세액 = vat_yn 이 false 면 0, 아니면 floor(월이용료 × 10%)
+ *     납부액   = 월이용료 + 부가세액
+ *
+ * ★ 버림이다. 반올림이 아니다.
+ */
+export function calcRowAmounts(row: Pick<ContractSpaceAmounts, 'monthlyFee' | 'vatYn'>): RowAmounts {
+  const monthlyFee = requireWon(row.monthlyFee, 'monthlyFee');
+
+  // 정수 연산만 쓴다 — 위 주석 "부동소수점을 쓰지 않는다" 참조.
+  const product = monthlyFee * VAT_RATE.numerator;
+  const vatAmount = row.vatYn ? (product - (product % VAT_RATE.denominator)) / VAT_RATE.denominator : 0;
+
+  return { vatAmount, paymentAmount: monthlyFee + vatAmount };
+}
+
+/**
+ * 합계 — **줄마다 계산해서 더한다.** 합계에 한 번 매기지 않는다.
+ *
+ * 두 방식은 결과가 다르다. 99,999 두 줄이면 줄별은 19,998, 합계 한 번은 19,999 다.
+ * 줄별이 맞다 — 세금계산서 명세가 줄 단위로 나가기 때문이다.
+ *
+ * 줄이 0개면 합계가 전부 0이다. 아직 호실을 안 고른 상태이지 오류가 아니다.
+ */
+export function calcTotals(rows: readonly ContractSpaceAmounts[]): ContractTotals {
+  return rows.reduce<ContractTotals>(
+    (acc, row) => {
+      const { vatAmount, paymentAmount } = calcRowAmounts(row);
+      return {
+        deposit: acc.deposit + requireWon(row.deposit, 'deposit'),
+        standardFee: acc.standardFee + requireWon(row.standardFee, 'standardFee'),
+        monthlyFee: acc.monthlyFee + row.monthlyFee,
+        vatAmount: acc.vatAmount + vatAmount,
+        monthlyPayment: acc.monthlyPayment + paymentAmount,
+      };
+    },
+    { deposit: 0, standardFee: 0, monthlyFee: 0, vatAmount: 0, monthlyPayment: 0 },
+  );
+}
+
+/**
+ * 첫달납부액.
+ *
+ *     월납    월납부액 합계 + 예치금 합계
+ *     일시불  (월납부액 합계 × 기간) + 예치금 합계
+ *
+ * ★ 월납부액은 **부가세 포함**이다(`ContractTotals.monthlyPayment`).
+ */
+export function calcFirstPayment(args: {
+  totals: ContractTotals;
+  paymentMethod: string;
+  periodMonths: number;
+}): number {
+  const { totals, paymentMethod, periodMonths } = args;
+
+  if (paymentMethod !== PAYMENT_METHOD.MONTHLY && paymentMethod !== PAYMENT_METHOD.LUMP_SUM) {
+    throw new RangeError(
+      `paymentMethod 는 코드값이어야 한다 ('${PAYMENT_METHOD.MONTHLY}' 월납 / '${PAYMENT_METHOD.LUMP_SUM}' 일시불): ${paymentMethod}`,
+    );
+  }
+
+  if (paymentMethod === PAYMENT_METHOD.MONTHLY) {
+    return totals.monthlyPayment + totals.deposit;
+  }
+
+  requirePeriod(periodMonths);
+  return totals.monthlyPayment * periodMonths + totals.deposit;
+}
+
+function requirePeriod(periodMonths: number): number {
+  if (!Number.isInteger(periodMonths) || periodMonths < 1) {
+    throw new RangeError(`periodMonths 는 1 이상의 정수여야 한다: ${periodMonths}`);
+  }
+  return periodMonths;
+}
+
+/**
+ * 종료일 = 시작일 + 기간(월) − 1일.
+ *
+ * ★ **말일 처리 — 그 달의 말일로 맞춘다.**
+ * 1월 31일 + 1개월은 2월 31일이 없으므로 2월 28일로 맞춘 뒤 하루를 빼 2월 27일이다.
+ * 시안(`calcEndDate`, 736행)은 JS `Date.setMonth` 의 오버플로를 그대로 둬서 3월 2일을
+ * 낸다 — 처리가 없는 것이지 그렇게 정한 것이 아니다.
+ *
+ * ★ **기간 0 은 오류다.** 시안은 `if (!months) return ""` 로 아무 값도 내지 않는데,
+ * `tb_s080_contracts.end_date` 는 NOT NULL 이라 서버가 저장할 값이 없다.
+ * 기간이 없는 계약은 계약이 아니므로 조용히 넘기지 않고 던진다.
+ *
+ * 날짜만 다룬다 — 시:분:초는 버리고 UTC 자정으로 맞춘다.
+ */
+export function calcEndDate(startDate: Date, periodMonths: number): Date {
+  requirePeriod(periodMonths);
+  if (Number.isNaN(startDate.getTime())) {
+    throw new RangeError('startDate 가 올바른 날짜가 아니다');
+  }
+
+  const year = startDate.getUTCFullYear();
+  const month = startDate.getUTCMonth();
+  const day = startDate.getUTCDate();
+
+  const targetMonth = month + periodMonths;
+  // 그 달의 말일. Date.UTC 는 day=0 을 "전 달의 마지막 날"로 읽는다.
+  const lastDayOfTargetMonth = new Date(Date.UTC(year, targetMonth + 1, 0)).getUTCDate();
+
+  // ★ 오버플로를 허용하지 않는다. 31일이 없는 달이면 그 달 말일에 멈춘다.
+  const clampedDay = Math.min(day, lastDayOfTargetMonth);
+
+  // 하루 뺀다. Date.UTC 가 day=0 이하를 전 달로 되짚어 주므로 달·해 넘김이 자동이다.
+  return new Date(Date.UTC(year, targetMonth, clampedDay - 1));
+}
+
+/**
+ * 화면 값과 서버 값을 대조한다.
+ *
+ * **서버 값이 정본이다.** 돌려주는 `rows` 는 서버가 다시 계산한 값이고, 어긋난 칸은
+ * `mismatches` 에 남는다 — 저장하는 쪽이 그 목록을 경고로 기록한다.
+ * 화면이 값을 안 보냈으면(`undefined`) 어긋남이 아니다. 서버가 채우는 것뿐이다.
+ *
+ * ★ 이 작업 범위는 여기까지다. 저장은 하지 않는다.
+ */
+export function reconcileRowAmounts(
+  rows: readonly (ContractSpaceAmounts & Partial<RowAmounts>)[],
+): { rows: (ContractSpaceAmounts & RowAmounts)[]; mismatches: AmountMismatch[] } {
+  const mismatches: AmountMismatch[] = [];
+
+  const resolved = rows.map((row) => {
+    const server = calcRowAmounts(row);
+
+    for (const field of ['vatAmount', 'paymentAmount'] as const) {
+      const submitted = row[field];
+      if (submitted !== undefined && submitted !== server[field]) {
+        mismatches.push({ seq: row.seq, field, submitted, server: server[field] });
+      }
+    }
+
+    return { ...row, ...server };
+  });
+
+  return { rows: resolved, mismatches };
+}
