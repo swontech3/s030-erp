@@ -1,6 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    // ★ import 경로에 .ts 확장자를 쓴다 — api 와 같은 이유다.
+    //   이 패키지는 빌드 산출물이 아니라 **TS 소스를 그대로** 내보낸다
+    //   (package.json 의 main·exports 가 ./src/*.ts 를 가리킨다).
+    //   그래서 api 가 `node --experimental-strip-types` 나 tsx 로 이 파일들을 직접
+    //   읽는데, 확장자 없는 상대경로는 Node ESM 이 해석하지 못한다
+    //   (ERR_MODULE_NOT_FOUND — 2026-09-17 4-3 에서 실제로 걸렸다).
+    //   noEmit 이라 이 플래그가 허용된다.
+    "allowImportingTsExtensions": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]

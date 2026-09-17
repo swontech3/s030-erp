@@ -31,7 +31,7 @@ import {
   type AmountMismatch,
   type ContractSpaceAmounts,
   type RowAmounts,
-} from './contract-amounts';
+} from './contract-amounts.ts';
 
 /**
  * 계약 항목 최대 행수 — CONT-04.
