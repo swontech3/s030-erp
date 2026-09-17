@@ -39,8 +39,14 @@ import {
   boolean, date, index, integer, jsonb, pgTable, smallint, text, timestamp, uniqueIndex, varchar,
 } from 'drizzle-orm/pg-core';
 
-/** 계약 상태 — 되돌리는 전이는 없다. 조건을 바꾸려면 종료 후 재계약이다. */
-export const CONTRACT_STATUS = ['draft', 'confirmed', 'terminated', 'cancelled'] as const;
+/**
+ * 계약 상태 — 되돌리는 전이는 없다. 조건을 바꾸려면 종료 후 재계약이다.
+ *
+ * ★ 정의는 `@swonbiz/shared/domain/contract-status` 에 있다. 여기서는 다시 내보내기만
+ *   한다 — 상태 어휘가 두 벌이 되면 전이 규칙과 스키마가 조용히 어긋난다.
+ *   화면도 같은 상수를 본다.
+ */
+export { CONTRACT_STATUS, type ContractStatus } from '@swonbiz/shared/domain/contract-status';
 
 /**
  * 계약 1건 = 계약 조건 1세트.
