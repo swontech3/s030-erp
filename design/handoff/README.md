@@ -60,6 +60,13 @@ handoff/
 │   04-shell.md                   ERP 셸 (사이드바·헤더·브랜드 분기)
 │   05-patterns.md                공통 패턴 (그리드·테이블·상태·스크롤)
 │
+├─ prototypes/                    ★ 동작 확인용 시안 — 단독 실행 HTML
+│   index.html                    시안 목록 (여기서 시작)
+│   s0300200030.html              입주사·계약 마스터-디테일 (+ 상세 모달)
+│   s0300200040.html              계약 폼 (+ 확인 모달 3종)
+│   s0300200040p1.html            계약서 미리보기 2종
+│   _shared.css.txt               세 파일이 공통으로 인라인한 CSS (참고용)
+│
 └─ tenant-contract/               입주사·계약 관리 업무
     01-flow.md                    업무 흐름과 화면 간 이동
     02-master-detail.md           입주사·계약 관리 화면

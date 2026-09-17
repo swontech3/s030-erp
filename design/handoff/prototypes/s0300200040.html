@@ -216,7 +216,8 @@ button,input,select,textarea{font-family:inherit}
 .inline-row{display:flex;gap:8px;align-items:center}
 
 /* 계약 항목 테이블 — 10열 */
-.contract-item-table{border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
+/* 가드는 유지하되, 제거해도 열이 잘리지 않고 가로 스크롤이 생기도록 overflow-x:auto 적용 */
+.contract-item-table{border:1px solid var(--border);border-radius:var(--radius-md);overflow-x:auto}
 .contract-item-head,.contract-item-row{
   display:grid;
   grid-template-columns:40px minmax(120px,.8fr) minmax(130px,.9fr) minmax(110px,.75fr)
@@ -309,6 +310,34 @@ button,input,select,textarea{font-family:inherit}
      font-size:12px;font-weight:700;white-space:nowrap}
 .is-locked-section .lock-badge{display:inline-flex}
 
+/* ── 로딩 스켈레톤 ── 전체 화면 스피너 대신 섹션 카드별로 자리를 잡습니다 ── */
+@keyframes shimmer{0%{opacity:.55}50%{opacity:1}100%{opacity:.55}}
+.skel{background:var(--surface-alt);border-radius:var(--radius-xs);animation:shimmer 1.5s ease-in-out infinite}
+.skel-field{height:44px}
+.skel-row{height:38px;margin:10px 6px}
+.section.is-loading .section-body{display:none}
+.section-skeleton{display:none}
+.section.is-loading .section-skeleton{display:block}
+
+/* ── 테이블 빈 상태 ── 헤더는 유지하고 본문 자리만 채웁니다 ── */
+.table-empty{display:flex;flex-direction:column;align-items:center;padding:40px 24px;text-align:center}
+.table-empty .icon{color:var(--text-caption)}
+.table-empty p{margin:12px 0 0;font-size:14px;color:var(--text-muted)}
+
+/* ── 오류 상태 ── 필수 미입력 필드 ── */
+.input.is-invalid,.select.is-invalid{border-color:var(--color-danger)}
+.field-error{font-size:12px;color:var(--color-danger)}
+
+/* 비활성 버튼은 hover 이벤트를 받지 못하므로 래퍼에 툴팁을 답니다 */
+.tip-wrap{position:relative;display:inline-flex}
+.tip-wrap .tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+     display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);
+     background:var(--surface-inverse);color:#fff;font-size:14px;font-weight:400;white-space:nowrap;
+     box-shadow:var(--shadow-float);pointer-events:none;z-index:40}
+.tip-wrap:hover .tip{display:flex}
+.tip-wrap .tip{visibility:hidden}
+.tip-wrap--block{display:flex;width:100%}
+
 .toast{position:fixed;right:32px;bottom:32px;z-index:60;display:none;align-items:center;gap:10px;
      width:380px;padding:16px;background:var(--surface);border:1px solid var(--border);
      border-radius:var(--radius-lg);box-shadow:var(--shadow-float)}
@@ -341,10 +370,19 @@ button,input,select,textarea{font-family:inherit}
     <select id="c-docs"><option value="none">none</option><option value="partial" selected>partial</option><option value="all">all</option></select>
   </label>
   <label>contractItemCount
-    <select id="c-items"><option>1</option><option>2</option><option selected>3</option></select>
+    <select id="c-items"><option>1</option><option selected>3</option><option>10</option></select>
   </label>
   <label>userCount
-    <select id="c-users"><option>1</option><option selected>3</option></select>
+    <select id="c-users"><option>1</option><option selected>3</option><option>20</option></select>
+  </label>
+  <label>emptyState
+    <select id="c-empty"><option value="none" selected>none</option><option value="no-items">no-items</option><option value="no-users">no-users</option></select>
+  </label>
+  <label>validationState
+    <select id="c-valid"><option value="none" selected>none</option><option value="error">error</option></select>
+  </label>
+  <label>loadingState
+    <select id="c-loading"><option value="none" selected>none</option><option value="loading">loading</option></select>
   </label>
   <label>bizCheckState
     <select id="c-biz">
@@ -403,6 +441,8 @@ button,input,select,textarea{font-family:inherit}
         <section class="section" id="sec-company">
           <div class="section-header"><h2>회사 기본정보</h2></div>
           <div class="section-rule"></div>
+<div class="section-skeleton"><div class="grid-4"><div class="skel skel-field"></div><div class="skel skel-field"></div><div class="skel skel-field"></div><div class="skel skel-field"></div><div class="skel skel-field"></div><div class="skel skel-field"></div><div class="skel skel-field"></div><div class="skel skel-field"></div></div></div>
+<div class="section-body">
           <div class="grid-4">
             <label class="field">
               <span class="label">회사명 <span class="req">*</span></span>
@@ -452,6 +492,7 @@ button,input,select,textarea{font-family:inherit}
 
             <div class="field span-4">
               <span class="label">대표자 주소</span>
+              <span class="hint">계약서에 인쇄되는 대표자 주소입니다</span>
               <div class="inline-row">
                 <input class="input" data-f="zip" readonly style="width:140px;flex:0 0 auto;font-variant-numeric:tabular-nums">
                 <button class="btn btn--ghost" type="button" style="width:100px;height:44px">주소 검색</button>
@@ -465,7 +506,8 @@ button,input,select,textarea{font-family:inherit}
               <textarea class="textarea" rows="2" data-f="note1"></textarea>
             </label>
           </div>
-        </section>
+        </div>
+</section>
 
         <!-- ══════════ 섹션 2 · 계약정보 ══════════
              create / draft 에서만 수정 가능. confirmed 이후 전체 잠금.
@@ -482,6 +524,8 @@ button,input,select,textarea{font-family:inherit}
             </div>
           </div>
           <div class="section-rule"></div>
+<div class="section-skeleton"><div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div><div style="height:16px"></div><div class="grid-4"><div class="skel skel-field"></div><div class="skel skel-field"></div><div class="skel skel-field"></div><div class="skel skel-field"></div></div></div>
+<div class="section-body">
           <p class="section-note" id="lock-note" style="display:none">계약 조건은 확정 후 변경할 수 없습니다. 변경이 필요하면 종료 후 재계약해 주세요.</p>
 
           <!-- ─ 1블록 · 계약 항목 테이블 ─ -->
@@ -490,9 +534,12 @@ button,input,select,textarea{font-family:inherit}
               <span style="font-size:14px;font-weight:700;color:var(--text-heading)">계약 항목</span>
               <span class="muted" style="font-size:12px" id="item-count">3건</span>
             </div>
-            <button class="btn btn--ghost btn--xs" type="button" id="item-add">
-              <i data-lucide="plus" style="width:14px;height:14px"></i>항목 추가
-            </button>
+            <span class="tip-wrap" id="item-add-wrap">
+              <button class="btn btn--ghost btn--xs" type="button" id="item-add">
+                <i data-lucide="plus" style="width:14px;height:14px"></i>항목 추가
+              </button>
+              <span class="tip" id="item-add-tip">최대 10개까지 등록 가능합니다</span>
+            </span>
           </div>
           <div class="contract-item-table" id="item-table">
             <div class="contract-item-head">
@@ -554,7 +601,8 @@ button,input,select,textarea{font-family:inherit}
               <textarea class="textarea" rows="2" data-f="note2" id="f-note2"></textarea>
             </div>
           </div>
-        </section>
+        </div>
+</section>
 
         <!-- ══════════ 섹션 3 · 입주자 사용자 정보 ══════════
              계약 항목과 연동하지 않습니다. 1행은 섹션 1 대표자 자동 반영. -->
@@ -564,16 +612,22 @@ button,input,select,textarea{font-family:inherit}
             <span class="muted" style="font-size:14px" id="user-count">3명 등록</span>
           </div>
           <div class="section-rule"></div>
+<div class="section-skeleton"><div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div></div>
+<div class="section-body">
           <div class="user-table-head">
             <span><input type="checkbox" class="checkbox" id="user-all"></span>
             <span>No</span><span class="pad">성명</span><span class="pad">연락처</span>
             <span class="pad">이메일</span><span>대표자</span><span class="pad">비고</span><span>삭제</span>
           </div>
           <div id="user-rows"></div>
-          <button class="add-row" type="button" id="user-add">
-            <i data-lucide="plus" style="width:16px;height:16px"></i>사용자 추가
-          </button>
-        </section>
+          <span class="tip-wrap tip-wrap--block" id="user-add-wrap">
+            <button class="add-row" type="button" id="user-add">
+              <i data-lucide="plus" style="width:16px;height:16px"></i>사용자 추가
+            </button>
+            <span class="tip" id="user-add-tip">최대 20명까지 등록 가능합니다</span>
+          </span>
+        </div>
+</section>
 
         <!-- ══════════ 섹션 4 · 첨부 서류 ══════════
              회원구분에 따라 필수·선택 뱃지가 바뀌고, 법인등기부등본은 법인일 때만 표시 -->
@@ -583,13 +637,16 @@ button,input,select,textarea{font-family:inherit}
             <span class="muted" style="font-size:14px" id="doc-count">0 / 2 등록</span>
           </div>
           <div class="section-rule"></div>
+<div class="section-skeleton"><div class="skel" style="height:76px;margin-bottom:12px"></div><div class="skel" style="height:76px"></div></div>
+<div class="section-body">
           <div style="display:flex;flex-direction:column;gap:12px" id="doc-cards"></div>
           <div style="margin-top:12px;font-size:12px;color:var(--text-caption)">JPG, PNG, PDF 형식 · 파일당 최대 10MB</div>
           <div class="notice notice--warning" id="doc-warning" style="display:none;margin-top:12px">
             <span class="icon" style="flex:0 0 auto;margin-top:1px"><i data-lucide="circle-alert" style="width:16px;height:16px"></i></span>
             <span>사업자등록증이 없으면 가등록 상태로 계약이 진행됩니다. 발급 후 반드시 제출해 주세요.</span>
           </div>
-        </section>
+        </div>
+</section>
 
       </div>
     </div>
@@ -634,7 +691,10 @@ const ROOMS = [
 ];
 
 const CONTRACT_TYPES = ["비상주", "고정석", "1인실", "2인실", "팀오피스"];
-const EMAIL_DOMAINS = ["bridgelab.co.kr", "naver.com", "gmail.com", "daum.net", "hanmail.net", "nate.com"];
+/** 도메인 목록. 예시 입주사 도메인(bridgelab.co.kr)은 여기 넣지 않습니다 —
+ *  기본 선택되면 그대로 저장돼 오등록이 납니다. 기본값은 빈 값입니다. */
+const EMAIL_DOMAINS = ["", "naver.com", "gmail.com", "daum.net", "hanmail.net", "nate.com", "직접입력"];
+const DOMAIN_PLACEHOLDER = "선택하세요";
 
 /** 계약 항목 시안 3건. contractItemCount 컨트롤로 1~3건을 전환합니다. */
 const DEMO_ITEMS = [
@@ -645,9 +705,9 @@ const DEMO_ITEMS = [
 
 /** 섹션 3 사용자 시안. 1행은 섹션 1 대표자를 자동으로 따라갑니다. */
 const DEMO_USERS = [
-  { name: "김도현", phone: "010-2345-6789", mailId: "kim",  domain: "bridgelab.co.kr", memo: "" },
-  { name: "이서준", phone: "010-3456-7890", mailId: "lee",  domain: "bridgelab.co.kr", memo: "" },
-  { name: "박민지", phone: "010-4567-8901", mailId: "park", domain: "bridgelab.co.kr", memo: "" },
+  { name: "김도현", phone: "010-2345-6789", mailId: "kim",  domain: "", memo: "" },
+  { name: "이서준", phone: "010-3456-7890", mailId: "lee",  domain: "", memo: "" },
+  { name: "박민지", phone: "010-4567-8901", mailId: "park", domain: "", memo: "" },
 ];
 
 /** 회사 기본정보 시안. mode=create 에서는 전부 빈 값으로 시작합니다. */
@@ -671,6 +731,9 @@ const DEMO_FILES = {
   corp: { name: "법인등기부등본_브릿지랩.pdf",  size: "512KB" },
 };
 
+/** 헤더 보조 안내에 쓰는 상태 전이 일자. */
+const STATE_DATES = { confirmed: "2026.01.10", terminated: "2026.07.14", cancelled: "2026.01.12" };
+
 const MAX_ITEMS = 10;
 const MAX_USERS = 20;
 const VAT_RATE = 0.1;
@@ -690,6 +753,10 @@ const state = {
   repIndex: 0,            // 대표자 행
   sidebarCollapsed: false,
   confirmKind: null,
+  emptyState: "none",      // none / no-items / no-users
+  validation: "none",      // none / error — 계약확정 시 필수 미입력 표시
+  loading: "none",         // none / loading
+  invalidFields: [],
 };
 
 /* 잠금 판정 — 계약 조건은 확정 후 바꿀 수 없고, 종료·취소는 전 섹션이 읽기 전용입니다. */
@@ -787,6 +854,8 @@ const icon = (name, size) =>
   '<i data-lucide="' + name + '" style="width:' + size + 'px;height:' + size + 'px"></i>';
 
 /* ── ERP 셸 사이드바 ── */
+/* ★ 예시입니다. 실제 ERP는 권한 응답으로 동적 렌더링합니다.
+   handoff/common/04-shell.md 참조 */
 const NAV_ITEMS = [
   ["tenants", "building-2", "입주사", true],
   ["billing", "receipt", "청구", false],
@@ -905,11 +974,21 @@ function renderItems() {
     host.appendChild(row);
   });
 
+  /* 0건이어도 헤더는 남기고 본문 자리만 안내로 채웁니다 — 열 구성이 보여야 합니다. */
+  if (!state.items.length) {
+    host.innerHTML =
+      '<div class="table-empty">' +
+        '<span class="icon">' + icon("package-open", 32) + '</span>' +
+        '<p>등록된 계약 항목이 없습니다</p>' +
+      '</div>';
+  }
   $("#item-count").textContent = state.items.length + "건";
   const add = $("#item-add");
   add.style.display = locked ? "none" : "inline-flex";
-  add.disabled = state.items.length >= MAX_ITEMS;
-  add.title = state.items.length >= MAX_ITEMS ? "최대 " + MAX_ITEMS + "개까지 등록 가능" : "";
+  const itemsFull = state.items.length >= MAX_ITEMS;
+  add.disabled = itemsFull;
+  $("#item-add-tip").style.visibility = itemsFull ? "visible" : "hidden";
+  $("#item-add-wrap").style.pointerEvents = "auto";
 }
 
 function inputCell(value, opts) {
@@ -994,8 +1073,12 @@ function renderUsers() {
     } else {
       const wrap = el("span", "select-wrap");
       const dom = el("select", "select");
-      EMAIL_DOMAINS.forEach((d) => { const o = el("option", null, d); o.value = d; dom.appendChild(o); });
-      dom.value = user.domain || EMAIL_DOMAINS[0];
+      EMAIL_DOMAINS.filter((d) => d !== "직접입력").forEach((d) => {
+        const o = el("option", null, d === "" ? DOMAIN_PLACEHOLDER : d);
+        o.value = d;
+        dom.appendChild(o);
+      });
+      dom.value = user.domain || "";
       dom.disabled = frozen;
       dom.addEventListener("change", () => { state.users[i].domain = dom.value; });
       wrap.appendChild(dom);
@@ -1034,10 +1117,18 @@ function renderUsers() {
     host.appendChild(row);
   });
 
+  if (!state.users.length) {
+    host.innerHTML =
+      '<div class="table-empty">' +
+        '<span class="icon">' + icon("users", 32) + '</span>' +
+        '<p>등록된 사용자가 없습니다</p>' +
+      '</div>';
+  }
   $("#user-count").textContent = state.users.length + "명 등록";
   const add = $("#user-add");
-  add.disabled = frozen || state.users.length >= MAX_USERS;
-  add.title = state.users.length >= MAX_USERS ? "최대 " + MAX_USERS + "명까지 등록 가능" : "";
+  const usersFull = state.users.length >= MAX_USERS;
+  add.disabled = frozen || usersFull;
+  $("#user-add-tip").style.visibility = usersFull ? "visible" : "hidden";
   const all = $("#user-all");
   all.disabled = frozen || state.users.length < 2;
   lucide.createIcons();
@@ -1144,12 +1235,25 @@ const ACTION_DEFS = {
 function renderHeader() {
   $("#page-title").textContent = TITLES[state.mode] || "계약 상세";
 
+  /* 보조 안내는 상태마다 성격이 다릅니다 — 작성 중에는 진행 상황, 확정 이후에는 이력입니다. */
   const note = $("#page-note");
-  const missing = state.mode === "create" ? 3 : 0;
-  note.className = "page-note " + (missing ? "is-warning" : "is-ok");
-  note.innerHTML = missing
-    ? "필수 항목 " + missing + "개 미입력"
-    : icon("circle-check", 12) + "입력 완료";
+  if (STATE_DATES[state.mode]) {
+    const suffix = { confirmed: "계약 확정", terminated: "종료", cancelled: "취소" }[state.mode];
+    note.className = "page-note";
+    note.style.color = "var(--text-muted)";
+    note.textContent = STATE_DATES[state.mode] + " " + suffix;
+  } else {
+    note.style.color = "";
+    /* 오류 상태의 건수는 표시 대상과 같은 출처를 씁니다 — devbar 로 강제한 경우
+       필드에는 표시가 붙는데 헤더만 "입력 완료"로 남는 모순을 막습니다. */
+    const missing = state.validation === "error"
+      ? (state.invalidFields.length || 3)
+      : countMissingRequired();
+    note.className = "page-note " + (missing ? "is-warning" : "is-ok");
+    note.innerHTML = missing
+      ? "필수 항목 " + missing + "개 미입력"
+      : icon("circle-check", 12) + "입력 완료";
+  }
 
   const host = $("#head-actions");
   host.innerHTML = "";
@@ -1159,7 +1263,13 @@ function renderHeader() {
     btn.type = "button";
     btn.innerHTML = (def.icon ? icon(def.icon, 16) : "") + def.label +
       (def.tip ? '<span class="tip">' + def.tip + "</span>" : "");
-    if (def.modal) btn.addEventListener("click", () => openConfirm(def.modal));
+    if (def.modal) {
+      btn.addEventListener("click", () => {
+        /* 확정은 필수 항목이 채워진 뒤에만 진행합니다. */
+        if (def.modal === "confirm" && !runValidation()) return;
+        openConfirm(def.modal);
+      });
+    }
     host.appendChild(btn);
   });
   lucide.createIcons();
@@ -1200,6 +1310,57 @@ function syncDiscountNote(line) {
   const rest = hasAuto ? lines.slice(1) : lines;
   const next = line ? [line].concat(rest).join("\n") : rest.join("\n");
   if (box.value !== next) box.value = next;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   검증 — 계약확정 시 필수 미입력 항목을 표시합니다
+   ══════════════════════════════════════════════════════════════ */
+/** 필수 필드 정의. 라벨은 마크업의 .req 로 이미 * 표시가 되어 있습니다. */
+const REQUIRED_FIELDS = ["company", "bizno", "ceo", "phone", "emailId", "signDate", "months", "startDate"];
+
+function countMissingRequired() {
+  return REQUIRED_FIELDS.filter((key) => !readField(key)).length;
+}
+
+/** 첫 오류 필드로 스크롤하고 포커스를 줍니다 — 화면 밖 오류를 놓치지 않게. */
+function runValidation() {
+  state.invalidFields = REQUIRED_FIELDS.filter((key) => !readField(key));
+  state.validation = state.invalidFields.length ? "error" : "none";
+  $("#c-valid").value = state.validation;
+  renderValidation();
+  if (!state.invalidFields.length) return true;
+  const first = $('[data-f="' + state.invalidFields[0] + '"]');
+  if (first) { first.focus({ preventScroll: false }); }
+  return false;
+}
+
+function renderValidation() {
+  const on = state.validation === "error";
+  const targets = on
+    ? (state.invalidFields.length ? state.invalidFields : REQUIRED_FIELDS.slice(0, 3))
+    : [];
+  REQUIRED_FIELDS.forEach((key) => {
+    const node = $('[data-f="' + key + '"]');
+    if (!node) return;
+    const bad = targets.indexOf(key) > -1;
+    node.classList.toggle("is-invalid", bad);
+    const holder = node.closest(".field");
+    if (!holder) return;
+    let msg = holder.querySelector(".field-error");
+    if (bad && !msg) {
+      msg = el("span", "field-error", "필수 입력 항목입니다");
+      holder.appendChild(msg);
+    } else if (!bad && msg) {
+      msg.remove();
+    }
+  });
+  renderHeader();
+}
+
+/* ── 1-7 · 로딩 ── 섹션 카드별 스켈레톤 ── */
+function renderLoading() {
+  const on = state.loading === "loading";
+  $$(".section").forEach((sec) => sec.classList.toggle("is-loading", on));
 }
 
 /* ── 상태 적용 ── */
@@ -1312,17 +1473,22 @@ function seedForm() {
     if (key === "memberType") { node.value = state.memberType; return; }
     node.value = blank ? "" : (src[key] ?? "");
   });
+  /* 컨트롤이 요구한 건수만큼 시안 데이터를 순환시켜 채웁니다 (10건·20명 확인용). */
+  const itemCount = blank ? 1 : (toNumber($("#c-items").value) || 3);
   state.items = blank
     ? [{ type: "1인실", room: "", deposit: 0, fee: 0, invoice: true }]
-    : DEMO_ITEMS.slice(0, toNumber($("#c-items").value) || 3).map((it) => Object.assign({}, it));
+    : Array.from({ length: itemCount }, (_, i) => Object.assign({}, DEMO_ITEMS[i % DEMO_ITEMS.length]));
   const userCount = blank ? 1 : (toNumber($("#c-users").value) || 3);
-  state.users = DEMO_USERS.slice(0, userCount).map((u) => Object.assign({}, u, blank ? { name: "", phone: "", mailId: "", memo: "" } : {}));
+  state.users = Array.from({ length: userCount }, (_, i) =>
+    Object.assign({}, DEMO_USERS[i % DEMO_USERS.length], blank ? { name: "", phone: "", mailId: "", memo: "" } : {}));
   state.userOn = state.users.map(() => true);
   state.repIndex = 0;
 }
 
 function renderAll() {
   applyMode();
+  renderValidation();
+  renderLoading();
   renderItems();
   renderUsers();
   renderDocs();
@@ -1355,11 +1521,13 @@ function bindOnce() {
     renderAll();
   });
 
+  /* 빈 값이 기본 선택입니다 — 예시 도메인이 그대로 저장되는 오등록을 막습니다. */
   const domain = $("#f-domain");
-  EMAIL_DOMAINS.forEach((d) => { const o = el("option", null, d); o.value = d; domain.appendChild(o); });
-  const custom = el("option", null, "직접입력");
-  custom.value = "custom";
-  domain.appendChild(custom);
+  EMAIL_DOMAINS.forEach((d) => {
+    const o = el("option", null, d === "" ? DOMAIN_PLACEHOLDER : d);
+    o.value = d === "직접입력" ? "custom" : d;
+    domain.appendChild(o);
+  });
   domain.addEventListener("change", () => {
     $("#f-domain-custom").style.display = domain.value === "custom" ? "block" : "none";
     renderUsers();
@@ -1390,7 +1558,7 @@ function bindOnce() {
   });
   $("#user-add").addEventListener("click", () => {
     if (state.users.length >= MAX_USERS) return;
-    state.users.push({ name: "", phone: "", mailId: "", domain: EMAIL_DOMAINS[0], memo: "" });
+    state.users.push({ name: "", phone: "", mailId: "", domain: "", memo: "" });
     state.userOn.push(true);
     renderUsers();
   });
@@ -1423,9 +1591,32 @@ function bindOnce() {
     renderAll();
   });
   $("#c-docs").addEventListener("change", (e) => { state.docUploaded = e.target.value; renderDocs(); });
-  $("#c-items").addEventListener("change", () => { seedForm(); renderAll(); });
-  $("#c-users").addEventListener("change", () => { seedForm(); renderUsers(); });
+  $("#c-items").addEventListener("change", () => {
+    state.emptyState = "none";
+    $("#c-empty").value = "none";
+    seedForm();
+    renderAll();
+  });
+  $("#c-users").addEventListener("change", () => {
+    state.emptyState = "none";
+    $("#c-empty").value = "none";
+    seedForm();
+    renderUsers();
+  });
   $("#c-biz").addEventListener("change", (e) => { state.bizCheck = e.target.value; applyMode(); lucide.createIcons(); });
+  $("#c-empty").addEventListener("change", (e) => {
+    state.emptyState = e.target.value;
+    if (e.target.value === "no-items") state.items = [];
+    else if (e.target.value === "no-users") { state.users = []; state.userOn = []; }
+    else seedForm();
+    renderAll();
+  });
+  $("#c-valid").addEventListener("change", (e) => {
+    state.validation = e.target.value;
+    state.invalidFields = e.target.value === "error" ? REQUIRED_FIELDS.slice(0, 3) : [];
+    renderValidation();
+  });
+  $("#c-loading").addEventListener("change", (e) => { state.loading = e.target.value; renderLoading(); });
 }
 
 bindOnce();

@@ -11,3 +11,9 @@ node_modules/
 # dev 는 .next/dev/types, build 는 .next/types 로 달라져서 커밋해 두면 매번 흔들린다.
 # 자동 생성물이라 지워도 손실이 없다.
 next-env.d.ts
+
+# 디자인팀 인계 원본 작업 폴더·압축파일 (각 21MB 남짓).
+# 필요한 파일만 design/handoff/ 아래 정본 경로로 옮겨 커밋한다 — 3-1c 에서 정한 방식.
+design/SwonBiz Design System*.zip
+design/SwonBiz Design System_html시안/
+design/SwonBiz Design System_html시안_2/

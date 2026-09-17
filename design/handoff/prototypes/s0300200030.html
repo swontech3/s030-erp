@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>s0300200030 입주사·계약 마스터-디테일 — SwonBiz ERP 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<script src="https://unpkg.com/lucide@0.414.0/dist/umd/lucide.js"></script>
+<style>
+/* ── 디자인 토큰 ── handoff/tokens/*.css 와 동일한 값 ── */
+:root{
+  --indigo-600:#4F46E5; --indigo-700:#4338CA; --indigo-400:#818CF8;
+  --cyan-400:#22D3EE; --indigo-50:#EEF2FF;
+  --slate-950:#0B1120; --slate-600:#475569; --slate-500:#64748B;
+  --slate-400:#94A3B8; --white:#FFFFFF; --slate-50:#F8FAFC; --slate-200:#E2E8F0;
+  --amber-600:#D97706; --amber-100:#FEF3C7; --amber-800:#92400E;
+  --red-600:#DC2626; --red-100:#FEE2E2; --red-800:#991B1B;
+
+  --color-primary:var(--indigo-600); --color-primary-hover:var(--indigo-700);
+  --color-secondary:var(--indigo-400); --color-accent:var(--cyan-400);
+  --color-accent-bg:var(--indigo-50);
+  --color-warning:var(--amber-600); --color-warning-bg:var(--amber-100); --color-warning-text:var(--amber-800);
+  --color-danger:var(--red-600); --color-danger-bg:var(--red-100); --color-danger-text:var(--red-800);
+
+  --surface:var(--white); --surface-alt:var(--slate-50); --surface-inverse:var(--slate-950);
+  --border:var(--slate-200); --border-strong:#CBD5E1;
+  --text-heading:var(--slate-950); --text-body:var(--slate-600);
+  --text-muted:var(--slate-500); --text-caption:var(--slate-400);
+  --text-on-primary:var(--white);
+  --focus-ring:rgba(79,70,229,.32);
+
+  --font-core:"Pretendard Variable",Pretendard,Inter,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:ui-monospace,"SFMono-Regular",Menlo,monospace;
+
+  --radius-xs:4px; --radius-sm:6px; --radius-md:8px; --radius-lg:12px; --radius-pill:999px;
+  --shadow-primary:0 4px 16px rgba(79,70,229,.22);
+  --shadow-float:0 8px 24px rgba(11,17,32,.10);
+  --shadow-overlay:0 20px 48px rgba(11,17,32,.18);
+
+  --ease-out:cubic-bezier(.22,.61,.36,1);
+  --dur-fast:120ms; --dur:180ms; --dur-slow:280ms;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface-alt);color:var(--text-body);
+     font-family:var(--font-core);font-size:16px;line-height:1.7}
+h1,h2,h3{margin:0;color:var(--text-heading);letter-spacing:-.02em}
+button,input,select,textarea{font-family:inherit}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ── 확인 컨트롤 바 ── ★ 개발 확인용. 실서비스에는 포함되지 않습니다 ── */
+.devbar{position:sticky;top:0;z-index:90;display:flex;align-items:center;gap:14px;
+        flex-wrap:wrap;padding:10px 20px;background:var(--surface-inverse);color:#fff;
+        font-size:13px}
+.devbar strong{font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.6}
+.devbar label{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.devbar select{height:30px;padding:0 10px;border:1px solid rgba(255,255,255,.22);
+        border-radius:var(--radius-sm);background:rgba(255,255,255,.08);color:#fff;font-size:13px}
+.devbar select option{color:#0B1120}
+.devbar .spacer{flex:1}
+
+/* ── ERP 셸 ── */
+.shell{display:flex;min-width:1440px;min-height:calc(100vh - 50px);background:var(--surface-alt)}
+.sidebar{width:248px;flex:0 0 auto;background:var(--surface);border-right:1px solid var(--border);
+         display:flex;flex-direction:column;padding:20px 16px;
+         transition:width 240ms var(--ease-out),padding 240ms var(--ease-out)}
+.sidebar.is-collapsed{width:64px;padding:20px 12px}
+.brand{display:flex;align-items:center;gap:10px;height:40px;padding:0 8px;margin-bottom:24px;
+       border:0;background:transparent;cursor:pointer;border-radius:var(--radius-md);width:100%}
+.brand:hover{background:var(--surface-alt)}
+.sidebar.is-collapsed .brand{justify-content:center;padding:0;gap:0}
+.brand img{height:24px;width:auto;flex:0 0 auto}
+.brand .wordmark{font-size:17px;font-weight:800;letter-spacing:-.03em;color:var(--text-heading);white-space:nowrap}
+.brand .wordmark .dot{opacity:.55}
+.brand .wordmark .suffix{color:var(--color-primary)}
+.sidebar.is-collapsed .side-label{display:none}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;
+          border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);
+          font-size:15px;text-align:left;cursor:pointer;white-space:nowrap}
+.nav-item:hover{background:var(--surface-alt)}
+.nav-item.is-active{background:var(--color-accent-bg);color:var(--color-primary-hover);font-weight:700}
+.sidebar.is-collapsed .nav-item{justify-content:center;padding:0;gap:0}
+.nav-item .tip{position:absolute;left:calc(100% + 22px);top:50%;transform:translateY(-50%);
+     display:none;align-items:center;height:28px;padding:0 10px;border-radius:var(--radius-sm);
+     background:var(--surface-inverse);color:#fff;font-size:14px;font-weight:400;white-space:nowrap;
+     box-shadow:var(--shadow-float);pointer-events:none;z-index:40}
+.sidebar.is-collapsed .nav-item:hover .tip{display:flex}
+.sidebar-toggle{position:fixed;left:248px;top:50%;transform:translateX(-50%) translateY(-50%);
+     z-index:50;width:24px;height:24px;display:grid;place-items:center;border:1px solid var(--border);
+     border-radius:999px;background:var(--surface);color:var(--text-muted);cursor:pointer;padding:0;
+     opacity:.45;transition:left 240ms var(--ease-out),opacity 180ms var(--ease-out)}
+.sidebar-toggle:hover,.shell:hover .sidebar-toggle{opacity:1}
+.sidebar-toggle.is-collapsed{left:64px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{flex:0 0 auto;height:64px;border-bottom:1px solid var(--border);background:var(--surface);
+        display:flex;align-items:center;gap:16px;padding:0 28px}
+.topbar .crumb{font-size:12px;color:var(--text-caption)}
+.topbar .title{font-size:17px;font-weight:700;letter-spacing:-.015em;color:var(--text-heading)}
+.topbar .spacer{flex:1}
+.account{display:flex;align-items:center;gap:10px;padding-left:16px;border-left:1px solid var(--border)}
+.account .avatar{width:32px;height:32px;border-radius:var(--radius-sm);background:var(--color-accent-bg);
+        color:var(--color-primary-hover);display:grid;place-items:center;font-size:13px;font-weight:700}
+.account .who{line-height:1.3}
+.account .who b{display:block;font-size:14px;color:var(--text-heading)}
+.account .who span{font-size:12px;color:var(--text-muted)}
+
+/* ── 버튼 ── */
+.btn{height:40px;padding:0 16px;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+     border-radius:var(--radius-md);font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;
+     border:1px solid transparent;transition:background var(--dur) var(--ease-out)}
+.btn--primary{background:var(--color-primary);color:var(--text-on-primary);box-shadow:var(--shadow-primary)}
+.btn--primary:hover{background:var(--color-primary-hover)}
+.btn--ghost{background:var(--surface);color:var(--text-heading);border-color:var(--border)}
+.btn--ghost:hover{background:var(--surface-alt)}
+.btn--danger{background:var(--surface);color:var(--color-danger);border-color:var(--border)}
+.btn--danger:hover{background:var(--color-danger-bg)}
+.btn--sm{height:36px;padding:0 14px}
+.btn--xs{height:32px;padding:0 10px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.link-btn{border:0;background:transparent;padding:0;color:var(--color-primary);
+          font-size:14px;font-weight:700;cursor:pointer}
+
+/* ── 폼 ── */
+.field{display:flex;flex-direction:column;gap:6px}
+.field > .label{font-size:14px;font-weight:600;color:var(--text-heading)}
+.field > .label .req{color:var(--color-danger)}
+.field > .hint{font-size:13px;color:var(--text-muted);margin-top:-2px}
+.field > .err{font-size:12px;color:var(--color-danger)}
+.input,.select,.textarea{width:100%;height:44px;padding:0 14px;font-size:14px;color:var(--text-heading);
+     background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;
+     transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)}
+.input:focus,.select:focus,.textarea:focus{border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)}
+.input[readonly]{background:var(--surface-alt);cursor:default}
+.input:disabled,.select:disabled{background:var(--surface-alt);opacity:.5;cursor:not-allowed}
+.input--money{text-align:right;font-variant-numeric:tabular-nums}
+.textarea{height:auto;padding:12px 14px;line-height:1.6;resize:vertical}
+.select-wrap{position:relative;display:flex}
+.select{appearance:none;padding-right:34px;cursor:pointer}
+/* Select 캐럿 — 정적 표기, 클릭 시 회전하지 않습니다 */
+.select-wrap::after{content:"";position:absolute;right:14px;top:50%;
+     transform:translateY(-60%) rotate(45deg);width:6px;height:6px;
+     border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);pointer-events:none}
+.checkbox{width:18px;height:18px;accent-color:var(--color-primary)}
+
+/* ── 뱃지 ── */
+.badge{height:24px;padding:0 10px;display:inline-flex;align-items:center;gap:5px;
+       border-radius:var(--radius-pill);font-size:12px;font-weight:700;white-space:nowrap}
+.badge--indigo{background:var(--color-accent-bg);color:var(--color-primary-hover)}
+.badge--warning{background:var(--color-warning-bg);color:var(--color-warning-text)}
+.badge--danger{background:var(--color-danger-bg);color:var(--color-danger-text)}
+.badge--neutral{background:var(--surface-alt);border:1px solid var(--border);color:var(--text-muted)}
+
+/* ── 섹션 ── */
+.section{background:var(--surface);border:1px solid var(--border);
+         border-radius:var(--radius-lg);padding:24px 28px}
+.section-header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.section-header h2{font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em}
+.section-rule{margin:16px 0;height:1px;background:var(--border)}
+.section-note{margin:0 0 16px;font-size:13px;line-height:1.6;color:var(--text-muted)}
+
+/* ── 모달 ── */
+.overlay{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;
+         padding:24px;background:rgba(11,17,32,.45)}
+.overlay.is-open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+       box-shadow:var(--shadow-overlay);display:flex;flex-direction:column;
+       max-height:calc(100vh - 48px);overflow:hidden}
+.modal--sm{width:480px;padding:28px}
+.modal--md{width:720px}
+.modal-head{flex:0 0 auto;display:flex;align-items:flex-start;justify-content:space-between;
+            gap:16px;padding:24px;border-bottom:1px solid var(--border)}
+.modal-body{flex:1;min-height:0;overflow-y:auto;padding:24px}
+.modal-foot{flex:0 0 auto;display:flex;justify-content:flex-end;gap:8px;
+            padding:20px 24px;border-top:1px solid var(--border)}
+.icon-btn{width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:var(--radius-sm);
+          background:transparent;color:var(--text-caption);cursor:pointer;padding:0}
+.icon-btn:hover{background:var(--surface-alt)}
+
+/* ── 유틸 ── */
+.money{font-variant-numeric:tabular-nums;text-align:right}
+.muted{color:var(--text-muted)}
+.empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:48px 24px;text-align:center}
+.empty .icon{color:var(--text-caption)}
+.empty p{margin:0;font-size:16px;color:var(--text-muted)}
+[data-scroll]::-webkit-scrollbar{width:8px}
+[data-scroll]::-webkit-scrollbar-track{background:transparent}
+[data-scroll]::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+/* ── 마스터-디테일 전용 ── */
+.page-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+     gap:24px;padding:28px 32px 0}
+.page-head h1{font-size:30px;font-weight:700;line-height:1.3;letter-spacing:-.018em}
+.btn{position:relative}
+.btn .tip{position:absolute;top:calc(100% + 8px);right:0;display:none;align-items:center;height:28px;
+     padding:0 10px;border-radius:var(--radius-sm);background:var(--surface-inverse);color:#fff;
+     font-size:14px;font-weight:400;white-space:nowrap;box-shadow:var(--shadow-float);
+     pointer-events:none;z-index:40}
+.btn:hover .tip{display:flex}
+
+.md-layout{flex:1;min-height:0;display:flex;gap:20px;padding:20px 32px 32px}
+
+/* ── 좌측 · 입주사 리스트 ── */
+.tenant-panel{width:420px;flex:0 0 auto;display:flex;flex-direction:column;
+     background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.tenant-filters{flex:0 0 auto;padding:16px;border-bottom:1px solid var(--border)}
+.tenant-search{display:flex;align-items:center;gap:12px}
+.search-wrap{position:relative;flex:1;min-width:0;display:flex;align-items:center}
+.search-wrap .icon{position:absolute;left:14px;display:flex;color:var(--text-caption);pointer-events:none}
+.search-wrap .input{height:40px;padding-left:40px}
+.tenant-search .count{flex:0 0 auto;font-size:14px;font-weight:700;color:var(--text-heading);white-space:nowrap}
+.tenant-search .reset{flex:0 0 auto;border:0;background:transparent;padding:0 2px;
+     font-size:12px;color:var(--text-muted);cursor:pointer;white-space:nowrap}
+.tenant-search .reset:hover{color:var(--color-primary)}
+.chip-row{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
+.chip{height:28px;padding:0 12px;display:inline-flex;align-items:center;gap:5px;
+     border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--surface);
+     color:var(--text-muted);font-size:12px;cursor:pointer;white-space:nowrap;
+     transition:background var(--dur) var(--ease-out),border-color var(--dur) var(--ease-out)}
+.chip.is-on{background:var(--color-accent-bg);border-color:var(--color-primary);
+     color:var(--color-primary-hover);font-weight:700}
+.chip .check{display:none}
+.chip.is-on .check{display:flex}
+
+/* 목록 — 독립 스크롤. 스크롤바를 상시 노출해 더 있다는 것을 알립니다 */
+.tenant-list{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.tenant-list::-webkit-scrollbar{width:6px}
+.tenant-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.tenant-list:hover::-webkit-scrollbar-thumb{background:var(--text-caption)}
+.tenant-card{position:relative;width:100%;display:block;padding:14px 16px;border:0;
+     border-bottom:1px solid var(--border);background:var(--surface);text-align:left;cursor:pointer;
+     transition:background var(--dur) var(--ease-out)}
+.tenant-card:hover{background:var(--surface-alt)}
+.tenant-card.is-selected{background:var(--color-accent-bg)}
+.tenant-card.is-selected::before{content:"";position:absolute;left:0;top:0;bottom:0;
+     width:3px;background:var(--color-primary)}
+.tenant-card .row1{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tenant-card .name{min-width:0;display:flex;align-items:baseline;gap:5px}
+.tenant-card .name .pre{flex:0 0 auto;font-size:12px;color:var(--text-caption)}
+.tenant-card .name b{min-width:0;font-size:16px;font-weight:700;color:var(--text-heading);
+     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tenant-card.is-selected .name b{color:var(--color-primary)}
+.tenant-card .meta{margin-top:6px;display:block;font-size:14px;color:var(--text-muted);
+     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 무한 스크롤 자리 — 시안에서는 동작하지 않습니다 */
+.list-spinner{display:none;align-items:center;justify-content:center;gap:8px;
+     padding:16px;font-size:12px;color:var(--text-muted)}
+
+/* ── 우측 · 계약 이력 ── */
+.contract-panel{flex:1;min-width:0;display:flex;flex-direction:column;
+     background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.contract-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+     gap:20px;padding:20px 24px;border-bottom:1px solid var(--border)}
+.contract-head .who{min-width:0;display:flex;align-items:center}
+.contract-head h2{font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.012em;white-space:nowrap}
+.contract-head .divider{width:1px;height:16px;background:var(--border);margin:0 12px;flex:0 0 auto}
+.contract-head .sub{font-size:14px;color:var(--text-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.contract-head .mid{margin:0 8px;flex:0 0 auto;font-size:14px;color:var(--text-body)}
+.contract-body{flex:1;min-height:0;overflow-y:auto}
+
+/* 계약 테이블 — 열 정의는 헤더와 행이 같은 변수를 씁니다 */
+.contract-table-head,.contract-row{
+  display:grid;
+  /* 하한 합계 636px + 행 패딩 36px = 672px ≤ 우측 패널 콘텐츠 박스 686px
+     (1440 − 사이드바 248 − 레이아웃 패딩 64 − 좌측 420 − gap 20)
+     하한은 압축되지 않으므로 이 합계를 넘기면 마지막 열이 잘립니다. */
+  grid-template-columns:80px minmax(160px,1.2fr) minmax(140px,1fr)
+                        minmax(96px,.8fr) minmax(72px,.7fr) minmax(88px,.75fr);
+  align-items:center}
+.contract-table-head{padding:12px 12px 12px 24px;background:var(--surface-alt);
+     border-bottom:1px solid var(--border)}
+.contract-table-head span{padding:0 12px;text-align:center;font-size:12px;font-weight:700;color:var(--text-muted)}
+.contract-table-head span:first-child{padding:0}
+.contract-row{position:relative;padding:16px 12px 16px 24px;border-bottom:1px solid var(--border);
+     cursor:pointer;transition:background var(--dur) var(--ease-out)}
+.contract-row:hover{background:var(--surface-alt)}
+.contract-row.is-active::before{content:"";position:absolute;left:0;top:0;bottom:0;
+     width:3px;background:var(--color-primary)}
+.contract-row .cell{min-width:0;padding:0 12px}
+.contract-row .term{padding:0;text-align:center;white-space:nowrap;font-size:14px;font-weight:700;color:var(--text-heading)}
+.contract-row .dates{display:block;font-size:14px;color:var(--text-heading);white-space:nowrap}
+.contract-row .remain{display:block;margin-top:3px;font-size:12px;color:var(--text-muted)}
+.contract-row .remain.is-soon{font-weight:700;color:var(--color-warning)}
+.contract-row .plan{font-size:14px;color:var(--text-heading);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.contract-row .fee{text-align:right;font-size:14px;font-weight:700;color:var(--text-heading);
+     white-space:nowrap;font-variant-numeric:tabular-nums}
+.contract-row .status{display:flex;flex-direction:column;align-items:center;gap:3px}
+.contract-row .status .soon{font-size:12px;font-weight:700;color:var(--color-warning);white-space:nowrap}
+.contract-row .action{display:flex;justify-content:center}
+
+/* ── 빈 상태 ── */
+.panel-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+     gap:0;padding:60px 24px;text-align:center}
+.panel-empty .icon{color:var(--text-caption)}
+.panel-empty .lead{margin:14px 0 0;font-size:16px;color:var(--text-muted)}
+.panel-empty .sub{margin:4px 0 0;font-size:14px;color:var(--text-caption)}
+.panel-empty .act{margin-top:20px}
+
+/* ── 계약 상세 모달 ── 부모 화면 안에서 열립니다 ── */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;row-gap:20px;column-gap:32px}
+.detail-grid .k{font-size:12px;color:var(--text-muted)}
+.detail-grid .v{margin-top:4px;font-size:16px;color:var(--text-heading);font-variant-numeric:tabular-nums}
+body.is-locked{overflow:hidden}
+
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════
+     확인 컨트롤 바
+     ★ 개발 확인용입니다. 실서비스 화면에는 포함되지 않습니다.
+     ══════════════════════════════════════════════════════════════ -->
+<div class="devbar">
+  <strong>확인용</strong>
+  <label>selectedTenant
+    <select id="c-selected"><option value="selected" selected>selected</option><option value="none">none</option></select>
+  </label>
+  <label>emptyContracts
+    <select id="c-contracts"><option value="has" selected>has</option><option value="empty">empty</option></select>
+  </label>
+  <label>tenantCount
+    <select id="c-tenants"><option value="5" selected>5</option><option value="0">0</option></select>
+  </label>
+  <label>searchEmpty
+    <select id="c-search"><option value="false" selected>false</option><option value="true">true</option></select>
+  </label>
+  <label>detailModal
+    <select id="c-modal"><option value="closed" selected>closed</option><option value="open">open</option></select>
+  </label>
+  <label>sidebarCollapsed
+    <select id="c-sidebar"><option value="false" selected>false</option><option value="true">true</option></select>
+  </label>
+  <span class="spacer"></span>
+  <span style="opacity:.6">s0300200030 · 입주사·계약 마스터-디테일</span>
+</div>
+
+<div class="shell">
+
+  <!-- ── ERP 셸 · 사이드바 ── 기준: erp-tenants ── -->
+  <aside class="sidebar" id="sidebar">
+    <button class="brand" type="button">
+      <img src="../assets/swonbiz-logo.png" alt="" onerror="this.style.visibility='hidden'">
+      <span class="wordmark side-label">S<span class="dot">·</span>won<span class="suffix">Biz</span></span>
+    </button>
+    <nav class="nav" id="nav"></nav>
+  </aside>
+  <button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-label="사이드바 접기">
+    <i data-lucide="chevron-left" style="width:14px;height:14px"></i>
+  </button>
+
+  <div class="main">
+    <!-- ── ERP 셸 · 헤더 ── -->
+    <header class="topbar">
+      <div>
+        <div class="crumb">운영 · 강남 삼성점</div>
+        <div class="title">입주사</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="account">
+        <span class="avatar">최</span>
+        <span class="who"><b>최현수</b><span>운영 관리자</span></span>
+      </div>
+    </header>
+
+    <!-- ── 페이지 헤더 ── 브레드크럼 없음 ── -->
+    <div class="page-head">
+      <h1>입주사 · 계약 관리</h1>
+      <button class="btn btn--primary" type="button" id="new-tenant">
+        <i data-lucide="plus" style="width:16px;height:16px"></i>신규 입주사 등록
+        <span class="tip">계약 등록 화면으로 이동합니다</span>
+      </button>
+    </div>
+
+    <div class="md-layout">
+
+      <!-- ══════════ 좌측 · 입주사 카드 리스트 ══════════ -->
+      <section class="tenant-panel">
+        <div class="tenant-filters">
+          <div class="tenant-search">
+            <span class="search-wrap">
+              <span class="icon"><i data-lucide="search" style="width:16px;height:16px"></i></span>
+              <input class="input" id="search" placeholder="회사명, 대표자 검색">
+            </span>
+            <span class="count" id="tenant-count">24곳</span>
+            <button class="reset" type="button" id="chip-reset">전체</button>
+          </div>
+          <div class="chip-row" id="chips"></div>
+        </div>
+        <div class="tenant-list" id="tenant-list"></div>
+        <div class="list-spinner" id="list-spinner">
+          <span style="width:14px;height:14px;border-radius:999px;border:2px solid var(--border);border-top-color:var(--color-primary)"></span>
+          불러오는 중
+        </div>
+      </section>
+
+      <!-- ══════════ 우측 · 계약 이력 ══════════ -->
+      <section class="contract-panel" id="contract-panel"></section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 계약 상세 모달 (s0300200030p1) ══════════
+     단독 파일이 아니라 이 화면 안에서 열립니다. 열릴 때 부모 스크롤을 잠급니다. -->
+<div class="overlay" id="detail-overlay">
+  <div class="modal modal--md">
+    <div class="modal-head">
+      <div>
+        <h3 id="detail-no" style="font-size:22px;font-weight:600;font-family:var(--font-mono)">CT-2026-0142</h3>
+        <span class="badge badge--indigo" id="detail-status" style="margin-top:6px">진행중</span>
+      </div>
+      <button class="icon-btn" type="button" id="detail-close" aria-label="닫기">
+        <i data-lucide="x" style="width:20px;height:20px"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-grid" id="detail-grid"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn--ghost" type="button" id="detail-dismiss">닫기</button>
+      <button class="btn btn--ghost" type="button">계약 상세<span class="tip">계약 폼으로 이동합니다</span></button>
+      <button class="btn btn--primary" type="button">
+        <i data-lucide="copy-plus" style="width:16px;height:16px"></i>재계약
+        <span class="tip">이 계약 조건으로 재계약합니다</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+/* ══════════════════════════════════════════════════════════════
+   시안 데이터 — 값만 바꿔 확인하실 수 있습니다
+   ══════════════════════════════════════════════════════════════ */
+
+/** 입주사 5건. provisional 은 가등록(사업자등록 신청 중)입니다.
+ *  filters 는 배열입니다 — 브릿지랩처럼 "계약중이면서 만기 임박"인 경우가 있어
+ *  단일 값으로는 기본 칩(계약중)과 기본 선택이 서로 어긋납니다. */
+const DEMO_TENANTS = [
+  { id: "nautilus",  name: "주식회사 노틸러스", ceo: "이수진", phone: "010-3456-7890",
+    bizno: "128-86-01234", status: "계약중", filters: ["active"],
+    contracts: 1, room: "3층 A-12" },
+  { id: "bridgelab", name: "브릿지랩 주식회사", ceo: "김도현", phone: "010-2345-6789",
+    bizno: "211-88-05567", status: "D-9", filters: ["active", "soon"],
+    contracts: 2, room: "Room-1 (1-10)" },
+  { id: "orca",      name: "오르카 스튜디오", ceo: "박지훈", phone: "010-5678-1234",
+    bizno: "105-87-33421", status: "계약중", filters: ["active"],
+    contracts: 1, room: "2층 고정석 7" },
+  { id: "hangyeol",  name: "한결세무법인", ceo: "최민서", phone: "010-7890-2345",
+    bizno: "220-81-77812", status: "계약중", filters: ["active"],
+    contracts: 1, room: "비상주" },
+  { id: "seum",      name: "세움컴퍼니", ceo: "정하늘", phone: "010-4567-8901",
+    bizno: "사업자등록 신청 중", status: "검토중", filters: ["review"],
+    contracts: 0, room: "3층 A-05", provisional: true },
+];
+
+/** 브릿지랩 기준 계약 2건. active 는 진행 중 계약입니다. */
+const DEMO_CONTRACTS = [
+  { no: "CT-2026-0142", term: "6개월", from: "2026.01.15", to: "2027.01.14",
+    remain: "잔여 9일", soon: true, plan: "1인실", room: "Room-1 (1-10)",
+    fee: 400000, status: "진행중", active: true,
+    signDate: "2026.01.10", roomNo: "1-10", remainDays: "9일",
+    deposit: 800000, monthly: 440000, payMethod: "월납", first: 1240000 },
+  { no: "CT-2025-0088", term: "12개월", from: "2025.01.15", to: "2026.01.14",
+    remain: "종료", soon: false, plan: "1인실", room: "Room-1 (1-10)",
+    fee: 380000, status: "만료", active: false,
+    signDate: "2025.01.10", roomNo: "1-10", remainDays: "0일",
+    deposit: 760000, monthly: 418000, payMethod: "월납", first: 1178000 },
+];
+
+/** 상태 필터. 기본은 "계약중"만 켜져 있습니다. */
+const STATUS_CHIPS = [
+  { key: "active", label: "계약중", count: 21, on: true },
+  { key: "soon",   label: "만기 임박", count: 2, on: false },
+  { key: "review", label: "검토중", count: 1, on: false },
+  { key: "ended",  label: "종료", count: 0, on: false },
+];
+
+/** 총 건수는 목록 길이와 별개입니다 — 서버 전체 건수를 보여줍니다. */
+const TOTAL_TENANTS = 24;
+
+/* ══════════════════════════════════════════════════════════════
+   상태
+   ══════════════════════════════════════════════════════════════ */
+const state = {
+  tenants: DEMO_TENANTS.slice(),
+  selected: "bridgelab",     // 선택된 입주사 id. null 이면 미선택
+  chips: STATUS_CHIPS.map((c) => ({ ...c })),
+  hasContracts: true,
+  searchEmpty: false,
+  detailIndex: null,         // 상세 모달에 띄울 계약 인덱스
+  sidebarCollapsed: false,
+};
+
+const selectedTenant = () => state.tenants.find((t) => t.id === state.selected) || null;
+
+/* ══════════════════════════════════════════════════════════════
+   유틸
+   ══════════════════════════════════════════════════════════════ */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+};
+const icon = (name, size) =>
+  '<i data-lucide="' + name + '" style="width:' + size + 'px;height:' + size + 'px"></i>';
+const won = (n) => "₩" + (n || 0).toLocaleString("ko-KR");
+
+/** 상태 뱃지 톤. 만기 임박만 warning 이고 완료·정상은 인디고입니다. */
+function statusBadgeClass(status) {
+  if (status === "검토중" || status === "만료") return "badge--neutral";
+  if (status.startsWith("D-")) return "badge--warning";
+  return "badge--indigo";
+}
+
+/* ══════════════════════════════════════════════════════════════
+   렌더
+   ══════════════════════════════════════════════════════════════ */
+
+/* ★ 예시입니다. 실제 ERP는 권한 응답으로 동적 렌더링합니다.
+   handoff/common/04-shell.md 참조 */
+const NAV_ITEMS = [
+  ["tenants", "building-2", "입주사", true],
+  ["billing", "receipt", "청구", false],
+  ["tax", "calculator", "세무", false],
+  ["rooms", "calendar-check", "회의실", false],
+  ["spaces", "door-open", "호실", false],
+  ["settings", "settings", "설정", false],
+];
+function renderNav() {
+  $("#nav").innerHTML = NAV_ITEMS.map(([key, ic, label, active]) =>
+    '<button class="nav-item' + (active ? " is-active" : "") + '" type="button" data-nav="' + key + '">' +
+      icon(ic, 18) + '<span class="side-label">' + label + '</span>' +
+      '<span class="tip">' + label + '</span>' +
+    '</button>').join("");
+}
+
+function renderChips() {
+  const host = $("#chips");
+  host.innerHTML = "";
+  state.chips.forEach((chip, i) => {
+    const btn = el("button", "chip" + (chip.on ? " is-on" : ""));
+    btn.type = "button";
+    btn.innerHTML = '<span class="check">' + icon("check", 12) + "</span>" +
+                    chip.label + " " + chip.count;
+    /* 다중 선택입니다 — 전체 해제하면 모두 표시합니다. */
+    btn.addEventListener("click", () => { state.chips[i].on = !state.chips[i].on; renderChips(); renderTenantList(); });
+    host.appendChild(btn);
+  });
+  lucide.createIcons();
+}
+
+/** 칩 선택이 하나도 없으면 필터를 걸지 않습니다. */
+function visibleTenants() {
+  const on = state.chips.filter((c) => c.on).map((c) => c.key);
+  if (!on.length) return state.tenants;
+  return state.tenants.filter((t) => t.filters.some((f) => on.indexOf(f) > -1));
+}
+
+function renderTenantList() {
+  const host = $("#tenant-list");
+  host.innerHTML = "";
+  $("#tenant-count").textContent = TOTAL_TENANTS + "곳";
+
+  /* 검색 결과 0건과 목록 0건은 다른 상태입니다 — 안내 문구와 액션이 다릅니다. */
+  if (state.searchEmpty) {
+    host.appendChild(panelEmpty("search-x", "검색 결과가 없습니다",
+      "다른 검색어를 입력해 보세요", "검색 초기화", "ghost", () => {
+        state.searchEmpty = false;
+        $("#c-search").value = "false";
+        $("#search").value = "";
+        renderTenantList();
+      }));
+    return;
+  }
+  if (!state.tenants.length) {
+    host.appendChild(panelEmpty("building-2", "등록된 입주사가 없습니다",
+      "신규 입주사를 등록해 주세요", "신규 입주사 등록", "primary", null));
+    return;
+  }
+
+  visibleTenants().forEach((t) => {
+    const card = el("button", "tenant-card" + (t.id === state.selected ? " is-selected" : ""));
+    card.type = "button";
+    card.innerHTML =
+      '<span class="row1">' +
+        '<span class="name">' +
+          (t.provisional ? '<span class="pre">(가등록)</span>' : "") +
+          "<b>" + t.name + "</b>" +
+        "</span>" +
+        '<span class="badge ' + statusBadgeClass(t.status) + '">' + t.status + "</span>" +
+      "</span>" +
+      '<span class="meta">' + [t.ceo, t.phone, t.bizno].join(" · ") + "</span>";
+    /* 카드를 눌러도 화면은 바뀌지 않고 우측 패널만 갱신됩니다. */
+    card.addEventListener("click", () => { state.selected = t.id; renderTenantList(); renderContractPanel(); });
+    host.appendChild(card);
+  });
+}
+
+function panelEmpty(ic, lead, sub, actionLabel, actionKind, onClick) {
+  const box = el("div", "panel-empty");
+  box.innerHTML =
+    '<span class="icon">' + icon(ic, 40) + "</span>" +
+    '<p class="lead">' + lead + "</p>" +
+    (sub ? '<p class="sub">' + sub + "</p>" : "");
+  if (actionLabel) {
+    const wrap = el("div", "act");
+    const btn = el("button", "btn btn--" + actionKind, actionLabel);
+    btn.type = "button";
+    if (onClick) btn.addEventListener("click", onClick);
+    wrap.appendChild(btn);
+    box.appendChild(wrap);
+  }
+  return box;
+}
+
+/** 우측 패널 — 미선택 / 계약 0건 / 계약 목록 세 상태를 그립니다. */
+function renderContractPanel() {
+  const host = $("#contract-panel");
+  const tenant = selectedTenant();
+  host.innerHTML = "";
+
+  if (!tenant) {
+    host.appendChild(panelEmpty("mouse-pointer-click", "왼쪽에서 입주사를 선택하세요", "", null, null, null));
+    lucide.createIcons();
+    return;
+  }
+
+  host.appendChild(renderContractHead(tenant));
+
+  if (!state.hasContracts) {
+    const body = el("div", "contract-body");
+    body.appendChild(panelEmpty("file-text", "등록된 계약이 없습니다", "", "첫 계약 등록", "primary", null));
+    host.appendChild(body);
+    lucide.createIcons();
+    return;
+  }
+
+  host.appendChild(renderContractTable());
+  lucide.createIcons();
+}
+
+function renderContractHead(tenant) {
+  const head = el("div", "contract-head");
+  head.innerHTML =
+    '<div class="who">' +
+      "<h2>" + tenant.name + "</h2>" +
+      '<span class="divider"></span>' +
+      '<span class="sub">계약 ' + (state.hasContracts ? tenant.contracts : 0) + "건</span>" +
+      '<span class="mid">·</span>' +
+      '<span class="sub">' + tenant.room + "</span>" +
+      '<span class="mid">·</span>' +
+      '<span class="badge ' + statusBadgeClass(tenant.status) + '">' +
+        (tenant.status.startsWith("D-") ? "계약중" : tenant.status) + "</span>" +
+    "</div>" +
+    '<button class="btn btn--primary btn--sm" type="button">' +
+      icon("plus", 16) + "신규 계약" +
+      '<span class="tip">선택한 입주사의 신규 계약을 등록합니다</span>' +
+    "</button>";
+  return head;
+}
+
+function renderContractTable() {
+  const body = el("div", "contract-body");
+
+  const head = el("div", "contract-table-head");
+  ["기간", "계약일자", "플랜·호실", "월 이용료", "상태", "액션"].forEach((label) => {
+    head.appendChild(el("span", null, label));
+  });
+  body.appendChild(head);
+
+  DEMO_CONTRACTS.forEach((c, i) => {
+    const row = el("div", "contract-row" + (c.active ? " is-active" : ""));
+
+    row.appendChild(el("span", "cell term", c.term));
+
+    const dates = el("span", "cell");
+    dates.innerHTML =
+      '<span class="dates">' + c.from + " ~ " + c.to + "</span>" +
+      '<span class="remain' + (c.soon ? " is-soon" : "") + '">' + c.remain + "</span>";
+    row.appendChild(dates);
+
+    row.appendChild(el("span", "cell plan", c.plan + " · " + c.room));
+    row.appendChild(el("span", "cell fee", won(c.fee)));
+
+    const status = el("span", "cell status");
+    status.innerHTML =
+      '<span class="badge ' + (c.active ? "badge--indigo" : "badge--neutral") + '">' + c.status + "</span>" +
+      (c.soon ? '<span class="soon">만기 임박</span>' : "");
+    row.appendChild(status);
+
+    const action = el("span", "cell action");
+    const renew = el("button", "btn btn--ghost btn--xs");
+    renew.type = "button";
+    renew.innerHTML = icon("copy-plus", 14) + "재계약" +
+      '<span class="tip">이 계약 조건으로 재계약합니다</span>';
+    /* 액션 버튼은 행 클릭과 분리합니다 — 모달이 같이 열리면 안 됩니다. */
+    renew.addEventListener("click", (e) => e.stopPropagation());
+    action.appendChild(renew);
+    row.appendChild(action);
+
+    row.addEventListener("click", () => openDetail(i));
+    body.appendChild(row);
+  });
+
+  return body;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   계약 상세 모달 — 이 화면 안에서 열립니다
+   ══════════════════════════════════════════════════════════════ */
+function openDetail(index) {
+  const c = DEMO_CONTRACTS[index];
+  const tenant = selectedTenant();
+  if (!c || !tenant) return;
+  state.detailIndex = index;
+
+  $("#detail-no").textContent = c.no;
+  const badge = $("#detail-status");
+  badge.textContent = c.status;
+  badge.className = "badge " + (c.active ? "badge--indigo" : "badge--neutral");
+
+  const rows = [
+    ["입주사", tenant.name],
+    ["계약구분", c.plan],
+    ["이용호실", c.room.split(" ")[0]],
+    ["계약호실", c.roomNo],
+    ["계약일자", c.signDate],
+    ["계약기간", c.term],
+    ["계약일자 범위", c.from + " ~ " + c.to],
+    ["잔여일", c.remainDays],
+    ["예치금 합계", won(c.deposit)],
+    ["월납부액 합계", won(c.monthly)],
+    ["납부방법", c.payMethod],
+    ["첫달납부액", won(c.first)],
+  ];
+  $("#detail-grid").innerHTML = rows.map(([k, v]) =>
+    '<div><div class="k">' + k + '</div><div class="v">' + v + "</div></div>").join("");
+
+  $("#detail-overlay").classList.add("is-open");
+  document.body.classList.add("is-locked");   // 배경 스크롤 잠금
+  $("#c-modal").value = "open";
+  lucide.createIcons();
+}
+
+function closeDetail() {
+  $("#detail-overlay").classList.remove("is-open");
+  document.body.classList.remove("is-locked");
+  $("#c-modal").value = "closed";
+  state.detailIndex = null;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   초기화
+   ══════════════════════════════════════════════════════════════ */
+function renderAll() {
+  renderChips();
+  renderTenantList();
+  renderContractPanel();
+  lucide.createIcons();
+}
+
+function bindOnce() {
+  renderNav();
+
+  /* 사이드바 접기 */
+  $("#sidebar-toggle").addEventListener("click", () => toggleSidebar(!state.sidebarCollapsed));
+
+  $("#chip-reset").addEventListener("click", () => {
+    state.chips.forEach((c) => { c.on = false; });
+    renderChips();
+    renderTenantList();
+  });
+
+  /* 검색은 시안에서 동작하지 않습니다 — searchEmpty 컨트롤로 결과 0건만 확인합니다. */
+  $("#search").addEventListener("input", () => {});
+
+  $("#detail-close").addEventListener("click", closeDetail);
+  $("#detail-dismiss").addEventListener("click", closeDetail);
+  $("#detail-overlay").addEventListener("click", (e) => {
+    if (e.target === $("#detail-overlay")) closeDetail();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDetail(); });
+
+  /* ── 확인 컨트롤 바 ── 실서비스 제외 영역 ── */
+  $("#c-selected").addEventListener("change", (e) => {
+    state.selected = e.target.value === "none" ? null : "bridgelab";
+    renderTenantList();
+    renderContractPanel();
+  });
+  $("#c-contracts").addEventListener("change", (e) => {
+    state.hasContracts = e.target.value === "has";
+    renderContractPanel();
+  });
+  $("#c-tenants").addEventListener("change", (e) => {
+    state.tenants = e.target.value === "0" ? [] : DEMO_TENANTS.slice();
+    if (!state.tenants.length) state.selected = null;
+    else if (!state.selected) state.selected = "bridgelab";
+    renderTenantList();
+    renderContractPanel();
+  });
+  $("#c-search").addEventListener("change", (e) => {
+    state.searchEmpty = e.target.value === "true";
+    renderTenantList();
+  });
+  $("#c-modal").addEventListener("change", (e) => {
+    if (e.target.value === "open") openDetail(0); else closeDetail();
+  });
+  $("#c-sidebar").addEventListener("change", (e) => toggleSidebar(e.target.value === "true"));
+}
+
+function toggleSidebar(collapsed) {
+  state.sidebarCollapsed = collapsed;
+  $("#sidebar").classList.toggle("is-collapsed", collapsed);
+  const toggle = $("#sidebar-toggle");
+  toggle.classList.toggle("is-collapsed", collapsed);
+  toggle.innerHTML = icon(collapsed ? "chevron-right" : "chevron-left", 14);
+  toggle.setAttribute("aria-label", collapsed ? "사이드바 펼치기" : "사이드바 접기");
+  $("#c-sidebar").value = String(collapsed);
+  lucide.createIcons();
+}
+
+bindOnce();
+renderAll();
+
+lucide.createIcons();
+</script>
+</body>
+</html>

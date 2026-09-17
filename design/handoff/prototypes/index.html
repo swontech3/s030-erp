@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SwonBiz ERP 프로토타입 — 1차 인계</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<style>
+:root{
+  --indigo-600:#4F46E5; --indigo-700:#4338CA; --indigo-400:#818CF8;
+  --cyan-400:#22D3EE; --indigo-50:#EEF2FF;
+  --slate-950:#0B1120; --slate-600:#475569; --slate-500:#64748B;
+  --slate-400:#94A3B8; --white:#FFFFFF; --slate-50:#F8FAFC; --slate-200:#E2E8F0;
+  --amber-600:#D97706; --amber-100:#FEF3C7; --amber-800:#92400E;
+  --red-600:#DC2626; --red-100:#FEE2E2; --red-800:#991B1B;
+
+  --color-primary:var(--indigo-600); --color-primary-hover:var(--indigo-700);
+  --color-secondary:var(--indigo-400); --color-accent:var(--cyan-400);
+  --color-accent-bg:var(--indigo-50);
+  --color-warning:var(--amber-600); --color-warning-bg:var(--amber-100); --color-warning-text:var(--amber-800);
+  --color-danger:var(--red-600); --color-danger-bg:var(--red-100); --color-danger-text:var(--red-800);
+
+  --surface:var(--white); --surface-alt:var(--slate-50); --surface-inverse:var(--slate-950);
+  --border:var(--slate-200); --border-strong:#CBD5E1;
+  --text-heading:var(--slate-950); --text-body:var(--slate-600);
+  --text-muted:var(--slate-500); --text-caption:var(--slate-400);
+  --text-on-primary:var(--white);
+  --focus-ring:rgba(79,70,229,.32);
+
+  --font-core:"Pretendard Variable",Pretendard,Inter,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:ui-monospace,"SFMono-Regular",Menlo,monospace;
+
+  --radius-xs:4px; --radius-sm:6px; --radius-md:8px; --radius-lg:12px; --radius-pill:999px;
+  --shadow-primary:0 4px 16px rgba(79,70,229,.22);
+  --shadow-float:0 8px 24px rgba(11,17,32,.10);
+  --shadow-overlay:0 20px 48px rgba(11,17,32,.18);
+
+  --ease-out:cubic-bezier(.22,.61,.36,1);
+  --dur-fast:120ms; --dur:180ms; --dur-slow:280ms;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface-alt);color:var(--text-body);
+     font-family:var(--font-core);font-size:16px;line-height:1.7}
+h1,h2,h3{margin:0;color:var(--text-heading);letter-spacing:-.02em}
+button,input,select,textarea{font-family:inherit}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface-alt);color:var(--text-body);font-family:var(--font-core);
+     font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased}
+h1,h2{margin:0;color:var(--text-heading);letter-spacing:-.02em}
+a{color:var(--color-primary)}a:hover{color:var(--color-primary-hover)}
+.wrap{max-width:920px;margin:0 auto;padding:64px 28px 96px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{height:26px;width:auto}
+.brand .wordmark{font-size:18px;font-weight:800;letter-spacing:-.03em;color:var(--text-heading)}
+.brand .wordmark .dot{opacity:.55}.brand .wordmark .suffix{color:var(--color-primary)}
+h1{margin-top:28px;font-size:36px;font-weight:700;line-height:1.25}
+.lede{margin:12px 0 0;font-size:17px;max-width:60ch;text-wrap:pretty}
+.facts{margin-top:28px;display:flex;flex-wrap:wrap;gap:8px 28px;font-size:14px;color:var(--text-muted)}
+.facts b{color:var(--text-heading);font-weight:700}
+.rule{margin:40px 0;height:1px;background:var(--border)}
+.grid{display:grid;gap:16px}
+.card{display:block;padding:24px 28px;background:var(--surface);border:1px solid var(--border);
+      border-radius:var(--radius-lg);text-decoration:none;color:inherit;
+      transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)}
+.card:hover{border-color:var(--color-primary);box-shadow:var(--shadow-float);color:inherit}
+.card-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.code{font-family:var(--font-mono);font-size:13px;color:var(--text-caption)}
+.card h2{font-size:22px;font-weight:600;line-height:1.4}
+.body{margin:10px 0 0;font-size:15px;color:var(--text-body);text-wrap:pretty}
+.meta{margin-top:14px;display:flex;gap:12px;align-items:baseline;font-size:13px}
+.meta-label{flex:0 0 76px;color:var(--text-caption)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:2px 9px;border-radius:var(--radius-pill);background:var(--surface-alt);
+      border:1px solid var(--border);color:var(--text-muted);font-size:12px;white-space:nowrap}
+.doc{font-family:var(--font-mono);font-size:12px;color:var(--text-muted)}
+.note{margin-top:40px;padding:20px 24px;background:var(--color-accent-bg);border-radius:var(--radius-lg)}
+.note h2{font-size:15px;font-weight:700}
+.note ul{margin:10px 0 0;padding-left:18px;font-size:14px;line-height:1.8}
+.note li+li{margin-top:4px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="brand">
+<img src="../assets/swonbiz-logo.png" alt="">
+<span class="wordmark">S<span class="dot">·</span>won<span class="suffix">Biz</span></span>
+</div>
+
+<h1>ERP 프로토타입 — 1차 인계</h1>
+<p class="lede">입주사·계약 관리 업무의 동작 확인용 시안입니다. 각 파일은 단독으로 열립니다 — 폰트 CDN 외에는 외부 의존이 없습니다.</p>
+
+<div class="facts">
+<span><b>기준 폭</b> 1440px 고정</span>
+<span><b>명세</b> ../tenant-contract/</span>
+<span><b>최종 갱신</b> 2026-09-13</span>
+</div>
+
+<div class="rule"></div>
+
+<div class="grid">
+<a class="card" href="s0300200030.html">
+<div class="card-head"><span class="code">s0300200030</span><h2>입주사·계약 마스터-디테일</h2></div>
+<p class="body">좌측 입주사 목록 + 우측 계약 목록. 계약 행을 누르면 상세 모달(s0300200030p1)이 이 화면 안에서 열립니다.</p>
+<div class="meta"><span class="meta-label">확인 컨트롤</span><span class="chips"><span class="chip">권한 (운영자·매니저·입주사)</span><span class="chip">빈 상태</span><span class="chip">로딩 스켈레톤</span><span class="chip">사이드바 접기</span></span></div>
+<div class="meta"><span class="meta-label">명세</span><span class="doc">tenant-contract/02-master-detail.md</span></div>
+</a>
+<a class="card" href="s0300200040.html">
+<div class="card-head"><span class="code">s0300200040</span><h2>계약 폼</h2></div>
+<p class="body">섹션 4개(회사 기본정보·계약정보·입주자 사용자·첨부 서류)와 상태 5종. 확인 모달 3종(계약확정·계약취소·종료)이 이 화면 안에 들어 있습니다.</p>
+<div class="meta"><span class="meta-label">확인 컨트롤</span><span class="chips"><span class="chip">상태 (create·draft·confirmed·terminated·cancelled)</span><span class="chip">회원구분</span><span class="chip">계약 항목 수 1~3건</span><span class="chip">첨부 서류</span><span class="chip">빈 상태</span><span class="chip">필수 미입력 검증</span></span></div>
+<div class="meta"><span class="meta-label">명세</span><span class="doc">tenant-contract/03-contract-form.md · 04-status.md · 05-logic.md</span></div>
+</a>
+<a class="card" href="s0300200040p1.html">
+<div class="card-head"><span class="code">s0300200040p1</span><h2>계약서 미리보기</h2></div>
+<p class="body">이용계약서 · 전대차계약서 2종. confirmed 이후에만 열립니다. 인쇄 시 선택된 문서만 A4 로 출력됩니다.</p>
+<div class="meta"><span class="meta-label">확인 컨트롤</span><span class="chips"><span class="chip">문서 탭</span><span class="chip">값 비어 있는 상태 (기입선)</span></span></div>
+<div class="meta"><span class="meta-label">명세</span><span class="doc">tenant-contract/06-contracts.md</span></div>
+</a>
+</div>
+
+<div class="note">
+<h2>읽는 방법</h2>
+<ul>
+<li>각 화면 상단의 <b>검정 확인 컨트롤 바</b>는 개발 확인용입니다. 실서비스에는 포함되지 않습니다.</li>
+<li>모달은 별도 파일이 아니라 부모 화면 안에서 열립니다 — 계약 상세(p1)는 s0300200030, 확인 모달 3종은 s0300200040 안에 있습니다.</li>
+<li>브릿지랩 주식회사 · Room-1 등은 예시값입니다. ㈜에스원테크의 사업자 정보와 인감은 실제 값입니다.</li>
+<li>시안과 명세가 어긋나면 <b>명세가 기준</b>입니다. 시안은 동작을 보이기 위한 것입니다.</li>
+</ul>
+</div>
+
+</div>
+</body>
+</html>
