@@ -248,3 +248,69 @@ export function reconcileRowAmounts(
 
   return { rows: resolved, mismatches };
 }
+
+/**
+ * 코드 `ROOM_TP` — 계약구분.
+ *
+ * ★ 특례가 걸리는 「비상주」만 상수로 둔다. 나머지 값(`R1`·`R2`·`R3`·`FI`·`FR`·`ET`)은
+ *   판정에 쓰이지 않으므로 여기에 늘어놓지 않는다 — 늘어놓으면 코드 마스터와
+ *   두 벌이 되어 어긋난다.
+ *
+ * 값의 근거는 실 DB 조사다(`doc/LEGACY_DATA_SURVEY.md` §③ · `doc/CONTRACT_DATA_MODEL.md` §A-6).
+ * **표시명("비상주")으로 비교하지 않는다** — 표시명은 바뀔 수 있고 실제로 바뀔 예정이다
+ * (`R3` 「3인실」→「팀오피스」, §C-3 ①).
+ */
+export const ROOM_TYPE = {
+  /** 비상주. */
+  VIRTUAL_OFFICE: 'VR',
+} as const;
+
+/** 계약서 출력에 쓰는 줄 — 금액 칸에 계약구분이 더 붙는다. */
+export type ContractSpaceForDocument = ContractSpaceAmounts & {
+  /** 코드 `ROOM_TP`. */
+  roomType: string;
+};
+
+/**
+ * 비상주 특례가 걸리는 호실 줄 수의 상한.
+ * 1~2건까지다. 3건부터는 특례가 아니다.
+ */
+const SUBLEASE_STANDARD_FEE_MAX_ROWS = 2;
+
+/**
+ * 전대차계약서 2조 2항 「월회비」.
+ *
+ * =============================================================================
+ * ★ 왜 이용계약서와 금액이 다른가
+ * =============================================================================
+ * 전대차계약서는 **세무서 제출용**이다. 비상주는 할인폭이 커서 실제 계약금액으로
+ * 내면 세무서가 인정하지 않는 경우가 많다. 그래서 호실 지정금액(`standardFee`)으로
+ * 찍는다. 이용계약서는 지금 설계 그대로 실제 계약금액(`monthlyFee`) 기준이다.
+ *
+ * =============================================================================
+ * ★★ 계약 단위 판정이다 — 줄마다 나누지 않는다
+ * =============================================================================
+ *     호실 1~2건이고 **그 전부가** 비상주   → 기준가(`standardFee`)로
+ *     그 외                                → 실계약가(`monthlyFee`)로
+ *
+ * 한 계약 안에서 비상주 줄만 기준가로, 나머지는 실계약가로 섞지 않는다. 섞으면
+ * 문서에 찍히는 합계가 어느 쪽 기준인지 설명할 수 없는 숫자가 된다.
+ * 줄이 하나라도 비상주가 아니면 **계약 전체가** 특례에서 빠진다.
+ *
+ * 부가세는 **고른 기준액에서 다시 계산한다**(버림). 기준가로 갈 때 실계약가에서
+ * 나온 부가세를 그대로 얹지 않는다 — 그러면 문서의 금액과 부가세가 서로 다른
+ * 근거를 갖게 된다.
+ *
+ * 줄이 0건이면 0이다. 아직 호실을 안 고른 상태이지 오류가 아니다.
+ */
+export function calcSubleaseMonthlyPayment(rows: readonly ContractSpaceForDocument[]): number {
+  const usesStandardFee =
+    rows.length > 0 &&
+    rows.length <= SUBLEASE_STANDARD_FEE_MAX_ROWS &&
+    rows.every((row) => row.roomType === ROOM_TYPE.VIRTUAL_OFFICE);
+
+  return rows.reduce((sum, row) => {
+    const base = usesStandardFee ? row.standardFee : row.monthlyFee;
+    return sum + calcRowAmounts({ monthlyFee: base, vatYn: row.vatYn }).paymentAmount;
+  }, 0);
+}

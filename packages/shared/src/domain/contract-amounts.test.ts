@@ -13,6 +13,8 @@ import {
   calcFirstPayment,
   calcEndDate,
   reconcileRowAmounts,
+  ROOM_TYPE,
+  calcSubleaseMonthlyPayment,
 } from './contract-amounts';
 
 /** 테스트용 줄 만들기 — 안 쓰는 칸은 0으로 채운다. */
@@ -366,5 +368,110 @@ describe('reconcileRowAmounts', () => {
 
   it('줄이 없으면 빈 결과다', () => {
     expect(reconcileRowAmounts([])).toEqual({ rows: [], mismatches: [] });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 전대차계약서 월회비 — 비상주 특례
+//
+// 전대차계약서는 세무서 제출용이다. 비상주는 할인폭이 커서 실제 계약금액으로
+// 내면 세무서가 인정하지 않는 경우가 많다 — 그래서 호실 지정금액(standard_fee)
+// 으로 찍는다. 이용계약서는 지금 설계 그대로 실제 계약금액이다.
+//
+// ★ 계약 단위 판정이다. 줄마다 나누지 않는다.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** 계약구분이 붙은 줄. 전대차 판정에 계약구분이 필요하다. */
+const docRow = (
+  roomType: string,
+  monthlyFee: number,
+  standardFee: number,
+  opts: { vatYn?: boolean; seq?: number } = {},
+) => ({
+  seq: opts.seq ?? 1,
+  roomType,
+  monthlyFee,
+  standardFee,
+  deposit: 0,
+  vatYn: opts.vatYn ?? true,
+});
+
+describe('ROOM_TYPE — 계약구분 코드값', () => {
+  it('비상주는 코드값 VR 이다 — 표시명이 아니다', () => {
+    expect(ROOM_TYPE.VIRTUAL_OFFICE).toBe('VR');
+  });
+});
+
+describe('calcSubleaseMonthlyPayment — 비상주 특례가 걸리는 경우', () => {
+  it('비상주 1건이면 기준가로 찍는다', () => {
+    // 기준가 300,000 + 부가세 30,000 = 330,000. 실계약가(100,000)를 쓰지 않는다.
+    expect(calcSubleaseMonthlyPayment([docRow('VR', 100_000, 300_000)])).toBe(330_000);
+  });
+
+  it('비상주 2건이어도 기준가로 찍는다', () => {
+    expect(
+      calcSubleaseMonthlyPayment([
+        docRow('VR', 100_000, 300_000, { seq: 1 }),
+        docRow('VR', 90_000, 200_000, { seq: 2 }),
+      ]),
+    ).toBe(330_000 + 220_000);
+  });
+
+  it('★ 부가세는 기준가에서 다시 계산한다 — 실계약가 기준 부가세가 아니다', () => {
+    // 기준가 99,999 → 버림 9,999. 실계약가(50,000) 기준이면 5,000 이 나온다.
+    expect(calcSubleaseMonthlyPayment([docRow('VR', 50_000, 99_999)])).toBe(99_999 + 9_999);
+  });
+
+  it('vat_yn=false 인 줄은 기준가만 찍는다', () => {
+    expect(calcSubleaseMonthlyPayment([docRow('VR', 100_000, 300_000, { vatYn: false })])).toBe(300_000);
+  });
+});
+
+describe('calcSubleaseMonthlyPayment — 특례가 걸리지 않는 경우', () => {
+  it('★ 비상주 3건이면 특례가 아니다 — 1~2건까지다', () => {
+    const rows = [
+      docRow('VR', 100_000, 300_000, { seq: 1 }),
+      docRow('VR', 100_000, 300_000, { seq: 2 }),
+      docRow('VR', 100_000, 300_000, { seq: 3 }),
+    ];
+    expect(calcSubleaseMonthlyPayment(rows)).toBe(330_000);
+  });
+
+  it('★ 2건 중 하나가 비상주가 아니면 계약 전체가 특례에서 빠진다', () => {
+    const rows = [
+      docRow('VR', 100_000, 300_000, { seq: 1 }),
+      docRow('R1', 400_000, 450_000, { seq: 2 }),
+    ];
+    // 특례였다면 300,000+450,000 기준이 됐을 것이다. 실계약가 기준으로 간다.
+    expect(calcSubleaseMonthlyPayment(rows)).toBe(110_000 + 440_000);
+  });
+
+  it('비상주가 하나도 없으면 실계약가 기준이다', () => {
+    expect(calcSubleaseMonthlyPayment([docRow('R1', 400_000, 450_000)])).toBe(440_000);
+  });
+
+  it('특례가 아닐 때는 월납부액 합계와 같다', () => {
+    const rows = [
+      docRow('R1', 400_000, 450_000, { seq: 1 }),
+      docRow('R2', 880_000, 880_000, { seq: 2 }),
+    ];
+    expect(calcSubleaseMonthlyPayment(rows)).toBe(calcTotals(rows).monthlyPayment);
+  });
+
+  it('★ 표시명 "비상주" 문자열은 비상주가 아니다 — 코드값으로만 판정한다', () => {
+    expect(calcSubleaseMonthlyPayment([docRow('비상주', 100_000, 300_000)])).toBe(110_000);
+  });
+
+  it('호실이 0건이면 0이다', () => {
+    expect(calcSubleaseMonthlyPayment([])).toBe(0);
+  });
+});
+
+describe('calcSubleaseMonthlyPayment — 순수 함수', () => {
+  it('입력 배열을 변형하지 않는다', () => {
+    const rows = [docRow('VR', 100_000, 300_000)];
+    const before = JSON.stringify(rows);
+    calcSubleaseMonthlyPayment(rows);
+    expect(JSON.stringify(rows)).toBe(before);
   });
 });
