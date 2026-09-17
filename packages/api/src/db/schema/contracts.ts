@@ -101,6 +101,18 @@ export const contracts = pgTable('tb_s080_contracts', {
   renewedFromContractId: text('renewed_from_contract_id'),
 
   createdAt: timestamp('created_at').notNull().defaultNow(),
+  /**
+   * ★★ **DB 에는 기본값이 없다.** 이 선언과 실제 테이블이 어긋나 있다.
+   *
+   * `tb_s080_contracts` 는 레거시가 만든 테이블이고, Prisma 의 `@updatedAt` 이 늘 값을
+   * 넣어 줘서 DB 기본값이 붙은 적이 없다. `created_at` 에는 `CURRENT_TIMESTAMP` 가
+   * 있는데 `updated_at` 에만 없다(2026-09-17 실측). 같은 상태인 레거시 테이블이
+   * **28개**다 — 우리가 만든 `tb_s080_contract_spaces` 만 예외다.
+   *
+   * 그래서 이 컬럼을 빼고 INSERT 하면 `23502 not-null violation` 이 난다.
+   * **쓰는 쪽이 항상 값을 넣어야 한다.** 이 줄의 `.defaultNow()` 는 drizzle 이
+   * DDL 을 만들 때만 쓰는 선언이지, 이미 있는 테이블을 바꾸지 않는다.
+   */
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   createdBy: text('created_by'),
   updatedBy: text('updated_by'),

@@ -545,6 +545,19 @@ MockBbiyongAuth + MockBbiyongAcl (shadow)
 > 답이 맞는가(파일명은 일치하나 명시적 회신은 없었다).
 > 막는 것은 **랜딩(0차)뿐, 1차 화면은 아니다.** 상세: `doc/DESIGN_HANDOFF_DIFF.md` §F-10.
 
+> **★ 레거시 28개 테이블의 `updated_at` 에 기본값이 없다 (2026-09-17, 4-3 실측).**
+> `NOT NULL` 인데 `DEFAULT` 가 없다. Prisma 의 `@updatedAt` 이 늘 값을 넣어 줘서
+> 기본값이 붙은 적이 없는 것이다 — `created_at` 에는 `CURRENT_TIMESTAMP` 가 있는데
+> `updated_at` 에만 없다. 우리가 만든 `tb_s080_contract_spaces` 만 예외다.
+>
+> **컬럼을 빼고 INSERT 하면 `23502` 로 죽는다.** drizzle 스키마는 `.defaultNow()` 라고
+> 적어 두었지만 그건 DDL 생성용 선언이라 이미 있는 테이블을 바꾸지 않는다 —
+> 스키마와 실제가 어긋나 있었다. `contracts` 쪽에 그 사실을 주석으로 박아 뒀다.
+>
+> **지금은 쓰는 쪽에서 값을 넣는 것으로 간다.** 28개 테이블에 `DEFAULT` 를 붙이는
+> 마이그레이션은 아직 우리 것이 아닌 테이블까지 건드리므로 **게이트(`004`) 때
+> 함께 판단한다** — 그때 `schema.prisma` 도 어차피 손본다.
+
 > **★ `check-design-links.js` 의 스캔 범위 (2026-09-17, 4-2b).**
 > `*.dc.html` 만 스캔해서 `design/handoff/prototypes/*.html` 은 **참조 0건으로
 > 나온다.** `s0300200040p1.html` 이 쓰는 `../assets/사용인감.png` 가 검사 밖이라는
