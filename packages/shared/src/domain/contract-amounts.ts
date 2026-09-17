@@ -228,9 +228,9 @@ export function calcEndDate(startDate: Date, periodMonths: number): Date {
  *
  * ★ 이 작업 범위는 여기까지다. 저장은 하지 않는다.
  */
-export function reconcileRowAmounts(
-  rows: readonly (ContractSpaceAmounts & Partial<RowAmounts>)[],
-): { rows: (ContractSpaceAmounts & RowAmounts)[]; mismatches: AmountMismatch[] } {
+export function reconcileRowAmounts<T extends ContractSpaceAmounts & Partial<RowAmounts>>(
+  rows: readonly T[],
+): { rows: (T & RowAmounts)[]; mismatches: AmountMismatch[] } {
   const mismatches: AmountMismatch[] = [];
 
   const resolved = rows.map((row) => {
