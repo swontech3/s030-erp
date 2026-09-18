@@ -19,19 +19,16 @@
  * 같은 규칙을 화면에 한 줄이라도 옮겨 적으면 두 벌이 되고, 조용히 갈린다.
  *
  * =============================================================================
- * ★★ 이 화면이 아직 저장하지 않는 것 — 섹션 1 · 3 · 4
+ * ★★ 저장 경로가 없는 섹션은 **잠근다** — 4-4 에서 실제로 물린 자리다
  * =============================================================================
- * 저장되는 것은 **섹션 2(계약 조건 + 계약 항목)와 상태**뿐이다. 4-3 이 만든 라우트가
- * 그것뿐이기 때문이다.
- *   섹션 1 회사 기본정보  → 회사·대표 등록을 계약 폼으로 옮기는 것이 로드맵 작업 15 다.
- *                          삐용 조직 정보 수정·퇴실 통보 규격 회신을 기다리는 중이라
- *                          **이 작업에서 손대지 않는다.** 지금은 NewTenantModal 이 그 자리다
- *   섹션 3 사용자          → 같은 작업에 딸려 있다
- *   섹션 4 첨부            → CONT-17(로드맵 페이즈 4 작업 11)
+ * 4-4 는 섹션 2 만 저장했는데 나머지 셋을 열어 뒀다. 운영자가 회사 정보와 사용자를
+ * 다 채우고 저장을 눌렀고, **오류 없이 조용히 사라졌다.** 화면이 거짓말을 한 것이다.
  *
- * 그래서 이 세 섹션은 **입력은 되지만 새로고침하면 사라진다.** 감추지 않은 이유는
- * 계약서에 인쇄될 항목이 무엇인지 운영자가 봐야 하고, 화면을 두 번 만들지 않기 위해서다.
- * 저장 경로가 붙는 순간 이 주석과 `saveSections123` 안내를 함께 지운다.
+ * 그래서 저장 경로가 없는 섹션은 읽기 전용으로 잠그고 이유를 띄운다. 어느 섹션이
+ * 열려 있는지는 `SECTION_SAVEABLE` 한 곳에 있다 — 경로가 붙으면 거기만 바꾼다.
+ *
+ * ★ 잠금을 풀기 전에 **저장하고 새로고침해서 값이 남는지** 먼저 확인한다.
+ *   "화면이 정상으로 보이는 것"과 "값이 남는 것"은 다른 문제다.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -46,6 +43,7 @@ import { SectionUsers } from './SectionUsers';
 import {
   MEMBER_TYPES,
   ROW_TEMPLATE,
+  SECTION_SAVEABLE,
   USER_TEMPLATE,
   discountLabel,
   missingRequired,
@@ -368,6 +366,7 @@ export function ContractForm({ contract, companyId, spaces, codes }: Props) {
             value={company}
             onChange={(patch) => setCompany((prev) => ({ ...prev, ...patch }))}
             disabled={frozen}
+            notSaveable={!SECTION_SAVEABLE[1]}
             invalid={invalid}
             bizCheck={bizCheck}
             onBizCheck={() => setBizCheck(isBiznoFormatOk(company.bizno) ? 'none' : 'format')}
@@ -391,11 +390,17 @@ export function ContractForm({ contract, companyId, spaces, codes }: Props) {
             repIndex={repIndex}
             company={company}
             frozen={frozen}
+            notSaveable={!SECTION_SAVEABLE[3]}
             onUsers={setUsers}
             onRep={setRepIndex}
           />
 
-          <SectionDocs memberType={company.memberType} disabled={frozen} onStub={notify} />
+          <SectionDocs
+            memberType={company.memberType}
+            disabled={frozen}
+            notSaveable={!SECTION_SAVEABLE[4]}
+            onStub={notify}
+          />
         </div>
       </div>
 

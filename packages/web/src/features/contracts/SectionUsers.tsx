@@ -23,6 +23,8 @@ import {
   DOMAIN_PLACEHOLDER,
   EMAIL_DOMAINS,
   MAX_USERS,
+  NOT_SAVEABLE_BADGE,
+  NOT_SAVEABLE_NOTICE,
   USER_TEMPLATE,
   currentDomain,
   maskValue,
@@ -37,11 +39,23 @@ interface Props {
   company: CompanyState;
   /** `terminated`·`cancelled` — 전 섹션 읽기 전용. */
   frozen: boolean;
+  /** ★ 저장 경로가 없어 잠근 상태인가. */
+  notSaveable: boolean;
   onUsers: (next: UserRow[]) => void;
   onRep: (index: number) => void;
 }
 
-export function SectionUsers({ users, repIndex, company, frozen, onUsers, onRep }: Props) {
+export function SectionUsers({
+  users,
+  repIndex,
+  company,
+  frozen: ended,
+  notSaveable,
+  onUsers,
+  onRep,
+}: Props) {
+  // ★ 저장할 곳이 없으면 입력도 받지 않는다 — 받으면 «저장된다»로 읽힌다.
+  const frozen = ended || notSaveable;
   const full = users.length >= MAX_USERS;
   const patch = (index: number, p: Partial<UserRow>) =>
     onUsers(users.map((u, i) => (i === index ? { ...u, ...p } : u)));
@@ -49,10 +63,19 @@ export function SectionUsers({ users, repIndex, company, frozen, onUsers, onRep 
   return (
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
-        <h2>입주자 사용자 정보</h2>
+        <div className={styles.titleWithBadge}>
+          <h2>입주자 사용자 정보</h2>
+          {notSaveable ? (
+            <span className={styles.lockBadge}>
+              <Icon name="lock" size={12} />
+              {NOT_SAVEABLE_BADGE}
+            </span>
+          ) : null}
+        </div>
         <span className={styles.sectionCount}>{users.length}명 등록</span>
       </div>
       <div className={styles.sectionRule} />
+      {notSaveable ? <p className={styles.sectionNote}>{NOT_SAVEABLE_NOTICE}</p> : null}
 
       <div className={styles.userHead}>
         <span>

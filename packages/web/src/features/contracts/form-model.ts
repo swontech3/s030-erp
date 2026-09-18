@@ -134,6 +134,33 @@ export const DOMAIN_CUSTOM = 'custom';
 /** 섹션 3 최대 행수. 계약 항목 상한(10)은 shared 의 `MAX_CONTRACT_SPACES` 다. */
 export const MAX_USERS = 20;
 
+/**
+ * ★★★ 섹션마다 **저장 경로가 있는가**.
+ *
+ * 4-4 는 계약 조건(섹션 2)만 저장했다. 나머지 셋은 입력은 되는데 새로고침하면
+ * 조용히 사라졌다 — **오류도 없이.** 운영자가 서류를 다 채우고 저장을 눌렀는데
+ * 값이 없어지는 것은 버그보다 나쁘다. 화면이 거짓말을 하는 것이다.
+ *
+ * 그래서 저장 경로가 없는 섹션은 **읽기 전용으로 잠그고 이유를 띄운다.**
+ * 경로가 붙으면 여기를 `true` 로 바꾸는 것이 전부다 — 잠금 코드가 한 곳에만 있다.
+ *
+ * ★ 이 표를 `true` 로 바꾸기 전에 **저장하고 새로고침해서 값이 남는지** 먼저 확인한다.
+ */
+export const SECTION_SAVEABLE: Record<1 | 2 | 3 | 4, boolean> = {
+  /** 회사 기본정보 — 저장 경로가 **아직 없다**. 3-4 에서 `PATCH /companies/:id` 를 붙인다. */
+  1: false,
+  /** 계약정보 — `POST/PATCH /contracts` (4-3). */
+  2: true,
+  /** 입주자 사용자 — 저장 경로가 **아직 없다**. 3-4 에서 `PUT /companies/:id/members` 를 붙인다. */
+  3: false,
+  /** 첨부 서류 — **없다.** CONT-17(로드맵 페이즈 4 작업 11). */
+  4: false,
+};
+
+/** 저장 경로가 없는 섹션에 띄우는 안내. `05-patterns.md` §5 「잠금 섹션」 형식을 쓴다. */
+export const NOT_SAVEABLE_NOTICE = '아직 저장되지 않습니다. 입력해도 값이 남지 않으니 준비된 뒤에 채워 주세요.';
+export const NOT_SAVEABLE_BADGE = '준비 중';
+
 export const ROW_TEMPLATE: ItemRow = {
   roomType: '',
   spaceId: '',

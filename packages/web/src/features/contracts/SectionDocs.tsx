@@ -22,7 +22,7 @@
  */
 import { Icon } from '@/components/ds';
 import styles from './contract-form.module.css';
-import { MEMBER_TYPE_CORP } from './form-model';
+import { MEMBER_TYPE_CORP, NOT_SAVEABLE_BADGE, NOT_SAVEABLE_NOTICE } from './form-model';
 
 const DOC_DEFS = [
   { key: 'id', name: '대표자 신분증', desc: '주민등록증 또는 운전면허증 사본' },
@@ -40,10 +40,13 @@ function docRule(key: (typeof DOC_DEFS)[number]['key'], memberType: string) {
 interface Props {
   memberType: string;
   disabled: boolean;
+  /** ★ 저장 경로가 없어 잠근 상태인가. 첨부는 CONT-17 까지 계속 그렇다. */
+  notSaveable: boolean;
   onStub: (message: string) => void;
 }
 
-export function SectionDocs({ memberType, disabled, onStub }: Props) {
+export function SectionDocs({ memberType, disabled: ended, notSaveable, onStub }: Props) {
+  const disabled = ended || notSaveable;
   const shown = DOC_DEFS.filter((d) => docRule(d.key, memberType).show);
   // 올릴 수 없으므로 등록 건수는 0 이다. 지어내지 않는다.
   const done = 0;
@@ -52,12 +55,21 @@ export function SectionDocs({ memberType, disabled, onStub }: Props) {
   return (
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
-        <h2>첨부 서류</h2>
+        <div className={styles.titleWithBadge}>
+          <h2>첨부 서류</h2>
+          {notSaveable ? (
+            <span className={styles.lockBadge}>
+              <Icon name="lock" size={12} />
+              {NOT_SAVEABLE_BADGE}
+            </span>
+          ) : null}
+        </div>
         <span className={styles.sectionCount}>
           {done} / {shown.length} 등록
         </span>
       </div>
       <div className={styles.sectionRule} />
+      {notSaveable ? <p className={styles.sectionNote}>{NOT_SAVEABLE_NOTICE}</p> : null}
 
       <div className={styles.docList}>
         {shown.map((def) => {

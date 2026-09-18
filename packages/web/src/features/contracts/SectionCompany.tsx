@@ -29,6 +29,8 @@ import {
   EMAIL_DOMAINS,
   MEMBER_TYPES,
   MEMBER_TYPE_CORP,
+  NOT_SAVEABLE_BADGE,
+  NOT_SAVEABLE_NOTICE,
   maskValue,
   type CompanyState,
   type RequiredKey,
@@ -47,14 +49,28 @@ type BizCheck = 'none' | 'format';
 interface Props {
   value: CompanyState;
   onChange: (patch: Partial<CompanyState>) => void;
+  /** `terminated`·`cancelled` — 계약이 끝나 읽기 전용. */
   disabled: boolean;
+  /** ★ 저장 경로가 없어 잠근 상태인가. 있으면 읽기 전용 + 안내다. */
+  notSaveable: boolean;
   invalid: readonly RequiredKey[];
   bizCheck: BizCheck;
   onBizCheck: () => void;
   onStub: (message: string) => void;
 }
 
-export function SectionCompany({ value, onChange, disabled, invalid, bizCheck, onBizCheck, onStub }: Props) {
+export function SectionCompany({
+  value,
+  onChange,
+  disabled: ended,
+  notSaveable,
+  invalid,
+  bizCheck,
+  onBizCheck,
+  onStub,
+}: Props) {
+  // ★ 저장할 곳이 없으면 입력도 받지 않는다 — 받으면 «저장된다»로 읽힌다.
+  const disabled = ended || notSaveable;
   const bad = (key: RequiredKey) => invalid.includes(key);
   const cls = (key: RequiredKey) => `${styles.input}${bad(key) ? ` ${styles.isInvalid}` : ''}`;
   const corpEnabled = value.memberType === MEMBER_TYPE_CORP && !disabled;
@@ -62,9 +78,18 @@ export function SectionCompany({ value, onChange, disabled, invalid, bizCheck, o
   return (
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
-        <h2>회사 기본정보</h2>
+        <div className={styles.titleWithBadge}>
+          <h2>회사 기본정보</h2>
+          {notSaveable ? (
+            <span className={styles.lockBadge}>
+              <Icon name="lock" size={12} />
+              {NOT_SAVEABLE_BADGE}
+            </span>
+          ) : null}
+        </div>
       </div>
       <div className={styles.sectionRule} />
+      {notSaveable ? <p className={styles.sectionNote}>{NOT_SAVEABLE_NOTICE}</p> : null}
 
       <div className={styles.grid4}>
         {/* ── 1행 ── */}
