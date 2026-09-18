@@ -686,6 +686,17 @@ UNIQUE 인덱스를 `(floor_id, room_name)` 으로 옮길지 함께 정한다.
 | **사업장 주소** | ★ **화면 입력란이 없다.** 건물 주소 + 계약호실로 만든다 | 세금계산서 · 삐용 `org010.ADDRESS` | ERP(건물·계약) + 삐용 |
 | **법인 등기 주소** | 등기부등본 | 법무 업무 | **ERP 는 다루지 않는다** |
 
+**저장 위치 (2026-09-18, 3-4 · 마이그레이션 `011`)**
+
+| 화면 | 컬럼 | 비고 |
+|---|---|---|
+| 대표자 주소 3칸 | `tb_s080_companies.ceo_zip_code` · `ceo_address` · `ceo_address_detail` | **신설.** 계약서에 인쇄된다 |
+| (화면 없음) 사업장 주소 | `address` · `zip_code` · `address_detail` | 세금계산서·삐용 `org010.ADDRESS` 가 읽는 칸. 주석을 달아 못박았다 |
+| (ERP 무관) 본점 주소 | `head_address` 계열 | 레거시 칸. 손대지 않았다 |
+
+기존 `address` 에 자택을 넣지 않은 이유가 위 표의 2행이다 — 그 칸은 이미 사업장 주소
+자리이고, 거기 넣으면 아래 sink 교정으로 막은 사고가 **컬럼 단위로 되돌아온다.**
+
 `packages/shared/src/tenant-registration.ts` 의 `zipCode`·`address`·`detailAddress`
 세 항목은 `sink: 'bbiyong'` → **`'erp'`** 로 바꿨다. 3-1 에서 이 값을 회사 주소로
 보고 삐용에 보내도록 정의해 뒀는데, 그대로 두면 **대표자 집 주소가 회사 주소로
