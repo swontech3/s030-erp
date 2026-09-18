@@ -1,0 +1,308 @@
+/**
+ * 계약 폼의 상태 모양과 파생값 — s0300200040.
+ *
+ * =============================================================================
+ * ★★★ 이 파일에 계산식을 쓰지 않는다
+ * =============================================================================
+ * 금액·종료일·첫달납부액은 전부 `@swonbiz/shared/domain/contract-amounts` 가 낸다.
+ * 여기가 하는 일은 **화면 값(문자열·빈 칸)을 그 함수가 받는 모양으로 바꾸고, 함수가
+ * 던지는 경우를 «아직 못 낸다»로 옮기는 것**뿐이다.
+ *
+ * 시안(`s0300200040.html`)에는 같은 계산이 JS 로 들어 있다. **베끼지 않았다** —
+ * 네 곳이 서버와 다르기 때문이다(`doc/CONTRACT_DATA_MODEL.md` §A-4).
+ *
+ *   부가세 끝수      시안 `Math.round`      서버 **버림**
+ *   종료일 말일 처리 시안 없음(오버플로)    서버 **그 달 말일로 맞춘 뒤 −1일**
+ *   기간 0           시안 빈 문자열         서버 **오류**
+ *   납부방법         시안 한글 문자열 비교  서버 **코드값 `M`·`C`**
+ *
+ * 그래서 이 파일에 `Math.round` 도 `setMonth` 도 없다. 있으면 그 순간 두 벌이 된다.
+ */
+import {
+  PAYMENT_METHOD,
+  calcEndDate,
+  calcFirstPayment,
+  calcRowAmounts,
+  calcTotals,
+  type ContractTotals,
+} from '@swonbiz/shared/domain/contract-amounts';
+
+/** 계약 항목 한 줄. 금액은 전부 원 단위 정수이고, 안 채운 칸은 0 이다. */
+export interface ItemRow {
+  /** 코드 `ROOM_TP`. 표시명이 아니다. */
+  roomType: string;
+  /** ★ 저장 키. 화면 표시는 `roomName` 이지만 값은 이쪽이다. 안 고르면 빈 문자열. */
+  spaceId: string;
+  /** 호실의 기준가(월회비). 읽기 전용 표시이고 호실을 고를 때만 바뀐다. */
+  standardFee: number;
+  deposit: number;
+  monthlyFee: number;
+  /** 「계산서」 열 — **부가세 대상 여부**다. 발행 여부가 아니다. */
+  vatYn: boolean;
+}
+
+/** 섹션 3 사용자 한 줄. 1행은 섹션 1 대표자를 미러링하므로 값을 갖지 않는다. */
+export interface UserRow {
+  name: string;
+  phone: string;
+  mailId: string;
+  domain: string;
+  memo: string;
+  /** 저장 대상 여부. 미체크 행도 **입력값은 유지**하고 저장 때만 뺀다. */
+  selected: boolean;
+}
+
+/** 섹션 1. ★ 저장 경로가 아직 없다 — ContractForm 의 「이 화면이 저장하지 않는 것」 참조. */
+export interface CompanyState {
+  company: string;
+  bizno: string;
+  memberType: string;
+  corpno: string;
+  industry: string;
+  bizKind: string;
+  ceo: string;
+  phone: string;
+  emailId: string;
+  emailDomain: string;
+  /** 도메인 Select 가 「직접입력」일 때만 쓴다. */
+  emailDomainCustom: string;
+  zip: string;
+  addr1: string;
+  addr2: string;
+  note1: string;
+}
+
+/** 섹션 2 계약 조건. 계약당 1세트. */
+export interface TermsState {
+  buildId: string;
+  floorId: string;
+  contractRoom: string;
+  /** 코드 `PAYMENT_METHOD` — `M` 월납 / `C` 일시불. */
+  paymentMethod: string;
+  /** 코드 `ACCESS_ROUTE`. */
+  accessRoute: string;
+  contractDate: string;
+  /** 문자열이다 — 비워 두는 상태가 있어야 해서 숫자로 두지 않는다. */
+  months: string;
+  startDate: string;
+  memo: string;
+}
+
+export interface SpaceOption {
+  spaceId: string;
+  buildId: string;
+  buildName: string;
+  floorId: string;
+  floorName: string;
+  roomName: string;
+  roomType: string;
+  standardFee: number | null;
+  deposit: number | null;
+}
+
+export interface CodeOption {
+  category: string;
+  code: string;
+  name: string;
+}
+
+/**
+ * 회원구분 — ★ **화면 상수다. 코드 테이블에서 받지 않는다.**
+ *
+ * DB 의 `MEMBER_TYPE` 은 법인 형태(주식회사·유한회사…)와 상호 표기 위치(「주식회사 앞/뒤」)를
+ * 담는 **같은 이름의 다른 개념**이고, 「프리랜서」·「개인사업자」는 DB 전체에 0건이다
+ * (`doc/CONTRACT_DATA_MODEL.md` §C-3 ⑤). 억지로 이으면 운영자가 엉뚱한 목록을 본다.
+ * 새 코드 카테고리를 만들지 `MEMBER_TYPE` 을 재정의할지는 **판단이 남아 있다**.
+ */
+export const MEMBER_TYPES = ['프리랜서', '개인사업자', '법인'] as const;
+
+/** 이 값일 때만 법인등록번호가 활성이고 법인등기부등본 카드가 보인다. */
+export const MEMBER_TYPE_CORP = '법인';
+
+/**
+ * 이메일 도메인 — ★ **화면 상수다. DB 에 코드 자체가 없다**(같은 문서 §C-3 ④).
+ *
+ * ★ 첫 값이 빈 문자열이고 표시는 「선택하세요」다. 시안 2차가 예시 입주사 도메인
+ *   (`bridgelab.co.kr`)을 기본 선택에서 뺐다 — 그대로 저장돼 오등록이 나기 때문이다.
+ *   `03-contract-form.md` 의 목록은 1차 것이라 그 도메인이 남아 있다. **시안 2차를 따른다.**
+ */
+export const EMAIL_DOMAINS = ['', 'naver.com', 'gmail.com', 'daum.net', 'hanmail.net', 'nate.com'] as const;
+export const DOMAIN_PLACEHOLDER = '선택하세요';
+/** 「직접입력」 Select 의 값. 도메인 문자열과 겹치지 않는 값이어야 한다. */
+export const DOMAIN_CUSTOM = 'custom';
+
+/** 섹션 3 최대 행수. 계약 항목 상한(10)은 shared 의 `MAX_CONTRACT_SPACES` 다. */
+export const MAX_USERS = 20;
+
+export const ROW_TEMPLATE: ItemRow = {
+  roomType: '',
+  spaceId: '',
+  standardFee: 0,
+  deposit: 0,
+  monthlyFee: 0,
+  vatYn: true,
+};
+
+export const USER_TEMPLATE: UserRow = {
+  name: '',
+  phone: '',
+  mailId: '',
+  domain: '',
+  memo: '',
+  selected: true,
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   표시 형식
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export const comma = (n: number): string => (n || 0).toLocaleString('ko-KR');
+
+/** 콤마가 섞인 입력값 → 정수. 빈 칸은 0 이다. */
+export const toNumber = (v: string): number => {
+  const digits = v.replace(/[^0-9]/g, '');
+  return digits ? Number.parseInt(digits, 10) : 0;
+};
+
+/**
+ * 마스크 3종 — 시안 `maskValue`(`05-logic.md` §5) 그대로다.
+ * 계산이 아니라 **표시 형식**이라 서버와 갈릴 것이 없다.
+ */
+export function maskValue(kind: 'bizno' | 'corpno' | 'phone', raw: string): string {
+  const max = kind === 'corpno' ? 13 : kind === 'phone' ? 11 : 10;
+  const d = raw.replace(/\D/g, '').slice(0, max);
+
+  if (kind === 'bizno') {
+    if (d.length > 5) return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`;
+    return d.length > 3 ? `${d.slice(0, 3)}-${d.slice(3)}` : d;
+  }
+  if (kind === 'corpno') {
+    return d.length > 6 ? `${d.slice(0, 6)}-${d.slice(6)}` : d;
+  }
+  // 010 은 3-4-4, 그 외는 3-3-4
+  const mid = d.startsWith('010') || d.length > 10 ? 7 : 6;
+  if (d.length > mid) return `${d.slice(0, 3)}-${d.slice(3, mid)}-${d.slice(mid)}`;
+  return d.length > 3 ? `${d.slice(0, 3)}-${d.slice(3)}` : d;
+}
+
+/**
+ * 콤마를 다시 넣으면 커서가 맨 앞으로 튄다 — 길이 차이만큼 되돌린다.
+ * ★ 이것이 없으면 **두 번째 글자부터 입력이 막힌다**(`05-logic.md` §5).
+ */
+export function formatMoneyInput(el: HTMLInputElement): string {
+  const prevLen = el.value.length;
+  const prevPos = el.selectionStart ?? el.value.length;
+  const digits = el.value.replace(/[^0-9]/g, '');
+  const formatted = digits ? Number(digits).toLocaleString('ko-KR') : '';
+  el.value = formatted;
+  const pos = Math.max(0, Math.min(formatted.length, prevPos + (formatted.length - prevLen)));
+  try {
+    el.setSelectionRange(pos, pos);
+  } catch {
+    /* detached */
+  }
+  return formatted;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   파생값 — 전부 shared 가 낸다
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** 줄 하나의 부가세액·납부액. **`floor` 는 shared 안에 있다.** */
+export function rowAmounts(row: ItemRow): { vatAmount: number; paymentAmount: number } {
+  return calcRowAmounts({ monthlyFee: row.monthlyFee, vatYn: row.vatYn });
+}
+
+export function totalsOf(rows: readonly ItemRow[]): ContractTotals {
+  return calcTotals(
+    rows.map((r, i) => ({
+      seq: i + 1,
+      standardFee: r.standardFee,
+      deposit: r.deposit,
+      monthlyFee: r.monthlyFee,
+      vatYn: r.vatYn,
+    })),
+  );
+}
+
+/**
+ * 첫달납부액. **아직 못 내는 상태가 있다** — 납부방법이 비었거나, 일시불인데 기간이 없을 때다.
+ * 그때 0 을 보여주면 「0원을 내면 된다」로 읽힌다. `null` 로 두고 화면이 빈 칸을 그린다.
+ */
+export function firstPaymentOf(totals: ContractTotals, paymentMethod: string, months: string): number | null {
+  const periodMonths = toNumber(months);
+  if (paymentMethod !== PAYMENT_METHOD.MONTHLY && paymentMethod !== PAYMENT_METHOD.LUMP_SUM) return null;
+  if (paymentMethod === PAYMENT_METHOD.LUMP_SUM && periodMonths < 1) return null;
+  return calcFirstPayment({ totals, paymentMethod, periodMonths });
+}
+
+/**
+ * 종료일 `YYYY.MM.DD`. 시작일이나 기간이 없으면 빈 문자열이다 —
+ * 그건 «아직 안 채웠다»이지 오류가 아니다. 기간 0 을 **저장하려 할 때** 서버가 막는다.
+ */
+export function endDateOf(startDate: string, months: string): string {
+  const periodMonths = toNumber(months);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || periodMonths < 1) return '';
+
+  const [y, m, d] = startDate.split('-').map(Number) as [number, number, number];
+  const start = new Date(Date.UTC(y, m - 1, d));
+  if (Number.isNaN(start.getTime())) return '';
+
+  const end = calcEndDate(start, periodMonths);
+  return end.toISOString().slice(0, 10).replace(/-/g, '.');
+}
+
+/**
+ * 기준가 대비 할인 문구. 차액이 없으면 빈 문자열이다.
+ * ★ 표시 문구이지 저장값이 아니다 — 시안 문자열 형식을 그대로 옮긴다(`05-logic.md` §4).
+ */
+export function discountLabel(standardFee: number, monthlyFee: number): string {
+  if (!standardFee || !monthlyFee || standardFee === monthlyFee) return '';
+  const diff = monthlyFee - standardFee;
+  const pct = Math.abs((diff / standardFee) * 100).toFixed(1);
+  return `기준가 대비 ${diff < 0 ? '-' : '+'}${comma(Math.abs(diff))}원 (${pct}${diff < 0 ? '% 할인)' : '% 추가)'}`;
+}
+
+/** 할인 문구를 특기사항 **첫 줄에만** 둔다. 사용자가 쓴 줄은 보존한다. */
+export function withDiscountLine(memo: string, line: string): string {
+  const lines = memo.split('\n');
+  const hasAuto = lines[0]?.startsWith('기준가 대비 ') ?? false;
+  const rest = hasAuto ? lines.slice(1) : lines;
+  return line ? [line, ...rest].join('\n') : rest.join('\n');
+}
+
+/** 섹션 1 대표자 이메일 — 도메인 Select 와 직접입력 중 지금 유효한 쪽. */
+export function currentDomain(c: CompanyState): string {
+  return c.emailDomain === DOMAIN_CUSTOM ? c.emailDomainCustom : c.emailDomain;
+}
+
+/**
+ * 필수 항목 — 헤더 보조 안내의 「필수 항목 N개 미입력」과 오류 표시가 같은 목록을 본다.
+ * 시안 `REQUIRED_FIELDS` 8개 그대로다.
+ */
+export const REQUIRED_FIELDS = [
+  { key: 'company', label: '회사명' },
+  { key: 'bizno', label: '사업자등록번호' },
+  { key: 'ceo', label: '대표자' },
+  { key: 'phone', label: '연락처' },
+  { key: 'emailId', label: '이메일' },
+  { key: 'contractDate', label: '계약일자' },
+  { key: 'months', label: '기간(월)' },
+  { key: 'startDate', label: '시작일' },
+] as const;
+
+export type RequiredKey = (typeof REQUIRED_FIELDS)[number]['key'];
+
+export function missingRequired(company: CompanyState, terms: TermsState): RequiredKey[] {
+  const value: Record<RequiredKey, string> = {
+    company: company.company,
+    bizno: company.bizno,
+    ceo: company.ceo,
+    phone: company.phone,
+    emailId: company.emailId,
+    contractDate: terms.contractDate,
+    months: terms.months,
+    startDate: terms.startDate,
+  };
+  return REQUIRED_FIELDS.filter((f) => !value[f.key].trim()).map((f) => f.key);
+}

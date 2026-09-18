@@ -53,8 +53,10 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     memberName: '김대표',
     orgName: '에스원비즈',
     scope: 'operator',
-    // ★ s0300200030 은 운영사 전용(audience_tp='P')이다. 입주사 계정에는 넣지 않는다.
-    screens: ['s0300000050', 's0300000060', 's0300200030', 's0300600010'],
+    // ★ s0300200030·s0300200040 은 운영사 전용(audience_tp='P')이다. 입주사 계정에는 넣지 않는다.
+    //   계약 폼(s0300200040)은 사이드바에 없고 계약 상세·목록에서 들어가지만, 목록에 없으면
+    //   requireScreen 이 /no-access 로 돌려보낸다 — 넣지 않으면 화면이 아예 열리지 않는다.
+    screens: ['s0300000050', 's0300000060', 's0300200030', 's0300200040', 's0300600010'],
   },
   {
     email: 'operator@s-wontech.co.kr',
@@ -64,8 +66,10 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     memberName: '박운영',
     orgName: '에스원비즈',
     scope: 'operator',
-    // ★ s0300200030 은 운영사 전용(audience_tp='P')이다. 입주사 계정에는 넣지 않는다.
-    screens: ['s0300000050', 's0300000060', 's0300200030', 's0300600010'],
+    // ★ s0300200030·s0300200040 은 운영사 전용(audience_tp='P')이다. 입주사 계정에는 넣지 않는다.
+    //   계약 폼(s0300200040)은 사이드바에 없고 계약 상세·목록에서 들어가지만, 목록에 없으면
+    //   requireScreen 이 /no-access 로 돌려보낸다 — 넣지 않으면 화면이 아예 열리지 않는다.
+    screens: ['s0300000050', 's0300000060', 's0300200030', 's0300200040', 's0300600010'],
   },
   {
     email: 'tenant@test.com',

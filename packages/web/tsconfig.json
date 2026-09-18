@@ -9,6 +9,11 @@
   //     Drizzle 타입으로 바꿀 때 함께 정리한다.
   "compilerOptions": {
     "noUncheckedIndexedAccess": true,
+    // ★ shared/domain/* 이 서로를 `.ts` 확장자로 import 한다(그쪽 tsconfig 주석 참조 —
+    //   Node ESM 이 확장자 없는 상대경로를 해석하지 못해서다). 4-4 에서 계약 폼이
+    //   contract-amounts·contract-status 를 부르면서 그 파일들이 이 설정으로도
+    //   검사되기 시작했다. noEmit 이라 이 플래그가 허용된다.
+    "allowImportingTsExtensions": true,
     "jsx": "preserve",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "allowJs": true,
