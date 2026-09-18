@@ -73,10 +73,33 @@ export const COMPANY_FIELDS = {
     label: '회사 전화', sink: 'bbiyong', wire: 'telNo', required: false, maxLength: 20,
     onScreen: true, digitsOnly: true,
   },
-  zipCode: { label: '우편번호', sink: 'bbiyong', wire: 'zipCode', required: false, maxLength: 10, onScreen: true },
-  address: { label: '주소', sink: 'bbiyong', wire: 'address', required: false, maxLength: 300, onScreen: true },
+  // ── 주소 3칸 ────────────────────────────────────────────────────────────────
+  // ★★★ 2026-09-18 정정 — **삐용에 보내지 않는다.** 3-1 에서는 `bbiyong` 이었다.
+  //
+  // 이 칸들이 받는 것은 **대표자 자택 주소**다. 계약 폼 섹션 1 의 라벨이 「대표자 주소」이고
+  // 힌트가 「계약서에 인쇄되는 대표자 주소입니다」다 — 디자인팀 라벨이 맞았고, 이것을
+  // «회사 주소를 받는 칸»으로 읽은 우리 가정이 틀렸다(doc/DESIGN_HANDOFF_DIFF.md §F-6 ①).
+  //
+  // ★ 주소는 **세 종류**이고 서로 다른 값이다.
+  //   대표자 자택 주소 — 이 칸들. 계약서 「주소」 행에 인쇄된다. **ERP 만 보관한다**
+  //   사업장 주소      — 건물 주소 + 계약호실. **화면 입력란이 없다.** 삐용
+  //                     org010.ADDRESS 로 가는 것은 이쪽이다(확정 계약 중 최근 것 기준).
+  //                     갱신 API 규격은 삐용 회신 대기 중이다
+  //   법인 등기 주소   — 등기부등본상 주소. ERP 는 다루지 않는다
+  //
+  // ★★ 여기를 'bbiyong' 으로 되돌리면 **대표자 집 주소가 회사 주소로 삐용에 등록되고,
+  //    세금계산서·계약서에 그 주소가 인쇄된다.** 되돌리기 전에 위 세 종류를 먼저 읽는다.
+  zipCode: {
+    label: '우편번호', sink: 'erp', wire: null, required: false, maxLength: 10, onScreen: true,
+    note: '대표자 자택 우편번호. 삐용에 보내지 않는다 — 위 주석 참조.',
+  },
+  address: {
+    label: '주소', sink: 'erp', wire: null, required: false, maxLength: 300, onScreen: true,
+    note: '대표자 자택 기본주소. 계약서에 인쇄된다. 삐용 org010.ADDRESS(사업장 주소)와 다른 값이다.',
+  },
   detailAddress: {
-    label: '상세주소', sink: 'bbiyong', wire: 'detailAddress', required: false, maxLength: 300, onScreen: true,
+    label: '상세주소', sink: 'erp', wire: null, required: false, maxLength: 300, onScreen: true,
+    note: '대표자 자택 상세주소.',
   },
 
   // ── 여기서부터 ERP 에만 남는다 ──────────────────────────────────────────────
