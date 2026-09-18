@@ -82,8 +82,21 @@ async function main() {
       c.query(`SELECT * FROM public.tb_s080_companies WHERE company_id = $1`, [arg]),
     );
     console.log(JSON.stringify(out.rows[0] ?? null, null, 2));
+  } else if (cmd === 'purge-inactive') {
+    // 검증하며 만든 비활성 행 정리. 예약이 걸린 사람은 남긴다 — 지우면 그 예약의
+    // 예약자가 조용히 비워진다(ON DELETE SET NULL).
+    const n = await asOperator(async (c) => {
+      const r = await c.query(
+        `DELETE FROM public.tb_s080_members m
+          WHERE m.company_id = $1 AND m.status = 'inactive'
+            AND NOT EXISTS (SELECT 1 FROM public.tb_s080_reservations r WHERE r.member_id = m.member_id)`,
+        [arg],
+      );
+      return r.rowCount;
+    });
+    console.log(`비활성 구성원 ${n}행 삭제`);
   } else {
-    console.error('probe | members <회사ID> | company <회사ID>');
+    console.error('probe | members <회사ID> | company <회사ID> | purge-inactive <회사ID>');
     process.exitCode = 2;
   }
 

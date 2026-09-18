@@ -1,27 +1,27 @@
 /*
- * s0300200030 마스터-디테일 자리 화면.
+ * s0300200030 입주사·계약 마스터-디테일.
  *
- * 원본: design/handoff/tenant-contract/02-master-detail.md  ← ★ 정본(2026-09-13 인계)
- *       새 원본의 레이아웃 값(좌 420px 고정 · 간격 20px · --surface + 1px --border +
- *       --radius-lg + overflow:hidden)은 옛 시안과 같다. 대조는 DESIGN_HANDOFF_DIFF.md A-3-1.
+ * 원본: design/handoff/prototypes/s0300200030.html  ← ★ 시각 정본(2차 인계분)
+ * 명세: design/handoff/tenant-contract/02-master-detail.md
  *
- * 값은 design/erp-master-detail/ErpMasterDetail.dc.html 의 인라인 스타일 그대로다.
- * 개발이 새 토큰을 만들지 않는다 — 원본에 없는 값은 여기에도 없다.
+ * 값은 원본의 <style> 블록 그대로다. 개발이 토큰을 새로 만들지 않는다.
  *
- * ★ 원본의 바깥 래퍼는 padding:28px 32px 인데 여기서는 뺐다. 셸(AppShell .main)이
- *   이미 padding:32px 를 준다 — 원본은 셸까지 한 파일에 그린 통짜 미리보기라서
- *   그 패딩을 자기가 들고 있었다. 겹쳐 넣으면 64px 이 된다.
+ * ★ 원본의 바깥 패딩(28px 32px / 20px 32px 32px)은 여기 없다 — 셸(AppShell .main)이
+ *   이미 padding:32px 를 준다. 겹쳐 넣으면 64px 이 된다.
+ *
+ * ★ 계약 테이블의 열 정의는 **원본 CSS 를 따른다**(80/160/140/96/72/88).
+ *   02-master-detail.md 의 표(88/168/164/96/70/86)와 숫자가 다른데, 원본 주석이
+ *   「하한 합계 636px + 행 패딩 36px = 672px ≤ 우측 패널 686px」로 계산 근거를 달고
+ *   있어 그쪽이 나중 값이다. 명세의 숫자를 쓰면 마지막 열이 잘린다.
  */
 
 .page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  /* 셸의 .main 이 overflow:auto 라 높이를 물려받지 못한다. 원본 미리보기(900px)에서
-     본문이 차지하던 높이를 하한으로 둔다 — 작아지면 셸이 스크롤한다. */
   min-height: 520px;
 }
 
+/* ── 페이지 헤더 ── */
 .head {
   flex: 0 0 auto;
   display: flex;
@@ -32,45 +32,96 @@
 
 .title {
   margin: 0;
-  font-size: var(--text-h2-size);
-  font-weight: var(--weight-bold);
-  line-height: var(--text-h2-lh);
-  letter-spacing: var(--text-h2-ls);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.018em;
   color: var(--text-heading);
 }
 
-/* 원본 41행 data-open="new-tenant" */
-.newTenant {
+/* ── 버튼 ── */
+.btn {
+  position: relative;
   height: 40px;
   padding: 0 16px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: var(--text-on-primary);
-  font-family: inherit;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: var(--shadow-primary);
+  border: 1px solid transparent;
   transition: background var(--dur) var(--ease-out);
 }
 
-.newTenant:hover {
+.btnPrimary {
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  box-shadow: var(--shadow-primary);
+}
+
+.btnPrimary:hover {
   background: var(--color-primary-hover);
 }
 
+.btnGhost {
+  background: var(--surface);
+  color: var(--text-heading);
+  border-color: var(--border);
+}
+
+.btnGhost:hover {
+  background: var(--surface-alt);
+}
+
+.btnSm {
+  height: 36px;
+  padding: 0 14px;
+}
+
+.btnXs {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+/* 툴팁 — 원본은 버튼 우측 기준이다 */
+.tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: none;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inverse);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 400;
+  white-space: nowrap;
+  box-shadow: var(--shadow-float);
+  pointer-events: none;
+  z-index: 40;
+}
+
+.btn:hover .tip {
+  display: flex;
+}
+
+/* ── 2단 레이아웃 ── */
 .body {
   flex: 1;
   min-height: 0;
   display: flex;
   gap: 20px;
+  padding-top: 20px;
 }
 
-/* 좌 — 입주사 목록 (원본 44행) */
+/* ── 좌측 · 입주사 리스트 ── */
 .list {
   width: 420px;
   flex: 0 0 auto;
@@ -91,6 +142,7 @@
 .searchRow {
   display: flex;
   align-items: center;
+  gap: 12px;
 }
 
 .searchWrap {
@@ -120,7 +172,9 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   outline: none;
-  transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+  transition:
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
 }
 
 .search:focus {
@@ -129,7 +183,6 @@
 }
 
 .count {
-  margin-left: 12px;
   flex: 0 0 auto;
   font-size: 14px;
   font-weight: 700;
@@ -137,7 +190,187 @@
   white-space: nowrap;
 }
 
-/* 우 — 상세 (원본 107행) */
+.reset {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  padding: 0 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.reset:hover {
+  color: var(--color-primary);
+}
+
+.chipRow {
+  margin-top: 10px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  height: 28px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out);
+}
+
+.chipOn {
+  background: var(--color-accent-bg);
+  border-color: var(--color-primary);
+  color: var(--color-primary-hover);
+  font-weight: 700;
+}
+
+.chipCheck {
+  display: none;
+}
+
+.chipOn .chipCheck {
+  display: flex;
+}
+
+/* 목록 — 독립 스크롤 */
+.cards {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cards::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cards::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.cards:hover::-webkit-scrollbar-thumb {
+  background: var(--text-caption);
+}
+
+.card {
+  position: relative;
+  width: 100%;
+  display: block;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease-out);
+}
+
+.card:hover {
+  background: var(--surface-alt);
+}
+
+.cardSelected {
+  background: var(--color-accent-bg);
+}
+
+.cardSelected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-primary);
+}
+
+.cardRow1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cardName {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.cardPre {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--text-caption);
+}
+
+.cardName b {
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardSelected .cardName b {
+  color: var(--color-primary);
+}
+
+.cardMeta {
+  margin-top: 6px;
+  display: block;
+  font-size: 14px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── 뱃지 ── */
+.badge {
+  height: 24px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badgeIndigo {
+  background: var(--color-accent-bg);
+  color: var(--color-primary-hover);
+}
+
+.badgeWarning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.badgeNeutral {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+/* ── 우측 · 계약 이력 ── */
 .detail {
   flex: 1;
   min-width: 0;
@@ -149,28 +382,342 @@
   overflow: hidden;
 }
 
-/*
- * 빈 상태 — 원본 158행(noSelection) 그대로.
- * 목록에도 같은 모양을 쓴다. 원본에 "입주사가 0곳"인 상태가 없어(24곳 고정)
- * 새 모양을 만드는 대신 이미 있는 빈 상태를 재사용했다.
- */
+.detailHead {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.who {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.who h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.012em;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.whoDivider {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 12px;
+  flex: 0 0 auto;
+}
+
+.whoSub {
+  font-size: 14px;
+  color: var(--text-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.whoMid {
+  margin: 0 8px;
+  flex: 0 0 auto;
+  font-size: 14px;
+  color: var(--text-body);
+}
+
+.detailBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ── 계약 테이블 ── 헤더와 행이 같은 열 정의를 쓴다 ── */
+.tableHead,
+.row {
+  display: grid;
+  grid-template-columns:
+    80px minmax(160px, 1.2fr) minmax(140px, 1fr)
+    minmax(96px, 0.8fr) minmax(72px, 0.7fr) minmax(88px, 0.75fr);
+  align-items: center;
+}
+
+.tableHead {
+  padding: 12px 12px 12px 24px;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.tableHead span {
+  padding: 0 12px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.tableHead span:first-child {
+  padding: 0;
+}
+
+.row {
+  position: relative;
+  width: 100%;
+  padding: 16px 12px 16px 24px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease-out);
+}
+
+.row:hover {
+  background: var(--surface-alt);
+}
+
+.rowActive::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-primary);
+}
+
+.cell {
+  min-width: 0;
+  padding: 0 12px;
+}
+
+.term {
+  padding: 0;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.dates {
+  display: block;
+  font-size: 14px;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.remain {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.remainSoon {
+  font-weight: 700;
+  color: var(--color-warning);
+}
+
+.plan {
+  font-size: 14px;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fee {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.statusSoon {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-warning);
+  white-space: nowrap;
+}
+
+.action {
+  display: flex;
+  justify-content: center;
+}
+
+/* ── 빈 상태 ── */
 .empty {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0;
+  padding: 60px 24px;
   text-align: center;
-  padding: 40px;
 }
 
 .emptyIcon {
-  display: flex;
   color: var(--text-caption);
 }
 
-.emptyText {
+.emptyLead {
   margin: 14px 0 0;
   font-size: 16px;
   color: var(--text-muted);
+}
+
+.emptySub {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-caption);
+}
+
+.emptyAct {
+  margin-top: 20px;
+}
+
+/* ── 계약 상세 모달 (s0300200030p1) ── 이 화면 안에서 열린다 ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(11, 17, 32, 0.45);
+}
+
+.modal {
+  width: 720px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+}
+
+.modalHead {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modalNo {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-heading);
+}
+
+.modalBadge {
+  margin-top: 6px;
+}
+
+.modalBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.modalFoot {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border);
+}
+
+.iconBtn {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-caption);
+  cursor: pointer;
+  padding: 0;
+}
+
+.iconBtn:hover {
+  background: var(--surface-alt);
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  row-gap: 20px;
+  column-gap: 32px;
+}
+
+.detailKey {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.detailValue {
+  margin-top: 4px;
+  font-size: 16px;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 토스트 ── 원본 s0300200040 의 것과 같은 규격이다 ── */
+.toast {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 380px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+.toastDot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--color-primary);
+}
+
+.toastMsg {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
 }

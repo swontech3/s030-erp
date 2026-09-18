@@ -20,6 +20,35 @@ import { readSid } from './session';
  *   3. 본문을 JSON 으로 읽는다. 못 읽으면 400
  *   4. Fastify 응답의 상태와 본문을 **그대로** 돌려준다 — 4xx 의 message 는 사용자용이다
  */
+/**
+ * 조회를 그대로 넘긴다. 본문도 CSRF 검사도 없다 — GET 은 상태를 바꾸지 않는다.
+ *
+ * ★ 그래도 세션은 반드시 넘긴다. 빼면 Fastify 가 401 을 내고, 그게 «데이터 없음»으로
+ *   보이는 화면이 된다.
+ */
+export async function forwardGetJson(path: string): Promise<NextResponse> {
+  const sid = await readSid();
+  if (!sid) {
+    return NextResponse.json({ message: '세션이 만료되었습니다. 다시 로그인해 주세요' }, { status: 401 });
+  }
+
+  let res;
+  try {
+    res = await callApi<{ message?: string }>(path, { erpSid: sid });
+  } catch (err) {
+    console.error(`[forward] GET ${path} 실패:`, (err as Error).message);
+    return NextResponse.json(
+      { message: '서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요' },
+      { status: 503 },
+    );
+  }
+
+  if (!res.ok && res.status >= 500) {
+    return NextResponse.json({ message: '서버 오류가 났습니다. 잠시 후 다시 시도해 주세요' }, { status: res.status });
+  }
+  return NextResponse.json(res.body ?? {}, { status: res.status });
+}
+
 export async function forwardJson(
   request: Request,
   path: string,
