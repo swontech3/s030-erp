@@ -43,6 +43,12 @@ export interface ItemRow {
 
 /** 섹션 3 사용자 한 줄. 1행은 섹션 1 대표자를 미러링하므로 값을 갖지 않는다. */
 export interface UserRow {
+  /**
+   * `tb_s080_members.member_id`. 새 줄이면 `null`.
+   * ★ 되돌려 보내야 **같은 사람으로 갱신**된다. 빼면 저장할 때마다 사람이 새로 생기고
+   *   옛 행은 비활성으로 밀려나 예약 이력이 끊긴다.
+   */
+  memberId: string | null;
   name: string;
   phone: string;
   mailId: string;
@@ -147,12 +153,12 @@ export const MAX_USERS = 20;
  * ★ 이 표를 `true` 로 바꾸기 전에 **저장하고 새로고침해서 값이 남는지** 먼저 확인한다.
  */
 export const SECTION_SAVEABLE: Record<1 | 2 | 3 | 4, boolean> = {
-  /** 회사 기본정보 — 저장 경로가 **아직 없다**. 3-4 에서 `PATCH /companies/:id` 를 붙인다. */
-  1: false,
+  /** 회사 기본정보 — `PATCH /companies/:id` (3-4). */
+  1: true,
   /** 계약정보 — `POST/PATCH /contracts` (4-3). */
   2: true,
-  /** 입주자 사용자 — 저장 경로가 **아직 없다**. 3-4 에서 `PUT /companies/:id/members` 를 붙인다. */
-  3: false,
+  /** 입주자 사용자 — `PUT /companies/:id/members` (3-4). */
+  3: true,
   /** 첨부 서류 — **없다.** CONT-17(로드맵 페이즈 4 작업 11). */
   4: false,
 };
@@ -171,6 +177,7 @@ export const ROW_TEMPLATE: ItemRow = {
 };
 
 export const USER_TEMPLATE: UserRow = {
+  memberId: null,
   name: '',
   phone: '',
   mailId: '',
@@ -301,6 +308,35 @@ export function withDiscountLine(memo: string, line: string): string {
 /** 섹션 1 대표자 이메일 — 도메인 Select 와 직접입력 중 지금 유효한 쪽. */
 export function currentDomain(c: CompanyState): string {
   return c.emailDomain === DOMAIN_CUSTOM ? c.emailDomainCustom : c.emailDomain;
+}
+
+/**
+ * 화면의 두 칸 → 저장하는 이메일 한 줄.
+ * 한쪽이 비면 `null` 이다 — `kim@` 이나 `@naver.com` 같은 반쪽을 저장하지 않는다.
+ */
+export function joinEmail(id: string, domain: string): string | null {
+  const a = id.trim();
+  const b = domain.trim();
+  return a && b ? `${a}@${b}` : null;
+}
+
+/**
+ * 저장된 이메일 → 화면의 두 칸.
+ *
+ * ★ 목록에 없는 도메인이면 **「직접입력」으로 연다.** Select 에 없는 값을 그대로 넣으면
+ *   브라우저가 첫 옵션(「선택하세요」)으로 되돌리고, 그 상태로 저장하면 **도메인이
+ *   사라진다.** 값이 조용히 지워지는 자리다.
+ */
+export function splitEmail(email: string | null): Pick<CompanyState, 'emailId' | 'emailDomain' | 'emailDomainCustom'> {
+  const at = email ? email.lastIndexOf('@') : -1;
+  if (!email || at < 1) return { emailId: email ?? '', emailDomain: '', emailDomainCustom: '' };
+
+  const id = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  const known = (EMAIL_DOMAINS as readonly string[]).includes(domain);
+  return known
+    ? { emailId: id, emailDomain: domain, emailDomainCustom: '' }
+    : { emailId: id, emailDomain: DOMAIN_CUSTOM, emailDomainCustom: domain };
 }
 
 /**

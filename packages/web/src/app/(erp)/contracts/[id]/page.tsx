@@ -21,7 +21,12 @@
 import { notFound } from 'next/navigation';
 import { callApi } from '@/lib/api';
 import { readSid, requireScreen } from '@/lib/session';
-import { ContractForm, type ContractResponse } from '@/features/contracts/ContractForm';
+import {
+  ContractForm,
+  type CompanyResponse,
+  type ContractResponse,
+  type MemberResponse,
+} from '@/features/contracts/ContractForm';
 import type { CodeOption, SpaceOption } from '@/features/contracts/form-model';
 
 /** 신규 작성을 가리키는 세그먼트. 실제 계약 ID 는 UUID 라 겹치지 않는다. */
@@ -55,6 +60,25 @@ export default async function ContractFormPage({
     contract = res.body;
   }
 
+  // 섹션 1·3 의 값은 **계약이 아니라 입주사**에 붙어 있다(3-4). 계약이 어느 입주사
+  // 것인지 정해진 뒤에만 읽을 수 있다 — 신규 작성인데 `companyId` 가 없으면 빈 폼이다.
+  const targetCompany = contract?.companyId ?? companyId ?? null;
+  let company: CompanyResponse | null = null;
+  let members: MemberResponse[] = [];
+  if (targetCompany) {
+    const [companyRes, membersRes] = await Promise.all([
+      callApi<CompanyResponse>(`/companies/${encodeURIComponent(targetCompany)}`, { erpSid: sid }),
+      callApi<{ members: MemberResponse[] }>(`/companies/${encodeURIComponent(targetCompany)}/members`, {
+        erpSid: sid,
+      }),
+    ]);
+    // ★ 없는 입주사를 가리키는 `?companyId=` 는 404 가 아니라 «회사 없음»으로 둔다.
+    //   계약 자체는 열려야 한다 — 계약이 있는데 회사 조회가 404 인 상황은 데이터가
+    //   깨진 것이고, 그때 화면까지 닫으면 고칠 방법이 없어진다.
+    if (companyRes.ok) company = companyRes.body;
+    if (membersRes.ok) members = membersRes.body.members;
+  }
+
   return (
     /*
      * ★ key 로 다시 마운트한다 — 상태가 **실제로 바뀐 경우에만** 폼을 다시 채우기 위해서다
@@ -65,7 +89,9 @@ export default async function ContractFormPage({
     <ContractForm
       key={`${id}:${contract?.status ?? 'create'}`}
       contract={contract}
-      companyId={contract?.companyId ?? companyId ?? null}
+      companyId={targetCompany}
+      company={company}
+      members={members}
       spaces={spacesRes.ok ? spacesRes.body.spaces : []}
       codes={codesRes.ok ? codesRes.body.codes : []}
     />

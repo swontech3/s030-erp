@@ -23,7 +23,7 @@ import { readSid } from './session';
 export async function forwardJson(
   request: Request,
   path: string,
-  method: 'POST' | 'PATCH',
+  method: 'POST' | 'PATCH' | 'PUT',
 ): Promise<NextResponse> {
   const blocked = rejectCrossSite(request, { requireJson: true });
   if (blocked) return blocked;
