@@ -14,6 +14,7 @@ import { registerAuthRoutes } from './routes/auth.ts';
 import { registerAclRoutes } from './routes/acl.ts';
 import { registerContractRoutes } from './routes/contracts.ts';
 import { registerLookupRoutes } from './routes/lookups.ts';
+import { registerCompanyRoutes } from './routes/companies.ts';
 import { closePool } from './db/pool.ts';
 
 // ★★ 어느 삐용에 붙었는지를 **가장 먼저** 찍는다. pino 의 JSON 한 줄에 섞으면 눈에 안 띄어서
@@ -45,6 +46,7 @@ registerAuthRoutes(app);
 registerAclRoutes(app);
 registerContractRoutes(app);
 registerLookupRoutes(app);
+registerCompanyRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,
