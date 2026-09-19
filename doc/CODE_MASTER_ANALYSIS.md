@@ -314,6 +314,7 @@ POST(`[category]/route.ts:44`)는 3개를 다 본다. 두 곳이 어긋나 있�
 | `supabase/migrations/015_code_category_common_name.sql` | `use_tp='000'` 이름을 전부 「공통」으로 · `EXEC_TP 001` 을 「(미상)」으로 |
 | `supabase/migrations/016_email_domain.sql` | `EMAIL_DOMAIN` 카테고리 신설 5행 — 화면 상수였던 것을 코드로 옮김 |
 | `supabase/migrations/017_member_type_individual.sql` | 회원구분 `P` 를 개인사업자로 · `Z` 개인 신설(`000` 에만) |
+| `supabase/migrations/018_company_member_type_code.sql` | `companies.member_type` 의 표시명을 코드값으로(`개인사업자`→`P`) |
 | `packages/api/src/db/lookups.ts` · `routes/lookups.ts` | `listCodes(client, CodeSpec[])` · `DISTINCT ON` 제거 |
 | `scripts/verify-013.js` · `verify-014.js` | 검증 9항목 · 12항목 — **전부 통과** |
 
@@ -420,8 +421,10 @@ E-1 · E-2 가 함께 닫힌다.
    파티션 지정으로 닫혔으므로 행을 끌 이유가 없어졌다. 용도가 밝혀지면 이름을 고친다
 2. ~~삐용이 이 테이블을 직접 읽는지~~ — ✅ **해소 (2026-09-19 사용자 확인).**
    삐용은 `tb_s080_codes_line` · `tb_s080_code_masters` 를 보지 않는다
-3. **`companies.member_type` 의 「개인사업자」** — 코드체계 밖의 값(A-2). 이번 변경과
-   무관하게 이미 어긋나 있다. 같이 정리할지 따로 둘지
+3. ~~`companies.member_type` 의 「개인사업자」~~ — ✅ **해소 (2026-09-19, 018).**
+   표시명을 코드값 `P` 로 바꿨다. 017 이 `P` 의 이름을 「개인사업자」로 확정해 대응
+   코드가 정확히 있었다 — 추측이 아니다. 마이그레이션은 값을 직접 쓰지 않고 **코드
+   이름과 맞는 행만** 바꾸므로 근거가 SQL 안에 남고 두 번 돌려도 같다
 4. **시안의 회원구분 3종** — 「프리랜서 / 개인사업자 / 법인」은 파티션을 골라도 대응
    코드가 없다. `CONTRACT_DATA_MODEL.md §C-3 ⑤` 의 판단은 **그대로 유효하다**
 5. ~~시행 시점~~ — ✅ **2026-09-19 시행 완료.** 페이즈 4-5(계약서 출력)보다 먼저 했다
