@@ -9,7 +9,7 @@
 > 조사 당시 이 문서는 "운영 중인 레거시가 함께 쓴다"를 전제로 「무거운 조회를 피한다」·
 > 「컬럼을 지우면 레거시가 깨진다」를 적었다. **그 전제가 틀렸다.** 아무도 쓰지 않는다.
 >
-> 바뀌는 것: 부하 걱정이 없어지고, 게이트(`004`)의 앱 정지 창 부담이 크게 줄고,
+> 바뀌는 것: 부하 걱정이 없어지고, 게이트(`019`)의 앱 정지 창 부담이 크게 줄고,
 > 레거시가 읽는지 모른다는 이유로 보류했던 판단(§B-5 의 `room_no` 등)의 무게가 달라진다.
 > **다만 `room_no` 는 여전히 지우지 않는다** — 4-0 에서 확정한 사항이고, 안 쓰는 컬럼을
 > 굳이 지워서 얻을 것이 없다.
@@ -36,7 +36,7 @@
 | 건물 · 층 | 건물 **1** (우리빌딩) · 층 **1** (3층) · 회의실 **1** (소회의실 A) |
 | 코드 5종 | 3종 찾음(계약구분·납부방법·접근경로) · 1종 개념 불일치(회원구분) · **1종 없음(이메일 도메인)** |
 | 코드가 입주사별인가 | **아니다.** `(build_id, category)` 로 묶인 **건물별**. 회사 컬럼이 없다 |
-| `004` 가 이 테이블들을 건드리는가 | **`spaces`·`code_masters`·`codes_line` 은 건드리지 않는다.** 단 `buildings` 는 대상이다 |
+| `019` 가 이 테이블들을 건드리는가 | **`spaces`·`code_masters`·`codes_line` 은 건드리지 않는다.** 단 `buildings` 는 대상이다 |
 | 권한에 막힌 곳 | **없다.** `erp_app` 로 6개 테이블 전부 조회됐다 |
 
 ---
@@ -511,14 +511,14 @@ SELECT (SELECT count(DISTINCT build_id) FROM tb_s080_code_masters) 마스터_건
 
 ---
 
-## C. `004_rename_tenant.sql` — 게이트와 겹치는지
+## C. `019_rename_tenant.sql` — 게이트와 겹치는지
 
-**파일:** `supabase/migrations_hold/004_rename_tenant.sql`
+**파일:** `supabase/migrations_hold/019_rename_tenant.sql`
 **하는 일:** `tenant_id` → `operator_id` 개명 + 타입 통일(text→int) + FK 부여
 
 ### 테이블 단위 판정
 
-| 테이블 | `004` 가 건드리는가 | 무엇을 |
+| 테이블 | `019` 가 건드리는가 | 무엇을 |
 |---|---|---|
 | **`tb_s080_spaces`** | **아니다** | — |
 | **`tb_s080_code_masters`** | **아니다** | — |
@@ -567,7 +567,7 @@ ORDER BY table_name;
 | `tb_s080_corp_changes` · `departments` · `doc_form_settings` · `employees` · `form_templates` · `incorporations` | `tenant_id` | text |
 | `tb_s080_tenant010` | `tenant_id` | integer |
 
-`operator_id` 는 **아직 어디에도 없다.** `004` 는 미적용 상태다.
+`operator_id` 는 **아직 어디에도 없다.** `019` 는 미적용 상태다.
 
 ---
 
@@ -649,7 +649,7 @@ FROM tb_s080_contracts ORDER BY created_at LIMIT 5;
 
 | 이름 | 레거시 | 새 설계 | 주의 |
 |---|---|---|---|
-| `tenant` | **운영사**(`tb_s080_tenant010`) | 문서에서 「입주사」를 tenant 로 쓰는 곳이 있다 | `004` 가 `operator` 로 바꾸는 이유다 |
+| `tenant` | **운영사**(`tb_s080_tenant010`) | 문서에서 「입주사」를 tenant 로 쓰는 곳이 있다 | `019` 가 `operator` 로 바꾸는 이유다 |
 | `deposit` | 호실=NULL · 층=5천만(임차보증금) · 계약=월세와 동일값 | 계약 항목의 「예치금」 | 세 곳의 의미가 다르다 |
 | `room_no` | 12자리 해시 | 화면의 「호실」 | `room_name` 을 써야 한다 |
 | `contract_room` | 계약의 국세청 신고용 호실(`6-1`) | 「계약호실」 | `tb_s080_space_room.contract_room` 도 있는데 **0행** |
@@ -702,7 +702,7 @@ SELECT current_user;  -- erp_app
 
 - **호실 데이터가 이미 있다** — 72실, 전부 활성. 기준관리 화면 없이도 조회만 붙이면 된다
 - **임대료가 72건 전부 채워져 있다** — 계약 폼의 "호실 선택 시 월회비 자동 입력"이 지금 된다
-- **`004` 가 `spaces`·`code_masters`·`codes_line` 을 건드리지 않는다** — 이 세 테이블에
+- **`019` 가 `spaces`·`code_masters`·`codes_line` 을 건드리지 않는다** — 이 세 테이블에
   붙인 조회 코드는 게이트 후에도 그대로 산다
 - **권한이 이미 열려 있다** — `erp_app` 로 6개 테이블이 전부 읽힌다
 - **코드가 입주사별이 아니다** — 페이즈 3 범위가 늘어나지 않는다

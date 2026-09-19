@@ -1,10 +1,22 @@
 # migrations_hold — 자동 적용 금지
 
-이 폴더의 SQL은 `supabase db push` / `supabase migration up` / 일괄 적용 스크립트가
+이 폴더의 SQL 은 `supabase db push` / `supabase migration up` / 일괄 적용 스크립트가
 **절대 건드리면 안 되는** 파일이다. 그래서 `supabase/migrations/` 밖에 둔다.
 
-| 파일 | 적용 시점 | 이유 |
-|---|---|---|
-| `004_rename_tenant.sql` | 페이즈 G — 별도 앱 정지 창 | `tenant_id → operator_id` 리네임. 운영 중인 S-WonERP(Prisma)의 `schema.prisma`와 **동시에** 바꿔야 한다. 먼저 적용하면 기존 앱이 즉시 깨진다 |
+## 지금은 비어 있다
 
-적용 순서가 확정되면 그때 `../migrations/`로 옮긴다.
+| 파일 | 상태 |
+|---|---|
+| ~~`004_rename_tenant.sql`~~ | ✅ **2026-09-19 적용됨.** `../migrations/019_rename_tenant.sql` 로 옮겼다 |
+
+`004` 는 `tenant_id → operator_id` 리네임이라 «운영 중인 S-WonERP 의 `schema.prisma` 와
+동시에 바꿔야 한다»는 이유로 보류돼 있었다. **그 전제가 해소됐다** — 레거시는 쓰이지
+않고, 새 앱(`packages/`)은 이 컬럼들을 한 번도 만지지 않는다(전수 0건).
+
+보류하는 동안 005~018 이 붙어서 번호를 **019** 로 옮겼다. 내용은 그대로다.
+
+## 다시 쓸 때
+
+앱 코드와 **같은 배포 창**에서만 적용해야 하는 마이그레이션이 또 생기면 여기에 둔다.
+적용 순서가 확정되면 그때 `../migrations/` 로 옮긴다 — **그때의 다음 번호를 쓴다.**
+보류된 파일의 옛 번호를 되살리지 않는다(019 가 그래서 004 가 아니다).

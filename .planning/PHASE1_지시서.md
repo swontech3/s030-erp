@@ -63,7 +63,7 @@ s0300000060: { route: '/dashboard', name: '대시보드',      group: '000' },  
    `anon` / `authenticated` 권한 회수가 기존 S-WonERP 앱을 깨뜨리지 않는지 판단하는 근거입니다.
    (`BACKEND_ANALYSIS.md` §1-5 의 grep 결과가 `from('tb_s080` **0건**이라 위험은 낮지만 확인은 합니다)
 
-**그리고** `004_rename_tenant.sql` 을 `supabase/migrations/` 밖으로 옮깁니다 → `supabase/migrations_hold/`.
+**그리고** `019_rename_tenant.sql` 을 `supabase/migrations/` 밖으로 옮깁니다 → `supabase/migrations_hold/`.
 
 별도 앱 정지 창(페이즈 G)에서 적용할 파일이고, `supabase db push` 나 `migration up` 을 무심코 실행하면 **운영 중인 S-WonERP 가 즉시 깨집니다.** 파일 상단 경고 주석에만 의존하지 말고 물리적으로 뺍니다.
 
@@ -470,7 +470,7 @@ return routeOf(screens[0])
 # 4장. 하지 말 것
 
 ```
-✗ 004_rename_tenant.sql 적용 (페이즈 G, 별도 앱 정지 창)
+✗ 019_rename_tenant.sql 적용 (페이즈 G, 별도 앱 정지 창)
 ✗ s0300000020 · 030 · 040 화면 제작 (템플릿에 있어도 이관하지 않음)
 ✗ s0300000010p1 조직 선택 (회신 ⑩ 전까지 보류)
 ✗ ERP 자체 직원 테이블 · 비밀번호 저장 · 토큰 발급

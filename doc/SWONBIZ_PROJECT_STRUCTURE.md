@@ -90,8 +90,8 @@ SwonBiz-erp/                             ← 모노레포 루트 · npm workspac
 │           └─ reservation-validation.ts
 │
 ├─ supabase/
-│  ├─ migrations/                        001~003 + Drizzle generate 산출물(005~)
-│  └─ migrations_hold/                   004 — ★ 자동 적용 금지 (페이즈 G 앱 정지 창)
+│  ├─ migrations/                        001~003 + Drizzle generate 산출물(005~019)
+│  └─ migrations_hold/                   비어 있음 (README 만) — 019 가 2026-09-19 적용됨
 │
 ├─ design/                               ★ Claude Design 산출물 (읽기 전용 · 개발이 고치지 않음)
 │  ├─ _ds/swonbiz/                       디자인 시스템 — tokens 6파일(119변수) · 컴포넌트 15종

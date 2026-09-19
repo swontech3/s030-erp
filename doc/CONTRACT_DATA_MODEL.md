@@ -422,9 +422,9 @@ WHERE n.nspname='public' AND con.contype='f' AND pg_get_constraintdef(con.oid) ~
 이 테이블의 성격은 **호실 ↔ 세무 제출 번호 매핑**으로 읽힌다(`space_id` + `contract_room`).
 지금 실제 값은 `tb_s080_contracts.contract_room` 에 들어가 있고 이쪽은 비어 있다 — §C-4.
 
-### B-4. `004_rename_tenant.sql` 이 건드리는가 — **아니다**
+### B-4. `019_rename_tenant.sql` 이 건드리는가 — **아니다**
 
-`004` 는 `tenant_id` → `operator_id` 개명 작업이고, 대상은 9개 테이블이다
+`019` 는 `tenant_id` → `operator_id` 개명 작업이고, 대상은 9개 테이블이다
 (`tenant010` · `buildings` · `tb_cm_file` · `departments` · `employees` ·
 `incorporations` · `corp_changes` · `form_templates` · `doc_form_settings`).
 
@@ -457,7 +457,7 @@ WHERE n.nspname='public' AND con.contype='f' AND pg_get_constraintdef(con.oid) ~
 | 걸린 제약·인덱스 | **UNIQUE 인덱스 1건** — `(floor_id, room_no)` |
 | 뷰·함수 참조 | **0건** |
 | `space_room` 과 연결 | **없음** (`space_id` 로만 이어짐) |
-| `004` 가 건드리는가 | **아니다** |
+| `019` 가 건드리는가 | **아니다** |
 | 레거시 앱이 쓰는가 | **알 수 없다 — 저장소가 없다** |
 
 ---
@@ -666,12 +666,12 @@ confirmed 계약    입주중
 - **다만 `(floor_id, room_no)` UNIQUE 인덱스의 구성 컬럼**이다. 지우면 층 안 호실
   유일성 보장이 함께 사라진다 — `room_name` 에는 UNIQUE 가 없다
 - `tb_s080_space_room` 과는 이어지지 않는다(`space_id` 로만)
-- `004` 가 건드리지 않는다
+- `019` 가 건드리지 않는다
 
 **참조가 0건으로 나와도 결론은 같다 — 레거시 애플리케이션 코드가 읽는지는
 DB 조사로 알 수 없다**(§B-5). 저장소가 여기 없다.
 
-정리한다면 **게이트(`004`) 때가 맞다.** 어차피 운영 앱을 세우는 작업이라
+정리한다면 **게이트(`019`) 때가 맞다.** 어차피 운영 앱을 세우는 작업이라
 정지 창을 한 번만 쓰면 된다. 그때 레거시 저장소에서 `room_no` 를 검색해 확인한 뒤,
 UNIQUE 인덱스를 `(floor_id, room_name)` 으로 옮길지 함께 정한다.
 
@@ -729,7 +729,7 @@ UNIQUE 인덱스를 `(floor_id, room_name)` 으로 옮길지 함께 정한다.
 | 2 | **호실에 `contract_room` 대응값이 있는가** | 3-2a 에서 안 나왔고 이번에도 확인했다 — `tb_s080_spaces` 에 `contract`·`report`·`tax`·`nts` 계열 컬럼이 **0개**. `tb_s080_space_room`(0행)이 그 자리로 보인다(`space_id` + `contract_room varchar(50)`). **비어 있어 확정 불가** |
 | 3 | **`space_room` 과 `contracts.contract_room` 중 정본** | 전자는 0행, 후자에 실제 값(`6-1`·`112-3`). **호실별 고정 번호인지 계약별 값인지**가 갈린다 |
 | 4 | 시험 데이터 정리 시점과 방법 | 호실 상태 6건(입주중 5·예약중 1) + 계약 5건 + 청구 31건. **페이즈 4 착수 시점**에 한다 |
-| 5 | `room_no` 컬럼 정리 시점 | **게이트(`004`)와 함께.** 레거시 저장소 검색이 선행 조건(§B-5). UNIQUE 인덱스 이전도 함께 |
+| 5 | `room_no` 컬럼 정리 시점 | **게이트(`019`)와 함께.** 레거시 저장소 검색이 선행 조건(§B-5). UNIQUE 인덱스 이전도 함께 |
 | 6 | **`tb_s080_contracts` 를 재사용할지 새로 만들지** | 기존 32컬럼에 `payment_method`·`access_route`·`contract_room` 이 이미 있다. 다만 `space_id` 가 **단일 NOT NULL** 이라 호실 N개 구조와 충돌한다. 컬럼을 NULL 허용으로 바꾸거나 테이블을 새로 만들어야 한다 |
 | 7 | **사물함번호가 시안에 없다** | 확정 사항(고정석·자유석만)을 시안으로 확인하지 못했다. 디자인팀 확인 필요 |
 | 8 | **호실이 계약구분으로 걸러지는지** | 확정 사항과 시안이 어긋난다(§A-5). DB 에 `room_type` 이 있어 거르는 것은 가능하다 |

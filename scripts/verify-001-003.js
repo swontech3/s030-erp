@@ -289,12 +289,13 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
     let a7b, a7bId = null;
     try {
       const r = await ec.query(`INSERT INTO public.tb_s080_tenant010(name, slug, updated_at)
-        VALUES ('vtest-운영사','vtest-slug-'||floor(random()*1e9)::text, now()) RETURNING tenant_id`);
-      a7bId = r.rows[0].tenant_id; a7b = null;
+        VALUES ('vtest-운영사','vtest-slug-'||floor(random()*1e9)::text, now()) RETURNING operator_id`);
+      a7bId = r.rows[0].operator_id; a7b = null;
     } catch (e) { a7b = e.code; }
     await ec.query('ROLLBACK');
     a7b === null
-      ? ok('A7b', 'nextval 쓰는 테이블 INSERT (tenant010)', `tenant_id=${a7bId} 발급됨 → 시퀀스 권한 정상`)
+      // ★ 컬럼명은 019 에서 tenant_id → operator_id 로 바뀌었다. PK 자체는 그대로다.
+      ? ok('A7b', 'nextval 쓰는 테이블 INSERT (tenant010)', `operator_id=${a7bId} 발급됨 → 시퀀스 권한 정상`)
       : ng('A7b', 'nextval 쓰는 테이블 INSERT (tenant010)', `${a7b} — 시퀀스 GRANT 확인 필요`);
 
     // A7c — 2-8 이 실제로 쓸 경로: 세션 행 INSERT
