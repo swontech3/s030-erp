@@ -158,10 +158,12 @@ export function SectionUsers({
                 <span className={styles.mailAt}>@</span>
                 {first ? (
                   // 1행의 도메인도 섹션 1 을 따라간다 — Select 가 아니라 읽기 전용 표시다.
+                  // ★ 폭은 `.mailFixed` 가 정한다. 2행 이후의 Select 와 **같은 값**이어야
+                  //   1행과 나머지 행이 나란히 보인다.
                   <input
-                    className={styles.input}
+                    className={`${styles.input} ${styles.mailFixed}`}
                     readOnly
-                    style={{ width: 140, flex: '0 0 auto', background: 'var(--surface-alt)' }}
+                    style={{ background: 'var(--surface-alt)' }}
                     value={currentDomain(company)}
                   />
                 ) : (
@@ -189,9 +191,8 @@ export function SectionUsers({
                     </span>
                     {user.domain === DOMAIN_CUSTOM ? (
                       <input
-                        className={styles.input}
-                        placeholder="도메인 직접입력"
-                        style={{ width: 140, flex: '0 0 auto' }}
+                        className={`${styles.input} ${styles.mailFixed}`}
+                        placeholder="직접입력"
                         value={user.domainCustom}
                         disabled={frozen}
                         onChange={(e) => patch(i, { domainCustom: e.target.value })}
