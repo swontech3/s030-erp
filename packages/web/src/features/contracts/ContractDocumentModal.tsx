@@ -261,6 +261,20 @@ export function ContractDocumentModal({ company, terms, items, spaces, codes, on
           </div>
         </div>
 
+        {/*
+          ★★ 용지 여백을 0 으로 두어 크롬이 머리글·바닥글(날짜·주소·쪽번호)을 그릴 자리를
+            없앴다(`styles/print.css`). 다만 **브라우저 설정이 이기는 경우가 있고**,
+            전대차계약서는 3장이라 매 장에 여백이 필요해 `@page` 여백을 주므로
+            그릴 자리가 남는다. 그래서 끄는 방법을 한 줄 적어 둔다 —
+            계약서에 「about:blank」나 「1/3」이 찍히면 그 종이는 못 쓴다.
+          ★ `data-print-hide` — 이 안내 자체는 종이에 나오지 않는다.
+        */}
+        <p data-print-hide="1" className={styles.printHint}>
+          <Icon name="circle-alert" size={14} />
+          인쇄 대화상자에서 <b>머리글·바닥글</b>을 꺼 주세요. 날짜·주소·쪽번호가 계약서에 함께
+          인쇄될 수 있습니다.
+        </p>
+
         <div data-scroll="1" className={styles.scroll}>
           {/*
             ★ 선택하지 않은 문서는 **렌더하지 않는다.** `display:none` 으로 숨기면
@@ -317,7 +331,7 @@ function Blank({ value, width }: { value: string | null | undefined; width?: num
 
 /** 표의 라벨 칸. */
 function Th({ children }: { children: React.ReactNode }) {
-  return <span className={styles.th}>{children}</span>;
+  return <span data-th="1" className={styles.th}>{children}</span>;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -344,56 +358,56 @@ function UsageDocument(props: {
     <div data-doc-page="usage" className={styles.page}>
       <div className={styles.brand}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/swonbiz-logo.png" alt="" className={styles.brandMark} />
+        <img data-brand-mark="1" src="/brand/swonbiz-logo.png" alt="" className={styles.brandMark} />
         <span className={styles.brandWord}>
           S<span className={styles.brandDot}>·</span>won<span className={styles.brandBiz}>Biz</span>
         </span>
       </div>
-      <h3 className={styles.docTitle}>이 용 계 약 서</h3>
+      <h3 data-doc-title="1" className={styles.docTitle}>이 용 계 약 서</h3>
 
       <SectionTitle first>계약 정보</SectionTitle>
       <div className={styles.table} data-doc-table="1">
         <div className={styles.tr} data-no-break="1">
           <Th>계약구분</Th>
-          <span className={styles.td}>
+          <span data-td="1" className={styles.td}>
             <Blank value={props.planSummary} />
           </span>
           <Th>회원구분</Th>
-          <span className={`${styles.td} ${styles.tdLast}`}>
+          <span data-td="1" className={`${styles.td} ${styles.tdLast}`}>
             <Blank value={props.memberTypeName} />
           </span>
         </div>
         <div className={styles.tr} data-no-break="1">
           <Th>회원명</Th>
-          <span className={styles.td}>
+          <span data-td="1" className={styles.td}>
             <Blank value={company.companyName} />
           </span>
           <Th>사업자번호</Th>
-          <span className={`${styles.td} ${styles.tdLast}`}>
+          <span data-td="1" className={`${styles.td} ${styles.tdLast}`}>
             <Blank value={company.bizNumber} />
           </span>
         </div>
         <div className={styles.tr} data-no-break="1">
           <Th>연락처</Th>
-          <span className={styles.td}>
+          <span data-td="1" className={styles.td}>
             <Blank value={company.tel} />
           </span>
           <Th>E-mail</Th>
-          <span className={`${styles.td} ${styles.tdLast}`}>
+          <span data-td="1" className={`${styles.td} ${styles.tdLast}`}>
             <Blank value={company.email} />
           </span>
         </div>
         <div className={styles.tr} data-no-break="1">
           <Th>주소</Th>
-          <span className={`${styles.td} ${styles.tdLast} ${styles.tdWide}`}>
+          <span data-td="1" className={`${styles.td} ${styles.tdLast} ${styles.tdWide}`}>
             <Blank value={props.addressWithZip} width={320} />
           </span>
         </div>
         <div className={styles.tr} data-no-break="1">
           <Th>이용기간</Th>
-          <span className={`${styles.td} ${styles.tdLast} ${styles.tdWide}`}>
+          <span data-td="1" className={`${styles.td} ${styles.tdLast} ${styles.tdWide}`}>
             <Blank value={periodLabel(terms.startDate, terms.endDate, terms.periodMonths)} width={240} />
-            <span className={styles.note}>
+            <span data-note="1" className={styles.note}>
               * 년단위 계약의 경우 이용기간 만료 1개월 전까지 별도의 서면 해지의사가 없으면 원계약
               단위로 자동연장됩니다.
             </span>
@@ -401,19 +415,19 @@ function UsageDocument(props: {
         </div>
         <div className={styles.tr} data-no-break="1">
           <Th>이용호실</Th>
-          <span className={styles.td}>
+          <span data-td="1" className={styles.td}>
             <Blank value={props.roomNames} />
           </span>
           <Th>예치금</Th>
-          <span className={`${styles.td} ${styles.tdLast}`}>{formatWon(props.deposit)} 원</span>
+          <span data-td="1" className={`${styles.td} ${styles.tdLast}`}>{formatWon(props.deposit)} 원</span>
         </div>
         <div className={styles.tr} data-no-break="1">
           <Th>월납부액</Th>
-          <span className={styles.td}>
+          <span data-td="1" className={styles.td}>
             {formatWon(props.monthlyPayment)} 원{props.vatNote}
           </span>
           <Th>첫달납부액</Th>
-          <span className={`${styles.td} ${styles.tdLast} ${styles.nowrap}`}>
+          <span data-td="1" className={`${styles.td} ${styles.tdLast} ${styles.nowrap}`}>
             {/*
               ★ 납부방법을 못 고른 계약은 첫달납부액이 **계산되지 않는다**(null).
                 0 원으로 찍지 않는다 — 0 원은 «공짜»라는 값이다.
@@ -432,7 +446,9 @@ function UsageDocument(props: {
         </div>
         <div className={styles.tr} data-no-break="1">
           <Th>특기사항</Th>
-          <span className={`${styles.td} ${styles.tdLast} ${styles.memoCell}`}>{props.memo}</span>
+          <span data-td="1" data-memo-cell="1" className={`${styles.td} ${styles.tdLast} ${styles.memoCell}`}>
+            {props.memo}
+          </span>
         </div>
       </div>
 
@@ -440,40 +456,40 @@ function UsageDocument(props: {
       <div className={styles.table} data-doc-table="1">
         <div className={styles.tr} data-no-break="1">
           <Th>센터명</Th>
-          <span className={styles.td}>{CONTRACT_DEFAULTS.DEFAULT_CENTER}</span>
+          <span data-td="1" className={styles.td}>{CONTRACT_DEFAULTS.DEFAULT_CENTER}</span>
           <Th>담당자</Th>
-          <span className={`${styles.td} ${styles.tdLast}`}>{CONTRACT_DEFAULTS.DEFAULT_MANAGER}</span>
+          <span data-td="1" className={`${styles.td} ${styles.tdLast}`}>{CONTRACT_DEFAULTS.DEFAULT_MANAGER}</span>
         </div>
         <div className={styles.tr} data-no-break="1">
           <Th>전화번호</Th>
-          <span className={styles.td}>{CONTRACT_OFFICE.TEL}</span>
+          <span data-td="1" className={styles.td}>{CONTRACT_OFFICE.TEL}</span>
           <Th>Fax번호</Th>
-          <span className={`${styles.td} ${styles.tdLast}`}>{CONTRACT_OFFICE.FAX}</span>
+          <span data-td="1" className={`${styles.td} ${styles.tdLast}`}>{CONTRACT_OFFICE.FAX}</span>
         </div>
         <div className={styles.tr} data-no-break="1">
           <Th>이메일</Th>
-          <span className={styles.td}>{CONTRACT_OFFICE.EMAIL}</span>
+          <span data-td="1" className={styles.td}>{CONTRACT_OFFICE.EMAIL}</span>
           <Th>은행(계좌번호)</Th>
-          <span className={`${styles.td} ${styles.tdLast}`}>
+          <span data-td="1" className={`${styles.td} ${styles.tdLast}`}>
             {CONTRACT_OFFICE.BANK}
-            <span className={styles.note}>{CONTRACT_OFFICE.ACCOUNT_HOLDER}</span>
+            <span data-note="1" className={styles.note}>{CONTRACT_OFFICE.ACCOUNT_HOLDER}</span>
           </span>
         </div>
       </div>
 
       <SectionTitle>이용안내</SectionTitle>
-      <div className={styles.guideBox}>
-        <span className={styles.guideLine}>
+      <div data-guide-box="1" className={styles.guideBox}>
+        <span data-guide-line="1" className={styles.guideLine}>
           - 이용범위는 사무공간과 부대시설(회의실, 접견실, 휴게실, IT기기, 유무선 통신망)을 이용 가능
         </span>
-        <span className={styles.guideLine}>
+        <span data-guide-line="1" className={styles.guideLine}>
           - 계약기간 만료 또는 종료시 사업자 주소지와 전화를 7일 이내에 이전해야 하고, 계약을 해지할
           경우 7일 이전에 서면 또는 구두 통보 해야함.
         </span>
       </div>
 
-      <div className={styles.rule} />
-      <div className={styles.pledgeBox}>
+      <div data-rule="1" className={styles.rule} />
+      <div data-pledge-box="1" className={styles.pledgeBox}>
         <p className={styles.pledge}>
           {CONTRACT_LESSOR.NAME}(이하 &lsquo;갑&rsquo;)와 상기 회원(이하 &lsquo;을&rsquo;)은
           &lsquo;갑&rsquo;이 제공하는 서비스를 &lsquo;을&rsquo;이 이용함에 있어서 수반되는 사항을 본
@@ -483,9 +499,9 @@ function UsageDocument(props: {
         <p className={styles.pledgeStrong}>* 본 이용계약서로는 임대차계약서를 대신할 수 없음</p>
       </div>
 
-      <p className={styles.signDate}>{signDateLabel(terms.contractDate)}</p>
+      <p data-sign-date="1" className={styles.signDate}>{signDateLabel(terms.contractDate)}</p>
 
-      <div className={styles.signGrid}>
+      <div data-sign-grid="1" className={styles.signGrid}>
         <div>
           <div className={styles.signLine}>갑 : {CONTRACT_LESSOR.ADDRESS_FULL}</div>
           <div className={styles.signName}>
@@ -522,7 +538,7 @@ function UsageDocument(props: {
 
 function SectionTitle({ children, first }: { children: React.ReactNode; first?: boolean }) {
   return (
-    <div className={`${styles.sectionTitle}${first ? ` ${styles.sectionTitleFirst}` : ''}`}>
+    <div data-section-title="1" className={`${styles.sectionTitle}${first ? ` ${styles.sectionTitleFirst}` : ''}`}>
       <span className={styles.sectionBar} />
       <span>{children}</span>
     </div>
@@ -545,7 +561,7 @@ function SubleaseDocument(props: {
 
   return (
     <div data-doc-page="sublease" className={styles.page}>
-      <h3 className={styles.docTitle}>전 대 차 계 약 서</h3>
+      <h3 data-doc-title="1" className={styles.docTitle}>전 대 차 계 약 서</h3>
 
       <div className={styles.parties}>
         <div className={styles.party}>

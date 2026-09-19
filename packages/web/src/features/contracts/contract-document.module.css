@@ -142,6 +142,27 @@
   background: var(--surface-alt);
 }
 
+/*
+ * 인쇄 전 안내. ★ 종이에는 나오지 않는다(`data-print-hide`).
+ * 머리글·바닥글은 브라우저 설정이라 CSS 로 확실히 끌 수 없다 — 그래서 말로 알린다.
+ */
+.printHint {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.printHint b {
+  font-weight: 700;
+}
+
 .scroll {
   flex: 1;
   min-height: 0;

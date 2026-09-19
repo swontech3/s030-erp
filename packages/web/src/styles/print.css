@@ -34,9 +34,29 @@
  * ========================================================================== */
 
 @media print {
+  /*
+   * ★★ 여백을 0 으로 두는 이유 — **브라우저 머리글·바닥글을 없애려고**
+   *
+   * 크롬은 용지 여백 안에 「날짜 · 제목 · about:blank · 1/2」 같은 줄을 자기 마음대로
+   * 그린다. 계약서 종이에 그게 찍히면 안 된다. 여백이 0 이면 그릴 자리가 없어서
+   * 사라진다 — 이것이 유일하게 CSS 로 되는 방법이다.
+   *
+   * 대신 **여백을 문서 안쪽(padding)으로 옮긴다.** 아래 `[data-doc-page]` 참조.
+   *
+   * ★ 이름 붙인 페이지를 쓴다. 이용계약서는 1장이라 안쪽 padding 으로 충분하지만,
+   *   전대차는 3장이라 **2·3장에는 padding 이 오지 않는다**(padding 은 흐름의
+   *   시작과 끝에만 붙는다). 그쪽은 `@page` 여백을 줘야 매 장에 여백이 생긴다.
+   *   그 대가로 전대차에는 머리글·바닥글이 뜰 수 있어서, 모달에 끄는 방법을 적어 두었다.
+   */
   @page {
     size: A4 portrait;
-    margin: 15mm;
+    margin: 0;
+  }
+
+  @page sublease {
+    size: A4 portrait;
+    /* 3장짜리라 매 장에 여백이 필요하다. 인쇄 불가 영역(보통 3~5mm)보다 넉넉히. */
+    margin: 14mm 13mm;
   }
 
   body[data-printing='contract-doc'] {
@@ -85,15 +105,31 @@
     flex: none !important;
   }
 
-  /* 문서 면 — A4 폭에 펼치고 종이 흉내(그림자·여백)는 지운다 */
+  /* 문서 면 — A4 폭에 펼치고 종이 흉내(그림자)는 지운다 */
   body[data-printing='contract-doc'] [data-doc-page] {
     width: 100% !important;
     max-width: none !important;
     height: auto !important;
     margin: 0 !important;
-    padding: 0 !important;
     box-shadow: none !important;
     background: #ffffff !important;
+  }
+
+  /*
+   * ★ 이용계약서 — **한 장짜리다.** @page 여백이 0 이므로 여백을 여기서 준다.
+   *   좌우 13mm · 상하 12mm. 프린터의 인쇄 불가 영역(보통 3~5mm)보다 넉넉하다.
+   */
+  body[data-printing='contract-doc'] [data-doc-page='usage'] {
+    padding: 12mm 13mm !important;
+  }
+
+  /*
+   * ★ 전대차 — 3장이라 여백을 `@page sublease` 가 준다(매 장에 붙어야 한다).
+   *   그래서 문서 자신의 padding 은 0 이다. 둘 다 주면 첫 장만 여백이 두 배가 된다.
+   */
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] {
+    padding: 0 !important;
+    page: sublease;
   }
 
   /* 인감은 배경 이미지라 브라우저가 기본으로 뺀다 — 강제로 넣는다 */
@@ -112,5 +148,111 @@
   body[data-printing='contract-doc'] [data-no-break] {
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+}
+
+/* =============================================================================
+ * 이용계약서 — **A4 한 장에 넣는다**
+ *
+ * 그냥 두면 1.25장이라 두 장이 나온다. 두 번째 장에는 서명란 몇 줄만 실린다 —
+ * 계약서로 쓰기 나쁜 모양이고, 두 장을 각각 날인해야 하는 것처럼 보인다.
+ *
+ * ★★ 시안 규격에서 벗어난다. 무엇을 얼마나 줄였는지는
+ *    `doc/DESIGN_HANDOFF_DIFF.md` §I-6 에 표로 적었다.
+ *
+ * ★ **글자는 마지막에 줄인다.** 먼저 여백을 줄였다 — 세로 빈틈이 230px 있었고
+ *   그걸 반으로 접는 것만으로 절반 이상이 해결된다. 글자를 먼저 줄이면
+ *   여백은 그대로인 채 읽기만 나빠진다.
+ *
+ * ★ 본문은 12px(≈9pt) 밑으로 내리지 않는다. 계약서는 사람이 읽고 서명하는
+ *   종이다. 더 줄여야 한다면 그건 이 문서에 내용이 너무 많다는 뜻이다.
+ *
+ * ★ 전대차에는 걸지 않는다 — 선택자가 `usage` 로 묶여 있다. 10조짜리라
+ *   한 장에 들어가지 않고, 억지로 줄이면 읽을 수 없어진다.
+ * ========================================================================== */
+@media print {
+  /* ── 로고·제목 ── 제목은 여전히 문서에서 가장 큰 글자다 ── */
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-brand-mark] {
+    height: 22px !important;
+  }
+
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-doc-title] {
+    margin-top: 8px !important;
+    font-size: 27px !important;
+  }
+
+  /* ── 섹션 제목 ── 위아래 여백만 줄인다. 글자는 그대로 16px ── */
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-section-title] {
+    margin-top: 13px !important;
+    margin-bottom: 5px !important;
+  }
+
+  /* ── 표 ── 칸 padding 이 8행 × 위아래라 제일 크게 준다 ── */
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-doc-table] [data-th],
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-doc-table] [data-td] {
+    padding-top: 3px !important;
+    padding-bottom: 3px !important;
+    font-size: 12.5px !important;
+    line-height: 1.45 !important;
+  }
+
+  /* 이용기간 아래 자동연장 주석 · 예금주 — 부수 정보라 한 단계 더 줄인다 */
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-note] {
+    margin-top: 2px !important;
+    font-size: 10.5px !important;
+    line-height: 1.35 !important;
+  }
+
+  /* 특기사항 칸의 최소 높이 — 빈 계약서에서 80px 를 그냥 먹는다 */
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-memo-cell] {
+    min-height: 42px !important;
+  }
+
+  /* ── 이용안내 · 약정 문구 ── 줄간격 1.8 은 인쇄에서 과하다 ── */
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-guide-box],
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-pledge-box] {
+    padding: 8px 12px !important;
+  }
+
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-guide-line],
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-pledge-box] p {
+    font-size: 12.5px !important;
+    line-height: 1.5 !important;
+  }
+
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-guide-box] {
+    gap: 3px !important;
+  }
+
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-pledge-box] p + p {
+    margin-top: 5px !important;
+  }
+
+  /* ── 구분선·서명란 ── 남은 빈틈 ── */
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-rule] {
+    margin-top: 13px !important;
+  }
+
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-pledge-box] {
+    margin-top: 11px !important;
+  }
+
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-sign-date] {
+    margin-top: 16px !important;
+    font-size: 14px !important;
+  }
+
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-sign-grid] {
+    margin-top: 14px !important;
+  }
+
+  /* 서명란 글자 — 16px 은 본문보다 크다. 이름이 읽히는 선에서 14px */
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-sign-grid] {
+    font-size: 14px !important;
+  }
+
+  body[data-printing='contract-doc'] [data-doc-page='usage'] [data-sign-grid] * {
+    font-size: 14px !important;
+    line-height: 1.45 !important;
   }
 }
