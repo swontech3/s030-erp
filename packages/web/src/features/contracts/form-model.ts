@@ -113,17 +113,36 @@ export interface CodeOption {
 }
 
 /**
- * 회원구분 — ★ **화면 상수다. 코드 테이블에서 받지 않는다.**
+ * 회원구분 — ★ **코드 테이블에서 온다**(`MEMBER_TYPE` / `use_tp='000'`).
  *
- * DB 의 `MEMBER_TYPE` 은 법인 형태(주식회사·유한회사…)와 상호 표기 위치(「주식회사 앞/뒤」)를
- * 담는 **같은 이름의 다른 개념**이고, 「프리랜서」·「개인사업자」는 DB 전체에 0건이다
- * (`doc/CONTRACT_DATA_MODEL.md` §C-3 ⑤). 억지로 이으면 운영자가 엉뚱한 목록을 본다.
- * 새 코드 카테고리를 만들지 `MEMBER_TYPE` 을 재정의할지는 **판단이 남아 있다**.
+ * ★★ **시안의 회원구분과 목록이 다르다.** 시안은 「프리랜서 / 개인사업자 / 법인」 3종이고
+ *    DB 의 `MEMBER_TYPE 000` 은 **법인 형태** 5종이다 — 주식회사(R) · 유한회사(A) ·
+ *    농/어업회사법인(C) · 사회적 기업/협동조합(S) · 개인(P).
+ *    「프리랜서」·「개인사업자」라는 글자는 DB 전체에 0건이다
+ *    (`doc/CONTRACT_DATA_MODEL.md` §C-3 ⑤ · `doc/CODE_MASTER_ANALYSIS.md` §G-4).
+ *
+ *    2026-09-19 **DB 쪽을 따르기로 했다.** 그래서 아래 두 규칙이 옮겨졌다:
+ *      - 법인 여부 — 예전엔 「법인」 한 값. 지금은 **개인(P)이 아닌 전부**
+ *      - 사업자등록증 필수 — 예전엔 「프리랜서가 아니면」. 지금은 **법인이면**
+ *        (개인(P) 안에 프리랜서와 개인사업자가 섞여 있어 갈라낼 수 없다)
  */
-export const MEMBER_TYPES = ['프리랜서', '개인사업자', '법인'] as const;
+export const MEMBER_TYPE_CATEGORY = 'MEMBER_TYPE';
 
-/** 이 값일 때만 법인등록번호가 활성이고 법인등기부등본 카드가 보인다. */
-export const MEMBER_TYPE_CORP = '법인';
+/** 회원구분 Select 의 목록. 코드 응답에서 뽑는다 — 표시명이 필요해 행째로 준다. */
+export const memberTypesOf = (codes: readonly CodeOption[]): readonly CodeOption[] =>
+  codes.filter((c) => c.category === MEMBER_TYPE_CATEGORY);
+
+/** 개인. 유일한 비법인 코드다. */
+export const MEMBER_TYPE_INDIVIDUAL = 'P';
+
+/**
+ * 법인격인가 — 법인등록번호 활성 · 법인등기부등본 카드 · 사업자등록증 필수를 가른다.
+ *
+ * ★ 미선택(`''`)은 **법인이 아니다.** 안 고른 상태에서 법인 전용 칸이 열리면
+ *   운영자가 채우고, 그 값은 저장될 때 버려진다(`corpNumber` 는 법인일 때만 실린다).
+ */
+export const isCorpMemberType = (code: string): boolean =>
+  code.trim() !== '' && code !== MEMBER_TYPE_INDIVIDUAL;
 
 /**
  * 이메일 도메인 카테고리 — ★ **코드 테이블에서 온다**(마이그레이션 016).

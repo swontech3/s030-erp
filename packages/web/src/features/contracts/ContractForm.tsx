@@ -43,8 +43,8 @@ import { SectionUsers } from './SectionUsers';
 import {
   DOMAIN_CUSTOM,
   emailDomainsOf,
-  MEMBER_TYPES,
-  MEMBER_TYPE_CORP,
+  isCorpMemberType,
+  memberTypesOf,
   ROW_TEMPLATE,
   SECTION_SAVEABLE,
   USER_TEMPLATE,
@@ -186,8 +186,12 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
 
   /** 도메인 Select 의 목록. 코드 테이블에서 온다(016) — 예전엔 화면 상수였다. */
   const emailDomains = emailDomainsOf(codes);
+  /** 회원구분 Select 의 목록. 코드 `MEMBER_TYPE` / `000` — 예전엔 화면 상수였다. */
+  const memberTypes = memberTypesOf(codes);
 
-  const [companyState, setCompany] = useState<CompanyState>(() => seedCompany(company, emailDomains));
+  const [companyState, setCompany] = useState<CompanyState>(() =>
+    seedCompany(company, emailDomains, memberTypes),
+  );
   const [terms, setTerms] = useState<TermsState>(() => seedTerms(contract, spaces));
   const [items, setItems] = useState<ItemRow[]>(() => seedItems(contract));
   const [users, setUsers] = useState<UserRow[]>(() => seedUsers(members, emailDomains));
@@ -288,7 +292,7 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
       companyName: companyState.company,
       bizNumber: companyState.bizno,
       // 법인이 아니면 법인등록번호를 비운다 — 화면에서 꺼진 칸의 옛 값을 남기지 않는다.
-      corpNumber: companyState.memberType === MEMBER_TYPE_CORP ? companyState.corpno : null,
+      corpNumber: isCorpMemberType(companyState.memberType) ? companyState.corpno : null,
       ceoName: companyState.ceo,
       // ★ 화면 「업태」 → business_type, 화면 「업종」 → business_item(=종목).
       //   DB 주석 기준이다. 사업자등록증의 「업태/종목」과 맞춘 것이고 판단이 필요했던 자리다.
@@ -497,6 +501,7 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
             disabled={frozen}
             notSaveable={!SECTION_SAVEABLE[1]}
             emailDomains={emailDomains}
+            memberTypes={memberTypes}
             invalid={invalid}
             bizCheck={bizCheck}
             onBizCheck={() => setBizCheck(isBiznoFormatOk(companyState.bizno) ? 'none' : 'format')}
@@ -602,12 +607,25 @@ function HeadNote({
  *   3종은 같은 이름의 다른 개념이라(§C-3 ⑤) 옛 값이 들어 있을 수 있는데, Select 에
  *   없는 값을 넣으면 브라우저가 첫 옵션으로 되돌리고 그대로 저장돼 값이 바뀐다.
  */
-function seedCompany(company: CompanyResponse | null, emailDomains: readonly string[]): CompanyState {
-  const known = (MEMBER_TYPES as readonly string[]).includes(company?.memberType ?? '');
+function seedCompany(
+  company: CompanyResponse | null,
+  emailDomains: readonly string[],
+  memberTypes: readonly CodeOption[],
+): CompanyState {
+  /**
+   * ★ 저장된 값이 목록에 없으면 **비워 둔다.** 예전에는 첫 값(「프리랜서」)으로
+   *   되돌렸는데, 코드 체계로 바뀐 지금 그러면 아무 회사나 조용히 「주식회사」가 된다.
+   *   회원구분은 필수 항목이 아니라(`REQUIRED_FIELDS`) 비워 두어도 저장이 막히지 않는다 —
+   *   운영자가 직접 고르게 두는 편이 낫다.
+   *
+   *   지금 `tb_s080_companies.member_type` 에는 「개인사업자」가 들어 있다. 코드가 아니라
+   *   표시명이라 어느 코드와도 맞지 않는다(`doc/CODE_MASTER_ANALYSIS.md` §A-2 · §G-3).
+   */
+  const known = memberTypes.some((t) => t.code === (company?.memberType ?? ''));
   return {
     company: company?.companyName ?? '',
     bizno: company?.bizNumber ?? '',
-    memberType: known ? (company?.memberType as string) : MEMBER_TYPES[0],
+    memberType: known ? (company?.memberType as string) : '',
     corpno: company?.corpNumber ?? '',
     // ★ 화면 「업종」 ↔ DB `business_item`(종목), 화면 「업태」 ↔ `business_type`.
     industry: company?.businessItem ?? '',

@@ -26,11 +26,11 @@ import styles from './contract-form.module.css';
 import {
   DOMAIN_CUSTOM,
   DOMAIN_PLACEHOLDER,
-  MEMBER_TYPES,
-  MEMBER_TYPE_CORP,
   NOT_SAVEABLE_BADGE,
   NOT_SAVEABLE_NOTICE,
+  isCorpMemberType,
   maskValue,
+  type CodeOption,
   type CompanyState,
   type RequiredKey,
 } from './form-model';
@@ -54,6 +54,8 @@ interface Props {
   notSaveable: boolean;
   /** 도메인 Select 목록. 코드 테이블에서 온다(016). */
   emailDomains: readonly string[];
+  /** 회원구분 Select 목록. 코드 `MEMBER_TYPE` / `use_tp='000'`. */
+  memberTypes: readonly CodeOption[];
   invalid: readonly RequiredKey[];
   bizCheck: BizCheck;
   onBizCheck: () => void;
@@ -66,6 +68,7 @@ export function SectionCompany({
   disabled: ended,
   notSaveable,
   emailDomains,
+  memberTypes,
   invalid,
   bizCheck,
   onBizCheck,
@@ -75,7 +78,7 @@ export function SectionCompany({
   const disabled = ended || notSaveable;
   const bad = (key: RequiredKey) => invalid.includes(key);
   const cls = (key: RequiredKey) => `${styles.input}${bad(key) ? ` ${styles.isInvalid}` : ''}`;
-  const corpEnabled = value.memberType === MEMBER_TYPE_CORP && !disabled;
+  const corpEnabled = isCorpMemberType(value.memberType) && !disabled;
 
   return (
     <section className={styles.section}>
@@ -150,9 +153,11 @@ export function SectionCompany({
               disabled={disabled}
               onChange={(e) => onChange({ memberType: e.target.value })}
             >
-              {MEMBER_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {/* ★ 값은 코드(R·A·C·S·P), 표시는 이름이다. 저장되는 것은 코드다. */}
+              <option value="">선택</option>
+              {memberTypes.map((t) => (
+                <option key={t.code} value={t.code}>
+                  {t.name}
                 </option>
               ))}
             </select>

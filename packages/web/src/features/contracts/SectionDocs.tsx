@@ -22,7 +22,7 @@
  */
 import { Icon } from '@/components/ds';
 import styles from './contract-form.module.css';
-import { MEMBER_TYPE_CORP, NOT_SAVEABLE_BADGE, NOT_SAVEABLE_NOTICE } from './form-model';
+import { isCorpMemberType, NOT_SAVEABLE_BADGE, NOT_SAVEABLE_NOTICE } from './form-model';
 
 const DOC_DEFS = [
   { key: 'id', name: '대표자 신분증', desc: '주민등록증 또는 운전면허증 사본' },
@@ -30,11 +30,19 @@ const DOC_DEFS = [
   { key: 'corp', name: '법인등기부등본', desc: '최근 3개월 이내 발급본' },
 ] as const;
 
-/** 회원구분이 표시 여부와 필수 여부를 정한다. */
+/**
+ * 회원구분이 표시 여부와 필수 여부를 정한다. **`memberType` 은 코드다**(`R`·`P`…).
+ *
+ * ★ 사업자등록증 필수 조건이 2026-09-19 에 바뀌었다. 예전엔 「프리랜서가 아니면 필수」
+ *   였는데, 코드 체계(`MEMBER_TYPE 000`)에 **프리랜서가 없다.** 개인(`P`) 안에
+ *   프리랜서와 개인사업자가 섞여 있어 갈라낼 수 없다. 그래서 **법인이면 필수**로 둔다 —
+ *   개인을 필수로 묶으면 사업자등록 전인 프리랜서가 막힌다(사업자번호 칸의 안내도
+ *   「사업자등록 전이면 비워두세요」다).
+ */
 function docRule(key: (typeof DOC_DEFS)[number]['key'], memberType: string) {
   if (key === 'id') return { show: true, required: true };
-  if (key === 'biz') return { show: true, required: memberType !== '프리랜서' };
-  return { show: memberType === MEMBER_TYPE_CORP, required: false };
+  if (key === 'biz') return { show: true, required: isCorpMemberType(memberType) };
+  return { show: isCorpMemberType(memberType), required: false };
 }
 
 interface Props {
@@ -50,7 +58,7 @@ export function SectionDocs({ memberType, disabled: ended, notSaveable, onStub }
   const shown = DOC_DEFS.filter((d) => docRule(d.key, memberType).show);
   // 올릴 수 없으므로 등록 건수는 0 이다. 지어내지 않는다.
   const done = 0;
-  const bizMissing = memberType !== '프리랜서';
+  const bizMissing = isCorpMemberType(memberType);
 
   return (
     <section className={styles.section}>
