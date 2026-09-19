@@ -475,6 +475,10 @@
   text-align: left;
   cursor: pointer;
   transition: background var(--dur) var(--ease-out);
+  /* ★ 이 행은 2026-09-19 부터 `<button>` 이 아니라 `<a>` 다(계약 폼으로 바로 간다).
+     앵커 기본값을 지우지 않으면 행 전체가 파란 밑줄 글씨가 된다. */
+  color: inherit;
+  text-decoration: none;
 }
 
 .row:hover {

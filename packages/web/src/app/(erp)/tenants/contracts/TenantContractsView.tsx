@@ -23,7 +23,6 @@ import Link from 'next/link';
 import { matchesChips, type TenantFilterKey } from '@swonbiz/shared/domain/tenant-status';
 import { Icon, type IconName } from '@/components/ds';
 import { NewTenantModal } from '@/features/tenants/NewTenantModal';
-import { ContractDetailModal } from '@/features/tenants/ContractDetailModal';
 import {
   contractStatusLabel,
   formatDate,
@@ -64,7 +63,6 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [contracts, setContracts] = useState<TenantContract[] | null>(null);
   const [loadingContracts, setLoadingContracts] = useState(false);
-  const [detailIndex, setDetailIndex] = useState<number | null>(null);
   const [newTenantOpen, setNewTenantOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -103,7 +101,6 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
     async (companyId: string) => {
       setSelectedId(companyId);
       setContracts(null);
-      setDetailIndex(null);
       setLoadingContracts(true);
       try {
         const res = await fetch(`/api/companies/${companyId}`);
@@ -293,11 +290,18 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                     const soon = isExpiringSoon(c, today, soonDays);
                     const live = c.status === 'confirmed';
                     return (
-                      <button
+                      /*
+                       * ★ 행을 누르면 **계약 폼으로 바로 간다.** 상세 모달을 거치지 않는다
+                       *   (2026-09-19 · `doc/DESIGN_HANDOFF_DIFF.md` §H-7).
+                       *
+                       * ★ `<button>` 이 아니라 `<Link>` 다. 버튼 안에 링크를 넣을 수 없고,
+                       *   링크여야 새 탭·가운데 클릭·주소 복사가 된다 — 목록에서 계약을
+                       *   여러 개 비교하는 자리라 그게 실제로 쓰인다.
+                       */
+                      <Link
                         key={c.contractId}
-                        type="button"
+                        href={`/contracts/${c.contractId}`}
                         className={`${styles.row}${live ? ` ${styles.rowActive}` : ''}`}
-                        onClick={() => setDetailIndex(i)}
                       >
                         <span className={`${styles.cell} ${styles.term}`}>
                           {c.periodMonths ? `${c.periodMonths}개월` : '—'}
@@ -321,10 +325,15 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                           {soon ? <span className={styles.statusSoon}>만기 임박</span> : null}
                         </span>
                         <span className={`${styles.cell} ${styles.action}`}>
-                          {/* ★ 액션 버튼은 행 클릭과 분리한다 — 모달이 같이 열리면 안 된다. */}
+                          {/*
+                            ★ 액션 버튼은 행 클릭과 **분리한다.** 행이 링크가 된 뒤로는
+                              `stopPropagation` 만으로 부족하다 — 링크의 기본 이동도 막아야
+                              [재계약] 을 눌렀을 때 계약 폼으로 새지 않는다.
+                          */}
                           <span
                             role="presentation"
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
                               notify('재계약(이전 계약 값 복사)은 아직 연결되지 않았습니다');
                             }}
@@ -336,7 +345,7 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                             </span>
                           </span>
                         </span>
-                      </button>
+                      </Link>
                     );
                   })}
                 </div>
@@ -346,16 +355,14 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
         </div>
       </div>
 
-      {detailIndex !== null && contracts?.[detailIndex] && selected ? (
-        <ContractDetailModal
-          contract={contracts[detailIndex]}
-          companyName={selected.companyName}
-          today={today}
-          onClose={() => setDetailIndex(null)}
-          onRenew={() => notify('재계약(이전 계약 값 복사)은 아직 연결되지 않았습니다')}
-        />
-      ) : null}
+      {/*
+        ★ 계약 상세 모달(`ContractDetailModal`)은 **더 이상 열지 않는다.**
+          행을 누르면 계약 폼으로 바로 간다 — 모달이 보여주던 값이 목록 행에 이미 다 있고,
+          확정된 계약은 폼도 읽기 전용이라 모달이 하던 일을 폼이 대신한다
+          (2026-09-19 · `doc/DESIGN_HANDOFF_DIFF.md` §H-7).
 
+          **파일은 지우지 않았다.** 첨부·상태 이력·청구가 붙으면 그 자리일 수 있다.
+      */}
       {newTenantOpen ? <NewTenantModal onClose={() => setNewTenantOpen(false)} /> : null}
 
       {toast ? (
