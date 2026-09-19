@@ -15,6 +15,7 @@ import { registerAclRoutes } from './routes/acl.ts';
 import { registerContractRoutes } from './routes/contracts.ts';
 import { registerLookupRoutes } from './routes/lookups.ts';
 import { registerCompanyRoutes } from './routes/companies.ts';
+import { registerFileRoutes } from './routes/files.ts';
 import { closePool } from './db/pool.ts';
 
 // ★★ 어느 삐용에 붙었는지를 **가장 먼저** 찍는다. pino 의 JSON 한 줄에 섞으면 눈에 안 띄어서
@@ -47,6 +48,9 @@ registerAclRoutes(app);
 registerContractRoutes(app);
 registerLookupRoutes(app);
 registerCompanyRoutes(app);
+// ★ 첨부 서류(CONT-17). 회사 하위 경로라 입주사 라우트 **뒤에** 둔다 — 같은 접두사를
+//   쓰는 라우트는 등록 순서와 무관하지만, 읽는 사람이 묶어서 보게 한다.
+registerFileRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,

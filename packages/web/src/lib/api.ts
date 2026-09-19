@@ -14,6 +14,12 @@ import { SESSION_COOKIE } from '@swonbiz/shared';
  * 주석으로 "서버 전용"이라고 적어두는 것과 달리 실제로 막는다.
  */
 const API_BASE_URL = process.env.API_BASE_URL ?? 'http://127.0.0.1:3001';
+
+/**
+ * Fastify 주소. ★ 첨부 업로드(`forwardUpload`)는 `callApi` 를 쓸 수 없어서
+ *   직접 `fetch` 하는데, 그쪽이 주소를 따로 들고 있으면 배포에서 한쪽만 바뀐다.
+ */
+export const apiBaseUrl = (): string => API_BASE_URL;
 const API_TIMEOUT_MS = 5_000;
 
 export interface ApiResult<T> {

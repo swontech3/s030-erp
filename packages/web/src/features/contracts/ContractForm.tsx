@@ -574,11 +574,17 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
             onUsers={setUsers}
           />
 
+          {/*
+            ★ 첨부는 **회사에 붙는다**(계약이 아니다). 그래서 `companyId` 를 준다 —
+              없으면(아직 저장 안 된 신규) 섹션이 「먼저 저장해 주세요」라고 말한다.
+            ★ 이 섹션은 제 저장 경로가 있다(CONT-17). 폼의 [저장] 과 무관하게 즉시
+              올라가므로 `SECTION_SAVEABLE[4]` 의 잠금 안내를 더 이상 쓰지 않는다.
+          */}
           <SectionDocs
+            companyId={companyId}
             memberType={companyState.memberType}
             disabled={frozen}
-            notSaveable={!SECTION_SAVEABLE[4]}
-            onStub={notify}
+            onNotify={notify}
           />
         </div>
       </div>

@@ -49,6 +49,40 @@ if (process.env.NODE_ENV === 'production' && (aclMode === 'mock' || process.env.
   throw new Error('NODE_ENV=production 에서 BBIYONG_MOCK=true 또는 BBIYONG_ACL_MODE=mock 은 허용하지 않는다.');
 }
 
+/**
+ * 스토리지(Supabase Storage) — 첨부 서류(CONT-17)가 쓴다.
+ *
+ * ★★ **`service_role` 키여야 한다.** 버킷 `erp-files` 는 비공개이고 `storage.objects`
+ *    는 RLS 가 켜진 채 정책이 하나도 없다 — `anon` 키로는 목록이 **빈 배열**로 오고
+ *    이름으로 찾으면 404 다. "버킷이 없다"처럼 보이지만 실제로는 권한 문제다.
+ *    2026-09-20 에 저장소 루트 `.env` 의 `SUPABASE_SERVICE_ROLE_KEY` 가 **anon 키의
+ *    복사본**이었다(두 값이 바이트까지 동일, JWT payload 가 `"role":"anon"`).
+ *    그래서 여기서 **role 을 직접 검사하고 아니면 기동을 막는다** — 이 값이 틀리면
+ *    첨부가 전부 404 로 죽는데, 그 원인을 찾는 자리는 업로드 화면이 아니라 여기다.
+ */
+const storageUrl = required('SUPABASE_URL').replace(/\/+$/, '');
+const storageServiceKey = required('SUPABASE_SERVICE_ROLE_KEY');
+assertServiceRole(storageServiceKey);
+
+function assertServiceRole(token: string): void {
+  const payload = token.split('.')[1];
+  if (!payload) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY 가 JWT 모양이 아니다.');
+  }
+  let role: unknown;
+  try {
+    role = (JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { role?: unknown }).role;
+  } catch {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY 의 payload 를 읽을 수 없다.');
+  }
+  if (role !== 'service_role') {
+    throw new Error(
+      `SUPABASE_SERVICE_ROLE_KEY 의 role 이 '${String(role)}' 이다. ` +
+        "'service_role' 이어야 한다 — anon 키로는 비공개 버킷이 404 로 보인다.",
+    );
+  }
+}
+
 const key = Buffer.from(required('ERP_ENCRYPTION_KEY'), 'base64');
 if (key.length !== 32) {
   throw new Error(`ERP_ENCRYPTION_KEY 는 base64 로 32바이트여야 한다(현재 ${key.length}바이트).`);
@@ -64,6 +98,14 @@ export const env = {
    */
   bbiyongBaseUrl: bbiyongBaseUrl ?? null,
   aclMode,
+  /** Supabase 게이트웨이. ★ 스토리지 경로(`/storage/v1/...`)는 `lib/storage.ts` 가 붙인다. */
+  storageUrl,
+  storageServiceKey,
+  /**
+   * 스토리지 왕복 상한. 파일이 최대 10MB 라 JSON 호출(5초)보다 넉넉해야 하지만,
+   * 상한이 없으면 느린 업로드 하나가 Fastify 워커를 잡아 둔다.
+   */
+  storageTimeoutMs: 30_000,
   port: Number(process.env.PORT ?? 3001),
   /**
    * 세션 유효기간 — 삐용 refresh 만료를 넘지 않아야 한다.

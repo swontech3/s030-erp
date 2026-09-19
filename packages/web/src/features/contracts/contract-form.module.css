@@ -754,6 +754,26 @@
   color: var(--text-muted);
 }
 
+/*
+ * 첨부 카드의 버튼들. ★ 카드가 좁아져도 버튼이 줄바꿈되지 않게 `flex: 0 0 auto` 다 —
+ * 「보기 · 삭제 · 교체」 셋이 붙는 자리라 접히면 카드 높이가 들쭉날쭉해진다.
+ */
+.docActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/*
+ * 「등록됨」 뱃지. ★ 새 색을 만들지 않는다 — DS 에 success 토큰이 없어서
+ * 초록을 지어내면 그 색이 이 파일에만 사는 색이 된다. 인디고(주색)를 쓴다.
+ */
+.badgeOk {
+  background: var(--color-accent-bg);
+  color: var(--color-primary);
+}
+
 .docFoot {
   margin-top: 12px;
   font-size: 12px;
