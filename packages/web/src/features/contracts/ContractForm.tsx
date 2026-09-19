@@ -36,6 +36,7 @@ import { editableSections } from '@swonbiz/shared/domain/contract-status';
 import { Icon, type IconName } from '@/components/ds';
 import styles from './contract-form.module.css';
 import { ConfirmDialog, localToday, type ConfirmKind, type ConfirmResult } from './ConfirmDialog';
+import { contractStatusName, contractStatusNamesOf } from './contract-status-name';
 import { SectionCompany, isBiznoFormatOk, type BizCheck } from './SectionCompany';
 import { SectionContract } from './SectionContract';
 import { SectionDocs } from './SectionDocs';
@@ -166,13 +167,22 @@ const ACTIONS: Record<Mode, readonly ActionKey[]> = {
 
 type ActionKey = 'back' | 'cancel' | 'draftSave' | 'confirm' | 'docs' | 'terminate' | 'save';
 
-const ACTION_DEFS: Record<ActionKey, { label: string; cls: string; icon?: IconName }> = {
+/**
+ * ★ `status` 가 있는 버튼은 **문구를 코드 테이블에서 가져온다**(`CONTRACT_ST`).
+ *   그 버튼이 만드는 결과 상태의 이름이 곧 버튼 문구이기 때문이다 — 코드에서
+ *   `cancelled` 를 「계약해지」로 고치면 뱃지와 버튼이 함께 따라간다.
+ *
+ * ★ **[계약확정]에는 `status` 를 달지 않았다.** `confirmed` 의 코드명은 「계약중」인데
+ *   그것은 **상태를 가리키는 이름이지 동작이 아니다** — 버튼에 「계약중」이라고 적으면
+ *   무엇을 하는 버튼인지 읽히지 않는다. 넷 중 이 하나만 이름과 동작이 어긋난다.
+ */
+const ACTION_DEFS: Record<ActionKey, { label: string; cls: string; icon?: IconName; status?: string }> = {
   back: { label: '이전', cls: styles.btnGhost ?? '' },
-  cancel: { label: '계약취소', cls: styles.btnDanger ?? '' },
+  cancel: { label: '계약취소', cls: styles.btnDanger ?? '', status: 'cancelled' },
   draftSave: { label: '임시저장', cls: styles.btnGhost ?? '', icon: 'save' },
   confirm: { label: '계약확정', cls: styles.btnPrimary ?? '', icon: 'circle-check' },
   docs: { label: '계약서 출력', cls: styles.btnGhost ?? '', icon: 'file-text' },
-  terminate: { label: '종료', cls: styles.btnDanger ?? '' },
+  terminate: { label: '종료', cls: styles.btnDanger ?? '', status: 'terminated' },
   save: { label: '저장', cls: styles.btnPrimary ?? '' },
 };
 
@@ -190,6 +200,11 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
   const emailDomains = emailDomainsOf(codes);
   /** 회원구분 Select 의 목록. 코드 `MEMBER_TYPE` / `000` — 예전엔 화면 상수였다. */
   const memberTypes = memberTypesOf(codes);
+  /**
+   * 상태 표시명. 코드 `CONTRACT_ST` / `000` — 예전엔 헤더·모달·목록이 각자 들고 있었다.
+   * `/codes` 가 실패해도 기본값이 받으므로 **비어 있는 상태 문구는 나오지 않는다.**
+   */
+  const statusNames = contractStatusNamesOf(codes);
 
   const [companyState, setCompany] = useState<CompanyState>(() =>
     seedCompany(company, emailDomains, memberTypes),
@@ -445,7 +460,8 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
       const to = kind === 'cancel' ? 'cancelled' : 'terminated';
       await send(`/api/contracts/${contract.contractId}/status`, 'POST', { to, ...result });
       setConfirmKind(null);
-      notify(kind === 'cancel' ? '계약취소 처리했습니다' : '종료 처리했습니다');
+      // 토스트도 같은 이름을 쓴다 — 뱃지는 「계약종료」인데 토스트만 「종료」면 다른 일이 난 것처럼 읽힌다.
+      notify(`${contractStatusName(statusNames, to)} 처리했습니다`);
       router.refresh();
     });
 
@@ -488,7 +504,12 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
         <div className={styles.pageHeadInner}>
           <div>
             <h1 className={styles.pageTitle}>{TITLES[mode]}</h1>
-            <HeadNote mode={mode} missing={missing.length} terminatedDate={contract?.terminatedDate ?? null} />
+            <HeadNote
+              mode={mode}
+              missing={missing.length}
+              terminatedDate={contract?.terminatedDate ?? null}
+              statusNames={statusNames}
+            />
           </div>
           <div className={styles.headActions}>
             {ACTIONS[mode].map((key) => {
@@ -502,7 +523,7 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
                   onClick={() => onAction(key)}
                 >
                   {def.icon ? <Icon name={def.icon} size={16} /> : null}
-                  {def.label}
+                  {def.status ? contractStatusName(statusNames, def.status) : def.label}
                 </button>
               );
             })}
@@ -566,6 +587,7 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
         <ConfirmDialog
           kind={confirmKind}
           busy={busy}
+          statusNames={statusNames}
           onClose={() => setConfirmKind(null)}
           onOk={(result) => void onConfirmOk(result)}
         />
@@ -592,20 +614,37 @@ function HeadNote({
   mode,
   missing,
   terminatedDate,
+  statusNames,
 }: {
   mode: Mode;
   missing: number;
   terminatedDate: string | null;
+  /** 상태 표시명 — 코드 `CONTRACT_ST`. 예전에는 「종료 / 취소 / 계약 확정」이 박혀 있었다. */
+  statusNames: Readonly<Record<string, string>>;
 }) {
+  // ★ 저장된 상태를 가리키는 세 줄은 코드 테이블의 이름을 그대로 쓴다.
+  //   `create`·`draft` 의 두 줄은 상태가 아니라 **입력 상태**라(필수 미입력 / 입력 완료)
+  //   코드에 대응하는 값이 없다 — 그대로 둔다.
   if (mode === 'terminated') {
+    const name = contractStatusName(statusNames, 'terminated');
     const day = terminatedDate ? formatDot(terminatedDate) : '';
-    return <div className={`${styles.pageNote} ${styles.pageNoteMuted}`}>{day ? `${day} 종료` : '종료'}</div>;
+    return (
+      <div className={`${styles.pageNote} ${styles.pageNoteMuted}`}>{day ? `${day} ${name}` : name}</div>
+    );
   }
   if (mode === 'cancelled') {
-    return <div className={`${styles.pageNote} ${styles.pageNoteMuted}`}>취소</div>;
+    return (
+      <div className={`${styles.pageNote} ${styles.pageNoteMuted}`}>
+        {contractStatusName(statusNames, 'cancelled')}
+      </div>
+    );
   }
   if (mode === 'confirmed') {
-    return <div className={`${styles.pageNote} ${styles.pageNoteMuted}`}>계약 확정</div>;
+    return (
+      <div className={`${styles.pageNote} ${styles.pageNoteMuted}`}>
+        {contractStatusName(statusNames, 'confirmed')}
+      </div>
+    );
   }
   if (missing > 0) {
     return <div className={`${styles.pageNote} ${styles.pageNoteWarning}`}>필수 항목 {missing}개 미입력</div>;

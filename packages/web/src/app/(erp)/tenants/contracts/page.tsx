@@ -31,7 +31,8 @@ export default async function TenantContractsPage() {
 
   const [listRes, codesRes] = await Promise.all([
     callApi<{ total: number; companies: TenantCard[] }>('/companies', { erpSid: sid }),
-    // 계약 테이블의 「플랜」과 상세의 「납부방법」이 코드 표시명을 쓴다.
+    // 계약 테이블의 「플랜」·「납부방법」·**상태 뱃지**가 코드 표시명을 쓴다.
+    // 상태는 `CONTRACT_ST` 다 — 실패하면 화면 쪽 기본값이 받는다(뱃지가 비지 않는다).
     callApi<{ codes: CodeOption[] }>('/codes', { erpSid: sid }),
   ]);
 

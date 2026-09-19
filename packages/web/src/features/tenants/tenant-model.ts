@@ -5,6 +5,7 @@
  *   이 파일은 서버가 준 값을 화면 문자열로 바꾸는 일만 한다.
  */
 import type { TenantFilterKey } from '@swonbiz/shared/domain/tenant-status';
+import { contractStatusNameFromMap } from '@/features/contracts/contract-status-name';
 
 /** `GET /companies` 의 한 줄. */
 export interface TenantCard {
@@ -89,26 +90,27 @@ export function isExpiringSoon(contract: ContractSummaryResponse, today: Date, s
   return left >= 0 && left <= soonDays;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: '대기',
-  confirmed: '진행중',
-  terminated: '종료',
-  cancelled: '취소',
-};
-
 /**
  * 계약 상태 뱃지 문구.
  *
- * ★ 시안은 「진행중 / 만료」 둘만 그린다(확정된 계약만 있는 시안 데이터라서).
- *   저장 가능한 상태는 넷이고(`draft`·`confirmed`·`terminated`·`cancelled`) 화면에
- *   전부 뜰 수 있다. 시안에 없는 둘은 계약 폼의 상태 어휘(04-status.md)를 그대로 쓴다 —
- *   거기서는 `draft`=「계약 대기」, `cancelled`=「취소」다.
+ * ★ **표시명은 코드 테이블에서 온다**(`CONTRACT_ST` / `use_tp='000'`). 2026-09-19
+ *   이전에는 여기 「대기 / 진행중 / 종료 / 취소」가 박혀 있었는데, 계약 폼은 같은
+ *   상태를 다른 이름으로 부르고 있었다. 이름을 한 곳으로 모았다 —
+ *   `features/contracts/contract-status-name.ts`.
+ *   `codeNames` 는 s0300200030 이 들고 있는 `카테고리:코드 → 이름` 사전이다.
+ *   코드를 못 받으면 그쪽 기본값이 받는다. **빈 칸이 되지 않는다.**
  *
  * ★ 만료는 상태값이 아니라 **날짜**다. `confirmed` 인데 종료일이 지났으면 「만료」다.
+ *   저장된 상태는 그대로 `confirmed` 이므로 **코드 테이블에 넣지 않았다** — 저장되지
+ *   않는 이름이 코드 목록에 끼면 상태가 다섯 개인 것처럼 보인다.
  */
-export function contractStatusLabel(contract: ContractSummaryResponse, today: Date): string {
+export function contractStatusLabel(
+  contract: ContractSummaryResponse,
+  today: Date,
+  codeNames: Readonly<Record<string, string>>,
+): string {
   if (contract.status === 'confirmed' && daysUntil(contract.endDate, today) < 0) return '만료';
-  return STATUS_LABEL[contract.status] ?? contract.status;
+  return contractStatusNameFromMap(codeNames, contract.status);
 }
 
 /** 「1인실」 / 「1인실 외 2건」 — 명세 「항목 1개면 그 값, 여러 개면 …」. */

@@ -28,6 +28,14 @@ interface Def {
   desc: string;
   cancelLabel: string;
   okLabel: string;
+  /**
+   * 확정 버튼 문구를 **코드 테이블에서 가져올 때** 그 결과 상태값(`CONTRACT_ST`).
+   * 없으면 `okLabel` 을 그대로 쓴다.
+   *
+   * ★ `confirm` 에는 없다 — `confirmed` 의 코드명은 「계약중」이고 그것은 상태 이름이지
+   *   동작 이름이 아니다. 버튼에 「계약중」이라고 적을 수는 없다.
+   */
+  okStatus?: string;
   /** 되돌릴 수 없는 전이는 확정 버튼이 붉다. */
   danger: boolean;
 }
@@ -49,6 +57,7 @@ const DEFS: Record<ConfirmKind, Def> = {
     desc: '임시저장된 계약 정보가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.',
     cancelLabel: '돌아가기',
     okLabel: '계약취소',
+    okStatus: 'cancelled',
     danger: true,
   },
   terminate: {
@@ -58,6 +67,7 @@ const DEFS: Record<ConfirmKind, Def> = {
     desc: '종료 후 해당 호실은 예약 가능 상태가 됩니다.',
     cancelLabel: '취소',
     okLabel: '종료 처리',
+    okStatus: 'terminated',
     danger: true,
   },
 };
@@ -70,12 +80,23 @@ export interface ConfirmResult {
 interface Props {
   kind: ConfirmKind;
   busy: boolean;
+  /**
+   * 상태 표시명 — 코드 `CONTRACT_ST` / `use_tp='000'`.
+   * 확정 버튼이 결과 상태의 이름을 그대로 쓴다(`Def.okStatus`).
+   */
+  statusNames: Readonly<Record<string, string>>;
   onClose: () => void;
   onOk: (result: ConfirmResult) => void;
 }
 
-export function ConfirmDialog({ kind, busy, onClose, onOk }: Props) {
+export function ConfirmDialog({ kind, busy, statusNames, onClose, onOk }: Props) {
   const def = DEFS[kind];
+  /**
+   * ★ 제목·설명은 그대로 둔다. 「계약을 종료하시겠습니까?」의 **종료는 동작**이고
+   *   코드 테이블이 가진 것은 **상태 이름**이다. 문장 안의 동사를 상태 이름으로
+   *   바꾸면 「계약을 계약종료하시겠습니까?」가 된다.
+   */
+  const okLabel = def.okStatus ? (statusNames[def.okStatus] ?? def.okLabel) : def.okLabel;
   // 종료일 기본값은 오늘이다. 로컬 날짜로 만든다 — toISOString 은 UTC 라 저녁에 하루 밀린다.
   const [date, setDate] = useState(() => localToday());
   const [reason, setReason] = useState('');
@@ -137,7 +158,7 @@ export function ConfirmDialog({ kind, busy, onClose, onOk }: Props) {
               )
             }
           >
-            {def.okLabel}
+            {okLabel}
           </button>
         </div>
       </div>

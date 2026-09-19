@@ -108,7 +108,8 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
         if (!res.ok) throw new Error(body.message ?? '계약을 불러오지 못했습니다');
         const list = (body.contracts ?? []).map((c) => ({
           ...c,
-          statusLabel: contractStatusLabel(c, new Date()),
+          // 표시명은 코드 테이블(`CONTRACT_ST`)에서 온다 — `codeNames` 가 그것까지 담고 있다.
+          statusLabel: contractStatusLabel(c, new Date(), codeNames),
           planLabel: planLabel(
             c.roomTypes.map((code) => codeNames[`ROOM_TP:${code}`] ?? code),
             c.spaceCount,

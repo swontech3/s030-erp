@@ -62,6 +62,15 @@ const CONTRACT_FORM_CODES: readonly CodeSpec[] = [
    *   DB 쪽을 따르기로 했다 — 화면 상수를 없애고 여기로 옮겼다.
    */
   { category: 'MEMBER_TYPE', useTp: '000' },
+  /**
+   * 계약 상태 표시명(계약 폼 헤더 · 계약 목록 뱃지). 2026-09-19 에 붙였다.
+   *
+   * ★ **표시명만 내려간다.** 저장값과 전이 규칙은 `@swonbiz/shared/domain/contract-status`
+   *   가 그대로 갖고 있다 — 코드 테이블이 상태를 늘리거나 줄이지 않는다.
+   * ★ 「만료」는 여기 없다. 저장되는 상태가 아니라 `confirmed` + 지난 종료일을 화면이
+   *   부르는 이름이다(`features/contracts/contract-status-name.ts`).
+   */
+  { category: 'CONTRACT_ST', useTp: '000' },
 ];
 
 const scopeOf = (session: { role: string; companyId: string | null }): CompanyScope => ({
