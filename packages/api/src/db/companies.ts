@@ -149,7 +149,12 @@ export async function listCompanyContracts(
 
 /** 섹션 1 이 고치는 칸만. 계약·상태·건물은 여기서 바뀌지 않는다. */
 export interface CompanyPatch {
-  companyName: string;
+  /**
+   * ★ `null` 이면 **기존 값을 그대로 둔다**(다른 칸은 `null` 이 「지운다」는 뜻이다).
+   *   `company_name` 은 `NOT NULL` 이라 비울 수 없고, 사업자등록 신청 중인 가계약은
+   *   회사명 없이 임시저장으로 들어온다.
+   */
+  companyName: string | null;
   bizNumber: string | null;
   corpNumber: string | null;
   ceoName: string | null;
@@ -171,8 +176,13 @@ export async function updateCompany(
   const { companyId, patch, actor } = args;
   await q(
     client,
+    // ★ `company_name` 만 **비어 있으면 기존 값을 유지**한다(`COALESCE`). 다른 칸은
+    //   비우면 지워지는데(`text('')` 가 null 을 준다) 이 칸은 그럴 수 없다 —
+    //   `NOT NULL` 이고, 무엇보다 사업자등록 신청 중인 가계약은 회사명 없이 임시저장으로
+    //   들어온다. 400 으로 막으면 그 임시저장이 섹션 3까지 통째로 날아간다.
+    //   확정 경로는 화면이 회사명을 필수로 막으므로 이름 없는 계약이 확정될 길은 없다.
     `UPDATE public.tb_s080_companies
-        SET company_name = $2, biz_number = $3, corp_number = $4, ceo_name = $5,
+        SET company_name = COALESCE($2, company_name), biz_number = $3, corp_number = $4, ceo_name = $5,
             business_type = $6, business_item = $7, member_type = $8, tel = $9, email = $10,
             ceo_zip_code = $11, ceo_address = $12, ceo_address_detail = $13, memo = $14,
             updated_at = now(), updated_by = $15

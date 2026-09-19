@@ -51,7 +51,9 @@ import {
   currentDomain,
   discountLabel,
   joinEmail,
+  missingForDraft,
   missingRequired,
+  userDomain,
   splitEmail,
   toNumber,
   totalsOf,
@@ -321,7 +323,7 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
           // 1행은 섹션 1 대표자를 미러링한다 — 화면에 보이는 값 그대로 저장한다.
           name: effectiveName(row, index, companyState),
           phone: index === 0 ? companyState.phone : row.phone,
-          email: index === 0 ? ownerEmail : joinEmail(row.mailId, row.domain),
+          email: index === 0 ? ownerEmail : joinEmail(row.mailId, userDomain(row)),
           isRepresentative: index === repIndex,
           memo: row.memo,
         },
@@ -369,8 +371,34 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
     }
   };
 
-  const onDraftSave = () =>
-    run(async () => {
+  /**
+   * 못 채운 칸을 빨갛게 표시하고 첫 칸으로 옮긴다. 막았으면 `true`.
+   *
+   * ★ 임시저장과 확정이 **같은 함수를 쓴다.** 목록만 다르다 — 표시 방식이 갈리면
+   *   운영자가 두 버튼에서 다른 화면을 본다.
+   */
+  const blockOnMissing = (keys: RequiredKey[]): boolean => {
+    setInvalid(keys);
+    if (keys.length === 0) return false;
+    setSaveError(null);
+    // 화면 밖 오류를 놓치지 않도록 첫 오류 칸으로 옮긴다.
+    requestAnimationFrame(() => {
+      const first = document.querySelector<HTMLElement>(`.${styles.isInvalid}`);
+      first?.scrollIntoView({ block: 'center' });
+      first?.focus();
+    });
+    return true;
+  };
+
+  /**
+   * 임시저장 — **대표자 · 연락처 · 이메일** 셋만 본다(`missingForDraft`).
+   *
+   * ★ 회사명·사업자등록번호를 보지 않는 것이 핵심이다. 사업자등록 신청 중인 가계약은
+   *   상호도 번호도 아직 없다. 그 상태로 자리를 잡아 두는 것이 임시저장의 쓸모다.
+   */
+  const onDraftSave = () => {
+    if (blockOnMissing(missingForDraft(companyState))) return;
+    return run(async () => {
       // 회사·사용자를 먼저 저장한다. 계약 쪽이 필수값 때문에 막히더라도 여기까지는
       // 남는다 — 임시저장의 뜻이 그거다.
       await saveTenant();
@@ -379,20 +407,11 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
       if (!contract) router.replace(`/contracts/${id}`);
       else router.refresh();
     });
+  };
 
-  /** 확정은 필수 항목이 채워진 뒤에만 연다(시안 2차의 `runValidation`). */
+  /** 확정은 필수 항목 8개가 채워진 뒤에만 연다(시안 2차의 `runValidation`). */
   const openConfirm = () => {
-    setInvalid(missing);
-    if (missing.length > 0) {
-      setSaveError(null);
-      // 화면 밖 오류를 놓치지 않도록 첫 오류 칸으로 옮긴다.
-      requestAnimationFrame(() => {
-        const first = document.querySelector<HTMLElement>(`.${styles.isInvalid}`);
-        first?.scrollIntoView({ block: 'center' });
-        first?.focus();
-      });
-      return;
-    }
+    if (blockOnMissing(missing)) return;
     setConfirmKind('confirm');
   };
 
@@ -654,9 +673,9 @@ function seedUsers(members: readonly MemberResponse[], emailDomains: readonly st
       name: m.name,
       phone: m.phone ?? '',
       mailId: emailId,
-      // 섹션 3 의 도메인은 Select 하나뿐이다(직접입력 칸이 없다). 목록에 없는 도메인은
-      // 그대로 두면 첫 옵션으로 되돌아가므로, 이 줄에서는 직접입력 값을 도메인에 넣는다.
-      domain: emailDomain === DOMAIN_CUSTOM ? emailDomainCustom : emailDomain,
+      // 섹션 1 과 같은 모양으로 담는다 — 목록에 없는 도메인은 「직접입력」으로 열린다.
+      domain: emailDomain,
+      domainCustom: emailDomainCustom,
       memo: m.memo ?? '',
       selected: true,
     };

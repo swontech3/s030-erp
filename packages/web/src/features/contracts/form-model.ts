@@ -52,7 +52,10 @@ export interface UserRow {
   name: string;
   phone: string;
   mailId: string;
+  /** 도메인 Select 의 값. 목록에 없는 주소면 `DOMAIN_CUSTOM` 이고 실제 값은 아래 칸이다. */
   domain: string;
+  /** 도메인 Select 가 「직접입력」일 때만 쓴다. 섹션 1 의 `emailDomainCustom` 과 같은 모양이다. */
+  domainCustom: string;
   memo: string;
   /** 저장 대상 여부. 미체크 행도 **입력값은 유지**하고 저장 때만 뺀다. */
   selected: boolean;
@@ -231,6 +234,7 @@ export const USER_TEMPLATE: UserRow = {
   phone: '',
   mailId: '',
   domain: '',
+  domainCustom: '',
   memo: '',
   selected: true,
 };
@@ -359,6 +363,11 @@ export function currentDomain(c: CompanyState): string {
   return c.emailDomain === DOMAIN_CUSTOM ? c.emailDomainCustom : c.emailDomain;
 }
 
+/** 섹션 3 입주자 사용자 — 같은 판정. 두 섹션이 같은 규칙을 쓰게 한 줄로 둔다. */
+export function userDomain(u: UserRow): string {
+  return u.domain === DOMAIN_CUSTOM ? u.domainCustom : u.domain;
+}
+
 /**
  * 화면의 두 칸 → 저장하는 이메일 한 줄.
  * 한쪽이 비면 `null` 이다 — `kim@` 이나 `@naver.com` 같은 반쪽을 저장하지 않는다.
@@ -414,6 +423,33 @@ export const REQUIRED_FIELDS = [
 ] as const;
 
 export type RequiredKey = (typeof REQUIRED_FIELDS)[number]['key'];
+
+/**
+ * **임시저장** 의 필수 항목 — 대표자 · 연락처 · 이메일 셋뿐이다.
+ *
+ * ★★ 회사명과 사업자등록번호가 **일부러 빠져 있다.** 사업자등록을 신청 중이면 상호도
+ *    번호도 아직 없는데, 그 상태로 자리를 잡아 두는 것이 가계약이다. 회사명을 필수로
+ *    두면 **가계약 자체를 등록할 수 없다.**
+ *
+ * ★ 그래도 셋은 받는다. 연락할 방법이 없는 가계약은 나중에 누구 것인지 알 수 없다 —
+ *   임시저장이 «아무것도 안 봐도 된다»는 뜻은 아니다.
+ *
+ * ★ 계약 조건(계약일자·기간·시작일)도 빠진다. 섹션 2 는 아직 협의 중일 수 있다.
+ *
+ * 회사명·사업자번호는 **확정** 시점에 `REQUIRED_FIELDS` 가 다시 막는다. 사업자등록이
+ * 나온 뒤에 확정하라는 규칙이 거기 들어 있다.
+ */
+export const DRAFT_REQUIRED_KEYS: readonly RequiredKey[] = ['ceo', 'phone', 'emailId'];
+
+/** 임시저장을 막을 항목. 비어 있으면 저장하지 않는다. */
+export function missingForDraft(company: CompanyState): RequiredKey[] {
+  const value: Partial<Record<RequiredKey, string>> = {
+    ceo: company.ceo,
+    phone: company.phone,
+    emailId: company.emailId,
+  };
+  return DRAFT_REQUIRED_KEYS.filter((key) => !(value[key] ?? '').trim());
+}
 
 export function missingRequired(company: CompanyState, terms: TermsState): RequiredKey[] {
   const value: Record<RequiredKey, string> = {

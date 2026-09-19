@@ -207,10 +207,15 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
     const session = requireSession(req);
     if (session.role !== OPERATOR) return forbidden(reply);
 
+    /**
+     * ★ 회사명이 비어도 **막지 않는다.** 사업자등록 신청 중인 가계약은 회사명 없이
+     *   임시저장으로 들어온다 — 400 으로 막으면 같은 요청에 실린 대표자·연락처까지
+     *   통째로 날아간다. 비어 있으면 `updateCompany` 가 기존 값을 그대로 둔다.
+     *
+     *   빈 이름으로 **확정**되는 일은 화면이 막는다(`REQUIRED_FIELDS` 의 `company`).
+     *   서버가 확정 시점의 필수값을 다시 보는 자리는 계약 라우트다.
+     */
     const companyName = text(req.body?.companyName);
-    if (!companyName) {
-      return reply.code(400).send({ error: 'invalid_request', message: '회사명은 필수입니다' });
-    }
 
     const actor = String(session.s020MemberId);
     const result = await withCompanyScope(scopeOf(session), async (client) => {

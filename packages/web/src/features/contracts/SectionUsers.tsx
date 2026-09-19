@@ -20,6 +20,7 @@
 import { Icon } from '@/components/ds';
 import styles from './contract-form.module.css';
 import {
+  DOMAIN_CUSTOM,
   DOMAIN_PLACEHOLDER,
   MAX_USERS,
   NOT_SAVEABLE_BADGE,
@@ -164,22 +165,39 @@ export function SectionUsers({
                     value={currentDomain(company)}
                   />
                 ) : (
-                  <span className={`${styles.selectWrap} ${styles.mailDomain}`}>
-                    <select
-                      className={styles.select}
-                      value={user.domain}
-                      disabled={frozen}
-                      onChange={(e) => patch(i, { domain: e.target.value })}
-                    >
-                      {/* placeholder 는 코드가 아니라 Select 의 조작 장치다 */}
-                      <option value="">{DOMAIN_PLACEHOLDER}</option>
-                      {emailDomains.map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
-                      ))}
-                    </select>
-                  </span>
+                  <>
+                    {/* ★ Select 를 숨기지 않는다. 직접입력 칸의 표시 여부를 매 렌더마다
+                        Select 값에서 파생시킨다 — 숨기면 직접입력에서 되돌아올 수 없다.
+                        섹션 1 과 같은 구조다. */}
+                    <span className={`${styles.selectWrap} ${styles.mailDomain}`}>
+                      <select
+                        className={styles.select}
+                        value={user.domain}
+                        disabled={frozen}
+                        onChange={(e) => patch(i, { domain: e.target.value })}
+                      >
+                        {/* placeholder·직접입력은 코드가 아니라 Select 의 조작 장치다 */}
+                        <option value="">{DOMAIN_PLACEHOLDER}</option>
+                        {emailDomains.map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                        {/* 「직접입력」은 목록 맨 뒤 — 옵트인이다 */}
+                        <option value={DOMAIN_CUSTOM}>직접입력</option>
+                      </select>
+                    </span>
+                    {user.domain === DOMAIN_CUSTOM ? (
+                      <input
+                        className={styles.input}
+                        placeholder="도메인 직접입력"
+                        style={{ width: 140, flex: '0 0 auto' }}
+                        value={user.domainCustom}
+                        disabled={frozen}
+                        onChange={(e) => patch(i, { domainCustom: e.target.value })}
+                      />
+                    ) : null}
+                  </>
                 )}
               </span>
 
