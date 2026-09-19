@@ -644,12 +644,23 @@ function effectiveName(row: UserRow, index: number, company: CompanyState): stri
   return (index === 0 ? company.ceo : row.name).trim();
 }
 
+/**
+ * 그 건물의 **첫 번째 층**. 호실 목록에 나오는 순서를 그대로 따른다.
+ *
+ * ★ 층 Select 에는 「전체 층」이 없다 — 층은 항상 하나가 골라져 있다. 비워 두면
+ *   호실 목록이 건물 전체로 열려, 층을 고르지 않은 채 다른 층 호실을 계약에 넣을 수 있다.
+ */
+function firstFloorOf(spaces: readonly SpaceOption[], buildId: string): string {
+  return spaces.find((s) => s.buildId === buildId)?.floorId ?? '';
+}
+
 function seedTerms(contract: ContractResponse | null, spaces: readonly SpaceOption[]): TermsState {
   if (!contract) {
+    const buildId = spaces[0]?.buildId ?? '';
     return {
       // 건물이 하나뿐이라 첫 값을 기본으로 둔다. 비워 두면 저장이 「건물 는 필수다」로 막힌다.
-      buildId: spaces[0]?.buildId ?? '',
-      floorId: '',
+      buildId,
+      floorId: firstFloorOf(spaces, buildId),
       contractRoom: '',
       paymentMethod: '',
       accessRoute: '',
@@ -661,7 +672,7 @@ function seedTerms(contract: ContractResponse | null, spaces: readonly SpaceOpti
   }
   return {
     buildId: contract.buildId,
-    floorId: '',
+    floorId: firstFloorOf(spaces, contract.buildId),
     contractRoom: contract.contractRoom ?? '',
     paymentMethod: contract.paymentMethod ?? '',
     accessRoute: contract.accessRoute ?? '',

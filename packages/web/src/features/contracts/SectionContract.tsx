@@ -61,6 +61,15 @@ interface Props {
 const codesOf = (codes: readonly CodeOption[], category: string) =>
   codes.filter((c) => c.category === category);
 
+/**
+ * 그 건물의 층 목록. 호실 목록에서 뽑고 순서를 그대로 쓴다.
+ *
+ * ★ 건물 Select 의 onChange 와 화면 렌더가 **같은 순서**를 봐야 한다. 둘이 어긋나면
+ *   건물을 바꿨을 때 고른 층과 보이는 층이 달라진다 — 그래서 한 함수로 둔다.
+ */
+const floorsOf = (spaces: readonly SpaceOption[], buildId: string) =>
+  dedupe(spaces.filter((s) => s.buildId === buildId).map((s) => ({ id: s.floorId, name: s.floorName })));
+
 export function SectionContract({
   items,
   terms,
@@ -84,9 +93,7 @@ export function SectionContract({
 
   // 건물·층은 호실 목록에서 뽑는다 — 따로 조회하지 않는다. 지금은 각각 1개다.
   const buildings = dedupe(spaces.map((s) => ({ id: s.buildId, name: s.buildName })));
-  const floors = dedupe(
-    spaces.filter((s) => s.buildId === terms.buildId).map((s) => ({ id: s.floorId, name: s.floorName })),
-  );
+  const floors = floorsOf(spaces, terms.buildId);
 
   const patchRow = (index: number, patch: Partial<ItemRow>) =>
     onItems(items.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -132,7 +139,13 @@ export function SectionContract({
                 className={styles.select}
                 style={{ height: 36 }}
                 value={terms.buildId}
-                onChange={(e) => onTerms({ buildId: e.target.value, floorId: '' })}
+                onChange={(e) => {
+                  // 건물을 바꾸면 층도 **그 건물의 첫 층**으로 옮긴다. 비워 두면
+                  // 층 Select 가 값 없는 상태가 되는데, 「전체 층」을 없앴으므로
+                  // 고를 수 없는 빈 칸이 된다.
+                  const buildId = e.target.value;
+                  onTerms({ buildId, floorId: floorsOf(spaces, buildId)[0]?.id ?? '' });
+                }}
               >
                 {buildings.map((b) => (
                   <option key={b.id} value={b.id}>
@@ -148,7 +161,6 @@ export function SectionContract({
                 value={terms.floorId}
                 onChange={(e) => onTerms({ floorId: e.target.value })}
               >
-                <option value="">전체 층</option>
                 {floors.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.name || '(이름 없음)'}
