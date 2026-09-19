@@ -42,6 +42,7 @@ import { SectionDocs } from './SectionDocs';
 import { SectionUsers } from './SectionUsers';
 import {
   DOMAIN_CUSTOM,
+  emailDomainsOf,
   MEMBER_TYPES,
   MEMBER_TYPE_CORP,
   ROW_TEMPLATE,
@@ -183,10 +184,13 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
   /** `terminated`·`cancelled` — 전 섹션 읽기 전용. */
   const frozen = editable.length === 0;
 
-  const [companyState, setCompany] = useState<CompanyState>(() => seedCompany(company));
+  /** 도메인 Select 의 목록. 코드 테이블에서 온다(016) — 예전엔 화면 상수였다. */
+  const emailDomains = emailDomainsOf(codes);
+
+  const [companyState, setCompany] = useState<CompanyState>(() => seedCompany(company, emailDomains));
   const [terms, setTerms] = useState<TermsState>(() => seedTerms(contract, spaces));
   const [items, setItems] = useState<ItemRow[]>(() => seedItems(contract));
-  const [users, setUsers] = useState<UserRow[]>(() => seedUsers(members));
+  const [users, setUsers] = useState<UserRow[]>(() => seedUsers(members, emailDomains));
   const [repIndex, setRepIndex] = useState(() => {
     const at = members.findIndex((m) => m.isRepresentative);
     return at >= 0 ? at : 0;
@@ -492,6 +496,7 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
             onChange={(patch) => setCompany((prev) => ({ ...prev, ...patch }))}
             disabled={frozen}
             notSaveable={!SECTION_SAVEABLE[1]}
+            emailDomains={emailDomains}
             invalid={invalid}
             bizCheck={bizCheck}
             onBizCheck={() => setBizCheck(isBiznoFormatOk(companyState.bizno) ? 'none' : 'format')}
@@ -516,6 +521,7 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
             company={companyState}
             frozen={frozen}
             notSaveable={!SECTION_SAVEABLE[3]}
+            emailDomains={emailDomains}
             onUsers={setUsers}
             onRep={setRepIndex}
           />
@@ -596,7 +602,7 @@ function HeadNote({
  *   3종은 같은 이름의 다른 개념이라(§C-3 ⑤) 옛 값이 들어 있을 수 있는데, Select 에
  *   없는 값을 넣으면 브라우저가 첫 옵션으로 되돌리고 그대로 저장돼 값이 바뀐다.
  */
-function seedCompany(company: CompanyResponse | null): CompanyState {
+function seedCompany(company: CompanyResponse | null, emailDomains: readonly string[]): CompanyState {
   const known = (MEMBER_TYPES as readonly string[]).includes(company?.memberType ?? '');
   return {
     company: company?.companyName ?? '',
@@ -608,7 +614,7 @@ function seedCompany(company: CompanyResponse | null): CompanyState {
     bizKind: company?.businessType ?? '',
     ceo: company?.ceoName ?? '',
     phone: company?.tel ?? '',
-    ...splitEmail(company?.email ?? null),
+    ...splitEmail(company?.email ?? null, emailDomains),
     // ★ 대표자 자택 주소다. 사업장 주소(`address`)를 읽지 않는다.
     zip: company?.ceoZipCode ?? '',
     addr1: company?.ceoAddress ?? '',
@@ -621,10 +627,10 @@ function seedCompany(company: CompanyResponse | null): CompanyState {
  * 섹션 3 초기값. 저장된 구성원이 없으면 빈 줄 하나로 시작한다 —
  * 1행은 섹션 1 대표자를 미러링하는 자리라 **항상 있어야 한다.**
  */
-function seedUsers(members: readonly MemberResponse[]): UserRow[] {
+function seedUsers(members: readonly MemberResponse[], emailDomains: readonly string[]): UserRow[] {
   if (members.length === 0) return [{ ...USER_TEMPLATE }];
   return members.map((m) => {
-    const { emailId, emailDomain, emailDomainCustom } = splitEmail(m.email);
+    const { emailId, emailDomain, emailDomainCustom } = splitEmail(m.email, emailDomains);
     return {
       memberId: m.memberId,
       name: m.name,

@@ -21,7 +21,6 @@ import { Icon } from '@/components/ds';
 import styles from './contract-form.module.css';
 import {
   DOMAIN_PLACEHOLDER,
-  EMAIL_DOMAINS,
   MAX_USERS,
   NOT_SAVEABLE_BADGE,
   NOT_SAVEABLE_NOTICE,
@@ -41,6 +40,8 @@ interface Props {
   frozen: boolean;
   /** ★ 저장 경로가 없어 잠근 상태인가. */
   notSaveable: boolean;
+  /** 도메인 Select 목록. 코드 테이블에서 온다(016). */
+  emailDomains: readonly string[];
   onUsers: (next: UserRow[]) => void;
   onRep: (index: number) => void;
 }
@@ -51,6 +52,7 @@ export function SectionUsers({
   company,
   frozen: ended,
   notSaveable,
+  emailDomains,
   onUsers,
   onRep,
 }: Props) {
@@ -169,9 +171,11 @@ export function SectionUsers({
                       disabled={frozen}
                       onChange={(e) => patch(i, { domain: e.target.value })}
                     >
-                      {EMAIL_DOMAINS.map((d) => (
-                        <option key={d || 'blank'} value={d}>
-                          {d === '' ? DOMAIN_PLACEHOLDER : d}
+                      {/* placeholder 는 코드가 아니라 Select 의 조작 장치다 */}
+                      <option value="">{DOMAIN_PLACEHOLDER}</option>
+                      {emailDomains.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
                         </option>
                       ))}
                     </select>

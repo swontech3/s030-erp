@@ -307,6 +307,7 @@ POST(`[category]/route.ts:44`)는 3개를 다 본다. 두 곳이 어긋나 있�
 | `supabase/migrations/013_code_categories.sql` | 카테고리 테이블 신설 · 27행 이관 · FK 강화 |
 | `supabase/migrations/014_name_position.sql` | `NAME_POSITION` 2행 · 자식 8행 삭제 · `parent_line_id` 드롭 |
 | `supabase/migrations/015_code_category_common_name.sql` | `use_tp='000'` 이름을 전부 「공통」으로 · `EXEC_TP 001` 을 「(미상)」으로 |
+| `supabase/migrations/016_email_domain.sql` | `EMAIL_DOMAIN` 카테고리 신설 5행 — 화면 상수였던 것을 코드로 옮김 |
 | `packages/api/src/db/lookups.ts` · `routes/lookups.ts` | `listCodes(client, CodeSpec[])` · `DISTINCT ON` 제거 |
 | `scripts/verify-013.js` · `verify-014.js` | 검증 9항목 · 12항목 — **전부 통과** |
 

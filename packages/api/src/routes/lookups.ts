@@ -49,6 +49,8 @@ const CONTRACT_FORM_CODES: readonly CodeSpec[] = [
   { category: 'ROOM_TP', useTp: '000' },
   { category: 'PAYMENT_METHOD', useTp: '000' },
   { category: 'ACCESS_ROUTE', useTp: '000' },
+  /** 대표자·입주자 사용자 이메일(섹션 1·3). 016 이전에는 화면 상수였다. */
+  { category: 'EMAIL_DOMAIN', useTp: '000' },
 ];
 
 const scopeOf = (session: { role: string; companyId: string | null }): CompanyScope => ({

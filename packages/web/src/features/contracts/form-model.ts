@@ -126,13 +126,26 @@ export const MEMBER_TYPES = ['프리랜서', '개인사업자', '법인'] as con
 export const MEMBER_TYPE_CORP = '법인';
 
 /**
- * 이메일 도메인 — ★ **화면 상수다. DB 에 코드 자체가 없다**(같은 문서 §C-3 ④).
+ * 이메일 도메인 카테고리 — ★ **코드 테이블에서 온다**(마이그레이션 016).
  *
- * ★ 첫 값이 빈 문자열이고 표시는 「선택하세요」다. 시안 2차가 예시 입주사 도메인
- *   (`bridgelab.co.kr`)을 기본 선택에서 뺐다 — 그대로 저장돼 오등록이 나기 때문이다.
- *   `03-contract-form.md` 의 목록은 1차 것이라 그 도메인이 남아 있다. **시안 2차를 따른다.**
+ * 2026-09-19 이전에는 `EMAIL_DOMAINS` 화면 상수였다. DB 에 코드가 없어서였는데
+ * (`doc/LEGACY_DATA_SURVEY.md` §C-3 ④), 016 이 `EMAIL_DOMAIN` 카테고리를 만들었다.
+ * 도메인은 운영자가 늘리고 줄이는 값이지 배포로 바꿀 값이 아니다.
+ *
+ * ★ 이 카테고리는 `code` 와 `name` 이 **둘 다 도메인 문자열**이다. 화면은 `code` 를
+ *   그대로 이메일에 붙인다(`joinEmail`).
  */
-export const EMAIL_DOMAINS = ['', 'naver.com', 'gmail.com', 'daum.net', 'hanmail.net', 'nate.com'] as const;
+export const EMAIL_DOMAIN_CATEGORY = 'EMAIL_DOMAIN';
+
+/** 도메인 Select 의 목록. 코드 응답에서 뽑는다 — 없으면 빈 배열이다. */
+export const emailDomainsOf = (codes: readonly CodeOption[]): readonly string[] =>
+  codes.filter((c) => c.category === EMAIL_DOMAIN_CATEGORY).map((c) => c.code);
+
+/**
+ * ★ 「선택하세요」와 「직접입력」은 **코드가 아니다.** Select 의 조작 장치라 화면이
+ *   앞뒤에 붙인다. 코드 테이블에 넣으면 운영자가 지울 수 있게 되고, 지우면 Select 가
+ *   값 없는 상태로 열린다.
+ */
 export const DOMAIN_PLACEHOLDER = '선택하세요';
 /** 「직접입력」 Select 의 값. 도메인 문자열과 겹치지 않는 값이어야 한다. */
 export const DOMAIN_CUSTOM = 'custom';
@@ -327,13 +340,23 @@ export function joinEmail(id: string, domain: string): string | null {
  *   브라우저가 첫 옵션(「선택하세요」)으로 되돌리고, 그 상태로 저장하면 **도메인이
  *   사라진다.** 값이 조용히 지워지는 자리다.
  */
-export function splitEmail(email: string | null): Pick<CompanyState, 'emailId' | 'emailDomain' | 'emailDomainCustom'> {
+export function splitEmail(
+  email: string | null,
+  /**
+   * 고를 수 있는 도메인 목록(`emailDomainsOf(codes)`).
+   *
+   * ★ 016 이전에는 이 함수가 상수 배열을 직접 봤다. 이제 목록이 **DB 에서 오므로**
+   *   호출자가 넘긴다 — 운영자가 도메인을 지우면 그 도메인을 쓰던 기존 계약은
+   *   자동으로 「직접입력」으로 열려야 하고, 그러려면 지금 목록을 봐야 한다.
+   */
+  domains: readonly string[],
+): Pick<CompanyState, 'emailId' | 'emailDomain' | 'emailDomainCustom'> {
   const at = email ? email.lastIndexOf('@') : -1;
   if (!email || at < 1) return { emailId: email ?? '', emailDomain: '', emailDomainCustom: '' };
 
   const id = email.slice(0, at);
   const domain = email.slice(at + 1);
-  const known = (EMAIL_DOMAINS as readonly string[]).includes(domain);
+  const known = domains.includes(domain);
   return known
     ? { emailId: id, emailDomain: domain, emailDomainCustom: '' }
     : { emailId: id, emailDomain: DOMAIN_CUSTOM, emailDomainCustom: domain };

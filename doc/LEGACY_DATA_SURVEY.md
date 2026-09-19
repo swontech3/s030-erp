@@ -407,7 +407,11 @@ FROM tb_s080_codes_line ORDER BY category, sort_order, code;
 > **「프리랜서」·「개인사업자」 문구는 DB 전체에 하나도 없다.**
 > 새 설계의 회원구분 3종은 **레거시에 대응하는 코드가 없다.** 판단이 필요하다.
 
-#### ② 이메일 도메인 → ★ **없다**
+#### ② 이메일 도메인 → ★ **없었다** — ✅ **2026-09-19 신설**
+
+> 마이그레이션 **016** 이 `EMAIL_DOMAIN` 카테고리를 만들었다(5행 · `use_tp='000'`).
+> 아래는 조사 시점(2026-09-13)에 **없었다**는 기록이다. 화면 상수 `EMAIL_DOMAINS` 도
+> 함께 걷어냈다 — 이제 계약 폼이 `GET /codes` 로 받는다.
 
 ```sql
 SELECT category, name FROM tb_s080_code_masters
