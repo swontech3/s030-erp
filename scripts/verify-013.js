@@ -58,8 +58,17 @@ function check(label, ok, detail) {
   check('테이블이 있다', t.n === 1);
 
   if (t.n === 1) {
-    const rows = await one(`SELECT count(*)::int n FROM public.tb_s080_code_categories`);
-    check('27행이 이관됐다', rows.n === 27, `실제 ${rows.n}`);
+    // ★ 숫자를 박지 않는다. 013 적용 시점에는 27행이었으나 014 가 NAME_POSITION 을
+    //   더해 28행이 됐다 — 스냅샷을 박아 두면 뒤 마이그레이션이 통과를 깨뜨린다.
+    //   확인할 것은 "라인이 쓰는 파티션마다 카테고리가 하나씩 있다"는 불변식이다.
+    //   (운영자가 라인 없는 빈 파티션을 만들면 이 등식은 정당하게 깨진다. 그때 고친다.)
+    const rows = await one(`
+      SELECT (SELECT count(*)::int FROM public.tb_s080_code_categories) cats,
+             (SELECT count(*)::int FROM (SELECT DISTINCT build_id, category, use_tp
+                                           FROM public.tb_s080_codes_line) x) combos`);
+    check('카테고리 수가 라인의 파티션 조합 수와 같다', rows.cats === rows.combos,
+          `카테고리 ${rows.cats} · 조합 ${rows.combos}`);
+    check('013 이 이관한 27행 이상이다', rows.cats >= 27, `실제 ${rows.cats}`);
 
     const orphan = await one(`
       SELECT count(*)::int n
@@ -80,7 +89,8 @@ function check(label, ok, detail) {
                                 AND grantee='erp_app' AND privilege_type='SELECT'`);
     check('erp_app 이 읽을 수 있다', grant.n === 1);
   } else {
-    check('27행이 이관됐다', false, '테이블 없음');
+    check('카테고리 수가 라인의 파티션 조합 수와 같다', false, '테이블 없음');
+    check('013 이 이관한 27행 이상이다', false, '테이블 없음');
     check('짝 없는 파티션이 0이다', false, '테이블 없음');
     check('역산표로 이름 붙인 파티션이 9개다', false, '테이블 없음');
     check('erp_app 이 읽을 수 있다', false, '테이블 없음');
