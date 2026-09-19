@@ -70,31 +70,38 @@ export interface CodeRow {
   sort_order: number;
 }
 
+export interface CodeSpec {
+  category: string;
+  /** 코드 카테고리(`tb_s080_code_categories.use_tp`). 공통은 `'000'`. */
+  useTp: string;
+}
+
 /**
- * 코드 라인 — `(build_id, category)` 로 묶인 건물별 코드다(회사별이 아니다).
+ * 코드 라인 — `(build_id, category, use_tp)` 로 묶인 **파티션 단위**로 읽는다.
  *
- * ★ **같은 코드가 여러 행으로 온다.** `use_tp`(000/001/002)가 같은 코드를 쓰임새별로
- *   나눠 두었는데 **그 의미가 어디에도 적혀 있지 않다**(`doc/LEGACY_DATA_SURVEY.md` §B-1).
- *   예: `ROOM_TP` 는 코드 7개가 13행이다. 뜻을 모르는 칸으로 거를 수 없으므로
- *   **코드값 단위로 하나만** 남긴다(`DISTINCT ON`). 셀렉트에 같은 항목이 두 번 뜨는
- *   것보다 낫고, 화면이 저장하는 것은 코드값 하나다.
+ * ★ `use_tp` 는 한 카테고리 안의 **독립 파티션**이다(`doc/CODE_MASTER_ANALYSIS.md` §B-1).
+ *   `000` 이 공통이지만 `001` 이 `000` 을 물려받지 않는다 — 각 파티션이 완결된 목록이고,
+ *   빼기도 한다(`PAY_ST 001` 은 `000` 의 「취소」가 없다). 그래서 **호출자가 어느
+ *   파티션인지 말해야 한다.** 이름은 `tb_s080_code_categories` 에 있다(마이그레이션 013).
+ *
+ * ★ 예전에는 `DISTINCT ON (category, code)` 로 `use_tp` 를 버렸다. 그래서 `ROOM_TP` 의
+ *   `ET`(기타)가 계약 폼에 새어 나왔다 — `001` 에만 있어 경쟁자가 없었기 때문이다
+ *   (`doc/CODE_MASTER_ANALYSIS.md` §E-1). 정렬 타이가 있으면 어느 행이 이길지도 정해지지
+ *   않았다(§E-2). 파티션을 지정하면 둘 다 생기지 않고, 정렬도 SQL 한 번으로 끝난다.
  *
  * ★ 건물이 하나뿐이라(`우리빌딩`) `build_id` 로 거르지 않는다. 건물이 늘면 거르는
  *   조건이 필요해진다 — 그때는 계약의 건물을 받아 여기로 넘긴다.
  */
-export async function listCodes(client: ScopedClient, categories: readonly string[]): Promise<CodeRow[]> {
+export async function listCodes(client: ScopedClient, specs: readonly CodeSpec[]): Promise<CodeRow[]> {
   const { rows } = await q<CodeRow>(
     client,
-    `SELECT DISTINCT ON (category, code) category, code, name, sort_order
-       FROM public.tb_s080_codes_line
-      WHERE category = ANY($1::text[]) AND is_active = true
-      ORDER BY category, code, sort_order`,
-    [categories as string[]],
+    `SELECT l.category, l.code, l.name, l.sort_order
+       FROM public.tb_s080_codes_line l
+       JOIN unnest($1::text[], $2::text[]) AS w(category, use_tp)
+         ON w.category = l.category AND w.use_tp = l.use_tp
+      WHERE l.is_active = true
+      ORDER BY l.category, l.sort_order, l.code`,
+    [specs.map((s) => s.category), specs.map((s) => s.useTp)],
   );
-  // DISTINCT ON 이 요구하는 정렬(category, code)과 화면이 원하는 정렬(sort_order)이
-  // 달라 여기서 다시 세운다. SQL 한 번으로는 둘을 같이 만족시킬 수 없다.
-  return rows.sort(
-    (a, b) =>
-      a.category.localeCompare(b.category) || a.sort_order - b.sort_order || a.code.localeCompare(b.code),
-  );
+  return rows;
 }

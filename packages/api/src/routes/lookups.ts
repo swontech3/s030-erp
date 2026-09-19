@@ -23,7 +23,7 @@
 import type { FastifyInstance } from 'fastify';
 import { requireSession } from '../session/hook.ts';
 import { withCompanyScope, type CompanyScope } from '../db/withCompanyScope.ts';
-import { listCodes, listSpaces } from '../db/lookups.ts';
+import { listCodes, listSpaces, type CodeSpec } from '../db/lookups.ts';
 
 /** 계약 화면과 같은 값이다(`routes/contracts.ts`). */
 const READ_ROLE = 'operator';
@@ -39,8 +39,17 @@ const READ_ROLE = 'operator';
  *   이름의 다른 개념**이다(`doc/CONTRACT_DATA_MODEL.md` §C-3 ⑤). 연결하면 운영자가
  *   엉뚱한 목록을 보게 된다. 판단이 끝나기 전까지 화면 상수로 둔다.
  * ★ 이메일 도메인은 코드 자체가 DB 에 없다(같은 문서 §C-3 ④).
+ *
+ * ★ **파티션(`use_tp`)까지 함께 고정한다.** 카테고리만 적으면 같은 코드가 쓰임새별로
+ *   여러 벌 내려온다 — `use_tp` 는 상속이 아니라 독립 파티션이다
+ *   (`doc/CODE_MASTER_ANALYSIS.md` §B-1). 셋 다 계약 폼이 쓰는 공통 파티션 `000` 이다.
+ *   `ROOM_TP 001` 을 고르면 레거시 어디도 쓰지 않는 `ET`(기타)가 딸려 온다.
  */
-const CONTRACT_FORM_CODES = ['ROOM_TP', 'PAYMENT_METHOD', 'ACCESS_ROUTE'] as const;
+const CONTRACT_FORM_CODES: readonly CodeSpec[] = [
+  { category: 'ROOM_TP', useTp: '000' },
+  { category: 'PAYMENT_METHOD', useTp: '000' },
+  { category: 'ACCESS_ROUTE', useTp: '000' },
+];
 
 const scopeOf = (session: { role: string; companyId: string | null }): CompanyScope => ({
   role: session.role as CompanyScope['role'],
