@@ -197,10 +197,6 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
   const [terms, setTerms] = useState<TermsState>(() => seedTerms(contract, spaces));
   const [items, setItems] = useState<ItemRow[]>(() => seedItems(contract));
   const [users, setUsers] = useState<UserRow[]>(() => seedUsers(members, emailDomains));
-  const [repIndex, setRepIndex] = useState(() => {
-    const at = members.findIndex((m) => m.isRepresentative);
-    return at >= 0 ? at : 0;
-  });
   const [invalid, setInvalid] = useState<RequiredKey[]>([]);
   const [bizCheck, setBizCheck] = useState<BizCheck>('none');
   const [confirmKind, setConfirmKind] = useState<ConfirmKind | null>(null);
@@ -324,7 +320,16 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
           name: effectiveName(row, index, companyState),
           phone: index === 0 ? companyState.phone : row.phone,
           email: index === 0 ? ownerEmail : joinEmail(row.mailId, userDomain(row)),
-          isRepresentative: index === repIndex,
+          /**
+           * ★ **대표자는 1행 고정이다.** 1행이 섹션 1 「대표자」를 미러링하는 자리라
+           *   회사의 대표자가 곧 이 행이고, 명세도 「1행 … 대표자 체크 고정」이다
+           *   (`03-contract-form.md` 섹션 3).
+           *
+           *   예전에는 저장된 `isRepresentative` 로 `repIndex` 를 잡아 화면에서 고를 수
+           *   있었는데, 그러면 **1행에 대표자 이름이 보이는데 체크는 3행에 있는** 상태가
+           *   만들어졌다. 화면과 저장이 갈리는 자리였다.
+           */
+          isRepresentative: index === 0,
           memo: row.memo,
         },
       }));
@@ -541,13 +546,11 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
 
           <SectionUsers
             users={users}
-            repIndex={repIndex}
             company={companyState}
             frozen={frozen}
             notSaveable={!SECTION_SAVEABLE[3]}
             emailDomains={emailDomains}
             onUsers={setUsers}
-            onRep={setRepIndex}
           />
 
           <SectionDocs

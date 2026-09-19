@@ -34,8 +34,6 @@ import {
 
 interface Props {
   users: UserRow[];
-  /** 대표자로 표시된 행. 1명만이다 — 라디오처럼 동작한다. */
-  repIndex: number;
   company: CompanyState;
   /** `terminated`·`cancelled` — 전 섹션 읽기 전용. */
   frozen: boolean;
@@ -44,18 +42,15 @@ interface Props {
   /** 도메인 Select 목록. 코드 테이블에서 온다(016). */
   emailDomains: readonly string[];
   onUsers: (next: UserRow[]) => void;
-  onRep: (index: number) => void;
 }
 
 export function SectionUsers({
   users,
-  repIndex,
   company,
   frozen: ended,
   notSaveable,
   emailDomains,
   onUsers,
-  onRep,
 }: Props) {
   // ★ 저장할 곳이 없으면 입력도 받지 않는다 — 받으면 «저장된다»로 읽힌다.
   const frozen = ended || notSaveable;
@@ -203,15 +198,23 @@ export function SectionUsers({
               </span>
 
               <span className={`${styles.cell} ${styles.center}`}>
-                {/* 1명만 선택된다 — 체크하면 나머지가 풀린다 */}
+                {/*
+                  ★★ **대표자는 1행 고정이다. 고를 수 없다.**
+                  1행은 섹션 1 「대표자」를 미러링하는 자리라, 회사의 대표자가 곧 이 행이다.
+                  명세도 「1행 … 대표자 체크 고정」이라고 적고 있다
+                  (`03-contract-form.md` 섹션 3 「1행 — 자동 채움 + ReadOnly」).
+
+                  그래서 **모든 행이 비활성**이다. 1행만 잠그고 2행 이후를 열어 두면
+                  2행을 체크하는 순간 1행이 풀려 「고정」이 깨진다 — 라디오처럼 동작하기
+                  때문이다. 대표자를 바꾸려면 섹션 1 의 대표자를 바꾼다.
+                */}
                 <input
                   type="checkbox"
                   className={styles.checkbox}
-                  checked={repIndex === i}
-                  disabled={frozen || !on}
-                  onChange={(e) => {
-                    if (e.target.checked) onRep(i);
-                  }}
+                  checked={first}
+                  disabled
+                  readOnly
+                  aria-label={first ? '대표자 (섹션 1 에서 정해진다)' : '대표자 아님'}
                 />
               </span>
 
@@ -230,12 +233,9 @@ export function SectionUsers({
                   className={styles.trash}
                   aria-label="삭제"
                   disabled={first || frozen}
-                  onClick={() => {
-                    onUsers(users.filter((_, k) => k !== i));
-                    // 대표자로 표시된 행이 사라지면 1행으로 되돌린다 — 아무도 대표가
-                    // 아닌 상태를 만들지 않는다.
-                    if (repIndex >= users.length - 1) onRep(0);
-                  }}
+                  // 대표자는 1행 고정이고 1행은 지울 수 없으므로(`disabled={first}`),
+                  // 지운 뒤 대표자를 되돌리는 처리가 필요 없다.
+                  onClick={() => onUsers(users.filter((_, k) => k !== i))}
                 >
                   <Icon name="trash-2" size={16} />
                 </button>
