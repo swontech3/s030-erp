@@ -22,6 +22,7 @@
  *   `terminated`·`cancelled` 에서만 전체가 읽기 전용이다 — 판정은 `editableSections()` 가 한다.
  */
 import { Icon } from '@/components/ds';
+import { useKakaoPostcode } from '@/lib/useKakaoPostcode';
 import styles from './contract-form.module.css';
 import {
   DOMAIN_CUSTOM,
@@ -79,6 +80,8 @@ export function SectionCompany({
   const bad = (key: RequiredKey) => invalid.includes(key);
   const cls = (key: RequiredKey) => `${styles.input}${bad(key) ? ` ${styles.isInvalid}` : ''}`;
   const corpEnabled = isCorpMemberType(value.memberType) && !disabled;
+  // 스크립트를 못 받았을 때만 부른다. 이 화면의 안내 경로가 `onStub` 토스트다.
+  const postcode = useKakaoPostcode(onStub);
 
   return (
     <section className={styles.section}>
@@ -287,13 +290,16 @@ export function SectionCompany({
               style={{ width: 140, flex: '0 0 auto' }}
               value={value.zip}
             />
-            {/* 카카오 우편번호 API 연동 지점 — 명세도 「현재 미구현」이다 */}
+            {/*
+              카카오 우편번호 팝업. ★ 상세주소(`addr2`)는 건드리지 않는다 — 팝업이 주는
+              것은 우편번호와 기본주소뿐이고, 사람이 적어 둔 동·호수를 지울 이유가 없다.
+            */}
             <button
               type="button"
               className={`${styles.btn} ${styles.btnGhost}`}
               style={{ width: 100, height: 44 }}
               disabled={disabled}
-              onClick={() => onStub('주소 검색은 아직 연결되지 않았습니다')}
+              onClick={() => postcode.open((r) => onChange({ zip: r.zipCode, addr1: r.address }))}
             >
               주소 검색
             </button>
