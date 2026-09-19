@@ -53,8 +53,13 @@ packages/api/src/routes/lookups.ts:87  GET /codes         운영사 전용 (약 
 | `invoice_lines` · `payments` · `settlements` | `pay_item` · `pay_method` · `payment_method` | — | **0행** |
 
 > ★ `companies.member_type` 의 값 「개인사업자」는 **코드가 아니라 표시명**이다.
-> `MEMBER_TYPE` 코드는 `R/A/C/S/P/F/B` 이고 「개인사업자」는 DB 어디에도 없다.
-> 이 컬럼은 코드체계와 **이미 끊어져 있다.** 구조 변경과 무관한 별건이다.
+> 조사 시점의 `MEMBER_TYPE` 코드는 `R/A/C/S/P/F/B` 였고 「개인사업자」는 DB 어디에도
+> 없었다. 이 컬럼은 코드체계와 **이미 끊어져 있다.** 구조 변경과 무관한 별건이다.
+>
+> **2026-09-19 이후 코드 목록이 바뀌었다** — `F`·`B`(표기위치)는 `NAME_POSITION` 으로
+> 떠났고(014), `P` 의 이름이 「개인사업자」가 되었으며 `Z` 개인이 생겼다(017).
+> 그래도 이 컬럼의 값은 여전히 **표시명**이라 어느 코드와도 맞지 않는다 — 화면은
+> 목록에 없는 값을 미선택으로 연다.
 
 **그러나 DB 제약 결합은 0이다:**
 
@@ -308,6 +313,7 @@ POST(`[category]/route.ts:44`)는 3개를 다 본다. 두 곳이 어긋나 있�
 | `supabase/migrations/014_name_position.sql` | `NAME_POSITION` 2행 · 자식 8행 삭제 · `parent_line_id` 드롭 |
 | `supabase/migrations/015_code_category_common_name.sql` | `use_tp='000'` 이름을 전부 「공통」으로 · `EXEC_TP 001` 을 「(미상)」으로 |
 | `supabase/migrations/016_email_domain.sql` | `EMAIL_DOMAIN` 카테고리 신설 5행 — 화면 상수였던 것을 코드로 옮김 |
+| `supabase/migrations/017_member_type_individual.sql` | 회원구분 `P` 를 개인사업자로 · `Z` 개인 신설(`000` 에만) |
 | `packages/api/src/db/lookups.ts` · `routes/lookups.ts` | `listCodes(client, CodeSpec[])` · `DISTINCT ON` 제거 |
 | `scripts/verify-013.js` · `verify-014.js` | 검증 9항목 · 12항목 — **전부 통과** |
 

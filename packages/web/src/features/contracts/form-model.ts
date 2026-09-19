@@ -132,16 +132,33 @@ export const MEMBER_TYPE_CATEGORY = 'MEMBER_TYPE';
 export const memberTypesOf = (codes: readonly CodeOption[]): readonly CodeOption[] =>
   codes.filter((c) => c.category === MEMBER_TYPE_CATEGORY);
 
-/** 개인. 유일한 비법인 코드다. */
-export const MEMBER_TYPE_INDIVIDUAL = 'P';
+/** 개인사업자 — 사업자등록을 한 개인. */
+export const MEMBER_TYPE_SOLE_PROPRIETOR = 'P';
+/** 개인 — 사업자등록이 아직 없을 수 있다(시안의 「프리랜서」 자리다). 017 이 만들었다. */
+export const MEMBER_TYPE_INDIVIDUAL = 'Z';
+
+/** 비법인 코드 둘. 나머지(`R`·`A`·`C`·`S`)는 전부 법인격이다. */
+const NON_CORP_MEMBER_TYPES: readonly string[] = [MEMBER_TYPE_SOLE_PROPRIETOR, MEMBER_TYPE_INDIVIDUAL];
 
 /**
- * 법인격인가 — 법인등록번호 활성 · 법인등기부등본 카드 · 사업자등록증 필수를 가른다.
+ * 법인격인가 — 법인등록번호 활성 · 법인등기부등본 카드 · 저장 시 `corpNumber` 포함.
  *
  * ★ 미선택(`''`)은 **법인이 아니다.** 안 고른 상태에서 법인 전용 칸이 열리면
  *   운영자가 채우고, 그 값은 저장될 때 버려진다(`corpNumber` 는 법인일 때만 실린다).
  */
 export const isCorpMemberType = (code: string): boolean =>
+  code.trim() !== '' && !NON_CORP_MEMBER_TYPES.includes(code);
+
+/**
+ * 사업자등록증을 내야 하는가 — **개인(`Z`)만 면제**다.
+ *
+ * ★ 017 전에는 「법인이면 필수」였다. 그때는 `P`(개인) 하나에 개인사업자와 프리랜서가
+ *   섞여 있어 갈라낼 수 없었고, 그 결과 **개인사업자가 사업자등록증 없이 통과**했다.
+ *   017 이 `P` 개인사업자 / `Z` 개인으로 나눠서 시안의 3분법이 그대로 표현된다.
+ *
+ * ★ 미선택(`''`)은 면제다. 구분을 고르기 전에 서류부터 요구하지 않는다.
+ */
+export const needsBizLicense = (code: string): boolean =>
   code.trim() !== '' && code !== MEMBER_TYPE_INDIVIDUAL;
 
 /**

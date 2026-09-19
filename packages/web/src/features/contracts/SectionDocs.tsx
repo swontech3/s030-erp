@@ -22,7 +22,7 @@
  */
 import { Icon } from '@/components/ds';
 import styles from './contract-form.module.css';
-import { isCorpMemberType, NOT_SAVEABLE_BADGE, NOT_SAVEABLE_NOTICE } from './form-model';
+import { isCorpMemberType, needsBizLicense, NOT_SAVEABLE_BADGE, NOT_SAVEABLE_NOTICE } from './form-model';
 
 const DOC_DEFS = [
   { key: 'id', name: '대표자 신분증', desc: '주민등록증 또는 운전면허증 사본' },
@@ -31,17 +31,18 @@ const DOC_DEFS = [
 ] as const;
 
 /**
- * 회원구분이 표시 여부와 필수 여부를 정한다. **`memberType` 은 코드다**(`R`·`P`…).
+ * 회원구분이 표시 여부와 필수 여부를 정한다. **`memberType` 은 코드다**(`R`·`P`·`Z`…).
  *
- * ★ 사업자등록증 필수 조건이 2026-09-19 에 바뀌었다. 예전엔 「프리랜서가 아니면 필수」
- *   였는데, 코드 체계(`MEMBER_TYPE 000`)에 **프리랜서가 없다.** 개인(`P`) 안에
- *   프리랜서와 개인사업자가 섞여 있어 갈라낼 수 없다. 그래서 **법인이면 필수**로 둔다 —
- *   개인을 필수로 묶으면 사업자등록 전인 프리랜서가 막힌다(사업자번호 칸의 안내도
- *   「사업자등록 전이면 비워두세요」다).
+ *     법인 R·A·C·S   사업자등록증 필수 · 법인등기부등본 표시
+ *     개인사업자 P    사업자등록증 필수 · 법인등기부등본 숨김
+ *     개인 Z          사업자등록증 **선택** · 법인등기부등본 숨김
+ *
+ * ★ 사업자등록증 판정을 `isCorpMemberType` 으로 하지 않는다. 017 직전에 잠깐 그랬는데,
+ *   그러면 **개인사업자가 사업자등록증 없이 통과한다.** 두 규칙은 가르는 선이 다르다.
  */
 function docRule(key: (typeof DOC_DEFS)[number]['key'], memberType: string) {
   if (key === 'id') return { show: true, required: true };
-  if (key === 'biz') return { show: true, required: isCorpMemberType(memberType) };
+  if (key === 'biz') return { show: true, required: needsBizLicense(memberType) };
   return { show: isCorpMemberType(memberType), required: false };
 }
 
@@ -58,7 +59,7 @@ export function SectionDocs({ memberType, disabled: ended, notSaveable, onStub }
   const shown = DOC_DEFS.filter((d) => docRule(d.key, memberType).show);
   // 올릴 수 없으므로 등록 건수는 0 이다. 지어내지 않는다.
   const done = 0;
-  const bizMissing = isCorpMemberType(memberType);
+  const bizMissing = needsBizLicense(memberType);
 
   return (
     <section className={styles.section}>
