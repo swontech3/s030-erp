@@ -306,6 +306,7 @@ POST(`[category]/route.ts:44`)는 3개를 다 본다. 두 곳이 어긋나 있�
 |---|---|
 | `supabase/migrations/013_code_categories.sql` | 카테고리 테이블 신설 · 27행 이관 · FK 강화 |
 | `supabase/migrations/014_name_position.sql` | `NAME_POSITION` 2행 · 자식 8행 삭제 · `parent_line_id` 드롭 |
+| `supabase/migrations/015_code_category_common_name.sql` | `use_tp='000'` 이름을 전부 「공통」으로 · `EXEC_TP 001` 을 「(미상)」으로 |
 | `packages/api/src/db/lookups.ts` · `routes/lookups.ts` | `listCodes(client, CodeSpec[])` · `DISTINCT ON` 제거 |
 | `scripts/verify-013.js` · `verify-014.js` | 검증 9항목 · 12항목 — **전부 통과** |
 
@@ -396,7 +397,8 @@ E-1 · E-2 가 함께 닫힌다.
 
 | 쟁점 | 정한 것 |
 |---|---|
-| `use_tp` 값 형식 | **`varchar(3)` 유지.** 112행·레거시 상수(`000`,`001`,`002`)를 건드리지 않는다. 의미는 `name` 이 담는다 |
+| `use_tp` 값 형식 | **`varchar(3)` 유지.** 112행·레거시 상수(`000`,`001`,`002`)를 건드리지 않는다 |
+| **이름(`name`) 의 역할** | **파티션이 무엇인지**를 말한다. `use_tp='000'` 은 **언제나 「공통」**이고(23행 전부), `000` 이 아닌 파티션은 용도 이름 또는 「(미상)」이다. **쓰임새(어느 화면이 쓰는지)는 `name` 이 아니라 `description` 이 담는다** — 015 에서 정리했다 |
 | `000` 의 위치 | **기본 파티션으로 고정**, 카테고리 생성 시 자동 생성 |
 | `000` 단독 18종 | 화면에서 파티션 선택 단계를 **숨긴다** — 안 그러면 의미 없는 클릭이 한 번씩 는다 |
 | 파티션 간 관계 | **형제(독립)** 로 둔다. 상속·합집합이 아니다(B-1) |

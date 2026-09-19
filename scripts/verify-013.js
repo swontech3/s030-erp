@@ -77,12 +77,31 @@ function check(label, ok, detail) {
                           WHERE g.build_id = l.build_id AND g.category = l.category AND g.use_tp = l.use_tp)`);
     check('짝 없는 파티션이 0이다', orphan.n === 0, `${orphan.n}건`);
 
-    const named = await one(
-      `SELECT count(*)::int n FROM public.tb_s080_code_categories WHERE name <> '공통'`,
-    );
-    // 8개다. 역산표는 9개를 적었으나 `RES_TP 001` 은 이 DB 에 행이 없다 — 레거시
-    // 운영사 직원 폼이 부르지만 데이터가 없는 자리다(EMP_* 와 같은 부류).
-    check('역산표로 이름 붙인 파티션이 8개다', named.n === 8, `실제 ${named.n}`);
+    // ★ 숫자가 아니라 **규칙**을 본다(015). `000` 은 어느 카테고리에서나 공통 파티션이니
+    //   이름도 「공통」이어야 한다. 쓰임새는 name 이 아니라 description 이 담는다.
+    const common = await one(`SELECT count(*)::int n FROM public.tb_s080_code_categories
+                               WHERE use_tp='000' AND name <> '공통'`);
+    check("use_tp='000' 은 이름이 전부 「공통」이다", common.n === 0, `어긋난 행 ${common.n}건`);
+
+    // `000` 이 아닌 파티션은 **공통이 아니다.** 이름이 「공통」이면 013 의 이름표에서
+    // 빠져 기본값을 받았다는 뜻이다(EXEC_TP 001 이 실제로 그랬다 — 015 가 고쳤다).
+    const subCommon = await one(`SELECT count(*)::int n FROM public.tb_s080_code_categories
+                                  WHERE use_tp <> '000' AND name = '공통'`);
+    check("use_tp<>'000' 인데 이름이 「공통」인 행이 없다", subCommon.n === 0, `${subCommon.n}건`);
+
+    // 역산표(§B-3) 기준 5개: EXEC_TP 001 · MEMBER_TYPE 001·002 · PAY_ST 001 · ROOM_TP 001.
+    // (`RES_TP 001` 은 레거시가 부르지만 이 DB 에 행이 없어 카테고리도 없다.)
+    const sub = await one(`SELECT count(*)::int n FROM public.tb_s080_code_categories
+                            WHERE use_tp <> '000'`);
+    check('000 이 아닌 파티션이 5개다', sub.n === 5, `실제 ${sub.n}`);
+
+    const blank = await one(`SELECT count(*)::int n FROM public.tb_s080_code_categories
+                              WHERE btrim(name) = ''`);
+    check('이름이 빈 파티션이 없다', blank.n === 0, `${blank.n}건`);
+
+    const desc = await one(`SELECT count(*)::int n FROM public.tb_s080_code_categories
+                             WHERE description IS NULL OR btrim(description) = ''`);
+    check('설명이 빈 파티션이 없다 — 쓰임새는 여기 남는다', desc.n === 0, `${desc.n}건`);
 
     const grant = await one(`SELECT count(*)::int n FROM information_schema.role_table_grants
                               WHERE table_schema='public' AND table_name='tb_s080_code_categories'
@@ -92,7 +111,11 @@ function check(label, ok, detail) {
     check('카테고리 수가 라인의 파티션 조합 수와 같다', false, '테이블 없음');
     check('013 이 이관한 27행 이상이다', false, '테이블 없음');
     check('짝 없는 파티션이 0이다', false, '테이블 없음');
-    check('역산표로 이름 붙인 파티션이 9개다', false, '테이블 없음');
+    check("use_tp='000' 은 이름이 전부 「공통」이다", false, '테이블 없음');
+    check("use_tp<>'000' 인데 이름이 「공통」인 행이 없다", false, '테이블 없음');
+    check('000 이 아닌 파티션이 5개다', false, '테이블 없음');
+    check('이름이 빈 파티션이 없다', false, '테이블 없음');
+    check('설명이 빈 파티션이 없다 — 쓰임새는 여기 남는다', false, '테이블 없음');
     check('erp_app 이 읽을 수 있다', false, '테이블 없음');
   }
 
