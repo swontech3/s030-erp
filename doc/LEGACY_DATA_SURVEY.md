@@ -324,6 +324,14 @@ ORDER BY table_name, ordinal_position;
 정렬은 `sort_order`, 사용 여부는 `is_active`. `use_tp`(3자)는 같은 카테고리 안에서
 쓰임새를 더 나누는 칸으로 보이는데, **의미가 어디에도 적혀 있지 않다**(D-4 참조).
 
+> **★ 2026-09-19 — 이 절은 조사 시점(2026-09-13)의 기록이고, 구조가 그 뒤 바뀌었다.**
+> `use_tp` 의 의미가 밝혀졌고(독립 파티션), 마이그레이션 **013**·**014** 가 적용됐다.
+> - 라인의 FK 는 `(build_id, category, use_tp) → tb_s080_code_categories` 로 바뀌었다
+> - **`parent_line_id` 컬럼과 그 FK 는 없다** — 표기위치를 `NAME_POSITION` 카테고리로
+>   분리하면서 삭제했다
+>
+> 지금의 정본은 **`doc/CODE_MASTER_ANALYSIS.md`** 다.
+
 ### B-2. 마스터 전체 — 22종
 
 ```sql
@@ -643,7 +651,7 @@ FROM tb_s080_contracts ORDER BY created_at LIMIT 5;
 | `contract_room` | 계약의 국세청 신고용 호실(`6-1`) | 「계약호실」 | `tb_s080_space_room.contract_room` 도 있는데 **0행** |
 | `PAY_METHOD` / `PAYMENT_METHOD` | 결제수단 / 납부방법 | 「납부방법」 | 이름이 거의 같다. 바꿔 쓰기 쉽다 |
 | `MEMBER_TYPE` | 법인 형태 + 상호 표기 위치 | 「회원구분」 프리랜서/개인사업자/법인 | **같은 이름, 다른 개념** |
-| `use_tp` | 코드 라인의 3자리 구분자 | — | **의미가 문서에 없다.** 같은 코드가 `use_tp` 별로 중복된다 |
+| `use_tp` | 코드 라인의 3자리 구분자 | — | ✅ **해소** — 카테고리 안의 독립 파티션(상속 아님). 중복은 파티션마다 완결 목록을 갖기 때문이다. `doc/CODE_MASTER_ANALYSIS.md` §B |
 
 ### D-5. `tb_s080_space_room` 이 비어 있다
 
@@ -713,6 +721,8 @@ SELECT current_user;  -- erp_app
 ### 이 조사로는 알 수 없는 것
 
 - 건물에 1·2층이 실제로 없는지, 입력이 덜 된 것인지
-- `use_tp` 3자리 구분자의 의미
+- ~~`use_tp` 3자리 구분자의 의미~~ → ✅ **해소.** 한 카테고리 안의 **독립 파티션**이다
+  (상속이 아니다). `doc/CODE_MASTER_ANALYSIS.md` §B. 2026-09-19 마이그레이션 013 이
+  `tb_s080_code_categories` 로 이름을 새겼다
 - `tb_s080_space_room` 과 `contracts.contract_room` 중 어느 쪽이 정본인지
 - `area_sqm`·`capacity` 가 전체적으로 얼마나 채워져 있는지(상위 5행은 전부 NULL)

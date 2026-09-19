@@ -235,7 +235,12 @@ lib/code-tree.ts                     50줄   트리 평탄화
 
 ## E. 발견한 결함
 
-### E-1. 현행 — 계약 폼 계약구분에 「기타」가 떠 있다 🔴
+### E-1. 계약 폼 계약구분에 「기타」가 떠 있었다 — ✅ **닫힘 (2026-09-19)**
+
+> `listCodes()` 가 파티션 `ROOM_TP/000` 을 지정하도록 바꿔 닫았다. 실측 확인:
+> 계약 폼이 받는 `ROOM_TP` 가 **7종 → 6종**(`R1·R2·R3·FI·FR·VR`).
+> 라인을 끄거나 지우지 않았다 — `ROOM_TP 001` 은 그대로 남아 있다.
+> (`ACCESS_ROUTE` 의 「기타」(`E`)는 `000` 에 정상적으로 있는 **별개 코드**다.)
 
 `listCodes()` 의 `DISTINCT ON (category, code)` 을 실제로 돌린 결과:
 
@@ -247,7 +252,10 @@ lib/code-tree.ts                     50줄   트리 평탄화
 레거시 어느 화면에서도 쓰지 않는 코드가 계약 폼에 노출 중이다.
 (`PAYMENT_METHOD`·`ACCESS_ROUTE` 는 `000` 뿐이라 영향 없음)
 
-### E-2. 현행 — `DISTINCT ON` 의 정렬 타이 🟡
+### E-2. `DISTINCT ON` 의 정렬 타이 — ✅ **닫힘 (2026-09-19)**
+
+> `DISTINCT ON` 자체를 걷어냈다. 파티션을 지정하므로 같은 `(category, code)` 가 여러 행
+> 올 일이 없고, 정렬도 `ORDER BY category, sort_order, code` 한 번으로 끝난다.
 
 `ORDER BY category, code, sort_order` 는 `sort_order` 가 같으면 **어느 행이 이길지
 정해지지 않는다.** `MEMBER_TYPE` 의 `F` 는 `sort_order` 가 전부 1인데 이름이
@@ -289,10 +297,23 @@ POST(`[category]/route.ts:44`)는 3개를 다 본다. 두 곳이 어긋나 있�
 
 ---
 
-## F. 결정 (2026-09-19)
+## F. 결정 (2026-09-19) — ★ 시행 완료
 
 > **A안 — `use_tp` 카테고리 승격 + `NAME_POSITION` 분리 + `parent_line_id` 삭제.**
-> 사용자 승인 완료.
+> 사용자 승인 완료. **2026-09-19 시행됐다.**
+
+| 산출물 | 결과 |
+|---|---|
+| `supabase/migrations/013_code_categories.sql` | 카테고리 테이블 신설 · 27행 이관 · FK 강화 |
+| `supabase/migrations/014_name_position.sql` | `NAME_POSITION` 2행 · 자식 8행 삭제 · `parent_line_id` 드롭 |
+| `packages/api/src/db/lookups.ts` · `routes/lookups.ts` | `listCodes(client, CodeSpec[])` · `DISTINCT ON` 제거 |
+| `scripts/verify-013.js` · `verify-014.js` | 검증 9항목 · 12항목 — **전부 통과** |
+
+계획서: `.planning/tasks/지시_코드테이블_구조변경.md`
+
+**시행 중 드러난 것** — 역산표의 `RES_TP 001` 이 **이 DB 에 없다.** 레거시 운영사 직원
+폼이 부르지만 행이 하나도 없다(`EMP_RANK`·`EMP_DUTY`·`EMP_STATUS` 와 같은 부류).
+카테고리를 만들지 않았고, §B-3 표에 표시해 두었다.
 
 ### F-1. 무엇을 바꾸는가
 
@@ -385,17 +406,16 @@ E-1 · E-2 가 함께 닫힌다.
 ## G. 아직 정하지 않은 것
 
 1. **이름 못 붙이는 파티션 4개** — `ROOM_TP 001` · `MEMBER_TYPE 000` · `PAY_ST 000` ·
-   `EXEC_TP 000/001`. 호출처가 없어 이름을 지을 수 없다(B-3). **지우지 말고
-   `is_active=false` 로 내려두기**를 권고했으나 미확정. 특히 `ROOM_TP 001` 은 E-1 의
-   출처라 비활성화 자체가 그 버그의 수정이 된다
-2. **삐용이 이 테이블을 직접 읽는지** — DB 결합은 0이고 권한도 `erp_app`·`service_role`
-   뿐이지만, 삐용 앱이 별도 커넥션으로 SELECT 할 가능성은 DB 로 확인할 수 없다.
-   **스키마를 바꾸기 전에 물어봐야 한다**
+   `EXEC_TP 000/001`. 호출처가 없어 이름을 지을 수 없다(B-3).
+   → **시행 시 `(미상)` 으로 이름을 넣고 비활성화하지 않았다.** 계약 폼 오노출(E-1)은
+   파티션 지정으로 닫혔으므로 행을 끌 이유가 없어졌다. 용도가 밝혀지면 이름을 고친다
+2. ~~삐용이 이 테이블을 직접 읽는지~~ — ✅ **해소 (2026-09-19 사용자 확인).**
+   삐용은 `tb_s080_codes_line` · `tb_s080_code_masters` 를 보지 않는다
 3. **`companies.member_type` 의 「개인사업자」** — 코드체계 밖의 값(A-2). 이번 변경과
    무관하게 이미 어긋나 있다. 같이 정리할지 따로 둘지
 4. **시안의 회원구분 3종** — 「프리랜서 / 개인사업자 / 법인」은 파티션을 골라도 대응
    코드가 없다. `CONTRACT_DATA_MODEL.md §C-3 ⑤` 의 판단은 **그대로 유효하다**
-5. **시행 시점** — 페이즈 4-5(계약서 출력)와의 순서
+5. ~~시행 시점~~ — ✅ **2026-09-19 시행 완료.** 페이즈 4-5(계약서 출력)보다 먼저 했다
 
 ---
 
