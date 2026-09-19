@@ -4,6 +4,9 @@
  * 화면·DS 컴포넌트는 다음 단계(2-4·2-5)다. 여기서는 토큰 로드와 폰트 프리로드까지만 한다.
  */
 import '@/styles/tokens.css';
+// ★ 계약서 인쇄 규칙. 전역이어야 한다 — 숨겨야 할 것(사이드바·폼 섹션)이 컴포넌트
+//   밖에 있어서 CSS 모듈로는 가리킬 수 없다. 자세한 이유는 파일 머리말.
+import '@/styles/print.css';
 
 export const metadata = {
   title: 'SwonBiz ERP',

@@ -334,6 +334,18 @@ export function firstPaymentOf(totals: ContractTotals, paymentMethod: string, mo
  * 그건 «아직 안 채웠다»이지 오류가 아니다. 기간 0 을 **저장하려 할 때** 서버가 막는다.
  */
 export function endDateOf(startDate: string, months: string): string {
+  return endDateIsoOf(startDate, months).replace(/-/g, '.');
+}
+
+/**
+ * 같은 종료일을 **ISO(`YYYY-MM-DD`)로** 준다.
+ *
+ * ★ 계약서(s0300200040p1)가 이것을 쓴다. `endDateOf` 는 화면 표기라 점을 찍는데,
+ *   그 값을 문서에 넘기면 날짜로 인식되지 않아 **종료일 칸이 빈 채로 인쇄된다.**
+ *   실제로 그렇게 나왔다(2026-09-20). 두 형식을 각각의 이름으로 둔다 —
+ *   계산은 여기 한 번뿐이고 `endDateOf` 가 이 결과를 바꿔 쓴다.
+ */
+export function endDateIsoOf(startDate: string, months: string): string {
   const periodMonths = toNumber(months);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || periodMonths < 1) return '';
 
@@ -341,8 +353,7 @@ export function endDateOf(startDate: string, months: string): string {
   const start = new Date(Date.UTC(y, m - 1, d));
   if (Number.isNaN(start.getTime())) return '';
 
-  const end = calcEndDate(start, periodMonths);
-  return end.toISOString().slice(0, 10).replace(/-/g, '.');
+  return calcEndDate(start, periodMonths).toISOString().slice(0, 10);
 }
 
 /**

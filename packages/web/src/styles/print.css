@@ -1,0 +1,116 @@
+/* =============================================================================
+ * 인쇄 스타일 — 계약서 2종(s0300200040p1)
+ *
+ * 명세: design/handoff/tenant-contract/06-contracts.md 「인쇄 스타일」
+ *
+ * -----------------------------------------------------------------------------
+ * ★★ 왜 CSS 모듈이 아니라 전역인가
+ * -----------------------------------------------------------------------------
+ * 인쇄할 때 숨겨야 하는 것이 **이 컴포넌트 밖에 있다** — 사이드바, 페이지 헤더,
+ * 계약 폼 네 섹션, 토스트. CSS 모듈은 이름을 해시로 바꾸므로 남의 요소를 가리킬 수 없다.
+ *
+ * -----------------------------------------------------------------------------
+ * ★★★ 절대위치를 쓰지 않는다 — **쓰면 뒷장이 통째로 잘린다**
+ * -----------------------------------------------------------------------------
+ * 처음에는 «전부 감추고 문서만 절대위치로 좌상단에 끌어낸다»로 만들었다. 화면에서는
+ * 멀쩡했고 PDF 도 나왔다. 그런데 **전대차계약서가 3장 분량인데 2장만 인쇄됐다.**
+ *
+ * 절대위치 요소는 **정상 흐름에서 빠진다.** 흐름에서 빠지면 브라우저가 페이지를
+ * 나눌 높이를 잃고, 조상(모달)의 높이만큼만 찍고 멈춘다. 10조까지 있는 계약서의
+ * 뒷부분이 **오류 없이 조용히** 사라지는 것이다 — 인쇄해 보기 전에는 모른다.
+ *
+ * 그래서 지금은 이렇게 한다:
+ *   ① 모달을 **`document.body` 로 포털**한다(`ContractDocumentModal`).
+ *      문서가 body 바로 밑 정상 흐름에 놓인다.
+ *   ② 인쇄할 때 **body 의 다른 자식만** `display:none` 한다.
+ *   ③ 모달 껍데기(오버레이·스크롤 상자)의 크기 제한만 풀어 준다. 위치는 건드리지 않는다.
+ * 그러면 페이지 나눔은 브라우저가 알아서 한다.
+ *
+ * -----------------------------------------------------------------------------
+ * ★ `data-printing` 은 모달이 열려 있는 동안에만 body 에 붙는다
+ * -----------------------------------------------------------------------------
+ * 안 붙여 두면 **다른 화면에서 Ctrl+P 를 눌렀을 때** 이 규칙이 전부 걸려서
+ * 빈 종이가 나온다. 모달이 닫히면 지운다(`ContractDocumentModal` 의 useEffect).
+ * ========================================================================== */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+
+  body[data-printing='contract-doc'] {
+    margin: 0;
+    background: #ffffff;
+  }
+
+  /* ② 계약서 포털을 뺀 나머지는 통째로 없앤다 — 사이드바·폼·토스트가 여기 걸린다 */
+  body[data-printing='contract-doc'] > *:not([data-print-portal]) {
+    display: none !important;
+  }
+
+  /* ③ 모달 껍데기의 «크기 제한»만 푼다. position 은 그대로 두어 흐름을 지킨다 */
+  body[data-printing='contract-doc'] [data-print-portal] {
+    position: static !important;
+    inset: auto !important;
+    padding: 0 !important;
+    background: transparent !important;
+    display: block !important;
+  }
+
+  body[data-printing='contract-doc'] [data-print-modal] {
+    width: auto !important;
+    max-width: none !important;
+    /* ★ 높이를 고정하지 않는다(92vh). 고정하면 첫 장에서 끊긴다 */
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    display: block !important;
+  }
+
+  /* 탭·인쇄 버튼은 종이에 찍히면 안 된다 */
+  body[data-printing='contract-doc'] [data-print-hide] {
+    display: none !important;
+  }
+
+  body[data-printing='contract-doc'] [data-scroll] {
+    overflow: visible !important;
+    padding: 0 !important;
+    background: transparent !important;
+    /* flex 자식의 min-height:0 이 남아 있으면 내용이 눌린다 */
+    min-height: 0 !important;
+    height: auto !important;
+    flex: none !important;
+  }
+
+  /* 문서 면 — A4 폭에 펼치고 종이 흉내(그림자·여백)는 지운다 */
+  body[data-printing='contract-doc'] [data-doc-page] {
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  /* 인감은 배경 이미지라 브라우저가 기본으로 뺀다 — 강제로 넣는다 */
+  body[data-printing='contract-doc'] [data-seal] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 표 보더는 실선 검정을 유지한다(명세) */
+  body[data-printing='contract-doc'] [data-doc-table] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 조항·표 행이 페이지 경계에서 끊기지 않게 */
+  body[data-printing='contract-doc'] [data-no-break] {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}

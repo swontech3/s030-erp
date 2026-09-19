@@ -37,6 +37,7 @@ import { Icon, type IconName } from '@/components/ds';
 import styles from './contract-form.module.css';
 import { ConfirmDialog, localToday, type ConfirmKind, type ConfirmResult } from './ConfirmDialog';
 import { contractStatusName, contractStatusNamesOf } from './contract-status-name';
+import { ContractDocumentModal } from './ContractDocumentModal';
 import { SectionCompany, isBiznoFormatOk, type BizCheck } from './SectionCompany';
 import { SectionContract } from './SectionContract';
 import { SectionDocs } from './SectionDocs';
@@ -51,6 +52,7 @@ import {
   USER_TEMPLATE,
   currentDomain,
   discountLabel,
+  endDateIsoOf,
   joinEmail,
   missingForDraft,
   missingRequired,
@@ -215,6 +217,8 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
   const [invalid, setInvalid] = useState<RequiredKey[]>([]);
   const [bizCheck, setBizCheck] = useState<BizCheck>('none');
   const [confirmKind, setConfirmKind] = useState<ConfirmKind | null>(null);
+  /** 계약서 2종 미리보기(s0300200040p1). 확정 이후에만 열린다. */
+  const [docsOpen, setDocsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -483,8 +487,8 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
         setConfirmKind('terminate');
         return;
       case 'docs':
-        // 계약서 2종 출력(s0300200040p1)은 4-5 다. 이 작업의 범위가 아니다.
-        notify('계약서 출력은 다음 작업에서 붙습니다');
+        // 계약서 2종(s0300200040p1). 확정 이후에만 이 버튼이 뜬다(`ACTIONS`).
+        setDocsOpen(true);
         return;
       case 'save':
         // 확정 이후의 [저장]은 **섹션 1·3 만** 저장한다. 섹션 2 는 잠겨 있어
@@ -596,6 +600,51 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
           statusNames={statusNames}
           onClose={() => setConfirmKind(null)}
           onOk={(result) => void onConfirmOk(result)}
+        />
+      ) : null}
+
+      {/*
+        ★ 계약서 2종. **폼의 현재 상태**를 넘긴다 — 저장된 값이 아니다.
+          이 버튼은 `confirmed` 이후에만 뜨고 그때 섹션 2(금액 전부)는 잠겨 있어
+          둘이 같다. 섹션 1·3 은 열려 있어 저장 전 편집이 있을 수 있는데,
+          그때는 보고 있는 것이 찍히는 편이 덜 놀랍다.
+      */}
+      {docsOpen ? (
+        <ContractDocumentModal
+          company={{
+            companyName: companyState.company,
+            ceoName: companyState.ceo,
+            bizNumber: companyState.bizno,
+            corpNumber: companyState.corpno,
+            memberType: companyState.memberType,
+            tel: companyState.phone,
+            // ★ 아이디만 있고 도메인을 못 고른 상태면 이메일이 아니다 — 빈칸으로 둔다.
+            email: emailOf(companyState),
+            /**
+             * ★★ 계약서의 「주소」는 섹션 1 의 **대표자 주소**다. 그 칸의 힌트가
+             *    «계약서에 인쇄되는 대표자 주소입니다» 이고, ERP 가 가진 주소는
+             *    이것 하나뿐이다(`doc/CONTRACT_DOCUMENTS.md` §B).
+             */
+            zipCode: companyState.zip,
+            address: companyState.addr1,
+            addressDetail: companyState.addr2,
+            memo: companyState.note1,
+          }}
+          terms={{
+            contractDate: terms.contractDate,
+            startDate: terms.startDate,
+            // ★ ISO 로 넘긴다. 화면 표기(`endDateOf`, 점)를 넘기면 날짜로 인식되지 않아
+            //   계약서의 이용기간이 「2026.01.15 ~ (6개월)」처럼 **종료일 없이** 인쇄된다.
+            endDate: endDateIsoOf(terms.startDate, terms.months),
+            periodMonths: Number(terms.months) || null,
+            paymentMethod: terms.paymentMethod,
+            contractRoom: terms.contractRoom || null,
+            memo: terms.memo,
+          }}
+          items={items}
+          spaces={spaces}
+          codes={codes}
+          onClose={() => setDocsOpen(false)}
         />
       ) : null}
 
@@ -807,4 +856,16 @@ function toDateInput(value: string | null): string {
 function formatDot(value: string): string {
   const iso = toDateInput(value);
   return iso ? iso.replace(/-/g, '.') : '';
+}
+
+/**
+ * 계약서에 찍히는 대표자 이메일 — 「아이디@도메인」.
+ *
+ * ★ 둘 중 하나라도 비면 **빈 문자열**이다. 「kim@」 같은 반쪽을 계약서에 찍지 않는다.
+ *   빈 값이면 문서가 기입선을 그린다.
+ */
+function emailOf(c: CompanyState): string {
+  const id = c.emailId.trim();
+  const domain = currentDomain(c).trim();
+  return id && domain ? `${id}@${domain}` : '';
 }

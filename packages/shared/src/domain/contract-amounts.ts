@@ -304,13 +304,29 @@ const SUBLEASE_STANDARD_FEE_MAX_ROWS = 2;
  * 줄이 0건이면 0이다. 아직 호실을 안 고른 상태이지 오류가 아니다.
  */
 export function calcSubleaseMonthlyPayment(rows: readonly ContractSpaceForDocument[]): number {
-  const usesStandardFee =
-    rows.length > 0 &&
-    rows.length <= SUBLEASE_STANDARD_FEE_MAX_ROWS &&
-    rows.every((row) => row.roomType === ROOM_TYPE.VIRTUAL_OFFICE);
+  const usesStandardFee = usesSubleaseStandardFee(rows);
 
   return rows.reduce((sum, row) => {
     const base = usesStandardFee ? row.standardFee : row.monthlyFee;
     return sum + calcRowAmounts({ monthlyFee: base, vatYn: row.vatYn }).paymentAmount;
   }, 0);
+}
+
+/**
+ * 이 계약이 **기준가 특례에 걸리는가.**
+ *
+ * ★★ **금액을 이걸로 만들지 않는다.** 금액은 `calcSubleaseMonthlyPayment` 하나가 정한다.
+ *    이 함수는 그 함수가 쓰는 조건을 **이름 붙여 내보낸 것**이고, 용도는 둘뿐이다:
+ *      · 시험이 「왜 그 숫자인가」를 조건으로 적을 수 있게
+ *      · 검증 스크립트가 어느 기준으로 찍혔는지 함께 보고할 수 있게
+ *
+ *    화면이 이걸 보고 금액을 갈라 계산하면 분기가 두 벌이 된다 — 그 순간
+ *    전대차계약서의 숫자와 이 판정이 어긋날 수 있다. **부르는 쪽은 금액을 만들지 않는다.**
+ */
+export function usesSubleaseStandardFee(rows: readonly ContractSpaceForDocument[]): boolean {
+  return (
+    rows.length > 0 &&
+    rows.length <= SUBLEASE_STANDARD_FEE_MAX_ROWS &&
+    rows.every((row) => row.roomType === ROOM_TYPE.VIRTUAL_OFFICE)
+  );
 }
