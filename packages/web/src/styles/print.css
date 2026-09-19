@@ -53,12 +53,6 @@
     margin: 0;
   }
 
-  @page sublease {
-    size: A4 portrait;
-    /* 3장짜리라 매 장에 여백이 필요하다. 인쇄 불가 영역(보통 3~5mm)보다 넉넉히. */
-    margin: 14mm 13mm;
-  }
-
   body[data-printing='contract-doc'] {
     margin: 0;
     background: #ffffff;
@@ -127,9 +121,13 @@
    * ★ 전대차 — 3장이라 여백을 `@page sublease` 가 준다(매 장에 붙어야 한다).
    *   그래서 문서 자신의 padding 은 0 이다. 둘 다 주면 첫 장만 여백이 두 배가 된다.
    */
+  /*
+   * ★ 전대차도 **여백 0** 이다(머리글·바닥글 제거). 3장이라 padding 으로는 2·3장에
+   *   여백이 안 붙어서, 표 틀(`thead`/`tfoot` 반복)이 매 장 여백을 만든다 —
+   *   이 파일 맨 아래 「전대차」 절 참조.
+   */
   body[data-printing='contract-doc'] [data-doc-page='sublease'] {
     padding: 0 !important;
-    page: sublease;
   }
 
   /* 인감은 배경 이미지라 브라우저가 기본으로 뺀다 — 강제로 넣는다 */
@@ -177,47 +175,55 @@
   }
 
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-doc-title] {
-    margin-top: 8px !important;
-    font-size: 27px !important;
+    margin-top: 10px !important;
+    font-size: 28px !important;
   }
 
   /* ── 섹션 제목 ── 위아래 여백만 줄인다. 글자는 그대로 16px ── */
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-section-title] {
-    margin-top: 13px !important;
-    margin-bottom: 5px !important;
+    margin-top: 14px !important;
+    margin-bottom: 6px !important;
   }
 
   /* ── 표 ── 칸 padding 이 8행 × 위아래라 제일 크게 준다 ── */
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-doc-table] [data-th],
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-doc-table] [data-td] {
-    padding-top: 3px !important;
-    padding-bottom: 3px !important;
-    font-size: 12.5px !important;
-    line-height: 1.45 !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
   }
 
   /* 이용기간 아래 자동연장 주석 · 예금주 — 부수 정보라 한 단계 더 줄인다 */
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-note] {
     margin-top: 2px !important;
-    font-size: 10.5px !important;
-    line-height: 1.35 !important;
+    font-size: 11px !important;
+    line-height: 1.4 !important;
   }
 
-  /* 특기사항 칸의 최소 높이 — 빈 계약서에서 80px 를 그냥 먹는다 */
+  /*
+   * 특기사항 칸의 최소 높이.
+   *
+   * ★★ **여기가 남는 여유를 두는 자리다.** 종이는 297mm 로 고정이라, 문서 아래 흰
+   *    공간과 「특기사항이 길어질 여유」는 **같은 공간**이다 — 아래를 채우면 여유가 준다.
+   *    다만 그 여유를 **이 칸 안쪽에 두면 값이 공짜다**: 특기사항이 길어지면 먼저
+   *    이 칸의 빈 자리를 쓰고, 다 쓴 뒤에야 문서가 길어진다. 총 허용량은 같은데
+   *    보기에는 서명란 밑이 허전하지 않다(계약서의 자유기재란은 원래 넓다).
+   */
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-memo-cell] {
-    min-height: 42px !important;
+    min-height: 68px !important;
   }
 
   /* ── 이용안내 · 약정 문구 ── 줄간격 1.8 은 인쇄에서 과하다 ── */
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-guide-box],
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-pledge-box] {
-    padding: 8px 12px !important;
+    padding: 10px 14px !important;
   }
 
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-guide-line],
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-pledge-box] p {
-    font-size: 12.5px !important;
-    line-height: 1.5 !important;
+    font-size: 13px !important;
+    line-height: 1.6 !important;
   }
 
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-guide-box] {
@@ -230,20 +236,20 @@
 
   /* ── 구분선·서명란 ── 남은 빈틈 ── */
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-rule] {
-    margin-top: 13px !important;
+    margin-top: 16px !important;
   }
 
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-pledge-box] {
-    margin-top: 11px !important;
+    margin-top: 14px !important;
   }
 
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-sign-date] {
-    margin-top: 16px !important;
-    font-size: 14px !important;
+    margin-top: 18px !important;
+    font-size: 15px !important;
   }
 
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-sign-grid] {
-    margin-top: 14px !important;
+    margin-top: 16px !important;
   }
 
   /* 서명란 글자 — 16px 은 본문보다 크다. 이름이 읽히는 선에서 14px */
@@ -254,5 +260,62 @@
   body[data-printing='contract-doc'] [data-doc-page='usage'] [data-sign-grid] * {
     font-size: 14px !important;
     line-height: 1.45 !important;
+  }
+}
+
+/* =============================================================================
+ * 전대차 — **여백 0 으로 머리글·바닥글을 없애고, 여백은 표 틀이 만든다**
+ *
+ * 크롬은 `@page` 여백 안에 날짜·주소·쪽번호를 그린다. 여백이 0 이면 그릴 자리가
+ * 없어 사라진다. 그런데 3장짜리 문서에서 여백을 0 으로 두면 문서 padding 은
+ * **흐름의 시작과 끝에만** 붙어서 2·3장 본문이 종이 끝까지 간다.
+ *
+ * `thead`·`tfoot` 는 인쇄에서 **매 장에 반복된다.** 그 성질로 위아래 빈 칸을 두면
+ * 여백 0 인 채로도 장마다 여백이 생긴다. 좌우는 본문 칸의 padding 이 준다.
+ *
+ * ★ 이 방식을 쓰기 전에 **먼저 실험해서 되는 것을 확인했다**(별도 probe).
+ *   되지 않았으면 `@page` 여백으로 되돌리고 안내 문구에 기대는 쪽이 맞다 —
+ *   뒷장 본문이 종이 끝까지 가는 것이 머리글이 찍히는 것보다 나쁘다.
+ * ========================================================================== */
+@media print {
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] [data-print-frame] {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] [data-print-frame] > thead {
+    display: table-header-group !important;
+  }
+
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] [data-print-frame] > tfoot {
+    display: table-footer-group !important;
+  }
+
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] [data-print-frame] > tbody,
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] [data-print-frame] > thead > tr,
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] [data-print-frame] > tfoot > tr,
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] [data-print-frame] > tbody > tr {
+    display: table-row-group !important;
+  }
+
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] [data-print-frame] > thead > tr,
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] [data-print-frame] > tfoot > tr,
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] [data-print-frame] > tbody > tr {
+    display: table-row !important;
+  }
+
+  /* ★ 매 장에 반복되는 위아래 여백. 인쇄 불가 영역(3~5mm)보다 넉넉하다. */
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] [data-frame-spacer] {
+    display: table-cell !important;
+    height: 14mm !important;
+    padding: 0 !important;
+  }
+
+  /* 좌우 여백은 본문 칸이 준다 — 이건 매 장에 그대로 적용된다(칸의 성질이다) */
+  body[data-printing='contract-doc'] [data-doc-page='sublease'] [data-frame-cell] {
+    display: table-cell !important;
+    padding: 0 13mm !important;
+    vertical-align: top !important;
   }
 }

@@ -262,17 +262,15 @@ export function ContractDocumentModal({ company, terms, items, spaces, codes, on
         </div>
 
         {/*
-          ★★ 용지 여백을 0 으로 두어 크롬이 머리글·바닥글(날짜·주소·쪽번호)을 그릴 자리를
-            없앴다(`styles/print.css`). 다만 **브라우저 설정이 이기는 경우가 있고**,
-            전대차계약서는 3장이라 매 장에 여백이 필요해 `@page` 여백을 주므로
-            그릴 자리가 남는다. 그래서 끄는 방법을 한 줄 적어 둔다 —
+          ★ **두 문서 모두 용지 여백이 0 이라** 크롬은 머리글·바닥글(날짜·주소·쪽번호)을
+            그릴 자리가 없다. 전대차의 매 장 여백은 표 틀이 만든다(`print.css` 참조).
+            그래도 이 줄을 남겨 둔다 — 여백 0 을 따르지 않는 브라우저·드라이버가 있고,
             계약서에 「about:blank」나 「1/3」이 찍히면 그 종이는 못 쓴다.
           ★ `data-print-hide` — 이 안내 자체는 종이에 나오지 않는다.
         */}
         <p data-print-hide="1" className={styles.printHint}>
           <Icon name="circle-alert" size={14} />
-          인쇄 대화상자에서 <b>머리글·바닥글</b>을 꺼 주세요. 날짜·주소·쪽번호가 계약서에 함께
-          인쇄될 수 있습니다.
+          날짜·주소·쪽번호가 함께 인쇄되면 인쇄 대화상자에서 <b>머리글·바닥글</b>을 꺼 주세요.
         </p>
 
         <div data-scroll="1" className={styles.scroll}>
@@ -561,6 +559,34 @@ function SubleaseDocument(props: {
 
   return (
     <div data-doc-page="sublease" className={styles.page}>
+      {/*
+        ★★★ 왜 표로 감쌌나 — **3장짜리 문서의 매 장에 여백을 주려고**
+        ─────────────────────────────────────────────────────────────────────
+        크롬 머리글·바닥글(날짜·주소·쪽번호)은 `@page` 여백이 0 일 때만 사라진다.
+        그런데 여백을 0 으로 두면 문서 안쪽 padding 은 **흐름의 시작과 끝에만** 붙어서
+        2·3장 본문이 종이 끝까지 간다.
+
+        `thead`·`tfoot` 는 인쇄에서 **매 장에 반복**된다. 그 성질을 빌려 위아래 14mm
+        짜리 빈 칸을 두면, 여백이 0 인 채로도 장마다 여백이 생긴다.
+        확인: 3장 모두 위 14mm 이상 · 좌우 13mm (`pdfink` 로 PDF 좌표를 직접 쟀다).
+
+        ★ 화면에서는 표가 아니다 — `display:block` 이고 thead·tfoot 은 숨긴다.
+          인쇄에서만 표로 돌아온다(`print.css`).
+      */}
+      <table data-print-frame="1" className={styles.printFrame}>
+        <thead>
+          <tr>
+            <td data-frame-spacer="1" className={styles.frameSpacer} />
+          </tr>
+        </thead>
+        <tfoot>
+          <tr>
+            <td data-frame-spacer="1" className={styles.frameSpacer} />
+          </tr>
+        </tfoot>
+        <tbody>
+          <tr>
+            <td data-frame-cell="1" className={styles.frameCell}>
       <h3 data-doc-title="1" className={styles.docTitle}>전 대 차 계 약 서</h3>
 
       <div className={styles.parties}>
@@ -743,6 +769,10 @@ function SubleaseDocument(props: {
           </div>
         </div>
       </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }

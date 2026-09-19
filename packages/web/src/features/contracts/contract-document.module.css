@@ -553,3 +553,37 @@
   vertical-align: baseline;
   border-bottom: 1px solid var(--border);
 }
+
+/* =============================================================================
+ * 인쇄 여백용 표 틀 (전대차 전용) — 화면에서는 **표가 아니다**
+ *
+ * `thead`·`tfoot` 가 인쇄에서 매 장 반복되는 성질만 빌린다. 화면에서는 블록으로
+ * 눕혀 두고 빈 칸은 감춘다 — 미리보기에 14mm 짜리 빈 줄이 보이면 안 된다.
+ * 인쇄에서 표로 되돌리는 규칙은 `styles/print.css` 에 있다.
+ * ========================================================================== */
+.printFrame {
+  display: block;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.printFrame > tbody,
+.printFrame > tbody > tr,
+.printFrame > tbody > tr > td {
+  display: block;
+  width: 100%;
+}
+
+/* 화면에서는 여백 칸이 필요 없다 */
+.printFrame > thead,
+.printFrame > tfoot {
+  display: none;
+}
+
+.frameSpacer {
+  padding: 0;
+}
+
+.frameCell {
+  padding: 0;
+}
