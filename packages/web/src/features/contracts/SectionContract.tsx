@@ -22,7 +22,14 @@
  * `@swonbiz/shared/domain/contract-amounts` 가 낸다. 시안의 계산 코드를 베끼면
  * 부가세 끝수(반올림 vs 버림)와 종료일 말일 처리가 서버와 갈린다.
  */
+import { useMemo } from 'react';
 import { MAX_CONTRACT_SPACES } from '@swonbiz/shared/domain/contract-payload';
+import {
+  canPickSpace,
+  occupancyBySpace,
+  spaceOptionLabel,
+  type SpaceHolder,
+} from '@swonbiz/shared/domain/space-occupancy';
 import { Icon } from '@/components/ds';
 import styles from './contract-form.module.css';
 import {
@@ -49,6 +56,13 @@ interface Props {
   items: ItemRow[];
   terms: TermsState;
   spaces: readonly SpaceOption[];
+  /**
+   * 살아 있는 계약(계약중·계약대기)이 붙들고 있는 호실들. 호실 셀렉트가 이것으로 거른다.
+   * **자기 계약도 들어 있고**, 빼는 것은 `occupancyBySpace` 가 한다.
+   */
+  spaceHolders: readonly SpaceHolder[];
+  /** 편집 중인 계약. 신규면 `null` — 뺄 자기 자신이 없다. */
+  selfContractId: string | null;
   codes: readonly CodeOption[];
   /** 섹션 2 를 수정할 수 있는가. `editableSections()` 이 판정한 값이다. */
   editable: boolean;
@@ -56,6 +70,8 @@ interface Props {
   onItems: (next: ItemRow[]) => void;
   onTerms: (patch: Partial<TermsState>) => void;
   onStub: (message: string) => void;
+  /** 계약호실 확인 팝업(`s0300200040p3`)을 연다. 계약호실은 팝업으로만 넣는다. */
+  onOpenRoomPicker: () => void;
 }
 
 const codesOf = (codes: readonly CodeOption[], category: string) =>
@@ -74,12 +90,15 @@ export function SectionContract({
   items,
   terms,
   spaces,
+  spaceHolders,
+  selfContractId,
   codes,
   editable,
   invalid,
   onItems,
   onTerms,
   onStub,
+  onOpenRoomPicker,
 }: Props) {
   const locked = !editable;
   const totals = totalsOf(items);
@@ -94,6 +113,19 @@ export function SectionContract({
   // 건물·층은 호실 목록에서 뽑는다 — 따로 조회하지 않는다. 지금은 각각 1개다.
   const buildings = dedupe(spaces.map((s) => ({ id: s.buildId, name: s.buildName })));
   const floors = floorsOf(spaces, terms.buildId);
+
+  /*
+   * ★★ 호실별 입주 현황. **자기 계약은 빼고** 센다 — 세면 자기 계약을 열어 그대로
+   *    저장할 때 자기 호실이 목록에서 사라지고, 빈 줄로 저장된다.
+   *
+   * ★ 판정도 문구도 `@swonbiz/shared/domain/space-occupancy` 한 곳이다. 서버가
+   *   저장할 때 **같은 함수**로 다시 본다 — 셀렉트에서 사라진 호실이 API 로는
+   *   들어가면 막은 의미가 없다.
+   */
+  const occupancy = useMemo(
+    () => occupancyBySpace(spaceHolders, selfContractId),
+    [spaceHolders, selfContractId],
+  );
 
   const patchRow = (index: number, patch: Partial<ItemRow>) =>
     onItems(items.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -253,6 +285,15 @@ export function SectionContract({
               );
             }
 
+            /**
+             * ★ 다른 줄이 이미 잡은 호실 — 같은 계약 안에서 같은 호실을 두 줄에 넣으면
+             *   금액이 두 번 잡히고 어느 줄이 진짜인지 아무도 모른다. 서버도 같은
+             *   규칙으로 거절한다(`rejectSpacePick`).
+             */
+            const pickedElsewhere = new Set(
+              items.filter((_, j) => j !== i).map((r) => r.spaceId).filter((id) => id !== ''),
+            );
+
             return (
               <div className={styles.itemRow} key={i}>
                 <span className={styles.no}>{i + 1}</span>
@@ -280,7 +321,12 @@ export function SectionContract({
                   </span>
                 </span>
 
-                {/* 호실 — ★ 표시는 room_name, 값은 space_id. 계약구분·건물·층으로 거른다. */}
+                {/*
+                  호실 — ★ 표시는 room_name, 값은 space_id. 계약구분·건물·층으로 거르고,
+                  그 위에 **입주 현황**으로 한 번 더 거른다:
+                    비상주(VR)  아무도 없는 호실만
+                    그 외        1곳까지. 그때는 「Room 1 (에스원3DP)」로 누가 쓰는지 보여준다
+                */}
                 <span className={styles.cell}>
                   <span className={styles.selectWrap}>
                     <select
@@ -293,9 +339,22 @@ export function SectionContract({
                         .filter((s) => (row.roomType ? s.roomType === row.roomType : true))
                         .filter((s) => (terms.buildId ? s.buildId === terms.buildId : true))
                         .filter((s) => (terms.floorId ? s.floorId === terms.floorId : true))
+                        .filter(
+                          (s) =>
+                            // ★ **지금 이 줄이 고른 호실은 언제나 남긴다.** 목록에서 빠지면
+                            //   셀렉트가 빈 줄이 되고 값이 조용히 사라진다 — 규칙이 생기기
+                            //   전에 저장된 계약에서 실제로 걸리는 자리다. 그대로 저장하면
+                            //   서버가 이유를 말하며 거절한다.
+                            s.spaceId === row.spaceId ||
+                            canPickSpace({
+                              roomType: row.roomType,
+                              occupancy: occupancy.get(s.spaceId),
+                              pickedElsewhere: pickedElsewhere.has(s.spaceId),
+                            }),
+                        )
                         .map((s) => (
                           <option key={s.spaceId} value={s.spaceId}>
-                            {s.roomName}
+                            {spaceOptionLabel(s.roomName, occupancy.get(s.spaceId))}
                           </option>
                         ))}
                     </select>
@@ -397,20 +456,29 @@ export function SectionContract({
         <div className={styles.field}>
           <span className={styles.label}>계약호실</span>
           <div className={styles.inlineRow}>
-            {/* 국세청 신고용 대표 호실. 계약당 1개다. */}
+            {/*
+              국세청 신고용 대표 호실. 계약당 1개다.
+
+              ★★ **읽기 전용이다. 팝업으로만 넣는다**(`s0300200040p3`).
+                 직접 타이핑을 열어 두면 중복 판정을 거치지 않은 번호가 들어온다 —
+                 이 번호는 세무서에 내는 번호라 겹치면 밖에서 사고가 난다.
+                 명세도 「ReadOnly + 조회 아이콘」이다(`03-contract-form.md` 섹션 2).
+            */}
             <input
               className={`${styles.input} ${styles.flex1}`}
               value={terms.contractRoom}
-              disabled={locked}
-              onChange={(e) => onTerms({ contractRoom: e.target.value })}
+              readOnly
+              placeholder="조회 버튼으로 선택"
+              onClick={locked ? undefined : onOpenRoomPicker}
+              style={locked ? undefined : { cursor: 'pointer' }}
             />
             <button
               type="button"
               className={`${styles.btn} ${styles.btnGhost}`}
-              aria-label="호실 조회"
+              aria-label="계약호실 확인"
               style={{ width: 44, height: 44, padding: 0 }}
               disabled={locked}
-              onClick={() => onStub('호실 조회 팝업은 아직 연결되지 않았습니다')}
+              onClick={onOpenRoomPicker}
             >
               <Icon name="search" size={16} />
             </button>

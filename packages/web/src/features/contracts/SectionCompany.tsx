@@ -21,6 +21,7 @@
  * ★ `confirmed` 에서도 이 섹션은 열려 있다. 잠기는 것은 계약 조건(섹션 2)뿐이다.
  *   `terminated`·`cancelled` 에서만 전체가 읽기 전용이다 — 판정은 `editableSections()` 가 한다.
  */
+import { bizCheckLine, type BizCheckResult } from '@swonbiz/shared/domain/biz-number-check';
 import { Icon } from '@/components/ds';
 import { useKakaoPostcode } from '@/lib/useKakaoPostcode';
 import styles from './contract-form.module.css';
@@ -30,6 +31,7 @@ import {
   NOT_SAVEABLE_BADGE,
   NOT_SAVEABLE_NOTICE,
   isCorpMemberType,
+  maskEmailId,
   maskValue,
   type CodeOption,
   type CompanyState,
@@ -39,12 +41,29 @@ import {
 /**
  * 사업자번호 확인 결과.
  *
- * ★ 명세는 성공·중복·무효 3종인데 **형식 오류 하나만 띄운다.** 중복은 입주사 조회 API 가,
- *   국세청 유효성은 외부 연동이 **아직 없기 때문**이다(명세도 「국세청 API 실연동 여부 TBD —
- *   미연동 시 형식 검증만」이라고 적고 있다). 없는 판정을 초록불로 보여주면 운영자가
- *   «확인했다»고 믿는다 — 그게 가장 나쁜 실패다.
+ * =============================================================================
+ * ★★ 한 버튼에 **성격이 다른 두 가지**가 들어 있다
+ * =============================================================================
+ *   국세청 상태  바깥 사실이다. 알려 줄 뿐 **아무것도 막지 않는다** — 폐업자와도
+ *                계약할 수 있고 그 판단은 운영자가 한다. 국세청이 죽어도 계약
+ *                등록은 그대로 된다(`unavailable`).
+ *   ERP 중복     우리 규칙이다. **「종료」인 입주사는 중복이 아니다** — 퇴실 후
+ *                재입주라, 막는 대신 기존 입주사로 계약할 수 있다고 알려 준다.
+ *   회사명 중복  **막지 않는다.** 같은 상호는 법적으로 가능하고, 사업자번호가 다르면
+ *                다른 회사다. 「혹시 같은 곳 아닙니까」라는 귀띔이다.
+ *
+ * 판정은 여기 없다. `@swonbiz/shared/domain/biz-number-check` 가 갖고, 서버가
+ * 같은 함수를 쓴다 — 두 벌이면 조용히 갈린다.
+ *
+ * ★ `idle` 은 「아직 확인 안 함」이다. 사업자번호가 바뀌면(사람이 고치든 OCR 이 덮든)
+ *   반드시 여기로 돌아간다 — 앞 번호로 받은 판정이 새 번호에 남으면, 아무도 확인한
+ *   적 없는 번호가 확인된 것으로 보인다.
  */
-type BizCheck = 'none' | 'format';
+type BizCheck =
+  | { kind: 'idle' }
+  | { kind: 'format' }
+  | { kind: 'checking' }
+  | { kind: 'done'; result: BizCheckResult };
 
 interface Props {
   value: CompanyState;
@@ -83,6 +102,16 @@ export function SectionCompany({
   // 스크립트를 못 받았을 때만 부른다. 이 화면의 안내 경로가 `onStub` 토스트다.
   const postcode = useKakaoPostcode(onStub);
 
+  /*
+   * ★ 사업자등록증 판독(OCR)은 **여기 없다.** 섹션 4 에서 사업자등록증을 올리면
+   *   그 업로드가 첨부와 판독을 같이 하고, 결과가 이 섹션의 칸으로 돌아온다
+   *   (`SectionDocs` → `ContractForm.applyBizReg` → 이 컴포넌트의 `onChange`).
+   *
+   *   예전에는 이 섹션에도 파일 입력과 [사업자등록증 인식] 버튼이 따로 있었다.
+   *   그러면 **같은 파일을 두 번 올리게 되고**, 더 나쁜 것은 섹션 1 에서 고른 파일과
+   *   섹션 4 에 첨부한 파일이 서로 다를 수 있다는 것이다.
+   */
+
   return (
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
@@ -95,6 +124,7 @@ export function SectionCompany({
             </span>
           ) : null}
         </div>
+
       </div>
       <div className={styles.sectionRule} />
       {notSaveable ? <p className={styles.sectionNote}>{NOT_SAVEABLE_NOTICE}</p> : null}
@@ -130,18 +160,21 @@ export function SectionCompany({
               type="button"
               className={`${styles.btn} ${styles.btnGhost}`}
               style={{ width: 72, height: 44 }}
-              disabled={disabled}
+              disabled={disabled || bizCheck.kind === 'checking'}
               onClick={onBizCheck}
             >
-              확인
+              {bizCheck.kind === 'checking' ? '확인 중' : '확인'}
             </button>
-            {bizCheck === 'format' ? (
+            {bizCheck.kind === 'format' ? (
               <span style={{ display: 'flex', flex: '0 0 auto', color: 'var(--color-warning)' }} title="형식이 올바르지 않습니다">
                 <Icon name="circle-alert" size={20} />
               </span>
             ) : null}
           </div>
-          {bizCheck === 'format' ? <span className={styles.err}>형식이 올바르지 않습니다</span> : null}
+          {bizCheck.kind === 'format' ? (
+            <span className={styles.err}>사업자등록번호 10자리를 입력해 주세요</span>
+          ) : null}
+          {bizCheck.kind === 'done' ? <BizCheckLine result={bizCheck.result} /> : null}
           {bad('bizno') ? <span className={styles.fieldError}>필수 입력 항목입니다</span> : null}
         </div>
 
@@ -239,7 +272,9 @@ export function SectionCompany({
               className={`${cls('emailId')} ${styles.flex1}`}
               value={value.emailId}
               disabled={disabled}
-              onChange={(e) => onChange({ emailId: e.target.value })}
+              // ★ 한글·공백·@ 는 들어오는 즉시 떨어진다(`maskEmailId`). 저장 직전에
+              //   막으면 이미 여러 칸을 채운 뒤라 되돌리기가 번거롭다.
+              onChange={(e) => onChange({ emailId: maskEmailId(e.target.value) })}
             />
             <span style={{ flex: '0 0 auto', color: 'var(--text-muted)' }}>@</span>
             {/* ★ Select 를 숨기지 않는다. 직접입력 인풋의 표시 여부를 매 렌더마다
@@ -328,6 +363,41 @@ export function SectionCompany({
         </label>
       </div>
     </section>
+  );
+}
+
+/**
+ * 확인 결과 — **한 줄**이다.
+ *
+ * ★ 예전에는 국세청과 중복이 두 줄이었는데 서로 붙어 읽혔다. 문장을 만드는 일은
+ *   `bizCheckLine` 이 한다 — 어느 것을 말하고 어느 것을 감출지가 규칙이라서
+ *   화면이 아니라 도메인에 있다(사업자번호가 걸리면 회사명은 말하지 않는다).
+ *
+ * ★ **링크가 없다.** 회사명만 괄호로 보여준다. 확인은 「지금 무엇이 걸렸는지」를
+ *   알려 주는 자리이지 다른 화면으로 보내는 자리가 아니다 —
+ *   운영자는 대개 그 자리에서 번호를 다시 본다.
+ *   (`/tenants/contracts?companyId=` 딥링크 자체는 살아 있다. 다른 데서 쓴다.)
+ *
+ * ★ 색으로 「막혔다」를 말하지 않는다. 휴업·폐업도 중복도 **경고이지 금지가 아니다** —
+ *   운영자가 보고 판단한다. 그래서 빨강(위험)이 아니라 주의색을 쓴다.
+ */
+function BizCheckLine({ result }: { result: BizCheckResult }) {
+  // 하나라도 걸린 것이 있으면 주의색으로 — 국세청이 계속사업자여도 중복이면 봐야 한다.
+  const flagged =
+    result.duplicate.kind !== 'none' ||
+    result.nameDuplicate.found ||
+    (result.nts.kind !== 'active' && result.nts.kind !== 'unavailable');
+
+  const tone = flagged
+    ? 'var(--color-warning)'
+    : result.nts.kind === 'unavailable'
+      ? 'var(--text-muted)'
+      : 'var(--color-success, green)';
+
+  return (
+    <span className={styles.hint} style={{ color: tone }}>
+      {bizCheckLine(result)}
+    </span>
   );
 }
 

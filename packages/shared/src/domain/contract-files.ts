@@ -79,7 +79,7 @@ export const DOC_DEFS: readonly DocDef[] = [
 export interface DocRule {
   /** 카드를 그리는가. `false` 면 **업로드도 막는다** — 안 보이는 칸에 파일이 들어가면 안 된다. */
   show: boolean;
-  /** 「필수」 뱃지. 저장을 막지는 않는다 — 막는 것은 계약확정 쪽 규칙이고 여기 없다. */
+  /** 「필수」 뱃지. 올리기·임시저장을 막지는 않는다 — 막는 것은 계약확정뿐이다(`missingRequiredDocs`). */
   required: boolean;
 }
 
@@ -126,6 +126,56 @@ export function isCorpMemberType(memberType: string): boolean {
 /** 이 회원구분에서 화면에 보일 서류들. */
 export function visibleDocs(memberType: string): readonly DocDef[] {
   return DOC_DEFS.filter((d) => docRuleFor(d.purpose, memberType).show);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   계약확정 게이트 — 필수 서류가 없으면 확정하지 못한다
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 계약확정을 막는 서류들. 빈 배열이면 확정할 수 있다.
+ *
+ * =============================================================================
+ * ★★ **임시저장은 이 함수를 부르지 않는다**
+ * =============================================================================
+ * 사업자등록 신청 중인 회사는 등록증이 아직 없다. 그런 회사도 자리는 잡아 둬야 하고
+ * 그게 계약대기(`draft`)의 쓸모다. 서류를 묻는 것은 **확정할 때 한 번**이다.
+ *
+ * ★ 규칙을 새로 쓰지 않는다 — `docRuleFor` 가 이미 회원구분별 필수를 안다.
+ *   여기서 「법인이면 사업자등록증」이라고 다시 적으면 두 벌이 되고, 갈리는 날
+ *   화면은 통과시키는데 서버가 막거나 그 반대가 된다.
+ *
+ * ★ `show` 도 함께 본다. 숨긴 칸은 올릴 수조차 없으므로(`rejectUpload`) 그것을
+ *   필수로 세면 **아무도 확정할 수 없는 계약**이 생긴다.
+ *
+ * @param attached 이미 붙어 있는 서류의 `file_purpose` 들. 모르는 값은 무시된다.
+ */
+export function missingRequiredDocs(memberType: string, attached: readonly string[]): DocDef[] {
+  const has = new Set(attached);
+  return DOC_DEFS.filter((d) => {
+    const rule = docRuleFor(d.purpose, memberType);
+    return rule.show && rule.required && !has.has(d.purpose);
+  });
+}
+
+/**
+ * 빠진 서류를 **사람에게 하는 말**로. 없으면 `null` — 확정해도 된다는 뜻이다.
+ *
+ * ★ 빠진 것을 **한 번에 다 말한다.** 하나씩 알려주고 돌려보내면 운영자가 같은
+ *   버튼을 두 번 누른다.
+ */
+export function missingDocsMessage(memberType: string, attached: readonly string[]): string | null {
+  const missing = missingRequiredDocs(memberType, attached);
+  if (missing.length === 0) return null;
+  const names = missing.map((d) => d.name).join(' · ');
+  return `계약을 확정하려면 ${names}${subjectParticle(names)} 필요합니다`;
+}
+
+/** 「신분증이」 / 「등기부등본이」 — 받침으로 이/가를 고른다. 한글이 아니면 둘 다 적는다. */
+function subjectParticle(word: string): string {
+  const code = word.charCodeAt(word.length - 1);
+  if (code < 0xac00 || code > 0xd7a3) return '이(가)';
+  return (code - 0xac00) % 28 === 0 ? '가' : '이';
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

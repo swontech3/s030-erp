@@ -12,6 +12,8 @@ import {
   MAX_FILE_BYTES,
   docRuleFor,
   isFilePurpose,
+  missingDocsMessage,
+  missingRequiredDocs,
   rejectUpload,
   storagePathFor,
   visibleDocs,
@@ -151,5 +153,58 @@ describe('스토리지 경로', () => {
   it('★ 원본 파일 이름이 경로에 들어가지 않는다 — URL 에 사람 이름이 실린다', () => {
     // 인자로 받지도 않는다. 경로는 식별자만으로 만들어진다.
     expect(storagePathFor(args)).not.toMatch(/[가-힣]/);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   계약확정 게이트
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('계약확정에 빠진 서류', () => {
+  const names = (memberType: string, attached: string[]) =>
+    missingRequiredDocs(memberType, attached).map((d) => d.purpose);
+
+  it('개인(Z)은 신분증 하나로 확정된다 — 사업자등록증을 묻지 않는다', () => {
+    expect(names(INDIV, ['CEO_ID'])).toEqual([]);
+    expect(missingDocsMessage(INDIV, ['CEO_ID'])).toBeNull();
+  });
+
+  it('법인은 신분증만으로는 막힌다 — 사업자등록증이 빠졌다', () => {
+    expect(names(CORP, ['CEO_ID'])).toEqual(['BIZ_REG']);
+    expect(missingDocsMessage(CORP, ['CEO_ID'])).toBe('계약을 확정하려면 사업자등록증이 필요합니다');
+  });
+
+  it('법인은 둘 다 있으면 확정된다', () => {
+    expect(names(CORP, ['CEO_ID', 'BIZ_REG'])).toEqual([]);
+  });
+
+  it('★ 법인등기부등본은 없어도 막지 않는다 — 선택이다', () => {
+    expect(names(CORP, ['CEO_ID', 'BIZ_REG'])).toEqual([]);
+    expect(missingDocsMessage(CORP, ['CEO_ID', 'BIZ_REG'])).toBeNull();
+  });
+
+  it('★ 개인사업자(P)도 사업자등록증이 필요하다 — 법인 여부로 가르면 여기서 샌다', () => {
+    expect(names(SOLE, ['CEO_ID'])).toEqual(['BIZ_REG']);
+  });
+
+  it('아무것도 없으면 빠진 것을 전부 말한다 — 하나씩 알려주고 돌려보내지 않는다', () => {
+    expect(names(CORP, [])).toEqual(['CEO_ID', 'BIZ_REG']);
+    expect(missingDocsMessage(CORP, [])).toBe(
+      '계약을 확정하려면 대표자 신분증 · 사업자등록증이 필요합니다',
+    );
+  });
+
+  it('회원구분 미선택은 신분증만 본다 — 아직 모르는 것을 필수라고 하지 않는다', () => {
+    expect(names('', ['CEO_ID'])).toEqual([]);
+    expect(names('', [])).toEqual(['CEO_ID']);
+  });
+
+  it('모르는 서류 종류가 섞여 있어도 필수를 대신하지 못한다', () => {
+    expect(names(CORP, ['PASSPORT', 'CEO_ID'])).toEqual(['BIZ_REG']);
+  });
+
+  it('공백이 섞인 회원구분도 같은 답을 낸다 — DB 값이 늘 깨끗하지는 않다', () => {
+    expect(names(' Z ', ['CEO_ID'])).toEqual([]);
+    expect(names(' R ', ['CEO_ID'])).toEqual(['BIZ_REG']);
   });
 });

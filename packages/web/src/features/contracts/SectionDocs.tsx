@@ -33,10 +33,12 @@ import {
   DOC_DEFS,
   MAX_FILE_MB,
   docRuleFor,
+  isFilePurpose,
   rejectUpload,
   visibleDocs,
   type FilePurpose,
 } from '@swonbiz/shared/domain/contract-files';
+import type { BizRegFields } from '@swonbiz/shared/domain/biz-reg-ocr';
 import { Icon } from '@/components/ds';
 import styles from './contract-form.module.css';
 
@@ -59,9 +61,57 @@ interface Props {
   /** `terminated`·`cancelled` — 읽기 전용. 올리지도 지우지도 못한다. */
   disabled: boolean;
   onNotify: (message: string) => void;
+  /**
+   * ★ 사업자등록증을 읽은 결과를 **섹션 1 에 얹는다.** 몇 칸을 덮었는지 돌려준다 —
+   *   이 섹션이 「n개 항목을 불러왔습니다」를 말하기 위해서다.
+   *
+   *   덮는 규칙(non-null 만 · 사업자번호를 덮으면 확인 상태 되돌리기)은 여기 없다.
+   *   폼이 갖고 있다(`ContractForm`) — 섹션 1 의 상태를 아는 쪽이 거기다.
+   */
+  onBizReg: (fields: BizRegFields) => number;
+  /**
+   * ★★ 아직 입주사가 없을 때 **고른 파일을 붙들어 두는 곳**. 폼이 갖고 있다.
+   *
+   *    여기(섹션)에 두지 않는 이유가 있다 — 첫 저장 뒤 폼은 `/contracts/{id}` 로
+   *    이동하고 그때 이 컴포넌트가 **통째로 다시 마운트된다.** 섹션이 들고 있으면
+   *    붙들어 둔 파일이 그 순간 사라진다. 그래서 저장 흐름을 아는 폼이 갖고,
+   *    회사가 생긴 직후 폼이 직접 올린다(`flushPendingDocs`).
+   */
+  pending: Partial<Record<FilePurpose, File>>;
+  onPending: (purpose: FilePurpose, file: File | null) => void;
+  /**
+   * ★★ **이미 붙어 있는 서류 종류를 폼에 알린다.** 계약확정 게이트가 이 목록을 본다.
+   *
+   *    이 섹션이 스스로 판정하지 않는 이유 — 확정을 막는 것은 폼의 [계약확정] 이고,
+   *    붙들고 있는 파일(`pending`)까지 합쳐야 답이 나온다. 그 둘을 다 아는 곳이 폼뿐이다.
+   *
+   * ★ **함수 정체성이 매 렌더 바뀌면 안 된다**(`useCallback`). `load` 의 의존성이라
+   *   그대로 두면 목록 불러오기가 무한히 돈다.
+   */
+  onAttached: (purposes: FilePurpose[]) => void;
+  /**
+   * 확정을 막은 이유. `null` 이면 아무것도 그리지 않는다.
+   *
+   * ★ 문구를 여기서 만들지 않는다 — 판정도 문구도 `missingDocsMessage` 한 곳이고,
+   *   서버가 같은 함수로 같은 말을 한다.
+   */
+  alert: string | null;
 }
 
-export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify }: Props) {
+/** [계약확정] 이 막혔을 때 폼이 이 섹션으로 화면을 옮긴다 — 눈이 가야 고칠 수 있다. */
+export const SECTION_DOCS_ID = 'contract-section-docs';
+
+export function SectionDocs({
+  companyId,
+  memberType,
+  disabled: frozen,
+  onNotify,
+  onBizReg,
+  pending,
+  onPending,
+  onAttached,
+  alert,
+}: Props) {
   const [files, setFiles] = useState<CompanyFile[]>([]);
   const [loading, setLoading] = useState(false);
   /** 지금 무엇을 처리 중인가. 같은 카드의 버튼만 죽인다 — 전체를 잠그면 답답하다. */
@@ -74,6 +124,15 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
   //   「1/3」이 「1/4」로 보이지 않는다.
   const done = shown.filter((d) => byPurpose.has(d.purpose)).length;
 
+  /** 받은 목록을 화면과 폼에 함께 반영한다 — 두 곳이 갈리면 확정 게이트가 헛돈다. */
+  const take = useCallback(
+    (list: CompanyFile[]) => {
+      setFiles(list);
+      onAttached(list.map((f) => f.purpose).filter(isFilePurpose));
+    },
+    [onAttached],
+  );
+
   const load = useCallback(async () => {
     if (!companyId) return;
     setLoading(true);
@@ -81,22 +140,27 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
       const res = await fetch(`/api/companies/${companyId}/files`, { cache: 'no-store' });
       const body = (await res.json()) as { files?: CompanyFile[]; message?: string };
       if (!res.ok) throw new Error(body.message ?? '첨부 서류를 불러오지 못했습니다');
-      setFiles(body.files ?? []);
+      take(body.files ?? []);
     } catch (err) {
       onNotify((err as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [companyId, onNotify]);
+  }, [companyId, onNotify, take]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  /** 고른 파일을 올린다. **화면에서 먼저 거른다** — 서버도 같은 함수로 다시 거른다. */
+  /**
+   * 고른 파일을 처리한다. **화면에서 먼저 거른다** — 서버도 같은 함수로 다시 거른다.
+   *
+   * ★ 회사가 **없으면** 올리지 못한다(첨부는 회사에 붙는다). 그래도 여기서 멈추지
+   *   않는다 — 사업자등록증이면 **판독은 지금 한다.** 판독이 가장 쓸모 있는 순간이
+   *   섹션 1 이 통째로 비어 있는 그때이기 때문이다. 파일은 폼이 붙들었다가
+   *   첫 저장 직후에 첨부로 올린다.
+   */
   const upload = async (purpose: FilePurpose, file: File) => {
-    if (!companyId) return;
-
     const reason = rejectUpload({
       purpose,
       mimeType: file.type,
@@ -105,6 +169,36 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
     });
     if (reason) {
       onNotify(reason);
+      return;
+    }
+
+    if (!companyId) {
+      onPending(purpose, file);
+      if (purpose !== 'BIZ_REG') {
+        onNotify('저장할 때 함께 첨부됩니다');
+        return;
+      }
+      setBusy(purpose);
+      try {
+        const res = await fetch('/api/contracts/ocr-biz-reg', {
+          method: 'POST',
+          headers: { 'content-type': file.type },
+          body: file,
+        });
+        const body = (await res.json()) as { bizReg?: BizRegFields | null; message?: string };
+        if (!res.ok) throw new Error(body.message ?? '사업자등록증을 읽지 못했습니다');
+        const applied = body.bizReg ? onBizReg(body.bizReg) : 0;
+        onNotify(
+          applied > 0
+            ? `${applied}개 항목을 불러왔습니다. 확인해 주세요 · 저장할 때 함께 첨부됩니다`
+            : '읽어 낸 항목이 없습니다. 저장할 때 함께 첨부됩니다',
+        );
+      } catch (err) {
+        // ★ 판독이 실패해도 **붙들어 둔 파일은 그대로다.** 저장하면 첨부는 된다.
+        onNotify(`${(err as Error).message} · 저장할 때 첨부는 됩니다`);
+      } finally {
+        setBusy(null);
+      }
       return;
     }
 
@@ -119,9 +213,26 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
         },
         body: file,
       });
-      const body = (await res.json()) as { replaced?: boolean; message?: string };
+      const body = (await res.json()) as {
+        replaced?: boolean;
+        message?: string;
+        /** 사업자등록증일 때만 온다. 판독이 안 됐으면 `null`. */
+        bizReg?: BizRegFields | null;
+      };
+
+      /*
+       * ★★ **판독 결과를 먼저 얹는다 — 첨부가 실패했더라도.**
+       *    둘은 한 번의 업로드로 같이 돌지만 서로의 실패에 끌려가지 않는다.
+       *    첨부가 실패했는데 판독은 끝난 경우, 그 값을 버리면 운영자가 같은 파일을
+       *    다시 올려 같은 판독을 또 시켜야 한다(`routes/files.ts` 와 같은 판단).
+       */
+      const applied = body.bizReg ? onBizReg(body.bizReg) : 0;
+
       if (!res.ok) throw new Error(body.message ?? '파일을 올리지 못했습니다');
-      onNotify(body.replaced ? '기존 파일을 교체했습니다' : '첨부했습니다');
+
+      // 한 번의 동작이니 문구도 한 줄이다 — 토스트 두 개가 겹쳐 뜨면 뒤엣것만 읽힌다.
+      const attached = body.replaced ? '기존 파일을 교체했습니다' : '첨부했습니다';
+      onNotify(applied > 0 ? `${attached} · ${applied}개 항목을 불러왔습니다. 확인해 주세요` : attached);
       await load();
     } catch (err) {
       onNotify((err as Error).message);
@@ -160,7 +271,7 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
       const res = await fetch(`/api/companies/${companyId}/files`, { cache: 'no-store' });
       const body = (await res.json()) as { files?: CompanyFile[]; message?: string };
       if (!res.ok) throw new Error(body.message ?? '첨부 서류를 불러오지 못했습니다');
-      setFiles(body.files ?? []);
+      take(body.files ?? []);
       const fresh = (body.files ?? []).find((f) => f.purpose === purpose);
       if (!fresh?.url) throw new Error('파일 주소를 받지 못했습니다. 잠시 후 다시 시도해 주세요');
       window.open(fresh.url, '_blank', 'noopener,noreferrer');
@@ -171,10 +282,15 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
     }
   };
 
-  const bizMissing = docRuleFor('BIZ_REG', memberType).required && !byPurpose.has('BIZ_REG');
+  /**
+   * ★ 붙들고 있는 파일도 「있는 것」으로 센다. 고르자마자 「사업자등록증이 필요합니다」가
+   *   그대로 떠 있으면, 방금 고른 것이 무시된 것처럼 읽힌다.
+   */
+  const bizMissing =
+    docRuleFor('BIZ_REG', memberType).required && !byPurpose.has('BIZ_REG') && !pending.BIZ_REG;
 
   return (
-    <section className={styles.section}>
+    <section className={styles.section} id={SECTION_DOCS_ID}>
       <div className={styles.sectionHeader}>
         <div className={styles.titleWithBadge}>
           <h2>첨부 서류</h2>
@@ -186,9 +302,15 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
       <div className={styles.sectionRule} />
 
       {!companyId ? (
-        // ★ 버튼만 죽이지 않는다. 왜 못 올리는지와 무엇을 하면 되는지를 말한다.
+        /*
+         * ★ 버튼을 죽이지 않는다. 첨부는 입주사에 붙으므로 **지금 올릴 수는 없지만**,
+         *   파일을 고르는 것까지 막으면 사업자등록증으로 섹션 1 을 채울 수가 없다 —
+         *   판독이 가장 쓸모 있는 순간이 바로 이 빈 화면이다.
+         *   고른 파일은 폼이 붙들었다가 첫 저장 직후에 올린다.
+         */
         <p className={styles.sectionNote}>
-          첨부 서류는 입주사에 붙습니다. 먼저 [임시저장] 으로 입주사를 등록한 뒤 올려 주세요.
+          아직 입주사가 없어 지금은 저장되지 않습니다. 고른 파일은 [임시저장] 할 때 함께 첨부됩니다.
+          사업자등록증은 고르는 즉시 읽어 회사 기본정보를 채웁니다.
         </p>
       ) : null}
 
@@ -196,8 +318,10 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
         {shown.map((def) => {
           const rule = docRuleFor(def.purpose, memberType);
           const file = byPurpose.get(def.purpose);
+          /** 아직 회사가 없어 붙들고 있는 파일. 저장할 때 올라간다. */
+          const waiting = pending[def.purpose];
           const working = busy === def.purpose;
-          const locked = frozen || !companyId || working;
+          const locked = frozen || working;
 
           return (
             <div className={styles.docCard} key={def.purpose}>
@@ -215,9 +339,17 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
                       등록됨
                     </span>
                   ) : null}
+                  {/* ★ 「등록됨」과 다른 말이다. 아직 저장된 것이 아니다. */}
+                  {!file && waiting ? (
+                    <span className={`${styles.badge} ${styles.badgeNeutral}`}>저장 시 첨부됨</span>
+                  ) : null}
                 </div>
                 <div className={styles.docDesc}>
-                  {file ? `${file.originalName} · ${sizeLabel(file.fileSize)}` : def.desc}
+                  {file
+                    ? `${file.originalName} · ${sizeLabel(file.fileSize)}`
+                    : waiting
+                      ? `${waiting.name} · ${sizeLabel(waiting.size)}`
+                      : def.desc}
                 </div>
               </div>
 
@@ -248,6 +380,19 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
                   </>
                 ) : null}
 
+                {/* 붙들고 있는 파일은 저장 전이라 「삭제」가 아니라 「취소」다 — 지울 것이 아직 없다. */}
+                {!file && waiting && !frozen ? (
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnGhost}`}
+                    disabled={working}
+                    onClick={() => onPending(def.purpose, null)}
+                  >
+                    <Icon name="x" size={16} />
+                    취소
+                  </button>
+                ) : null}
+
                 {!frozen ? (
                   <>
                     <input
@@ -272,7 +417,7 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
                       onClick={() => inputs.current[def.purpose]?.click()}
                     >
                       <Icon name="upload" size={16} />
-                      {working ? '처리 중…' : file ? '교체' : '파일 선택'}
+                      {working ? '처리 중…' : file || waiting ? '교체' : '파일 선택'}
                     </button>
                   </>
                 ) : null}
@@ -287,6 +432,26 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
         {loading ? ' · 불러오는 중…' : ''}
       </div>
 
+      {/*
+        ★ 확정이 막힌 이유. 폼이 [계약확정] 에서 막고 이 섹션으로 화면을 옮긴다 —
+          머리말의 빨간 줄만으로는 **어디를 고쳐야 하는지**가 보이지 않는다.
+      */}
+      {alert ? (
+        <div className={`${styles.notice} ${styles.noticeDanger}`} role="alert">
+          <span className={styles.noticeIcon}>
+            <Icon name="circle-alert" size={16} />
+          </span>
+          <span>{alert}</span>
+        </div>
+      ) : null}
+
+      {/*
+        ★ 가등록 안내는 그대로 둔다 — **임시저장까지는 맞는 말이다.** 사업자등록
+          신청 중인 회사는 계약대기로 두고 나중에 등록증을 받는다.
+        ★ 다만 「확정에는 필요하다」를 덧붙였다. 이 문구만 읽으면 «없어도 계약이
+          끝까지 간다»로 읽히는데, 이제 확정에서 실제로 막힌다 — 안내와 동작이
+          어긋나면 안내를 믿지 않게 된다.
+      */}
       {bizMissing ? (
         <div className={`${styles.notice} ${styles.noticeWarning}`}>
           <span className={styles.noticeIcon}>
@@ -294,6 +459,7 @@ export function SectionDocs({ companyId, memberType, disabled: frozen, onNotify 
           </span>
           <span>
             사업자등록증이 없으면 가등록 상태로 계약이 진행됩니다. 발급 후 반드시 제출해 주세요.
+            <strong> 계약 확정에는 필요합니다 — 그때까지는 [임시저장] 으로 둡니다.</strong>
           </span>
         </div>
       ) : null}

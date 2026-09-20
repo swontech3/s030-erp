@@ -169,6 +169,128 @@ export interface CompanyPatch {
   memo: string | null;
 }
 
+/**
+ * 입주사를 새로 만든다 — 계약 폼을 `companyId` 없이 열었을 때의 첫 저장이다.
+ *
+ * =============================================================================
+ * ★★ 삐용에는 아직 만들지 않는다
+ * =============================================================================
+ * 여기서 만드는 것은 **ERP 테이블 한 행**뿐이다. 삐용 조직 등록과 단체코드 발급은
+ * 3-2 에서 이 저장 경로에 얹는다(ROADMAP 페이즈 4 작업 15). 그래서
+ * `link_s020_org_id` 는 비워 둔다 — 연결되지 않은 입주사라는 뜻이고, 스코프 해석은
+ * 그 상태를 이미 알고 있다(`ORG_ARCHITECTURE.md` §1-2 「연결이 없으면 빈 스코프」).
+ *
+ * ★ `company_name` 이 `NOT NULL` 이라 **빈 이름은 빈 문자열로 넣는다.** 막지 않는
+ *   이유는 `updateCompany` 와 같다 — 사업자등록 신청 중인 가계약은 회사명 없이
+ *   임시저장으로 들어오고, 400 으로 막으면 같은 요청의 대표자·연락처까지 날아간다.
+ *
+ * ★ `status` 는 컬럼 기본값(`'R'`)에 맡긴다. 입주사의 표시 상태는 이 컬럼이 아니라
+ *   **계약에서 파생된다**(`domain/tenant-status` 의 `deriveTenantStatus`). 여기서
+ *   아무 값이나 정해 넣으면 두 벌이 된다.
+ *
+ * ★ `updated_at` 을 명시한다 — 이 레거시 테이블은 NOT NULL 인데 DEFAULT 가 없다
+ *   (파일 머리말).
+ */
+export async function insertCompany(
+  client: ScopedClient,
+  args: { companyId: string; buildId: string; patch: CompanyPatch; actor: string },
+): Promise<void> {
+  const { companyId, buildId, patch, actor } = args;
+  await q(
+    client,
+    `INSERT INTO public.tb_s080_companies
+       (company_id, build_id, company_name, biz_number, corp_number, ceo_name,
+        business_type, business_item, member_type, tel, email,
+        ceo_zip_code, ceo_address, ceo_address_detail, memo,
+        created_at, updated_at, created_by, updated_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now(), now(), $16, $16)`,
+    [
+      companyId, buildId, patch.companyName ?? '', patch.bizNumber, patch.corpNumber, patch.ceoName,
+      patch.businessType, patch.businessItem, patch.memberType, patch.tel, patch.email,
+      patch.ceoZipCode, patch.ceoAddress, patch.ceoAddressDetail, patch.memo, actor,
+    ],
+  );
+}
+
+/**
+ * 같은 사업자번호의 입주사 — 계약 폼 섹션 1 의 [확인] 이 쓴다.
+ *
+ * ★ **숫자만 비교한다.** 저장된 값은 `000-00-00000` 인데 들어오는 값이 하이픈 없는
+ *   10자리일 수 있다. 문자열 그대로 비교하면 같은 회사를 못 찾고 **중복이 없다고
+ *   답한다** — `biz_number` 가 UNIQUE 라 저장 단계에서 409 로 터진다.
+ *
+ * ★ 상태 판정에 필요한 계약까지 같이 읽는다. 「종료」인 입주사는 중복이 아니라
+ *   재입주라서, 계약을 봐야 그것을 가를 수 있다(`deriveTenantStatus`).
+ */
+export interface CompanyByBizNumber {
+  company_id: string;
+  company_name: string;
+  contracts: { status: string; end_date: Date }[];
+}
+
+export async function findCompanyByBizNumber(
+  client: ScopedClient,
+  digits: string,
+): Promise<CompanyByBizNumber | null> {
+  const { rows } = await q<{ company_id: string; company_name: string }>(
+    client,
+    `SELECT company_id, company_name
+       FROM public.tb_s080_companies
+      WHERE regexp_replace(COALESCE(biz_number, ''), '\\D', '', 'g') = $1
+      LIMIT 1`,
+    [digits],
+  );
+  const company = rows[0];
+  if (!company) return null;
+
+  const { rows: contracts } = await q<{ status: string; end_date: Date }>(
+    client,
+    `SELECT status, end_date FROM public.tb_s080_contracts WHERE company_id = $1`,
+    [company.company_id],
+  );
+  return { ...company, contracts };
+}
+
+/**
+ * 같은 **회사명**의 입주사 — [확인] 이 귀띔용으로 쓴다.
+ *
+ * ★★ 이것은 **막는 판정이 아니다.** 같은 상호는 법적으로 가능하고, 사업자번호가
+ *    다르면 다른 회사다. 그래서 상태(`종료` 포함)를 가리지 않고 그냥 찾는다 —
+ *    사업자번호 쪽과 규칙이 다른 자리라 헷갈리기 쉽다.
+ *
+ * ★ 앞뒤 공백과 대소문자를 무시한다. 「에스원3DP」와 「에스원3dp 」를 다른 회사로
+ *   보면 귀띔의 쓸모가 없다. 가운데 공백은 건드리지 않는다 — 「우리 은행」과
+ *   「우리은행」은 실제로 다른 상호일 수 있다.
+ *
+ * @param excludeCompanyId 지금 편집 중인 회사. 자기 이름을 자기에게 알려 주지 않는다.
+ */
+export async function findCompanyByName(
+  client: ScopedClient,
+  name: string,
+  excludeCompanyId: string | null,
+): Promise<{ company_id: string; company_name: string } | null> {
+  const { rows } = await q<{ company_id: string; company_name: string }>(
+    client,
+    `SELECT company_id, company_name
+       FROM public.tb_s080_companies
+      WHERE lower(btrim(company_name)) = lower(btrim($1))
+        AND ($2::text IS NULL OR company_id <> $2)
+      LIMIT 1`,
+    [name, excludeCompanyId],
+  );
+  return rows[0] ?? null;
+}
+
+/** 건물이 실재하는지. `build_id` 는 NOT NULL 이고 FK 가 없어서 오타가 조용히 들어간다. */
+export async function buildExists(client: ScopedClient, buildId: string): Promise<boolean> {
+  const { rows } = await q<{ one: number }>(
+    client,
+    `SELECT 1 AS one FROM public.tb_s080_buildings WHERE build_id = $1`,
+    [buildId],
+  );
+  return rows.length > 0;
+}
+
 export async function updateCompany(
   client: ScopedClient,
   args: { companyId: string; patch: CompanyPatch; actor: string },

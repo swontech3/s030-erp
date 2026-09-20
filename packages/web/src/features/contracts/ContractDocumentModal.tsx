@@ -361,7 +361,18 @@ function UsageDocument(props: {
           S<span className={styles.brandDot}>·</span>won<span className={styles.brandBiz}>Biz</span>
         </span>
       </div>
-      <h3 data-doc-title="1" className={styles.docTitle}>이 용 계 약 서</h3>
+      {/*
+        ★★ 「(비 제출용)」 — **이용계약서에만** 붙는다. 세무서에 내는 것은 전대차계약서이고
+           (`SubleaseDocument`), 이용계약서는 우리와 입주사 사이의 문서다. 둘이 비슷하게
+           생겨서 창구에서 잘못 내는 일을 제목에서 막는다.
+        ★ 별도 `<span>` 으로 둔 이유 — 제목 본문과 **같은 크기로 이으면 한 줄을 넘는다**
+          (40px · 자간 0.15em 에서 폭이 714px 를 넘긴다). 작은 글자로 이어 붙이면 줄 높이가
+          그대로라 **문서 길이가 1px 도 늘지 않는다** — 이용계약서는 이미 0.94장이다.
+      */}
+      <h3 data-doc-title="1" className={styles.docTitle}>
+        이 용 계 약 서
+        <span data-doc-title-note="1" className={styles.docTitleNote}>(비 제출용)</span>
+      </h3>
 
       <SectionTitle first>계약 정보</SectionTitle>
       <div className={styles.table} data-doc-table="1">

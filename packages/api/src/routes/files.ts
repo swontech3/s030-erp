@@ -46,8 +46,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import {
-  ALLOWED_MIME_TYPES,
-  MAX_FILE_BYTES,
   rejectUpload,
   storagePathFor,
   type FilePurpose,
@@ -64,6 +62,8 @@ import {
   type FileRow,
 } from '../db/files.ts';
 import { putObject, removeObject, signedUrl, StorageError } from '../lib/storage.ts';
+import { scanBizReg } from '../lib/bizRegScan.ts';
+import type { BizRegFields } from '@swonbiz/shared/domain/biz-reg-ocr';
 
 /** 입주사 라우트와 같은 값이다. 첨부는 입주사 업무가 아니다. */
 const OPERATOR = 'operator';
@@ -108,20 +108,8 @@ function toFile(row: FileRow, url: string | null) {
 }
 
 export function registerFileRoutes(app: FastifyInstance): void {
-  /**
-   * ★ 바이트를 그대로 받는다. multipart 를 쓰지 않는다 —
-   *   파일 한 개에 메타데이터가 둘뿐이라(종류·원본이름) 경계 파싱을 들일 이유가 없고,
-   *   플러그인이 늘면 그만큼 «어디서 크기를 막는가»가 흩어진다.
-   *   종류는 쿼리스트링, 원본 이름은 헤더로 온다.
-   *
-   * ★ `bodyLimit` 이 **마지막 방어선이 아니라 첫 번째**다. 이게 없으면 10MB 검사를
-   *   하기도 전에 서버가 임의 크기를 메모리에 올린다.
-   */
-  app.addContentTypeParser(
-    [...ALLOWED_MIME_TYPES],
-    { parseAs: 'buffer', bodyLimit: MAX_FILE_BYTES },
-    (_req, body, done) => done(null, body),
-  );
+  // ★ 바이트 본문의 content-type 파서는 `index.ts` 에서 한 번만 등록한다 —
+  //   Fastify 는 같은 타입을 두 번 등록하면 던지고, 첨부와 OCR 이 같은 파서를 쓴다.
 
   // ── 목록 ────────────────────────────────────────────────────────────────
   app.get<{ Params: { id: string } }>('/companies/:id/files', async (req, reply) => {
@@ -209,12 +197,34 @@ export function registerFileRoutes(app: FastifyInstance): void {
         mimeType,
       });
 
+      /* ══════════════════════════════════════════════════════════════════
+         ★★ 사업자등록증이면 **같은 바이트로 판독까지** 한다
+         ══════════════════════════════════════════════════════════════════
+         예전에는 화면이 파일을 두 번 보냈다 — 첨부로 한 번, 판독으로 한 번.
+         10MB 짜리를 두 번 올리는 것도 문제지만, 더 나쁜 것은 **두 번이 다른
+         파일일 수 있다는 것**이다. 사람이 첨부와 판독 사이에 다른 파일을 고르면
+         섹션 1 은 A 를 읽고 첨부는 B 가 남는다. 한 번 받아 둘 다 쓰면 그 틈이 없다.
+
+         ★ 판독은 `BIZ_REG` 에서만 돈다. 신분증·등기부등본·기존계약서는 읽지 않는다 —
+           사업자등록증 양식을 전제한 파서라 다른 서류에서는 엉뚱한 값이 나오고,
+           무엇보다 **신분증을 외부 API 에 보낼 이유가 없다.**
+
+         ★ 스토리지 쓰기와 **동시에** 돈다. 줄 세우면 Vision 왕복(1~3초)만큼 첨부가
+           늦어지는데, 둘은 서로의 결과를 쓰지 않는다.
+
+         ★ `scanBizReg` 는 던지지 않는다(그쪽 파일 머리말). 그래서 판독 실패가
+           업로드 실패가 되는 길이 없다. */
+      const scanning: Promise<BizRegFields | null> =
+        purpose === 'BIZ_REG' ? scanBizReg(body, mimeType, req.log) : Promise.resolve(null);
+
       // ── ① 스토리지 먼저 ───────────────────────────────────────────────
       try {
         await putObject({ path: storagePath, body, contentType: mimeType });
       } catch (err) {
         req.log.error({ err, storagePath }, '스토리지 업로드 실패 — DB 는 건드리지 않았다');
-        return storageFailed(reply, err);
+        // ★ 첨부가 실패해도 **이미 읽은 값은 돌려준다.** 판독은 끝났고, 그 결과를
+        //   버리면 운영자가 같은 파일을 다시 올려 같은 판독을 또 시켜야 한다.
+        return storageFailed(reply, err, await scanning);
       }
 
       // ── ② DB. 실패하면 ①을 되돌린다 ──────────────────────────────────
@@ -243,7 +253,14 @@ export function registerFileRoutes(app: FastifyInstance): void {
             '★ 되돌리기 실패 — 고아 파일이 남았다. 기록은 없다(의도한 방향)',
           );
         });
-        throw err;
+        // ★ 던지지 않고 여기서 답한다 — 전역 핸들러로 보내면 본문이 통째로 갈리면서
+        //   **이미 끝난 판독 결과까지 사라진다.** 사용자에게 보이는 것(500 + 일반 문구)은
+        //   전역 핸들러와 같게 두고, `bizReg` 만 살린다.
+        return reply.code(500).send({
+          error: 'internal_error',
+          message: '서버 오류가 났습니다',
+          bizReg: await scanning,
+        });
       }
 
       // ── ③ 옛 실물. 여기서 실패해도 **응답은 성공**이다 ────────────────
@@ -282,6 +299,11 @@ export function registerFileRoutes(app: FastifyInstance): void {
         ),
         /** 옛 파일을 바꿔치웠는가 — 화면이 「교체했습니다」라고 말할 수 있게. */
         replaced: previous !== null,
+        /**
+         * ★ 사업자등록증을 읽은 결과. 다른 서류거나 판독이 안 되면 `null` 이고,
+         *   그 뜻은 「섹션 1 을 건드리지 않는다」다. **OCR 원문은 싣지 않는다.**
+         */
+        bizReg: await scanning,
       });
     },
   );
@@ -342,13 +364,23 @@ function readFileName(raw: unknown): string | null {
   return name.slice(0, 200);
 }
 
-/** 스토리지가 거절한 것을 사용자 문구로. 내부 주소·토큰은 내보내지 않는다. */
-function storageFailed(reply: FastifyReply, err: unknown): FastifyReply {
+/**
+ * 스토리지가 거절한 것을 사용자 문구로. 내부 주소·토큰은 내보내지 않는다.
+ *
+ * ★ `bizReg` 를 실어 보낸다. 첨부는 실패했어도 판독은 끝났을 수 있고, 그 값은
+ *   섹션 1 을 채우는 데 쓸 수 있다 — 둘은 서로의 실패에 끌려가지 않는다.
+ */
+function storageFailed(
+  reply: FastifyReply,
+  err: unknown,
+  bizReg: BizRegFields | null,
+): FastifyReply {
   if (err instanceof StorageError && err.status === 413) {
-    return reply.code(400).send({ error: 'invalid_request', message: '파일이 너무 큽니다' });
+    return reply.code(400).send({ error: 'invalid_request', message: '파일이 너무 큽니다', bizReg });
   }
   return reply.code(502).send({
     error: 'storage_unavailable',
     message: '파일 저장소에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요',
+    bizReg,
   });
 }

@@ -21,14 +21,24 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { deriveTenantStatus } from '@swonbiz/shared/domain/tenant-status';
 import { buildMemberWrites, type MemberInput } from '@swonbiz/shared/domain/member-payload';
+import {
+  duplicateVerdictOf,
+  isBizNumberFormatOk,
+  NO_NAME_DUPLICATE,
+} from '@swonbiz/shared/domain/biz-number-check';
 import { requireSession } from '../session/hook.ts';
 import { withCompanyScope, type CompanyScope } from '../db/withCompanyScope.ts';
+import { lookupNtsStatus } from '../lib/ntsStatus.ts';
 import {
+  buildExists,
   findCompany,
+  findCompanyByBizNumber,
+  findCompanyByName,
   listCompanies,
   listCompanyContracts,
   listContractFacts,
   listMembers,
+  insertCompany,
   listRoomSummaries,
   replaceMembers,
   updateCompany,
@@ -109,6 +119,14 @@ interface CompanyBody {
   ceoAddressDetail?: string | null;
   memo?: string | null;
 }
+
+/**
+ * Postgres 의 UNIQUE 위반(`23505`)인가.
+ *
+ * ★ 문구가 아니라 **코드**로 본다. 메시지는 서버 로캘·버전에 따라 바뀐다.
+ */
+const isUniqueViolation = (err: unknown): boolean =>
+  typeof err === 'object' && err !== null && (err as { code?: unknown }).code === '23505';
 
 const text = (v: unknown): string | null => {
   if (typeof v !== 'string') return null;
@@ -200,6 +218,158 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
         spaceCount: k.space_count,
       })),
     });
+  });
+
+  // ── 사업자번호 확인 (계약 폼 섹션 1 의 [확인]) ──────────────────────────
+  /**
+   * 국세청 상태와 ERP 중복을 **한 번에** 본다. 버튼이 하나라 호출도 하나다.
+   *
+   * ★★ **아무것도 저장하지 않고, 아무것도 막지 않는다.** 폐업자와도 계약할 수 있고
+   *    그 판단은 운영자가 한다. 이 라우트는 계약 저장 경로에 있지 않다 — 여기가
+   *    죽어도 계약 등록은 그대로 된다.
+   *
+   * ★ 형식이 틀리면 국세청을 **부르지 않는다.** 남의 API 를 쓰레기로 두드리지 않는다.
+   *
+   * ★ 둘을 **동시에** 본다. 국세청 왕복(최대 5초)에 DB 조회를 줄 세울 이유가 없다.
+   */
+  app.get<{ Querystring: { bizNumber?: string; companyName?: string; selfCompanyId?: string } }>(
+    '/companies/biz-check',
+    async (req, reply) => {
+      const session = requireSession(req);
+      if (session.role !== OPERATOR) return forbidden(reply);
+
+      const digits = (req.query?.bizNumber ?? '').replace(/\D/g, '');
+      if (!isBizNumberFormatOk(digits)) {
+        return reply
+          .code(400)
+          .send({ error: 'invalid_request', message: '사업자등록번호 10자리를 입력해 주세요' });
+      }
+
+      const self = text(req.query?.selfCompanyId);
+      const name = text(req.query?.companyName);
+
+      const [nts, found, sameName] = await Promise.all([
+        lookupNtsStatus(digits, req.log),
+        withCompanyScope(scopeOf(session), (client) => findCompanyByBizNumber(client, digits)),
+        // 회사명을 안 보냈으면 찾지 않는다 — 빈 이름끼리 걸리면 전부 중복이 된다.
+        name
+          ? withCompanyScope(scopeOf(session), (client) => findCompanyByName(client, name, self))
+          : Promise.resolve(null),
+      ]);
+
+      // 상태 판정은 목록 화면과 **같은 함수**를 쓴다 — 두 벌이면 「종료」의 뜻이 갈린다.
+      const status = found
+        ? deriveTenantStatus({
+            contracts: found.contracts.map((c) => ({ status: c.status, endDate: c.end_date })),
+            today: new Date(),
+          })
+        : null;
+      const existing =
+        found && status
+          ? {
+              companyId: found.company_id,
+              companyName: found.company_name,
+              filters: status.filters,
+              statusLabel: status.label,
+            }
+          : null;
+
+      const duplicate = duplicateVerdictOf(existing, self);
+
+      /**
+       * ★ 회사명 중복은 **알려만 준다.** 같은 상호는 법적으로 가능하고, 사업자번호가
+       *   다르면 다른 회사다. 상태를 가리지 않는다 — 종료된 입주사와 겹치는 것도
+       *   사람이 알아봐야 할 정보다.
+       *
+       * ★ 화면은 사업자번호가 이미 걸렸으면 이 값을 말하지 않는다(`bizCheckLine`).
+       *   같은 번호면 같은 회사라 한 회사를 두 번 가리키게 되기 때문이다. 여기서
+       *   미리 지우지 않는 이유는, **무엇을 보여줄지는 문장을 만드는 쪽의 판단**이고
+       *   서버가 그것까지 정하면 화면이 다른 조합을 만들 수 없게 되기 때문이다.
+       */
+      const nameDuplicate = sameName
+        ? { found: true, companyId: sameName.company_id, companyName: sameName.company_name }
+        : NO_NAME_DUPLICATE;
+
+      // ★ `no-store` — 국세청 상태는 **조회한 그 순간의 사실**이다. 캐시에 남으면
+      //   어제의 사실이 오늘의 화면에 뜬다.
+      return reply.header('cache-control', 'no-store').send({ nts, duplicate, nameDuplicate });
+    },
+  );
+
+  // ── 등록 (계약 폼을 companyId 없이 열었을 때) ───────────────────────────
+  /**
+   * 새 입주사를 만든다. `[신규 입주사 등록]` → `/contracts/new` 의 첫 저장이 여기다.
+   *
+   * ★★ **삐용 호출은 없다.** ERP 테이블 한 행만 만든다. 삐용 조직 등록·단체코드 발급은
+   *    3-2 에서 이 자리에 얹는다(ROADMAP 페이즈 4 작업 15). 지금 반쪽만 붙여 두면
+   *    「ERP 에는 있는데 삐용에는 없는 회사」가 생기고, 그 상태를 되돌릴 화면이 없다.
+   *
+   * ★ 회사명이 비어도 막지 않는다 — `PATCH` 와 같은 이유다(아래 주석).
+   *
+   * ★ `buildId` 는 막는다. `NOT NULL` 인데 FK 가 없어서 틀린 값이 조용히 들어가고,
+   *   그 회사의 구성원·계약이 전부 그 값을 물려받는다(`replaceMembers`).
+   */
+  app.post<{ Body: CompanyBody & { buildId?: string } }>('/companies', async (req, reply) => {
+    const session = requireSession(req);
+    if (session.role !== OPERATOR) return forbidden(reply);
+
+    const buildId = text(req.body?.buildId);
+    if (!buildId) {
+      return reply.code(400).send({ error: 'invalid_request', message: '건물을 지정해야 합니다' });
+    }
+
+    const companyId = randomUUID();
+    const actor = String(session.s020MemberId);
+
+    /**
+     * ★ UNIQUE 위반을 **트랜잭션 밖에서** 받는다. 안에서 삼키면 `withCompanyScope` 가
+     *   COMMIT 을 부르는데, 그 시점의 트랜잭션은 이미 abort 상태다. Postgres 가
+     *   조용히 롤백해 주긴 하지만 「성공 경로로 COMMIT 을 부르는 실패」는 읽는 사람을
+     *   속인다. 던져서 `withCompanyScope` 의 ROLLBACK 을 그대로 태운다.
+     */
+    let result: 'ok' | 'no_build';
+    try {
+      result = await withCompanyScope(scopeOf(session), async (client) => {
+        if (!(await buildExists(client, buildId))) return 'no_build' as const;
+        await insertCompany(client, {
+          companyId,
+          buildId,
+          actor,
+          patch: {
+            companyName: text(req.body?.companyName),
+            bizNumber: text(req.body?.bizNumber),
+            corpNumber: text(req.body?.corpNumber),
+            ceoName: text(req.body?.ceoName),
+            businessType: text(req.body?.businessType),
+            businessItem: text(req.body?.businessItem),
+            memberType: text(req.body?.memberType),
+            tel: text(req.body?.tel),
+            email: text(req.body?.email),
+            ceoZipCode: text(req.body?.ceoZipCode),
+            ceoAddress: text(req.body?.ceoAddress),
+            ceoAddressDetail: text(req.body?.ceoAddressDetail),
+            memo: text(req.body?.memo),
+          },
+        });
+        return 'ok' as const;
+      });
+    } catch (err) {
+      // ★ `biz_number` 는 UNIQUE 다. 이미 등록된 번호로 신규 등록하면 여기로 온다 —
+      //   운영자가 실제로 하는 일이다(같은 회사를 두 번 등록). 그대로 두면
+      //   「서버 오류가 났습니다」가 뜨고, 운영자는 무엇을 고쳐야 하는지 알 수 없다.
+      if (isUniqueViolation(err)) {
+        return reply.code(409).send({
+          error: 'duplicate',
+          message: '이미 등록된 사업자등록번호입니다. 입주사 목록에서 찾아 주세요',
+        });
+      }
+      throw err;
+    }
+
+    if (result === 'no_build') {
+      return reply.code(400).send({ error: 'invalid_request', message: '없는 건물입니다' });
+    }
+    return reply.code(201).send({ companyId });
   });
 
   // ── 수정 (계약 폼 섹션 1) ───────────────────────────────────────────────

@@ -105,6 +105,68 @@ export async function listContracts(
   return rows;
 }
 
+/**
+ * 계약호실을 쓰고 있는 계약들 — 조회 팝업(`s0300200040p3`)과 저장 검증이 **같은 함수**를 쓴다.
+ *
+ * ★ 「살아 있는 계약」만 본다(`ROOM_LIVE_STATUSES`). 종료·취소된 계약의 번호는
+ *   다시 쓸 수 있다 — 퇴실했으면 그 호실로 다시 신고한다.
+ *
+ * ★ 계약호실이 빈 계약은 뺀다. 아직 안 정한 계약끼리 부딪히면 안 된다.
+ *
+ * ★ **자기 계약도 넣는다.** 팝업 목록에는 보여야 하고(지금 무엇이 어디 있는지가
+ *   판단 재료다), 중복으로 볼지 말지는 `findRoomConflict` 가 `selfContractId` 로 가른다.
+ */
+export async function listRoomHolders(
+  client: ScopedClient,
+  liveStatuses: readonly string[],
+): Promise<{ contract_id: string; company_name: string; contract_room: string }[]> {
+  const { rows } = await q<{ contract_id: string; company_name: string; contract_room: string }>(
+    client,
+    `SELECT k.contract_id, c.company_name, btrim(k.contract_room) AS contract_room
+       FROM public.tb_s080_contracts k
+       JOIN public.tb_s080_companies c ON c.company_id = k.company_id
+      WHERE k.status = ANY($1::text[])
+        AND k.contract_room IS NOT NULL
+        AND btrim(k.contract_room) <> ''`,
+    [[...liveStatuses]],
+  );
+  return rows;
+}
+
+/**
+ * 호실을 붙들고 있는 계약 줄들 — 셀렉트 목록과 저장 검증이 **같은 데이터**를 본다.
+ *
+ * ★ 「살아 있는 계약」만이다(`OCCUPANCY_LIVE_STATUSES`). 종료·취소된 계약이 잡던
+ *   호실은 다시 고를 수 있다.
+ *
+ * ★ **자기 계약도 넣는다.** 뺄지 말지는 `occupancyBySpace` 가 `selfContractId` 로
+ *   가른다 — 여기서 빼면 화면이 「누가 쓰고 있나」를 물을 때마다 SQL 이 달라진다.
+ *
+ * ★ 회사 이름을 함께 준다. 셀렉트가 「Room 1 (에스원3DP)」로 보여주기 때문이다.
+ */
+export async function listSpaceHolders(
+  client: ScopedClient,
+  liveStatuses: readonly string[],
+): Promise<{ space_id: string; contract_id: string; company_id: string; company_name: string }[]> {
+  const { rows } = await q<{
+    space_id: string;
+    contract_id: string;
+    company_id: string;
+    company_name: string;
+  }>(
+    client,
+    `SELECT s.space_id, s.contract_id, k.company_id, c.company_name
+       FROM public.tb_s080_contract_spaces s
+       JOIN public.tb_s080_contracts k ON k.contract_id = s.contract_id
+       JOIN public.tb_s080_companies c ON c.company_id = k.company_id
+      WHERE k.status = ANY($1::text[])
+        AND s.space_id IS NOT NULL
+        AND s.space_id <> ''`,
+    [[...liveStatuses]],
+  );
+  return rows;
+}
+
 export async function insertContract(
   client: ScopedClient,
   args: {

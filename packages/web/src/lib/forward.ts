@@ -159,7 +159,17 @@ export async function forwardUpload(request: Request, path: string): Promise<Nex
     body = { message: '서버 응답을 읽지 못했습니다' };
   }
   if (!res.ok && res.status >= 500) {
-    return NextResponse.json({ message: '서버 오류가 났습니다. 잠시 후 다시 시도해 주세요' }, { status: res.status });
+    /*
+     * 5xx 의 내부 문구는 가린다. ★ 다만 `bizReg` 는 남긴다 —
+     * 이 마스크가 막으려는 것은 **내부 오류 문구**이지 도메인 값이 아니다.
+     * 사업자등록증은 첨부가 실패해도 판독은 끝났을 수 있고, 그 값을 여기서 버리면
+     * 운영자가 같은 파일을 다시 올려 같은 판독을 또 시켜야 한다(`routes/files.ts`).
+     */
+    const bizReg = (body as { bizReg?: unknown } | null)?.bizReg ?? null;
+    return NextResponse.json(
+      { message: '서버 오류가 났습니다. 잠시 후 다시 시도해 주세요', bizReg },
+      { status: res.status },
+    );
   }
   return NextResponse.json((body ?? {}) as Record<string, unknown>, { status: res.status });
 }

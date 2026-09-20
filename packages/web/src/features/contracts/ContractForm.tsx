@@ -30,7 +30,7 @@
  * ★ 잠금을 풀기 전에 **저장하고 새로고침해서 값이 남는지** 먼저 확인한다.
  *   "화면이 정상으로 보이는 것"과 "값이 남는 것"은 다른 문제다.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { editableSections } from '@swonbiz/shared/domain/contract-status';
 import { Icon, type IconName } from '@/components/ds';
@@ -38,9 +38,14 @@ import styles from './contract-form.module.css';
 import { ConfirmDialog, localToday, type ConfirmKind, type ConfirmResult } from './ConfirmDialog';
 import { contractStatusName, contractStatusNamesOf } from './contract-status-name';
 import { ContractDocumentModal } from './ContractDocumentModal';
-import { SectionCompany, isBiznoFormatOk, type BizCheck } from './SectionCompany';
+import { SectionCompany, type BizCheck } from './SectionCompany';
 import { SectionContract } from './SectionContract';
-import { SectionDocs } from './SectionDocs';
+import { RoomPickerModal } from './RoomPickerModal';
+import { bizRegPatch, type BizRegFields } from '@swonbiz/shared/domain/biz-reg-ocr';
+import { isBizNumberFormatOk, type BizCheckResult } from '@swonbiz/shared/domain/biz-number-check';
+import { missingDocsMessage, type FilePurpose } from '@swonbiz/shared/domain/contract-files';
+import type { SpaceHolder } from '@swonbiz/shared/domain/space-occupancy';
+import { SectionDocs, SECTION_DOCS_ID } from './SectionDocs';
 import { SectionUsers } from './SectionUsers';
 import {
   DOMAIN_CUSTOM,
@@ -145,6 +150,14 @@ interface Props {
   members: MemberResponse[];
   spaces: SpaceOption[];
   codes: CodeOption[];
+  /**
+   * 살아 있는 계약(계약중·계약대기)이 붙들고 있는 호실들 — 섹션 2 의 호실 셀렉트가
+   * 이것으로 거른다.
+   *
+   * ★ **자기 계약도 들어 있다.** 뺄지 말지는 `occupancyBySpace` 가 가른다 —
+   *   자기 것으로 세면 열어서 그대로 저장할 때 자기 호실이 목록에서 사라진다.
+   */
+  spaceHolders: SpaceHolder[];
 }
 
 const TITLES: Record<Mode, string> = {
@@ -188,7 +201,7 @@ const ACTION_DEFS: Record<ActionKey, { label: string; cls: string; icon?: IconNa
   save: { label: '저장', cls: styles.btnPrimary ?? '' },
 };
 
-export function ContractForm({ contract, companyId, company, members, spaces, codes }: Props) {
+export function ContractForm({ contract, companyId, company, members, spaces, codes, spaceHolders }: Props) {
   const router = useRouter();
   const status = contract?.status ?? null;
   const mode: Mode = (contract?.status as Mode | undefined) ?? 'create';
@@ -215,10 +228,12 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
   const [items, setItems] = useState<ItemRow[]>(() => seedItems(contract));
   const [users, setUsers] = useState<UserRow[]>(() => seedUsers(members, emailDomains));
   const [invalid, setInvalid] = useState<RequiredKey[]>([]);
-  const [bizCheck, setBizCheck] = useState<BizCheck>('none');
+  const [bizCheck, setBizCheck] = useState<BizCheck>({ kind: 'idle' });
   const [confirmKind, setConfirmKind] = useState<ConfirmKind | null>(null);
   /** 계약서 2종 미리보기(s0300200040p1). 확정 이후에만 열린다. */
   const [docsOpen, setDocsOpen] = useState(false);
+  /** 계약호실 확인 팝업(s0300200040p3). 계약호실은 이 팝업으로만 넣는다. */
+  const [roomPickerOpen, setRoomPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -245,13 +260,150 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
     [],
   );
 
-  const notify = (message: string) => {
+  /**
+   * ★ `useCallback` 이 필요하다. 이 함수가 섹션 4 의 `load` 의존성이라, 매 렌더 새로
+   *   만들어지면 **첨부 목록을 무한히 다시 불러온다**(불러오기 → 상태 갱신 → 재렌더 →
+   *   새 `notify` → 다시 불러오기). 섹션 4 에 첨부 목록을 물어보게 되면서 드러난 자리다.
+   */
+  const notify = useCallback((message: string) => {
     setToast(message);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2800);
-  };
+  }, []);
 
   const missing = missingRequired(companyState, terms);
+
+  /* ── 사업자등록증 판독 결과를 섹션 1 에 얹는다 ───────────────────────────
+     섹션 4 에서 사업자등록증을 올리면 그 업로드가 첨부와 판독을 같이 하고,
+     읽어 낸 값이 여기로 온다(`SectionDocs.onBizReg`).
+
+     ★ 이 함수가 섹션 1 에 있지 않고 폼에 있는 이유 — 섹션 1 의 상태(`companyState`)와
+       사업자번호 확인 상태(`bizCheck`)를 둘 다 아는 곳이 여기뿐이다.
+
+     ★ **non-null 만 덮는다**(`bizRegPatch`). 못 읽은 칸을 빈 값으로 덮으면 사람이
+       이미 적어 둔 값이 지워진다. 판독은 도우미지 정본이 아니다.
+
+     ★★ **사업자번호를 덮었으면 확인 상태를 되돌린다.** 되돌리지 않으면 앞 번호로
+        받은 판정이 새 번호에 그대로 남아, 아무도 확인한 적 없는 번호가 확인된
+        것으로 보인다. `'none'` 이 이 화면의 「아직 확인 안 함」이다.
+
+     돌려주는 값은 **덮은 칸 수**다 — 섹션 4 가 「n개 항목을 불러왔습니다」를 말한다. */
+  /* ── 아직 입주사가 없을 때 고른 첨부 파일 ────────────────────────────────
+     첨부는 **회사에 붙는다**. 그래서 신규 폼에서는 지금 올릴 수 없다. 그렇다고
+     파일 고르기까지 막으면 사업자등록증으로 섹션 1 을 채울 수가 없다 —
+     판독이 가장 쓸모 있는 순간이 그 빈 화면이다.
+
+     ★ **이 상태가 섹션 4 가 아니라 여기 있는 이유** — 첫 저장 뒤 폼은
+       `/contracts/{id}` 로 이동하고 그때 섹션이 통째로 다시 마운트된다. 섹션이
+       들고 있으면 붙들어 둔 파일이 그 순간 사라진다. 그래서 이동 **전에** 올려야
+       하고, 그 시점을 아는 것은 저장 흐름을 가진 이 컴포넌트뿐이다. */
+  const [pendingDocs, setPendingDocs] = useState<Partial<Record<FilePurpose, File>>>({});
+
+  const setPendingDoc = (purpose: FilePurpose, file: File | null) =>
+    setPendingDocs((prev) => {
+      const next = { ...prev };
+      if (file) next[purpose] = file;
+      else delete next[purpose];
+      return next;
+    });
+
+  /* ── 계약확정 게이트 — 필수 서류가 없으면 확정하지 못한다 ────────────────
+     ★★ 판정은 `missingDocsMessage` 한 곳이다. **서버가 같은 함수로 다시 본다**
+        (`routes/contracts.ts`) — 화면만 막으면 API 를 직접 부르는 길이 열려 있고,
+        서류 없이 확정된 계약은 나중에 아무도 알아채지 못한다.
+
+     ★ 임시저장은 이 값을 보지 않는다. 사업자등록 신청 중인 회사는 등록증이 아직
+       없고, 그 상태로 자리를 잡아 두는 것이 계약대기의 쓸모다.
+
+     ★ **붙들고 있는 파일도 「있는 것」으로 센다.** 확정 흐름이 `flushPendingDocs()`
+       로 먼저 올리고 나서 확정하므로, 서버가 볼 때는 이미 붙어 있다. 안 세면
+       방금 고른 파일을 두고 「없습니다」라고 말하게 된다. */
+  const [attachedDocs, setAttachedDocs] = useState<FilePurpose[]>([]);
+  /** [계약확정] 을 눌러 막힌 적이 있는가. 누르기 전에는 빨간 안내를 띄우지 않는다. */
+  const [docsChecked, setDocsChecked] = useState(false);
+
+  const docsMissingText = missingDocsMessage(companyState.memberType, [
+    ...attachedDocs,
+    ...Object.keys(pendingDocs),
+  ]);
+
+  /**
+   * 붙들고 있던 파일을 올린다. **회사가 막 생긴 직후, 이동하기 전에** 부른다.
+   *
+   * ★ 한 장이 실패해도 나머지를 계속 올린다. 그리고 **저장 자체를 실패시키지 않는다** —
+   *   회사와 계약은 이미 저장됐고, 여기서 던지면 화면이 「저장 실패」로 보인다.
+   *   실패한 것은 붙들고 있던 자리에 그대로 남겨 다시 시도할 수 있게 둔다.
+   */
+  async function flushPendingDocs(forCompany: string): Promise<void> {
+    const entries = Object.entries(pendingDocs) as [FilePurpose, File][];
+    if (entries.length === 0) return;
+
+    const failed: FilePurpose[] = [];
+    for (const [purpose, file] of entries) {
+      try {
+        const res = await fetch(`/api/companies/${forCompany}/files?purpose=${purpose}`, {
+          method: 'POST',
+          headers: {
+            'content-type': file.type,
+            // ★ 한글 파일명이 헤더에 그대로 들어가면 규격 위반이라 프록시가 끊는다.
+            'x-file-name': encodeURIComponent(file.name),
+          },
+          body: file,
+        });
+        if (!res.ok) failed.push(purpose);
+      } catch {
+        failed.push(purpose);
+      }
+    }
+    // 올라간 것만 손에서 놓는다.
+    setPendingDocs((prev) => {
+      const next: Partial<Record<FilePurpose, File>> = {};
+      for (const p of failed) if (prev[p]) next[p] = prev[p];
+      return next;
+    });
+    if (failed.length > 0) notify(`첨부 ${failed.length}건을 올리지 못했습니다. 다시 시도해 주세요`);
+  }
+
+  const applyBizReg = (fields: BizRegFields): number => {
+    const { patch, applied, resetBizCheck } = bizRegPatch(
+      fields,
+      memberTypes.map((t) => t.code),
+    );
+    if (applied === 0) return 0;
+    setCompany((prev) => ({ ...prev, ...patch }));
+    if (resetBizCheck) setBizCheck({ kind: 'idle' });
+    return applied;
+  };
+
+  /* ── 사업자번호 확인 ─────────────────────────────────────────────────────
+     국세청 상태와 ERP 중복을 **한 번에** 본다. 버튼이 하나라 호출도 하나다.
+
+     ★ 형식이 틀리면 **부르지 않는다.** 남의 API 를 쓰레기로 두드리지 않는다.
+     ★ 여기가 실패해도 계약 등록은 그대로 된다 — 확인은 저장 경로가 아니다.
+       그래서 실패를 `saveError` 가 아니라 토스트로 알린다. */
+  const runBizCheck = async () => {
+    const digits = companyState.bizno.replace(/\D/g, '');
+    if (!isBizNumberFormatOk(digits)) {
+      setBizCheck({ kind: 'format' });
+      return;
+    }
+    setBizCheck({ kind: 'checking' });
+    try {
+      const query = new URLSearchParams({ bizNumber: digits });
+      // ★ 회사명도 같이 보낸다 — 같은 상호가 있는지 **알려만 주려고**. 막지 않는다.
+      //   비어 있으면 보내지 않는다: 빈 이름끼리 걸리면 전부 중복이 된다.
+      if (companyState.company.trim()) query.set('companyName', companyState.company.trim());
+      // ★ 자기 자신을 중복으로 보고하지 않게 지금 편집 중인 회사를 알려 준다.
+      if (companyId) query.set('selfCompanyId', companyId);
+      const res = await fetch(`/api/companies/biz-check?${query.toString()}`, { cache: 'no-store' });
+      const body = (await res.json()) as BizCheckResult & { message?: string };
+      if (!res.ok) throw new Error(body.message ?? '확인하지 못했습니다');
+      setBizCheck({ kind: 'done', result: body });
+    } catch (err) {
+      setBizCheck({ kind: 'idle' });
+      notify(`${(err as Error).message} · 등록은 그대로 진행할 수 있습니다`);
+    }
+  };
 
   /* ── 저장 ────────────────────────────────────────────────────────────── */
 
@@ -284,6 +436,8 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
     const data = (await res.json().catch(() => ({}))) as {
       message?: string;
       contractId?: string;
+      /** 입주사를 새로 만든 경우에만 온다(`POST /api/companies`). */
+      companyId?: string;
       members?: { memberId: string }[];
     };
     if (!res.ok) throw new Error(data.message ?? '저장에 실패했습니다');
@@ -299,13 +453,10 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
    * ★ 저장 뒤 새로 생긴 `memberId` 를 화면 상태에 되돌려 넣는다. 이걸 빼면 **저장할
    *   때마다 같은 사람이 새로 만들어지고** 옛 행은 비활성으로 밀린다.
    */
-  async function saveTenant(): Promise<void> {
-    if (!companyId) {
-      throw new Error('입주사를 먼저 선택해야 합니다 — 입주사·계약 관리에서 들어와 주세요');
-    }
+  async function saveTenant(): Promise<string> {
     const ownerEmail = joinEmail(companyState.emailId, currentDomain(companyState));
 
-    await send(`/api/companies/${companyId}`, 'PATCH', {
+    const body = {
       companyName: companyState.company,
       bizNumber: companyState.bizno,
       // 법인이 아니면 법인등록번호를 비운다 — 화면에서 꺼진 칸의 옛 값을 남기지 않는다.
@@ -323,7 +474,28 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
       ceoAddress: companyState.addr1,
       ceoAddressDetail: companyState.addr2,
       memo: companyState.note1,
-    });
+    };
+
+    /**
+     * ★★ `companyId` 가 없으면 **여기서 입주사를 만든다.** `[신규 입주사 등록]` 이
+     *    `/contracts/new` 를 그냥 열기 때문이다 — 예전에는 별도 모달이 회사를 먼저
+     *    만들었고, 그 모달은 저장 경로가 없어 아무것도 남지 않았다.
+     *
+     * ★ 건물은 섹션 2 의 값을 그대로 보낸다. `NOT NULL` 인데 화면이 아는 값이
+     *   거기뿐이고, 새 폼은 건물이 하나라 기본값이 이미 채워져 있다(`seedTerms`).
+     *
+     * ★ 삐용 회사·대표 등록은 **아직 붙지 않는다**(3-2, ROADMAP 작업 15).
+     *   지금 만드는 것은 ERP 의 입주사 행 하나다.
+     */
+    let id: string;
+    if (!companyId) {
+      const created = await send('/api/companies', 'POST', { ...body, buildId: terms.buildId });
+      if (!created.companyId) throw new Error('저장은 됐는데 입주사 ID 가 오지 않았습니다');
+      id = created.companyId;
+    } else {
+      id = companyId;
+      await send(`/api/companies/${id}`, 'PATCH', body);
+    }
 
     // 미체크 행은 저장에서 뺀다 — **입력값은 화면에 그대로 둔다**(명세 섹션 3).
     // 이름이 빈 줄도 뺀다. 임시저장 중에는 대표자조차 비어 있을 수 있는데, 그걸
@@ -353,7 +525,7 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
         },
       }));
 
-    const saved = await send(`/api/companies/${companyId}/members`, 'PUT', {
+    const saved = await send(`/api/companies/${id}/members`, 'PUT', {
       members: kept.map((k) => k.payload),
     });
 
@@ -367,18 +539,23 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
         }),
       );
     }
+
+    // ★ 만들었든 고쳤든 **확정된 입주사 ID** 를 돌려준다. 계약 저장이 이 값을 쓴다 —
+    //   새로 만든 경우 `companyId` prop 은 아직 `null` 이라 그걸 보면 안 된다.
+    return id;
   }
 
   /** 계약을 만들거나(create) 고친다(draft). 돌려주는 값은 계약 ID 다. */
-  async function saveContract(nextStatus: 'draft' | 'confirmed'): Promise<string> {
+  async function saveContract(nextStatus: 'draft' | 'confirmed', forCompany: string): Promise<string> {
     if (contract) {
       await send(`/api/contracts/${contract.contractId}`, 'PATCH', payload());
       return contract.contractId;
     }
-    if (!companyId) {
-      throw new Error('입주사를 먼저 선택해야 합니다 — 입주사·계약 관리에서 들어와 주세요');
-    }
-    const data = await send('/api/contracts', 'POST', { ...payload(), companyId, status: nextStatus });
+    const data = await send('/api/contracts', 'POST', {
+      ...payload(),
+      companyId: forCompany,
+      status: nextStatus,
+    });
     if (!data.contractId) throw new Error('저장은 됐는데 계약 ID 가 오지 않았습니다');
     return data.contractId;
   }
@@ -425,17 +602,36 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
     return run(async () => {
       // 회사·사용자를 먼저 저장한다. 계약 쪽이 필수값 때문에 막히더라도 여기까지는
       // 남는다 — 임시저장의 뜻이 그거다.
-      await saveTenant();
-      const id = await saveContract('draft');
+      const savedCompanyId = await saveTenant();
+      // ★ 회사가 생긴 직후, **이동하기 전에** 붙들고 있던 첨부를 올린다.
+      await flushPendingDocs(savedCompanyId);
+      const id = await saveContract('draft', savedCompanyId);
       notify('임시저장했습니다');
       if (!contract) router.replace(`/contracts/${id}`);
       else router.refresh();
     });
   };
 
-  /** 확정은 필수 항목 8개가 채워진 뒤에만 연다(시안 2차의 `runValidation`). */
+  /**
+   * 확정은 필수 항목 8개가 채워진 뒤에만 연다(시안 2차의 `runValidation`).
+   *
+   * ★ 그 다음이 **서류**다. 여기서 막는 것은 편의이고, 막는 힘은 서버에 있다
+   *   (`POST /contracts` · `POST /contracts/:id/status` 가 409 를 낸다).
+   *
+   * ★ 빠진 서류 이름을 그대로 말하고 **섹션 4 로 화면을 옮긴다.** 머리말의 빨간 줄만
+   *   띄우면 어디를 고쳐야 하는지가 보이지 않는다 — 폼이 길어서 섹션 4 는 화면 밖이다.
+   */
   const openConfirm = () => {
     if (blockOnMissing(missing)) return;
+    if (docsMissingText) {
+      setDocsChecked(true);
+      setSaveError(docsMissingText);
+      setInvalid([]);
+      requestAnimationFrame(() => {
+        document.getElementById(SECTION_DOCS_ID)?.scrollIntoView({ block: 'start' });
+      });
+      return;
+    }
     setConfirmKind('confirm');
   };
 
@@ -445,10 +641,11 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
       if (!kind) return;
 
       if (kind === 'confirm') {
-        await saveTenant();
+        const savedCompanyId = await saveTenant();
+        await flushPendingDocs(savedCompanyId);
         // create 는 한 번에 confirmed 로 만들고, draft 는 섹션 2 를 먼저 저장한 뒤 전이한다 —
         // 저장하지 않고 전이하면 화면에 보이는 값과 확정된 값이 갈린다.
-        const id = await saveContract('confirmed');
+        const id = await saveContract('confirmed', savedCompanyId);
         if (contract) await send(`/api/contracts/${id}/status`, 'POST', { to: 'confirmed' });
         setConfirmKind(null);
         notify('확정 처리했습니다');
@@ -546,15 +743,51 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
 
           <SectionCompany
             value={companyState}
-            onChange={(patch) => setCompany((prev) => ({ ...prev, ...patch }))}
+            onChange={(patch) => {
+              setCompany((prev) => ({ ...prev, ...patch }));
+              /*
+               * ★★ 사업자번호가 바뀌면 확인 결과를 버린다. 되돌리지 않으면 앞 번호로 받은
+               *    「계속사업자입니다」가 새 번호 옆에 그대로 남아, **아무도 확인한 적 없는
+               *    번호가 확인된 것으로 보인다.** OCR 이 덮을 때도 같은 일을 한다
+               *    (`applyBizReg`) — 값이 밖에서 바뀌는 경로가 둘이라 양쪽 다 막는다.
+               */
+              if (patch.bizno !== undefined) setBizCheck({ kind: 'idle' });
+            }}
             disabled={frozen}
             notSaveable={!SECTION_SAVEABLE[1]}
             emailDomains={emailDomains}
             memberTypes={memberTypes}
             invalid={invalid}
             bizCheck={bizCheck}
-            onBizCheck={() => setBizCheck(isBiznoFormatOk(companyState.bizno) ? 'none' : 'format')}
+            onBizCheck={() => void runBizCheck()}
             onStub={notify}
+          />
+
+          {/*
+            ══════════════════════════════════════════════════════════════════
+            ★★ 첨부 서류가 **여기** 있다 — 시안은 맨 아래였다(§J-1)
+            ══════════════════════════════════════════════════════════════════
+            사업자등록증을 올리면 그 업로드가 판독까지 해서 **바로 위 섹션 1 을 채운다**
+            (`applyBizReg`). 맨 아래에 두면 올린 뒤 화면 끝에서 맨 위로 되돌아가
+            무엇이 채워졌는지 확인해야 한다. 첨부는 회사 서류이지 계약 서류도 아니다.
+
+            ★ **번호는 그대로 4 다.** 바뀐 것은 보이는 자리뿐이고,
+              `SECTION_SAVEABLE`·`editableSections`·계약서 출력은 손대지 않았다.
+            ★ 첨부는 제 저장 경로가 있다(CONT-17). 폼의 [저장] 과 무관하게 즉시 올라가므로
+              `SECTION_SAVEABLE[4]` 의 잠금 안내를 쓰지 않는다.
+            ★ `companyId` 가 없으면(아직 저장 안 된 신규) 섹션이 스스로 그 사정을 말한다.
+          */}
+          <SectionDocs
+            companyId={companyId}
+            memberType={companyState.memberType}
+            disabled={frozen}
+            onNotify={notify}
+            onBizReg={applyBizReg}
+            pending={pendingDocs}
+            onPending={setPendingDoc}
+            onAttached={setAttachedDocs}
+            // ★ 누르기 전에는 띄우지 않는다. 폼을 열자마자 빨간 줄이 있으면 읽히지 않는다.
+            alert={docsChecked ? docsMissingText : null}
           />
 
           <SectionContract
@@ -567,6 +800,13 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
             onItems={setItems}
             onTerms={(patch) => setTerms((prev) => ({ ...prev, ...patch }))}
             onStub={notify}
+            onOpenRoomPicker={() => setRoomPickerOpen(true)}
+            /*
+             * ★ 호실 셀렉트가 입주 현황을 본다. **자기 계약은 빼고** 세야 하므로 지금
+             *   계약 ID 를 함께 준다 — 신규면 `null` 이고 뺄 자기 자신이 없다.
+             */
+            spaceHolders={spaceHolders}
+            selfContractId={contract?.contractId ?? null}
           />
 
           <SectionUsers
@@ -576,19 +816,6 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
             notSaveable={!SECTION_SAVEABLE[3]}
             emailDomains={emailDomains}
             onUsers={setUsers}
-          />
-
-          {/*
-            ★ 첨부는 **회사에 붙는다**(계약이 아니다). 그래서 `companyId` 를 준다 —
-              없으면(아직 저장 안 된 신규) 섹션이 「먼저 저장해 주세요」라고 말한다.
-            ★ 이 섹션은 제 저장 경로가 있다(CONT-17). 폼의 [저장] 과 무관하게 즉시
-              올라가므로 `SECTION_SAVEABLE[4]` 의 잠금 안내를 더 이상 쓰지 않는다.
-          */}
-          <SectionDocs
-            companyId={companyId}
-            memberType={companyState.memberType}
-            disabled={frozen}
-            onNotify={notify}
           />
         </div>
       </div>
@@ -609,6 +836,24 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
           둘이 같다. 섹션 1·3 은 열려 있어 저장 전 편집이 있을 수 있는데,
           그때는 보고 있는 것이 찍히는 편이 덜 놀랍다.
       */}
+      {/*
+        계약호실 확인 팝업(s0300200040p3).
+
+        ★ `sec2Editable` 일 때만 연다 — `terminated`·`cancelled` 에서는 버튼 자체가
+          비활성이지만, 상태가 밖에서 바뀌는 경우까지 생각하면 여는 조건도 같이 본다.
+      */}
+      {roomPickerOpen && sec2Editable ? (
+        <RoomPickerModal
+          current={terms.contractRoom}
+          selfContractId={contract?.contractId ?? null}
+          onClose={() => setRoomPickerOpen(false)}
+          onPick={(room) => {
+            setTerms((prev) => ({ ...prev, contractRoom: room }));
+            setRoomPickerOpen(false);
+          }}
+        />
+      ) : null}
+
       {docsOpen ? (
         <ContractDocumentModal
           company={{

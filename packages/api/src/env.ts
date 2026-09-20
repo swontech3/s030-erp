@@ -83,6 +83,40 @@ function assertServiceRole(token: string): void {
   }
 }
 
+/**
+ * 사업자등록증 OCR(Google Cloud Vision) 서비스 계정 키.
+ *
+ * ★ **없어도 기동한다.** 다른 변수와 다르게 `required()` 를 쓰지 않는다 — OCR 은
+ *   운영자의 타이핑을 줄이는 도우미일 뿐이고, 없으면 손으로 입력하면 된다.
+ *   여기서 기동을 막으면 키 하나 때문에 계약 등록 전체가 멈춘다. 없을 때는
+ *   OCR 라우트만 503 을 낸다(`routes/ocr.ts`).
+ *
+ * ★★ **상대경로를 `packages/api` 기준으로 절대경로로 바꿔 둔다.** 레거시는 이 값이
+ *    `D:\workspace\claude\S-WonERP\secrets\...` 절대경로여서 다른 기계로 옮기는
+ *    순간 OCR 이 죽었다. 상대경로를 그대로 두면 이번에는 **프로세스의 cwd** 에
+ *    따라 죽는다(`npm --prefix` 로 띄우면 cwd 가 저장소 루트다). 그래서 읽는
+ *    자리에서 한 번 확정한다.
+ */
+const credentialsRaw = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const ocrCredentialsPath = credentialsRaw ? resolve(here, '..', credentialsRaw) : null;
+if (ocrCredentialsPath && !existsSync(ocrCredentialsPath)) {
+  // 죽이지는 않지만 조용히 넘어가지도 않는다 — 「OCR 이 왜 503 이지」를 찾는 자리가 여기다.
+  console.warn(
+    `[env] GOOGLE_APPLICATION_CREDENTIALS 가 가리키는 파일이 없다: ${ocrCredentialsPath} — OCR 은 503 을 낸다.`,
+  );
+}
+
+/**
+ * 국세청 사업자등록 상태조회(공공데이터포털) 인증키.
+ *
+ * ★ **없어도 기동한다.** OCR 키와 같은 이유다 — 확인이 안 되는 것은 계약 등록을
+ *   막을 이유가 못 된다. 없으면 [확인] 버튼이 「확인하지 못했습니다」라고 답한다.
+ *
+ * ★ 저장소 루트 `.env` 에도 같은 키가 있다(스크립트용). 두 파일이 갈릴 수 있으니
+ *   **여기(`packages/api/.env`)가 이 서버의 정본**이다.
+ */
+const ntsServiceKey = process.env.DATA_GO_KR_KEY?.trim() || null;
+
 const key = Buffer.from(required('ERP_ENCRYPTION_KEY'), 'base64');
 if (key.length !== 32) {
   throw new Error(`ERP_ENCRYPTION_KEY 는 base64 로 32바이트여야 한다(현재 ${key.length}바이트).`);
@@ -106,6 +140,15 @@ export const env = {
    * 상한이 없으면 느린 업로드 하나가 Fastify 워커를 잡아 둔다.
    */
   storageTimeoutMs: 30_000,
+  /**
+   * Vision 서비스 계정 키의 절대경로. `null` 이면 OCR 기능이 꺼진 것이다 —
+   * 라우트가 503 과 함께 사람이 읽을 수 있는 이유를 돌려준다.
+   */
+  ocrCredentialsPath: ocrCredentialsPath && existsSync(ocrCredentialsPath) ? ocrCredentialsPath : null,
+  /**
+   * 국세청 상태조회 인증키. `null` 이면 **그 기능만** 꺼진다 — 계약 등록은 그대로 된다.
+   */
+  ntsServiceKey,
   port: Number(process.env.PORT ?? 3001),
   /**
    * 세션 유효기간 — 삐용 refresh 만료를 넘지 않아야 한다.

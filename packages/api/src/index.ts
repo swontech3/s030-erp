@@ -16,7 +16,9 @@ import { registerContractRoutes } from './routes/contracts.ts';
 import { registerLookupRoutes } from './routes/lookups.ts';
 import { registerCompanyRoutes } from './routes/companies.ts';
 import { registerFileRoutes } from './routes/files.ts';
+import { registerOcrRoutes } from './routes/ocr.ts';
 import { closePool } from './db/pool.ts';
+import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
 
 // ★★ 어느 삐용에 붙었는지를 **가장 먼저** 찍는다. pino 의 JSON 한 줄에 섞으면 눈에 안 띄어서
 //    일부러 평문으로 낸다 — 8080(가동계)과 8082(개발계)를 눈으로 가르는 것이 목적이다.
@@ -40,6 +42,22 @@ app.setNotFoundHandler((req: FastifyRequest, reply: FastifyReply) => {
   reply.code(404).send({ error: 'not_found', message: `${req.method} ${req.url} 은 없는 경로입니다` });
 });
 
+/**
+ * 첨부 업로드가 바이트 본문을 받는 content-type 파서.
+ *
+ * ★ **여기서 한 번만 등록한다.** Fastify 는 같은 타입을 두 번 등록하면 던지므로
+ *   라우트 파일마다 붙일 수 없다. 두 기능이 같은 형식·같은 상한을 쓰는 것도 맞다 —
+ *   화면이 고른 파일 하나를 첨부로도, 판독으로도 보내기 때문이다.
+ *
+ * ★ `bodyLimit` 이 **마지막 방어선이 아니라 첫 번째**다. 이게 없으면 10MB 검사를
+ *   하기도 전에 서버가 임의 크기를 메모리에 올린다.
+ */
+app.addContentTypeParser(
+  [...ALLOWED_MIME_TYPES],
+  { parseAs: 'buffer', bodyLimit: MAX_FILE_BYTES },
+  (_req, body, done) => done(null, body),
+);
+
 // ★ 순서가 중요하다 — 훅을 먼저 걸어야 이후 등록되는 모든 라우트가 인증을 거친다.
 //   라우트를 먼저 등록해도 onRequest 훅은 전역이라 걸리지만, 읽는 사람이 헷갈린다.
 registerSessionHook(app);
@@ -51,6 +69,9 @@ registerCompanyRoutes(app);
 // ★ 첨부 서류(CONT-17). 회사 하위 경로라 입주사 라우트 **뒤에** 둔다 — 같은 접두사를
 //   쓰는 라우트는 등록 순서와 무관하지만, 읽는 사람이 묶어서 보게 한다.
 registerFileRoutes(app);
+// ★ 사업자등록증 **판독만** 하는 라우트. 아직 입주사가 없는 신규 폼이 쓴다 —
+//   회사가 있으면 첨부 업로드가 판독까지 겸한다(`routes/ocr.ts` 머리말).
+registerOcrRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,

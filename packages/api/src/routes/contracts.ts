@@ -24,10 +24,28 @@ import {
   isContractLocked,
 } from '@swonbiz/shared/domain/contract-status';
 import {
+  ROOM_LIVE_STATUSES,
+  ROOM_TAKEN_MESSAGE,
+  findRoomConflict,
+  normalizeRoom,
+  sortRoomHolders,
+  type RoomHolder,
+} from '@swonbiz/shared/domain/contract-room';
+import {
   buildContractWrite,
   type ContractInput,
 } from '@swonbiz/shared/domain/contract-payload';
+import { missingDocsMessage } from '@swonbiz/shared/domain/contract-files';
+import {
+  OCCUPANCY_LIVE_STATUSES,
+  occupancyBySpace,
+  rejectSpacePick,
+  type SpaceHolder,
+} from '@swonbiz/shared/domain/space-occupancy';
 import { requireSession } from '../session/hook.ts';
+import { findCompany } from '../db/companies.ts';
+import { listSpaces } from '../db/lookups.ts';
+import { listCompanyFiles } from '../db/files.ts';
 import { withCompanyScope, type CompanyScope } from '../db/withCompanyScope.ts';
 import {
   findContract,
@@ -35,6 +53,8 @@ import {
   insertContract,
   insertStatusHistory,
   listContracts,
+  listRoomHolders,
+  listSpaceHolders,
   replaceSpaces,
   updateContract,
   updateStatus,
@@ -154,7 +174,160 @@ function asBadRequest(err: unknown, reply: FastifyReply): FastifyReply | never {
   throw err;
 }
 
+/**
+ * 계약호실이 이미 쓰이고 있으면 그 계약을 돌려준다. 통과면 `null`.
+ *
+ * ★★ **화면과 같은 함수**(`findRoomConflict`)로 본다. 화면은 팝업에서 [확인] 을
+ *    막지만 화면은 우회할 수 있다. 이 번호는 **세무서에 내는 번호**라 우리 DB 안에서
+ *    끝나는 문제가 아니다 — 두 계약이 같은 번호로 제출되면 밖에서 사고가 난다.
+ *
+ * ★ 저장 트랜잭션 **안에서** 부른다. 밖에서 미리 보면 그 사이에 다른 요청이
+ *   같은 번호를 넣을 수 있다.
+ */
+async function roomConflict(
+  client: Parameters<typeof listRoomHolders>[0],
+  room: string | null,
+  selfContractId: string | null,
+): Promise<RoomHolder | null> {
+  if (normalizeRoom(room) === '') return null;
+  const rows = await listRoomHolders(client, ROOM_LIVE_STATUSES);
+  const holders: RoomHolder[] = rows.map((r) => ({
+    contractId: r.contract_id,
+    companyName: r.company_name,
+    room: r.contract_room,
+  }));
+  return findRoomConflict(holders, normalizeRoom(room), selfContractId);
+}
+
+/**
+ * 계약확정에 빠진 필수 서류가 있으면 **사람에게 할 말**을 돌려준다. 통과면 `null`.
+ *
+ * ★★ **화면과 같은 함수**(`missingDocsMessage`)로 본다. 화면은 [계약확정] 을 막지만
+ *    화면은 우회할 수 있다 — 서류 없이 확정된 계약은 나중에 아무도 알아채지 못한다.
+ *
+ * ★ **임시저장(`draft`)에서는 부르지 않는다.** 사업자등록 신청 중인 회사는 등록증이
+ *   아직 없고, 그 상태로 자리를 잡아 두는 것이 계약대기의 쓸모다.
+ *
+ * ★ 회사를 못 찾으면 회원구분을 `''` 로 본다 — 신분증만 필수가 되고, 없으면 막힌다.
+ *   모르는 상태에서 통과시키지 않는다(fail-closed).
+ */
+async function missingDocs(
+  client: Parameters<typeof listCompanyFiles>[0],
+  companyId: string,
+): Promise<string | null> {
+  const company = await findCompany(client, companyId);
+  const files = await listCompanyFiles(client, companyId);
+  return missingDocsMessage(
+    company?.member_type ?? '',
+    files.map((f) => f.file_purpose),
+  );
+}
+
+const docsMissing = (reply: FastifyReply, message: string) =>
+  reply.code(409).send({ error: 'docs_missing', message });
+
+/**
+ * 호실 줄을 받아도 되는지 — 통과면 `null`, 아니면 **사용자에게 보여줄 문구**.
+ *
+ * ★★ **화면과 같은 함수**(`rejectSpacePick`)로 본다. 셀렉트에서 사라진 호실이 API 로는
+ *    들어가면 막은 의미가 없다.
+ *
+ * ★ **저장 트랜잭션 안에서** 부른다. 밖에서 미리 보면 그 사이에 다른 요청이 같은
+ *   호실을 채울 수 있다.
+ *
+ * ★ `selfContractId` — 자기 계약이 잡고 있는 호실은 자기 것으로 세지 않는다.
+ *   안 그러면 열어서 그대로 저장하는 것조차 막힌다.
+ */
+async function spaceConflict(
+  client: Parameters<typeof listSpaceHolders>[0],
+  rows: readonly { roomType: string; spaceId: string }[],
+  selfContractId: string | null,
+): Promise<string | null> {
+  if (rows.every((r) => r.spaceId === '')) return null;
+
+  const [holderRows, spaceRows] = await Promise.all([
+    listSpaceHolders(client, OCCUPANCY_LIVE_STATUSES),
+    listSpaces(client),
+  ]);
+  const holders: SpaceHolder[] = holderRows.map((r) => ({
+    spaceId: r.space_id,
+    contractId: r.contract_id,
+    companyId: r.company_id,
+    companyName: r.company_name,
+  }));
+  const names = new Map(spaceRows.map((s) => [s.space_id, s.room_name ?? '']));
+
+  return rejectSpacePick(
+    rows,
+    occupancyBySpace(holders, selfContractId),
+    (id) => names.get(id) ?? '',
+  );
+}
+
+const spaceTaken = (reply: FastifyReply, message: string) =>
+  reply.code(409).send({ error: 'space_taken', message });
+
+const roomTaken = (reply: FastifyReply, conflict: RoomHolder) =>
+  reply.code(409).send({
+    error: 'room_taken',
+    // ★ 어느 회사가 쓰고 있는지까지 말한다 — 「이미 사용 중」만으로는 무엇을 해야
+    //   할지 알 수 없다. 운영사만 부르는 API 라 회사명을 말해도 된다.
+    message: `${ROOM_TAKEN_MESSAGE} (${conflict.companyName})`,
+  });
+
 export function registerContractRoutes(app: FastifyInstance): void {
+  /* ── 계약호실 조회 팝업 (s0300200040p3) ─────────────────────────────────
+     ★ 운영사 전용이다. 이 목록은 **어느 회사가 어느 호실을 쓰는지**를 통째로 내려
+       준다 — 입주사가 볼 것이 아니다(명부 유출과 같은 모양).
+     ★ 아무것도 저장하지 않는다. */
+  app.get('/contracts/rooms', async (req, reply) => {
+    const session = requireSession(req);
+    if (session.role !== WRITE_ROLE) {
+      return reply
+        .code(403)
+        .send({ error: 'forbidden', message: '계약호실 조회는 운영사만 할 수 있습니다' });
+    }
+
+    const rows = await withCompanyScope(scopeOf(session), (client) =>
+      listRoomHolders(client, ROOM_LIVE_STATUSES),
+    );
+    // 정렬도 **화면과 같은 함수**다 — 팝업이 다시 정렬하지 않아도 되고, 둘이 갈리지도 않는다.
+    const rooms = sortRoomHolders(
+      rows.map((r) => ({
+        contractId: r.contract_id,
+        companyName: r.company_name,
+        room: r.contract_room,
+      })),
+    );
+    return reply.header('cache-control', 'no-store').send({ rooms });
+  });
+
+  /* ── 호실 입주 현황 (섹션 2 호실 셀렉트) ────────────────────────────────
+     ★ 운영사 전용이다. **어느 회사가 어느 호실에 있는지**를 통째로 내려 준다 —
+       입주사가 볼 것이 아니다(명부 유출과 같은 모양).
+     ★ 자기 계약을 빼는 것은 **화면이 한다**(`occupancyBySpace`). 여기서 빼면
+       같은 목록을 부르는 곳마다 SQL 이 달라진다.
+     ★ 아무것도 저장하지 않는다. */
+  app.get('/contracts/space-holders', async (req, reply) => {
+    const session = requireSession(req);
+    if (session.role !== WRITE_ROLE) {
+      return reply
+        .code(403)
+        .send({ error: 'forbidden', message: '호실 입주 현황은 운영사만 조회할 수 있습니다' });
+    }
+
+    const rows = await withCompanyScope(scopeOf(session), (client) =>
+      listSpaceHolders(client, OCCUPANCY_LIVE_STATUSES),
+    );
+    const holders: SpaceHolder[] = rows.map((r) => ({
+      spaceId: r.space_id,
+      contractId: r.contract_id,
+      companyId: r.company_id,
+      companyName: r.company_name,
+    }));
+    return reply.header('cache-control', 'no-store').send({ holders });
+  });
+
   // ── 목록 ────────────────────────────────────────────────────────────────
   app.get<{ Querystring: { companyId?: string } }>('/contracts', async (req, reply) => {
     const session = requireSession(req);
@@ -200,14 +373,34 @@ export function registerContractRoutes(app: FastifyInstance): void {
     const contractId = randomUUID();
     const actor = String(session.s020MemberId);
 
-    await withCompanyScope(scopeOf(session), async (client) => {
+    const created = await withCompanyScope(scopeOf(session), async (client) => {
+      // ★ 트랜잭션 **안에서** 본다. 밖에서 미리 보면 그 사이에 다른 요청이 같은
+      //   번호를 넣을 수 있다. 새 계약이라 제외할 자기 자신이 없다.
+      const conflict = await roomConflict(client, write.contract.contractRoom, null);
+      if (conflict) return { kind: 'room_taken' as const, conflict };
+
+      // ★ 새 계약이라 제외할 자기 자신이 없다.
+      const spaceMessage = await spaceConflict(client, write.spaces, null);
+      if (spaceMessage) return { kind: 'space_taken' as const, message: spaceMessage };
+
+      // ★ 첫 저장이 바로 확정일 수 있다(create → confirmed). 그 길도 서류를 본다.
+      if (status === 'confirmed') {
+        const message = await missingDocs(client, companyId);
+        if (message) return { kind: 'docs_missing' as const, message };
+      }
+
       await insertContract(client, { contractId, companyId, status, write: write.contract, actor });
       await replaceSpaces(client, { contractId, companyId, spaces: write.spaces, actor, newId: randomUUID });
       // 최초 생성도 이력이다. from_status 가 NULL 인 행이 그것이다.
       await insertStatusHistory(client, {
         historyId: randomUUID(), contractId, fromStatus: null, toStatus: status, actor,
       });
+      return { kind: 'ok' as const };
     });
+
+    if (created.kind === 'room_taken') return roomTaken(reply, created.conflict);
+    if (created.kind === 'docs_missing') return docsMissing(reply, created.message);
+    if (created.kind === 'space_taken') return spaceTaken(reply, created.message);
 
     if (write.warnings.length > 0) {
       // ★ 끄지 말 것. 프런트가 Math.round 를 쓰는 동안 계속 뜬다 — 그게 이 경고의 목적이다.
@@ -233,10 +426,19 @@ export function registerContractRoutes(app: FastifyInstance): void {
     const actor = String(session.s020MemberId);
     const result = await withCompanyScope(scopeOf(session), async (client) => {
       const contract = await findContract(client, req.params.id);
-      if (!contract) return 'not_found' as const;
+      if (!contract) return { kind: 'not_found' as const };
 
       // ★★ CONT-09 — 여기가 잠금의 실제 지점이다. 화면 비활성화가 아니라 이 줄이다.
-      if (isContractLocked(contract.status)) return 'locked' as const;
+      if (isContractLocked(contract.status)) return { kind: 'locked' as const };
+
+      // ★ 자기 자신은 제외한다. 안 그러면 **아무도 자기 계약을 수정할 수 없다** —
+      //   열어서 그대로 저장해도 자기 번호가 걸린다.
+      const conflict = await roomConflict(client, write.contract.contractRoom, contract.contract_id);
+      if (conflict) return { kind: 'room_taken' as const, conflict };
+
+      // ★ 자기 계약은 세지 않는다 — 열어서 그대로 저장하는 것까지 막히면 안 된다.
+      const spaceMessage = await spaceConflict(client, write.spaces, contract.contract_id);
+      if (spaceMessage) return { kind: 'space_taken' as const, message: spaceMessage };
 
       await updateContract(client, { contractId: contract.contract_id, write: write.contract, actor });
       await replaceSpaces(client, {
@@ -246,11 +448,13 @@ export function registerContractRoutes(app: FastifyInstance): void {
         actor,
         newId: randomUUID,
       });
-      return 'ok' as const;
+      return { kind: 'ok' as const };
     });
 
-    if (result === 'not_found') return notFound(reply);
-    if (result === 'locked') {
+    if (result.kind === 'room_taken') return roomTaken(reply, result.conflict);
+    if (result.kind === 'space_taken') return spaceTaken(reply, result.message);
+    if (result.kind === 'not_found') return notFound(reply);
+    if (result.kind === 'locked') {
       return reply.code(409).send({
         error: 'contract_locked',
         message: '확정된 계약의 조건은 변경할 수 없습니다. 종료 후 재계약해 주세요',
@@ -286,6 +490,13 @@ export function registerContractRoutes(app: FastifyInstance): void {
         return { kind: 'rejected' as const, message: (err as Error).message };
       }
 
+      // ★★ 확정에만 건다. 취소·종료는 서류와 무관하다 — 오히려 서류가 없는 계약일수록
+      //    정리돼야 하는데, 여기서 막으면 잘못 만든 계약을 닫을 수가 없다.
+      if (to === 'confirmed') {
+        const message = await missingDocs(client, contract.company_id);
+        if (message) return { kind: 'docs_missing' as const, message };
+      }
+
       await updateStatus(client, {
         contractId: contract.contract_id,
         toStatus: to,
@@ -305,6 +516,7 @@ export function registerContractRoutes(app: FastifyInstance): void {
     });
 
     if (result.kind === 'not_found') return notFound(reply);
+    if (result.kind === 'docs_missing') return docsMissing(reply, result.message);
     if (result.kind === 'rejected') {
       return reply.code(400).send({ error: 'invalid_transition', message: result.message });
     }

@@ -3,6 +3,9 @@ s02-back/
 S-WonERP.zip
 S-WonERP/
 .env
+
+# Google 서비스 계정 키 등 비밀 파일. 절대 커밋하지 않는다.
+secrets/
 node_modules/
 .next/
 *.tsbuildinfo

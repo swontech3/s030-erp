@@ -797,10 +797,21 @@
   border: 1px solid rgba(217, 119, 6, 0.3);
 }
 
+/* 확정을 막은 이유 — 경고(노랑)와 다른 말이다. 이건 «지금 못 간다»다. */
+.noticeDanger {
+  background: var(--color-danger-bg);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: var(--color-danger-text);
+}
+
 .noticeIcon {
   flex: 0 0 auto;
   margin-top: 1px;
   color: var(--color-warning);
+}
+
+.noticeDanger .noticeIcon {
+  color: var(--color-danger);
 }
 
 /* ── 테이블 빈 상태 ── 헤더는 유지하고 본문 자리만 채운다 ── */
@@ -1002,4 +1013,91 @@
   font-size: 14px;
   line-height: 1.6;
   color: var(--color-danger-text);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   계약호실 확인 팝업 (s0300200040p3)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* 6열이 들어가야 해서 확인 모달(480px)보다 넓다. */
+.roomModal {
+  width: 720px;
+  max-width: 100%;
+  text-align: left;
+}
+
+.roomVerdict {
+  flex: 0 0 auto;
+  min-width: 200px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* ★ 스크롤은 **목록만** 한다. 입력칸과 [취소]·[확인] 은 자리에 남아 있어야 한다 —
+   60건을 훑다가 확인 버튼을 찾으러 다시 올라가게 하지 않는다. */
+.roomList {
+  margin-top: 14px;
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.roomTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.roomTable td {
+  padding: 0;
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+  vertical-align: middle;
+}
+
+.roomTable tr:last-child td {
+  border-bottom: 0;
+}
+
+/* ★ 회사명만 말줄임한다. 잘려도 되는 쪽이다. */
+.roomCompany {
+  width: 22%;
+  max-width: 0;
+  color: var(--text-muted);
+}
+
+.roomCompany .roomPick {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ★★ 호실번호는 **잘리지 않는다.** 이 팝업의 본체이고, 운영자가 찾는 것이 이 값이다. */
+.roomNo {
+  width: 11.33%;
+  font-weight: 600;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.roomNoOn {
+  color: var(--color-primary, #2563eb);
+}
+
+.roomPick {
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.roomPick:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
 }

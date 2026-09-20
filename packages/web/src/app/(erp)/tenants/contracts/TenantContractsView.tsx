@@ -19,10 +19,10 @@
  * [전체] 버튼이 목록을 비우는 버튼이 된다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { matchesChips, type TenantFilterKey } from '@swonbiz/shared/domain/tenant-status';
 import { Icon, type IconName } from '@/components/ds';
-import { NewTenantModal } from '@/features/tenants/NewTenantModal';
 import {
   contractStatusLabel,
   formatDate,
@@ -36,6 +36,14 @@ import {
   type TenantContract,
 } from '@/features/tenants/tenant-model';
 import styles from './tenant-contracts.module.css';
+
+/**
+ * 신규 입주사 — 계약 폼을 **입주사 없이** 연다.
+ *
+ * ★ `?companyId=` 를 붙이지 않는 것이 전부다. 폼은 그 경우 섹션 1 을 빈 값으로 열고,
+ *   첫 저장에서 입주사를 만든다(`ContractForm.saveTenant`).
+ */
+const NEW_TENANT_HREF = '/contracts/new';
 
 /** 만기 임박 기준. shared 의 `EXPIRY_SOON_DAYS` 와 같은 값을 서버가 내려준다. */
 interface Props {
@@ -58,12 +66,12 @@ const CHIPS: { key: TenantFilterKey; label: string }[] = [
 const DEFAULT_CHIPS: TenantFilterKey[] = ['active'];
 
 export function TenantContractsView({ tenants, total, codeNames, soonDays }: Props) {
+  const searchParams = useSearchParams();
   const [chips, setChips] = useState<TenantFilterKey[]>(DEFAULT_CHIPS);
   const [keyword, setKeyword] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [contracts, setContracts] = useState<TenantContract[] | null>(null);
   const [loadingContracts, setLoadingContracts] = useState(false);
-  const [newTenantOpen, setNewTenantOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -129,19 +137,44 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
     [codeNames, notify],
   );
 
+  /**
+   * ★ `?companyId=` 로 들어오면 그 입주사를 골라 둔다.
+   *
+   *   계약 폼의 [확인] 이 「이미 계약중인 입주사입니다」와 함께 이 링크를 준다 —
+   *   이름만 알려 주고 찾는 일을 운영자에게 떠넘기지 않으려고 넣었다.
+   *
+   * ★ **한 번만** 고른다. 이후 사람이 다른 카드를 누른 것을 이 effect 가 되돌리면
+   *   목록이 눌리지 않는 화면이 된다.
+   */
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (deepLinked.current) return;
+    const wanted = searchParams.get('companyId');
+    if (!wanted || !tenants.some((t) => t.companyId === wanted)) return;
+    deepLinked.current = true;
+    void select(wanted);
+    // 칩이 「계약중」만 켜져 있으면 종료된 입주사가 목록에서 걸러져 고른 것이 안 보인다.
+    setChips([]);
+  }, [searchParams, tenants, select]);
+
   return (
     <div className={styles.page}>
       <div className={styles.head}>
         <h1 className={styles.title}>입주사 · 계약 관리</h1>
         {/*
-          ★ 새 원본에서 이 버튼은 **계약 폼**을 연다. 그런데 신규 입주사는 삐용에 회사를
-            먼저 만들어야 하고 그 규격이 회신 대기다(ROADMAP 페이즈 4 작업 15).
-            그때까지 기존 모달을 그대로 연다 — 3-4 는 이 자리를 건드리지 않는다.
+          ★ **계약 폼을 빈 값으로 연다**(`?companyId=` 없이). 새 원본이 계약 등록 모달
+            3종을 없애고 폼 한 장으로 일원화했고(02-master-detail.md 최종 문단),
+            ROADMAP 페이즈 4 작업 15 가 그 이관이다.
+
+          ★ 회사는 **폼의 첫 저장에서 만들어진다**(`POST /companies`). 예전 모달은
+            저장 경로가 없어 입력해도 아무것도 남지 않았다.
+
+          ★ 삐용 조직 등록·단체코드 발급은 아직 붙지 않았다 — 3-2 에서 저장 경로에 얹는다.
         */}
-        <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setNewTenantOpen(true)}>
+        <Link className={`${styles.btn} ${styles.btnPrimary}`} href={NEW_TENANT_HREF}>
           <Icon name="plus" size={16} />
           신규 입주사 등록
-        </button>
+        </Link>
       </div>
 
       <div className={styles.body}>
@@ -197,7 +230,7 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                 icon="building-2"
                 lead="등록된 입주사가 없습니다"
                 sub="신규 입주사를 등록해 주세요"
-                action={{ label: '신규 입주사 등록', kind: 'primary', onClick: () => setNewTenantOpen(true) }}
+                action={{ label: '신규 입주사 등록', kind: 'primary', href: NEW_TENANT_HREF }}
               />
             ) : searching && visible.length === 0 ? (
               // ★ 검색 0건과 목록 0건은 다른 상태다 — 문구도 액션도 다르다.
@@ -357,14 +390,15 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
       </div>
 
       {/*
-        ★ 계약 상세 모달(`ContractDetailModal`)은 **더 이상 열지 않는다.**
+        ★ 계약 상세 모달(`ContractDetailModal`)은 **파일째 지웠다**(2026-09-20).
           행을 누르면 계약 폼으로 바로 간다 — 모달이 보여주던 값이 목록 행에 이미 다 있고,
           확정된 계약은 폼도 읽기 전용이라 모달이 하던 일을 폼이 대신한다
           (2026-09-19 · `doc/DESIGN_HANDOFF_DIFF.md` §H-7).
 
-          **파일은 지우지 않았다.** 첨부·상태 이력·청구가 붙으면 그 자리일 수 있다.
+          하루 동안 「자리일 수 있다」는 이유로 남겨 뒀지만, 그 자리는 결국 폼의 섹션이
+          됐다(첨부는 섹션 4, 상태는 헤더 뱃지). 열리지 않는 화면이 남아 있으면 다음
+          사람이 그 파일을 고치고 반영이 안 된다고 헤맨다.
       */}
-      {newTenantOpen ? <NewTenantModal onClose={() => setNewTenantOpen(false)} /> : null}
 
       {toast ? (
         <div className={styles.toast}>

@@ -21,6 +21,12 @@ export default defineConfig({
       ERP_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
       BBIYONG_MOCK: 'true',
       BBIYONG_ACL_MODE: 'mock',
+      /**
+       * ★ **일부러 없는 경로**다. 이 값이 진짜 키를 가리키면 테스트가 Google Vision 을
+       *   실제로 부른다 — 과금되고, 네트워크에 따라 결과가 흔들린다. DATABASE_URL 을
+       *   못 붙는 주소로 둔 것과 같은 이유다.
+       */
+      GOOGLE_APPLICATION_CREDENTIALS: 'secrets/vitest-should-not-call-vision.json',
     },
   },
 });

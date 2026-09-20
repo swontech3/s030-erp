@@ -1,0 +1,168 @@
+/**
+ * 호실 입주 현황 — **판정만** 한다. DB 도 화면도 여기서 만지지 않는다.
+ *
+ * =============================================================================
+ * ★★ 한 호실에 몇 곳이 들어 있느냐가 고를 수 있느냐를 정한다
+ * =============================================================================
+ *   비상주(VR)   **아무도 없어야** 고를 수 있다 — 한 호실에 한 회사다
+ *   그 외         **1곳까지는** 고를 수 있다. 2곳 이상이면 목록에서 뺀다
+ *
+ * 1곳이 있을 때 목록에 남기는 것은 «같이 쓸 수 있다»는 뜻이고, 그때는 **누가 쓰고
+ * 있는지 이름을 함께 보여준다**(`spaceOptionLabel`). 모르고 겹치는 것과 알고 겹치는
+ * 것은 다르다.
+ *
+ * =============================================================================
+ * ★★ 규칙이 여기 하나뿐이다
+ * =============================================================================
+ *   화면  `SectionContract`      — 셀렉트에 무엇을 보일지
+ *   서버  `routes/contracts.ts`  — 저장을 받아도 되는지 (화면을 믿지 않는다)
+ *
+ * 두 벌이면 언젠가 갈리고, 그때 화면은 통과시키는데 서버가 거절한다 — 또는 더 나쁘게,
+ * 화면이 막는 것을 서버가 받는다.
+ *
+ * =============================================================================
+ * ★★★ **자기 계약은 세지 않는다**
+ * =============================================================================
+ * 세면 자기 계약을 열어 그대로 저장할 때 **자기 호실이 목록에서 사라진다.** 값이
+ * 사라진 셀렉트는 빈 줄로 저장되고, 아무도 그걸 눈치채지 못한다.
+ * `occupancyBySpace` 의 `selfContractId` 가 그 자리다.
+ */
+import { ROOM_LIVE_STATUSES } from './contract-room.ts';
+
+/**
+ * 입주로 세는 계약 상태.
+ *
+ * ★ 계약호실(`contract-room`)과 **일부러 같은 목록**이다. 「살아 있는 계약」의 정의는
+ *   하나여야 한다 — 한쪽만 고치면 호실은 비었다는데 계약호실은 쓰고 있다고 나온다.
+ */
+export const OCCUPANCY_LIVE_STATUSES = ROOM_LIVE_STATUSES;
+
+/**
+ * 비상주 계약구분 코드(`ROOM_TP`).
+ *
+ * ★ 비상주는 **주소만 쓰는 계약**이라 자리를 나눌 여지가 없다. 한 호실에 두 회사가
+ *   들어가면 같은 주소로 두 사업자가 등록된다.
+ */
+export const VIRTUAL_ROOM_TYPE = 'VR';
+
+export function isVirtualRoomType(roomType: string): boolean {
+  return roomType.trim() === VIRTUAL_ROOM_TYPE;
+}
+
+/** 호실 하나를 붙들고 있는 계약 줄 하나. */
+export interface SpaceHolder {
+  spaceId: string;
+  contractId: string;
+  companyId: string;
+  companyName: string;
+}
+
+export interface SpaceOccupancy {
+  /** 들어 있는 **회사** 수. 줄 수가 아니다 — 한 회사가 두 줄을 잡아도 1곳이다. */
+  count: number;
+  /** 회사 이름. 한 곳일 때 화면이 이름을 함께 보여준다. */
+  companyNames: string[];
+}
+
+export const EMPTY_OCCUPANCY: SpaceOccupancy = { count: 0, companyNames: [] };
+
+/**
+ * 호실별 입주 현황을 만든다.
+ *
+ * ★ **회사 단위로 센다.** 한 회사가 같은 호실을 여러 줄(또는 여러 계약)로 잡고 있어도
+ *   1곳이다. 줄로 세면 재계약 직후처럼 계약이 겹치는 순간에 2곳으로 보인다.
+ *
+ * ★ `selfContractId` 의 줄은 **빼고** 센다. 위 ★★★ 참고.
+ */
+export function occupancyBySpace(
+  holders: readonly SpaceHolder[],
+  selfContractId: string | null,
+): Map<string, SpaceOccupancy> {
+  /** spaceId → (companyId → companyName). 회사 단위로 접는 자리다. */
+  const bySpace = new Map<string, Map<string, string>>();
+
+  for (const h of holders) {
+    if (selfContractId !== null && h.contractId === selfContractId) continue;
+    const companies = bySpace.get(h.spaceId) ?? new Map<string, string>();
+    // 이름이 비어 있으면 덮어쓰지 않는다 — 한 줄이라도 이름이 있으면 그것을 보여준다.
+    if (!companies.has(h.companyId) || companies.get(h.companyId) === '') {
+      companies.set(h.companyId, h.companyName);
+    }
+    bySpace.set(h.spaceId, companies);
+  }
+
+  const out = new Map<string, SpaceOccupancy>();
+  for (const [spaceId, companies] of bySpace) {
+    out.set(spaceId, { count: companies.size, companyNames: [...companies.values()] });
+  }
+  return out;
+}
+
+/**
+ * 이 줄에서 이 호실을 고를 수 있는가.
+ *
+ * ★ `pickedElsewhere` — **같은 계약 안에서 같은 호실을 두 줄에 넣는 것**도 막는다.
+ *   두 줄이 되면 금액이 두 번 잡히고, 어느 줄이 진짜인지 아무도 모른다.
+ *
+ * ★ 계약구분이 비어 있으면(아직 안 고름) 입주 현황만 본다. 그때는 비상주인지 알 수
+ *   없으므로 **느슨한 쪽**을 쓴다 — 계약구분을 고르는 순간 다시 걸러진다.
+ */
+export function canPickSpace(args: {
+  roomType: string;
+  occupancy: SpaceOccupancy | undefined;
+  pickedElsewhere?: boolean;
+}): boolean {
+  if (args.pickedElsewhere) return false;
+  const occ = args.occupancy ?? EMPTY_OCCUPANCY;
+  if (isVirtualRoomType(args.roomType)) return occ.count === 0;
+  return occ.count <= 1;
+}
+
+/**
+ * 셀렉트에 뜨는 글자 — 「Room 1 (에스원3DP)」.
+ *
+ * ★ 이름을 붙이는 것은 **1곳일 때뿐**이다. 0곳이면 붙일 이름이 없고, 2곳 이상은
+ *   애초에 목록에 없다.
+ */
+export function spaceOptionLabel(roomName: string, occupancy: SpaceOccupancy | undefined): string {
+  const occ = occupancy ?? EMPTY_OCCUPANCY;
+  const first = occ.companyNames[0];
+  return occ.count === 1 && first ? `${roomName} (${first})` : roomName;
+}
+
+/**
+ * 저장을 받아도 되는지 — 통과면 `null`, 아니면 **사용자에게 보여줄 문구**.
+ *
+ * ★ 화면이 거르는 것과 **같은 규칙**(`canPickSpace`)이다. 여기는 화면을 우회한 요청을
+ *   막는 자리다.
+ *
+ * ★ 빈 호실 줄은 여기서 보지 않는다 — 그건 `buildContractWrite` 가 먼저 막는다.
+ */
+export function rejectSpacePick(
+  rows: readonly { roomType: string; spaceId: string }[],
+  occupancy: Map<string, SpaceOccupancy>,
+  roomNameOf: (spaceId: string) => string,
+): string | null {
+  const seen = new Set<string>();
+
+  for (const row of rows) {
+    if (row.spaceId === '') continue;
+
+    const name = roomNameOf(row.spaceId) || row.spaceId;
+
+    if (seen.has(row.spaceId)) {
+      return `${name} 을(를) 두 줄에 넣었습니다. 한 계약에서 같은 호실은 한 줄입니다`;
+    }
+    seen.add(row.spaceId);
+
+    const occ = occupancy.get(row.spaceId) ?? EMPTY_OCCUPANCY;
+    if (canPickSpace({ roomType: row.roomType, occupancy: occ })) continue;
+
+    const who = occ.companyNames.join(' · ');
+    return isVirtualRoomType(row.roomType)
+      ? `비상주는 한 호실에 한 회사입니다. ${name} 은(는) 이미 사용 중입니다 (${who})`
+      : `${name} 은(는) 이미 2곳이 사용 중입니다 (${who})`;
+  }
+
+  return null;
+}

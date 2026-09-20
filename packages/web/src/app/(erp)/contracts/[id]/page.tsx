@@ -28,6 +28,7 @@ import {
   type MemberResponse,
 } from '@/features/contracts/ContractForm';
 import type { CodeOption, SpaceOption } from '@/features/contracts/form-model';
+import type { SpaceHolder } from '@swonbiz/shared/domain/space-occupancy';
 
 /** 신규 작성을 가리키는 세그먼트. 실제 계약 ID 는 UUID 라 겹치지 않는다. */
 const NEW = 'new';
@@ -45,10 +46,18 @@ export default async function ContractFormPage({
   const { companyId } = await searchParams;
   const sid = await readSid();
 
-  // 호실·코드는 두 경로 다 필요하다 — 같이 부른다.
-  const [spacesRes, codesRes] = await Promise.all([
+  /*
+   * 호실·코드·입주 현황은 두 경로 다 필요하다 — 같이 부른다.
+   *
+   * ★ 입주 현황(`space-holders`)을 **서버에서** 받아 넘긴다. 브라우저가 따로 부르면
+   *   셀렉트가 한 번 「아무도 없음」으로 그려졌다가 뒤늦게 바뀐다 — 그 짧은 사이에
+   *   고른 호실이 사실은 못 고르는 호실일 수 있다.
+   * ★ 자기 계약을 빼는 것은 화면이 한다(`occupancyBySpace`). 서버는 전부 준다.
+   */
+  const [spacesRes, codesRes, holdersRes] = await Promise.all([
     callApi<{ spaces: SpaceOption[] }>('/spaces', { erpSid: sid }),
     callApi<{ codes: CodeOption[] }>('/codes', { erpSid: sid }),
+    callApi<{ holders: SpaceHolder[] }>('/contracts/space-holders', { erpSid: sid }),
   ]);
 
   let contract: ContractResponse | null = null;
@@ -94,6 +103,11 @@ export default async function ContractFormPage({
       members={members}
       spaces={spacesRes.ok ? spacesRes.body.spaces : []}
       codes={codesRes.ok ? codesRes.body.codes : []}
+      /*
+       * ★ 못 받으면 **빈 배열**이다 — 「아무도 없다」로 보여 전부 고를 수 있게 된다.
+       *   화면이 느슨해지는 쪽이고, 저장할 때 서버가 같은 함수로 다시 막는다.
+       */
+      spaceHolders={holdersRes.ok ? holdersRes.body.holders : []}
     />
   );
 }

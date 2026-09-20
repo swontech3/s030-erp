@@ -27,6 +27,7 @@ import {
   NOT_SAVEABLE_NOTICE,
   USER_TEMPLATE,
   currentDomain,
+  maskEmailId,
   maskValue,
   type CompanyState,
   type UserRow,
@@ -148,7 +149,8 @@ export function SectionUsers({
                   readOnly={readOnly}
                   style={readOnly ? { background: 'var(--surface-alt)' } : undefined}
                   value={first ? company.emailId : user.mailId}
-                  onChange={(e) => patch(i, { mailId: e.target.value })}
+                  // 섹션 1 과 같은 마스크다 — 같은 종류의 칸이 서로 다르게 굴면 안 된다.
+                  onChange={(e) => patch(i, { mailId: maskEmailId(e.target.value) })}
                 />
                 <span className={styles.mailAt}>@</span>
                 {first ? (
