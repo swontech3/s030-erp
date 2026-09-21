@@ -14,6 +14,9 @@ import {
   assertTransition,
   isContractLocked,
   editableSections,
+  isContractExpired,
+  terminationDefaults,
+  EXPIRED_TERMINATION_REASON,
 } from './contract-status';
 
 describe('CONTRACT_STATUS — 저장되는 상태는 넷이다', () => {
@@ -194,5 +197,121 @@ describe('editableSections — 섹션별 수정 가능 여부', () => {
     const sections = editableSections('draft');
     sections.push(9 as never);
     expect(editableSections('draft')).toEqual([1, 2, 3, 4]);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   기간 만료 — **상태가 아니라 날짜다**
+   ══════════════════════════════════════════════════════════════════════════
+   종료일이 지나도 저장된 상태는 `confirmed` 그대로다. 자동으로 종료하는 배치를
+   만들지 않기 때문이다 — 운영자가 입주사에게 재계약 의사를 확인한 뒤 손으로 닫는다.
+
+   ★ 그래서 만료된 계약도 **호실을 계속 잡는다.** 확인하는 동안 호실이 다른 회사에
+     넘어가면 안 된다. `ROOM_LIVE_STATUSES` 가 그 약속이고 아래에서 함께 못 박는다. */
+describe('isContractExpired', () => {
+  const day = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+
+  it('★ 종료일이 지났고 계약중이면 만료다', () => {
+    expect(isContractExpired({ status: 'confirmed', endDate: day('2026-09-20'), today: day('2026-09-21') })).toBe(true);
+  });
+
+  /** ★ 하루 겹침을 만들지 않는 것과 같은 경계다 — 종료일 당일은 아직 계약 중이다. */
+  it('★ 종료일 당일은 만료가 아니다', () => {
+    expect(isContractExpired({ status: 'confirmed', endDate: day('2026-09-21'), today: day('2026-09-21') })).toBe(false);
+  });
+
+  it('아직 남았으면 만료가 아니다', () => {
+    expect(isContractExpired({ status: 'confirmed', endDate: day('2026-12-31'), today: day('2026-09-21') })).toBe(false);
+  });
+
+  /** ★ 이미 닫힌 계약은 만료가 아니다 — 「종료 처리할 것이 남았다」는 뜻이기 때문이다. */
+  it('★ 종료·취소·임시저장은 만료가 아니다 — 확정된 계약만 만료된다', () => {
+    for (const status of ['terminated', 'cancelled', 'draft']) {
+      expect(isContractExpired({ status, endDate: day('2026-01-01'), today: day('2026-09-21') })).toBe(false);
+    }
+  });
+
+  it('시각이 섞여 있어도 날짜로만 본다', () => {
+    expect(
+      isContractExpired({
+        status: 'confirmed',
+        endDate: new Date('2026-09-21T23:00:00.000Z'),
+        today: new Date('2026-09-21T01:00:00.000Z'),
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('terminationDefaults — [계약종료] 모달의 첫 값', () => {
+  const TODAY = '2026-09-21';
+
+  /**
+   * ★ 종료일자 기본값이 **오늘이 아니라 원래 종료일**이다. 만료된 계약을 뒤늦게 닫는
+   *   것이라, 오늘을 넣으면 계약이 실제보다 길었던 것으로 남는다. 실제 퇴실일이 다르면
+   *   운영자가 바꾼다.
+   */
+  it('★ 만료된 계약이면 종료일자는 원래 종료일이고 사유가 채워져 있다', () => {
+    expect(terminationDefaults({ endDate: '2026-08-31', today: TODAY })).toEqual({
+      terminatedDate: '2026-08-31',
+      reason: EXPIRED_TERMINATION_REASON,
+    });
+  });
+
+  it('사유 문구가 「계약기간 만료로 계약 종료」다', () => {
+    expect(EXPIRED_TERMINATION_REASON).toBe('계약기간 만료로 계약 종료');
+  });
+
+  /** 아직 안 끝난 계약을 중도 종료하는 것이라 사유를 지어내지 않는다. */
+  it('★ 아직 안 끝난 계약이면 오늘이고 사유는 비어 있다', () => {
+    expect(terminationDefaults({ endDate: '2026-12-31', today: TODAY })).toEqual({
+      terminatedDate: TODAY,
+      reason: '',
+    });
+  });
+
+  it('★ 종료일 당일은 만료가 아니다 — 오늘이고 사유는 비어 있다', () => {
+    expect(terminationDefaults({ endDate: TODAY, today: TODAY })).toEqual({
+      terminatedDate: TODAY,
+      reason: '',
+    });
+  });
+
+  it('종료일을 읽을 수 없으면 오늘로 떨어진다', () => {
+    expect(terminationDefaults({ endDate: '', today: TODAY }).terminatedDate).toBe(TODAY);
+    expect(terminationDefaults({ endDate: '2026-02-31', today: TODAY }).terminatedDate).toBe(TODAY);
+    expect(terminationDefaults({ endDate: '2026-08-31T15:00:00.000Z', today: TODAY }).reason).toBe('');
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ★★★ pg 가 주는 날짜는 **로컬 자정**이다 — UTC 로 세면 하루가 어긋난다
+   ══════════════════════════════════════════════════════════════════════════
+   `tb_s080_contracts.end_date` 는 `date`/`timestamp` 이고, pg 드라이버는 그것을
+   **로컬 자정의 Date** 로 준다. 웹으로 오면 JSON 이 UTC 로 바꿔 `...T15:00:00.000Z`
+   가 되는데, 그 값의 **UTC 날짜는 하루 앞**이다(KST 기준).
+
+   반대로 「오늘」(`new Date()`)은 낮 시간대에는 UTC 날짜와 로컬 날짜가 같다.
+   즉 **둘의 어긋남이 서로 다르다** — 한쪽만 밀린다. 그래서 종료일 당일이 만료로
+   읽히고, 아직 계약 중인 입주사가 「기간 만료」 칩에 뜬다.
+
+   `new Date(y, m, d)` 는 **정의상 로컬 자정**이라 pg 가 주는 모양 그대로다.
+   아래 두 시험이 그 모양을 박아 둔다. */
+describe('★★ 로컬 자정으로 오는 날짜 — pg 가 주는 모양', () => {
+  /** pg 가 `2026-09-18` 을 줄 때의 Date. 시간대와 무관하게 로컬 자정이다. */
+  const pgDay = (y: number, m: number, d: number) => new Date(y, m - 1, d);
+
+  it('★ 종료일 당일은 만료가 아니다 — 오전에 봐도, 저녁에 봐도', () => {
+    const endDate = pgDay(2026, 9, 18);
+    for (const hour of [0, 9, 15, 23]) {
+      const today = new Date(2026, 8, 18, hour, 30);
+      expect(isContractExpired({ status: 'confirmed', endDate, today }), `${hour}시`).toBe(false);
+    }
+  });
+
+  it('★ 그 다음 날부터 만료다', () => {
+    const endDate = pgDay(2026, 9, 18);
+    expect(
+      isContractExpired({ status: 'confirmed', endDate, today: new Date(2026, 8, 19, 0, 1) }),
+    ).toBe(true);
   });
 });

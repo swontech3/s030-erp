@@ -60,6 +60,14 @@ interface Props {
   memberType: string;
   /** `terminated`·`cancelled` — 읽기 전용. 올리지도 지우지도 못한다. */
   disabled: boolean;
+  /**
+   * 이 화면에 **[임시저장] 버튼이 있는가.**
+   *
+   * ★★ **재계약에는 없다.** 「그때까지는 [임시저장] 으로 둡니다」를 그대로 띄우면
+   *    없는 버튼을 누르라고 말하는 셈이고, 안내와 화면이 어긋나면 운영자는 안내를
+   *    아예 믿지 않게 된다. 실제로 그렇게 나올 뻔했다(2026-09-21).
+   */
+  draftable: boolean;
   onNotify: (message: string) => void;
   /**
    * ★ 사업자등록증을 읽은 결과를 **섹션 1 에 얹는다.** 몇 칸을 덮었는지 돌려준다 —
@@ -105,6 +113,7 @@ export function SectionDocs({
   companyId,
   memberType,
   disabled: frozen,
+  draftable,
   onNotify,
   onBizReg,
   pending,
@@ -451,6 +460,7 @@ export function SectionDocs({
         ★ 다만 「확정에는 필요하다」를 덧붙였다. 이 문구만 읽으면 «없어도 계약이
           끝까지 간다»로 읽히는데, 이제 확정에서 실제로 막힌다 — 안내와 동작이
           어긋나면 안내를 믿지 않게 된다.
+        ★★ **재계약에서는 뒷문장이 달라진다.** 그 화면에는 [임시저장] 이 없다.
       */}
       {bizMissing ? (
         <div className={`${styles.notice} ${styles.noticeWarning}`}>
@@ -459,7 +469,11 @@ export function SectionDocs({
           </span>
           <span>
             사업자등록증이 없으면 가등록 상태로 계약이 진행됩니다. 발급 후 반드시 제출해 주세요.
-            <strong> 계약 확정에는 필요합니다 — 그때까지는 [임시저장] 으로 둡니다.</strong>
+            {draftable ? (
+              <strong> 계약 확정에는 필요합니다 — 그때까지는 [임시저장] 으로 둡니다.</strong>
+            ) : (
+              <strong> 재계약은 [계약확정] 뿐이라 서류가 갖춰져야 저장됩니다.</strong>
+            )}
           </span>
         </div>
       ) : null}

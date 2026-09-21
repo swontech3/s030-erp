@@ -14,7 +14,8 @@ import {
 } from './tenant-status.ts';
 
 const day = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
-const TODAY = day('2026-09-18');
+const TODAY_ISO = '2026-09-18';
+const TODAY = day(TODAY_ISO);
 
 const confirmed = (endIso: string): TenantContractFact => ({ status: 'confirmed', endDate: day(endIso) });
 
@@ -46,10 +47,53 @@ describe('deriveTenantStatus', () => {
     expect(s.label).toBe('D-0');
   });
 
-  it('어제 끝났으면 종료다', () => {
+  /**
+   * ★★ 예전에는 이것도 「종료」였다. 나눴다 — **종료 처리한 곳과 안 한 곳이 섞여**
+   *    운영자가 어디를 처리해야 하는지 알 수 없었기 때문이다. 자동 종료 배치가 없으니
+   *    이 상태는 **할 일이 남았다는 뜻**이고, 칩이 그 목록이다.
+   */
+  it('★★ 어제 끝났는데 아직 계약중이면 「기간 만료」다 — 「종료」가 아니다', () => {
     const s = deriveTenantStatus({ contracts: [confirmed('2026-09-17')], today: TODAY });
+    expect(s.label).toBe('기간 만료');
+    expect(s.filters).toEqual(['expired']);
+  });
+
+  it('★ 종료 처리를 끝내면 「종료」로 옮겨간다', () => {
+    const s = deriveTenantStatus({
+      contracts: [{ status: 'terminated', endDate: day('2026-09-17') }],
+      today: TODAY,
+    });
     expect(s.label).toBe('종료');
     expect(s.filters).toEqual(['ended']);
+  });
+
+  /**
+   * ★ 재계약을 확정하면 이전 계약이 같은 트랜잭션에서 닫히므로 이 상태는 오래가지
+   *   않는다. 그래도 손으로 만든 계약 때문에 생길 수 있고, 그때 **닫아야 할 계약이
+   *   있다는 것**이 보여야 한다.
+   */
+  it('★ 살아 있는 계약 + 종료 처리 안 된 만료 계약이면 둘 다에 걸린다', () => {
+    const s = deriveTenantStatus({
+      contracts: [confirmed('2027-06-30'), confirmed('2026-09-17')],
+      today: TODAY,
+    });
+    expect(s.filters).toEqual(['active', 'expired']);
+    // 뱃지는 **할 일 쪽**을 보여준다 — 계약중인 것은 칩으로 이미 찾을 수 있다.
+    expect(s.label).toBe('기간 만료');
+  });
+
+  /**
+   * ★★ 칩은 **더해진다.** 만료가 붙었다고 「만기 임박」에서 빠지면, 임박으로 거르는
+   *    운영자가 그 회사를 못 본다 — 실제로 한 번 그렇게 만들었다(2026-09-21).
+   */
+  it('★★ 만기 임박이면서 만료인 입주사는 세 칩 모두에 걸린다', () => {
+    const s = deriveTenantStatus({
+      contracts: [confirmed('2026-09-27'), confirmed('2026-09-17')],
+      today: TODAY,
+    });
+    expect(s.filters).toEqual(['active', 'soon', 'expired']);
+    expect(s.label).toBe('기간 만료');
+    expect(s.remainingDays).toBe(9);
   });
 
   it('계약이 여러 건이면 **가장 빨리 끝나는 것**이 기준이다', () => {
@@ -80,12 +124,20 @@ describe('deriveTenantStatus', () => {
     expect(s.label).toBe('종료');
   });
 
-  it('★ 만료된 확정 계약 + 새 임시저장이면 「종료」다 — 성립한 적이 있다', () => {
+  it('★ 만료된 확정 계약 + 새 임시저장이면 「기간 만료」다 — 옛 계약을 아직 안 닫았다', () => {
     const s = deriveTenantStatus({
       contracts: [confirmed('2026-09-17'), { status: 'draft', endDate: day('2027-06-30') }],
       today: TODAY,
     });
-    expect(s.label).toBe('종료');
+    expect(s.label).toBe('기간 만료');
+    expect(s.filters).toEqual(['expired']);
+  });
+
+  /** ★ 만료 판정은 `contract-status` 의 `isContractExpired` 하나다 — 두 벌이 아니다. */
+  it('★ 종료일 당일은 만료가 아니다 — 계약중이다', () => {
+    const s = deriveTenantStatus({ contracts: [confirmed(TODAY_ISO)], today: TODAY });
+    expect(s.filters).not.toContain('expired');
+    expect(s.filters).toContain('active');
   });
 
   it('계약이 한 건도 없으면 검토중이다', () => {

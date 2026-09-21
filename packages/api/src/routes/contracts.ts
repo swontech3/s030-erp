@@ -37,9 +37,13 @@ import {
 } from '@swonbiz/shared/domain/contract-payload';
 import { missingDocsMessage } from '@swonbiz/shared/domain/contract-files';
 import {
+  PREVIOUS_TERMINATION_REASON,
+  closesPrevious,
   rejectRenewal,
+  rejectRenewalStart,
   selfContractIds,
 } from '@swonbiz/shared/domain/contract-renewal';
+import { toDay } from '@swonbiz/shared/domain/day';
 import {
   OCCUPANCY_LIVE_STATUSES,
   occupancyBySpace,
@@ -397,13 +401,29 @@ export function registerContractRoutes(app: FastifyInstance): void {
        * 금액이 이 계약에 복사되고, 그 뒤엔 어디서 온 숫자인지 아무도 모른다.
        * 판정은 화면과 **같은 함수**(`rejectRenewal`)가 한다.
        */
+      let previous: ContractRow | null = null;
       if (renewedFrom) {
-        const previous = await findContract(client, renewedFrom);
+        previous = await findContract(client, renewedFrom);
         const message = rejectRenewal(
           previous && { companyId: previous.company_id, status: previous.status },
           companyId,
         );
         if (message) return { kind: 'bad_renewal' as const, message };
+
+        /*
+         * ★★ 시작일이 이전 계약 종료일 **다음 날 이후**여야 한다 — **종료일 당일도 막는다.**
+         *
+         * 겹치면 두 계약이 같은 날 같은 호실을 동시에 들고, 그 상태는 바로 아래
+         * 재계약 예외(`selfContractIds`)가 **일부러 허용하는 모양**이라 중복 판정에
+         * 걸리지 않는다. 즉 여기서 안 막으면 **아무도 못 알아챈다.**
+         *
+         * 화면과 **같은 함수**(`rejectRenewalStart`)를 부른다.
+         */
+        const startMessage = rejectRenewalStart(
+          toDay(write.contract.startDate),
+          previous && toDay(previous.end_date),
+        );
+        if (startMessage) return { kind: 'bad_renewal' as const, message: startMessage };
       }
 
       /*
@@ -429,8 +449,13 @@ export function registerContractRoutes(app: FastifyInstance): void {
         if (message) return { kind: 'docs_missing' as const, message };
       }
 
-      // ★ 이전 계약은 **건드리지 않는다.** 재계약을 만든다고 옛 계약이 종료되지 않는다 —
-      //   언제 닫을지는 운영자가 따로 정하는 결정이다(`contract-renewal.ts` 머리말).
+      /* ══════════════════════════════════════════════════════════════════════
+         여기부터 **쓰기**다. 위는 전부 검사였다.
+         ══════════════════════════════════════════════════════════════════════
+         ★★★ 순서가 규칙이다. 서류 부족처럼 막히는 경우는 **쓰기 전에** 돌려보내므로
+              아무것도 저장되지 않는다. 쓰기 도중에 던지면 `withCompanyScope` 가
+              ROLLBACK 하므로 역시 둘 다 그대로다. 「하나만 바뀌고 멈추는」 상태가
+              만들어질 자리가 없다. */
       await insertContract(client, {
         contractId,
         companyId,
@@ -444,7 +469,42 @@ export function registerContractRoutes(app: FastifyInstance): void {
       await insertStatusHistory(client, {
         historyId: randomUUID(), contractId, fromStatus: null, toStatus: status, actor,
       });
-      return { kind: 'ok' as const };
+
+      /* ══════════════════════════════════════════════════════════════════════
+         ★★★ 재계약 확정 — **같은 트랜잭션에서** 이전 계약을 닫는다
+         ══════════════════════════════════════════════════════════════════════
+         하나만 바뀌고 멈추면 두 계약이 동시에 계약중이거나(호실이 이중으로 잡힌다)
+         둘 다 끝난 상태(입주사에 유효 계약이 없다)가 된다.
+
+         ★ **확정일 때만** 닫는다. 임시저장된 재계약은 아직 계약이 아니다 —
+           애초에 재계약 화면에 [임시저장] 이 없다.
+
+         ★ 이미 종료·취소된 계약은 건드리지 않는다(`closesPrevious`). 다시 닫으면
+           종료일자와 사유가 덮여서 원래 왜 끝났는지가 사라진다.
+
+         ★ 종료일자는 **이전 계약의 원래 종료일**이다. 오늘을 넣으면 만기 전 재계약에서
+           이전 계약이 실제보다 짧았던 것으로 남고, 그 날짜가 정산에 쓰인다.
+
+         ★ 상태 이력도 **두 계약 모두** 남는다. 새 계약은 위에서, 이전 계약은 여기서. */
+      if (status === 'confirmed' && previous && closesPrevious(previous.status)) {
+        await updateStatus(client, {
+          contractId: previous.contract_id,
+          toStatus: 'terminated',
+          terminatedDate: previous.end_date,
+          terminationReason: PREVIOUS_TERMINATION_REASON,
+          actor,
+        });
+        await insertStatusHistory(client, {
+          historyId: randomUUID(),
+          contractId: previous.contract_id,
+          fromStatus: previous.status,
+          toStatus: 'terminated',
+          actor,
+        });
+        return { kind: 'ok' as const, closedPrevious: previous.contract_id };
+      }
+
+      return { kind: 'ok' as const, closedPrevious: null };
     });
 
     if (created.kind === 'bad_renewal') {
@@ -458,7 +518,14 @@ export function registerContractRoutes(app: FastifyInstance): void {
       // ★ 끄지 말 것. 프런트가 Math.round 를 쓰는 동안 계속 뜬다 — 그게 이 경고의 목적이다.
       req.log.warn({ contractId, mismatches: write.warnings }, '화면 금액이 서버 계산과 어긋났다 — 서버 값을 저장했다');
     }
-    return reply.code(201).send({ contractId, status, warnings: write.warnings });
+    // ★ 이전 계약을 닫았는지 알려 준다. 화면이 「이전 계약이 종료됐습니다」를 말할
+    //   근거이고, 검증 스크립트가 보는 값이기도 하다.
+    return reply.code(201).send({
+      contractId,
+      status,
+      warnings: write.warnings,
+      closedPrevious: created.closedPrevious,
+    });
   });
 
   // ── 섹션2 수정 ──────────────────────────────────────────────────────────
@@ -496,6 +563,21 @@ export function registerContractRoutes(app: FastifyInstance): void {
         renewedFromContractId: contract.renewed_from_contract_id,
       });
 
+      /*
+       * ★ 재계약이면 시작일 검사도 **여기서 다시** 한다. 등록에서만 보면 저장 뒤에
+       *   시작일을 이전 종료일 위로 끌어올려 하루 겹침을 만들 수 있다.
+       *
+       * ★ 저장된 `renewed_from_contract_id` 를 쓴다 — 본문이 보낸 값을 믿지 않는다.
+       */
+      if (contract.renewed_from_contract_id) {
+        const previous = await findContract(client, contract.renewed_from_contract_id);
+        const message = rejectRenewalStart(
+          toDay(write.contract.startDate),
+          previous && toDay(previous.end_date),
+        );
+        if (message) return { kind: 'bad_renewal' as const, message };
+      }
+
       const conflict = await roomConflict(client, write.contract.contractRoom, self);
       if (conflict) return { kind: 'room_taken' as const, conflict };
 
@@ -513,6 +595,9 @@ export function registerContractRoutes(app: FastifyInstance): void {
       return { kind: 'ok' as const };
     });
 
+    if (result.kind === 'bad_renewal') {
+      return reply.code(400).send({ error: 'invalid_renewal', message: result.message });
+    }
     if (result.kind === 'room_taken') return roomTaken(reply, result.conflict);
     if (result.kind === 'space_taken') return spaceTaken(reply, result.message);
     if (result.kind === 'not_found') return notFound(reply);

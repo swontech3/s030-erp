@@ -20,6 +20,7 @@
  * 상태 문자열은 화면·DB·다른 서비스 어디서든 올 수 있다. 오타 하나가 "잠기지 않음"
  * 으로 읽히면 확정된 계약의 금액이 바뀐다. 판단이 안 서면 잠근다.
  */
+import { daysBetweenLocal, parseDay } from './day.ts';
 
 /**
  * 저장되는 계약 상태 — 넷이다.
@@ -122,4 +123,68 @@ export function editableSections(status: string | null): ContractSection[] {
   if (status === null || status === 'draft') return [...ALL_SECTIONS];
   if (status === 'confirmed') return [...SECTIONS_WITHOUT_CONTRACT];
   return [...NO_SECTIONS]; // terminated · cancelled · 모르는 값
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   기간 만료 — **상태가 아니라 날짜다**
+   ══════════════════════════════════════════════════════════════════════════
+   ★★★ 종료일이 지나도 저장된 상태는 `confirmed` **그대로**다.
+
+   자동으로 종료하는 배치를 만들지 않기로 했다. 운영자가 입주사에게 재계약 의사를
+   확인한 뒤에 손으로 닫는다 — 그 사이에 시스템이 먼저 닫아 버리면 아직 이야기 중인
+   계약이 끝난 것으로 보이고, 되돌리는 전이가 없어 **재계약으로만 복구할 수 있다.**
+
+   ★ 그래서 만료된 계약도 **호실을 계속 잡는다**(`ROOM_LIVE_STATUSES` 가 상태만 본다).
+     확인하는 동안 호실이 다른 회사에 넘어가면 안 된다. 자동으로 풀지 않는 것이 규칙이고
+     실수가 아니다.
+
+   ★ 만료는 **코드 테이블에 없다.** 저장되지 않는 이름이 `CONTRACT_ST` 에 끼면 상태가
+     다섯 개인 것처럼 보인다. 화면 문구로만 쓴다.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 종료 처리가 남은 계약인가 — 「기간 만료」 칩과 계약 행의 「만료」가 같은 판정을 본다.
+ *
+ * ★ **확정된 계약만** 만료된다. 이미 닫힌(`terminated`·`cancelled`) 계약은 할 일이
+ *   없고, `draft` 는 아직 계약이 아니다.
+ *
+ * ★ **종료일 당일은 만료가 아니다.** 재계약 시작일이 「종료일 다음 날부터」인 것과
+ *   같은 경계다 — 두 곳이 갈리면 종료일 당일에 계약이 없는 하루가 생긴다.
+ */
+export function isContractExpired(args: { status: string; endDate: Date; today: Date }): boolean {
+  if (args.status !== 'confirmed') return false;
+  return daysBetweenLocal(args.today, args.endDate) < 0;
+}
+
+/** 기간 만료로 닫을 때의 사유. 화면이 기본값으로 채우고 운영자가 고칠 수 있다. */
+export const EXPIRED_TERMINATION_REASON = '계약기간 만료로 계약 종료';
+
+/**
+ * [계약종료] 확인 모달의 첫 값.
+ *
+ * ★★ 만료된 계약이면 종료일자가 **오늘이 아니라 원래 종료일**이다. 뒤늦게 닫는
+ *    것이라 오늘을 넣으면 계약이 실제보다 길었던 것으로 남고, 그 날짜가 정산에 쓰인다.
+ *    실제 퇴실일이 다르면 운영자가 바꾼다 — **기본값일 뿐이다.**
+ *
+ * ★ 아직 안 끝난 계약을 중도에 닫는 것이면 사유를 지어내지 않는다. 오늘 날짜만 준다.
+ *
+ * ★ [종료] 버튼은 `confirmed` 에서만 보이므로 상태를 받지 않는다. 판정은
+ *   `isContractExpired` 한 곳이다.
+ *
+ * @param endDate 계약 종료일 `YYYY-MM-DD`. 읽을 수 없으면 만료가 아닌 것으로 본다
+ *   — 모르는 날짜를 종료일자로 박아 넣지 않는다.
+ * @param today 오늘 `YYYY-MM-DD`. 부르는 쪽의 시간대를 여기서 추측하지 않는다.
+ */
+export function terminationDefaults(args: { endDate: string; today: string }): {
+  terminatedDate: string;
+  reason: string;
+} {
+  const end = parseDay(args.endDate);
+  const today = parseDay(args.today);
+  const expired =
+    end !== null && today !== null && isContractExpired({ status: 'confirmed', endDate: end, today });
+
+  return expired
+    ? { terminatedDate: args.endDate, reason: EXPIRED_TERMINATION_REASON }
+    : { terminatedDate: args.today, reason: '' };
 }

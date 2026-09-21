@@ -22,7 +22,10 @@
  * 사용: node --experimental-strip-types scripts/verify-4-6.js
  */
 import Fastify from 'fastify';
+import { randomUUID } from 'node:crypto';
 import { registerContractRoutes } from '../packages/api/src/routes/contracts.ts';
+import { PREVIOUS_TERMINATION_REASON } from '../packages/shared/src/domain/contract-renewal.ts';
+import { dayAfter } from '../packages/shared/src/domain/day.ts';
 import { pool, closePool } from '../packages/api/src/db/pool.ts';
 import { withCompanyScope } from '../packages/api/src/db/withCompanyScope.ts';
 
@@ -117,30 +120,42 @@ const json = (res) => {
               JOIN public.tb_s080_contracts k ON k.contract_id = cs.contract_id
              WHERE cs.space_id = s.space_id AND k.status IN ('confirmed', 'draft'))
         ORDER BY s.room_name
-        LIMIT 1`,
+        LIMIT 3`,
       [BUILD_ID],
     ),
   );
 
-  if (!BUILD_ID || companyRows.length < 2 || spaceRows.length < 1) {
-    console.error('✘ 건물·회사 2곳·비상주 호실이 모자라 검증할 수 없다');
+  if (!BUILD_ID || companyRows.length < 2 || spaceRows.length < 3) {
+    console.error('✘ 건물·회사 2곳·빈 비상주 호실 3실이 모자라 검증할 수 없다');
     process.exit(1);
   }
 
   const COMPANY_A = companyRows[0].company_id;
   const COMPANY_B = companyRows[1].company_id;
+  /*
+   * ★ 호실이 **둘** 필요하다. 앞부분(1~7)이 만든 재계약(계약대기)이 첫 호실과 첫
+   *   계약호실을 계속 붙들고 있어서, 뒷부분(8~10)이 같은 값을 다시 쓰면 그 draft 와
+   *   부딪힌다 — 재계약 규칙과 무관한 실패다.
+   */
   const VR = spaceRows[0];
+  const VR2 = spaceRows[1];
+  /** 10번(서류 부족 롤백) 전용. 8~9번이 VR2 를 붙들고 있어 또 쓸 수 없다. */
+  const VR3 = spaceRows[2];
   /** 계약호실 — 실재 번호와 겹치지 않도록 표식에서 만든다. */
   const ROOM = `V9-${String(Date.now()).slice(-5)}`;
+  const ROOM2 = `${ROOM}-2`;
+  /** 이전 계약이 2026-01-02 + 12개월 → 종료일 2027-01-01. 재계약은 그 **다음 날**부터다. */
+  const RENEW_START = '2027-01-02';
 
   console.log(
-    `준비 — build=${BUILD_ID} A=${COMPANY_A} B=${COMPANY_B} 비상주=${VR.room_name} 계약호실=${ROOM}\n`,
+    `준비 — build=${BUILD_ID} A=${COMPANY_A} B=${COMPANY_B}\n` +
+      `       비상주=${VR.room_name}·${VR2.room_name}·${VR3.room_name} 계약호실=${ROOM}·${ROOM2}\n`,
   );
 
-  const vrSpace = () => ({
-    roomType: VR.room_type,
-    spaceId: VR.space_id,
-    standardFee: VR.standard_fee ?? 0,
+  const vrSpace = (space = VR) => ({
+    roomType: space.room_type,
+    spaceId: space.space_id,
+    standardFee: space.standard_fee ?? 0,
     deposit: 0,
     monthlyFee: 30_000,
     vatYn: true,
@@ -160,6 +175,8 @@ const json = (res) => {
 
   const op = buildApp(operatorSession(COMPANY_A));
   const created = [];
+  /** 검증 도중에 **직접** 지운 계약 수. 마지막 대조에서 뺀다. */
+  let createdRemoved = 0;
 
   try {
     // ── 1. 이전 계약 — 계약중(confirmed) 인 비상주 계약 ──────────────────────
@@ -187,12 +204,20 @@ const json = (res) => {
         : `  · 계약대기로 둔다(첨부 게이트: ${json(res).message ?? res.statusCode}) — 살아 있는 계약인 것은 같다`,
     );
 
-    // ── 2. ★★ 재계약 — 같은 호실·같은 계약호실로 저장된다 ────────────────────
+    /*
+     * ── 2. ★★ 재계약 — 같은 호실·같은 계약호실로 저장된다 ────────────────────
+     * ★ 시작일은 **이전 종료일 다음 날**이어야 한다(8번이 그 경계를 따로 본다).
+     *   이전 계약이 2026-01-02 + 12개월이라 종료일은 2027-01-01 이다.
+     */
     console.log('\n2. ★★ 재계약 — 이전 계약을 「자기」로 본다');
     res = await op.inject({
       method: 'POST',
       url: '/contracts',
-      payload: body({ companyId: COMPANY_A, renewedFromContractId: prev.contractId }),
+      payload: body({
+        companyId: COMPANY_A,
+        startDate: RENEW_START,
+        renewedFromContractId: prev.contractId,
+      }),
     });
     const renewal = json(res);
     check(
@@ -293,7 +318,7 @@ const json = (res) => {
     res = await op.inject({
       method: 'PATCH',
       url: `/contracts/${renewal.contractId}`,
-      payload: body({ companyId: COMPANY_A }),
+      payload: body({ companyId: COMPANY_A, startDate: RENEW_START }),
     });
     check(
       '★ 자기와 이전 계약을 둘 다 빼므로 막히지 않는다',
@@ -302,6 +327,209 @@ const json = (res) => {
       res.statusCode === 200 || json(res).error === 'contract_locked',
       `${res.statusCode} ${res.body}`,
     );
+
+    /* ════════════════════════════════════════════════════════════════════════
+       여기부터는 **두 번째 호실·두 번째 계약호실**을 쓴다.
+       위에서 만든 재계약(계약대기)이 첫 호실과 ROOM 을 아직 붙들고 있어서,
+       같은 값으로 또 만들면 그 draft 와 부딪힌다 — 재계약 규칙과 무관한 실패다.
+       ════════════════════════════════════════════════════════════════════════ */
+
+    // ── 8. 시작일 경계 — 종료일 당일은 막히고 다음 날은 된다 ────────────────
+    console.log('\n8. ★★ 시작일 경계 — 하루도 겹치지 않는다');
+    res = await op.inject({
+      method: 'POST',
+      url: '/contracts',
+      payload: body({
+        companyId: COMPANY_A,
+        contractRoom: ROOM2,
+        spaces: [vrSpace(VR2)],
+        startDate: '2026-01-02',
+        periodMonths: 12,
+      }),
+    });
+    const prev2 = json(res);
+    check('두 번째 이전 계약이 만들어진다', res.statusCode === 201, `${res.statusCode} ${res.body}`);
+    if (prev2.contractId) created.push(prev2.contractId);
+
+    res = await op.inject({ method: 'GET', url: `/contracts/${prev2.contractId}` });
+    const prev2End = String(json(res).endDate).slice(0, 10);
+    console.log(`  · 이전 계약 종료일 = ${prev2End}`);
+
+    // 종료일 **당일**로 시작하는 재계약 — 하루 겹친다.
+    res = await op.inject({
+      method: 'POST',
+      url: '/contracts',
+      payload: body({
+        companyId: COMPANY_A,
+        contractRoom: ROOM2,
+        spaces: [vrSpace(VR2)],
+        startDate: prev2End,
+        renewedFromContractId: prev2.contractId,
+      }),
+    });
+    if (json(res).contractId) created.push(json(res).contractId);
+    check(
+      '★★ 시작일 = 이전 종료일 → 400 으로 막힌다 (하루 겹침)',
+      res.statusCode === 400 && json(res).error === 'invalid_renewal',
+      `${res.statusCode} ${res.body}`,
+    );
+
+    // ── 9. 재계약 확정 — 한 번에 두 계약 ────────────────────────────────────
+    console.log('\n9. ★★★ 재계약 확정 — 새 계약 계약중 · 이전 계약 계약종료');
+    // 이전 계약을 계약중으로 올린다. 여기서 막히면 9번 전체가 성립하지 않는다.
+    res = await op.inject({
+      method: 'POST',
+      url: `/contracts/${prev2.contractId}/status`,
+      payload: { to: 'confirmed' },
+    });
+    check('이전 계약을 계약중으로 올렸다', res.statusCode === 200, `${res.statusCode} ${res.body}`);
+
+    const nextStart = dayAfter(prev2End);
+    res = await op.inject({
+      method: 'POST',
+      url: '/contracts',
+      payload: body({
+        companyId: COMPANY_A,
+        contractRoom: ROOM2,
+        spaces: [vrSpace(VR2)],
+        startDate: nextStart,
+        status: 'confirmed',
+        renewedFromContractId: prev2.contractId,
+      }),
+    });
+    const renewal2 = json(res);
+    if (renewal2.contractId) created.push(renewal2.contractId);
+    check(
+      `★ 시작일 = 이전 종료일 다음 날(${nextStart}) → 확정된다`,
+      res.statusCode === 201,
+      `${res.statusCode} ${res.body}`,
+    );
+    check(
+      '★ 이전 계약을 닫았다고 응답이 말한다',
+      renewal2.closedPrevious === prev2.contractId,
+      String(renewal2.closedPrevious),
+    );
+
+    res = await op.inject({ method: 'GET', url: `/contracts/${renewal2.contractId}` });
+    check("★ 새 계약이 'confirmed' 다", json(res).status === 'confirmed', String(json(res).status));
+
+    res = await op.inject({ method: 'GET', url: `/contracts/${prev2.contractId}` });
+    const closed = json(res);
+    check("★★ 이전 계약이 'terminated' 로 닫혔다", closed.status === 'terminated', String(closed.status));
+    check(
+      '★ 종료일자 = 이전 계약의 **원래 종료일** (오늘이 아니다)',
+      String(closed.terminatedDate).slice(0, 10) === prev2End,
+      `${String(closed.terminatedDate).slice(0, 10)} ≠ ${prev2End}`,
+    );
+    check(
+      '★ 사유가 「재계약으로 계약 종료」다',
+      closed.terminationReason === PREVIOUS_TERMINATION_REASON,
+      String(closed.terminationReason),
+    );
+
+    // 상태 이력 — **두 계약 모두** 남는다.
+    const hist = await asOperator((c) =>
+      c.query(
+        `SELECT contract_id, from_status, to_status
+           FROM public.tb_s080_contract_status_history
+          WHERE contract_id = ANY($1::text[]) ORDER BY changed_at`,
+        [[prev2.contractId, renewal2.contractId]],
+      ),
+    );
+    check(
+      '★ 이전 계약에 confirmed → terminated 이력이 남았다',
+      hist.rows.some(
+        (r) => r.contract_id === prev2.contractId && r.from_status === 'confirmed' && r.to_status === 'terminated',
+      ),
+      JSON.stringify(hist.rows),
+    );
+    check(
+      '★ 새 계약에 최초 생성(confirmed) 이력이 남았다',
+      hist.rows.some(
+        (r) => r.contract_id === renewal2.contractId && r.from_status === null && r.to_status === 'confirmed',
+      ),
+      JSON.stringify(hist.rows),
+    );
+
+    // ── 10. ★★★ 확정이 막히면 **둘 다 그대로** ─────────────────────────────
+    console.log('\n10. ★★★ 확정이 막히면 아무것도 저장되지 않는다');
+    /*
+     * 서류가 없는 회사를 **이 검증이 직접 만든다.** 개발계의 회사는 넷 다 서류가
+     * 갖춰져 있어서 그대로는 이 길을 밟을 수 없고, 남의 서류를 지웠다 되돌리는 것은
+     * 검증이 할 일이 아니다. 만든 회사는 마지막에 지운다.
+     */
+    const tmpCompany = randomUUID();
+    await asOperator((c) =>
+      c.query(
+        `INSERT INTO public.tb_s080_companies
+           (company_id, build_id, company_name, member_type, updated_at, created_at)
+         VALUES ($1, $2, $3, 'R', now(), now())`,
+        [tmpCompany, BUILD_ID, `${TAG}-서류없는회사`],
+      ),
+    );
+
+    res = await op.inject({
+      method: 'POST',
+      url: '/contracts',
+      payload: body({
+        companyId: tmpCompany,
+        contractRoom: `${ROOM}-D`,
+        spaces: [vrSpace(VR3)],
+        startDate: '2026-01-02',
+        periodMonths: 12,
+      }),
+    });
+    const bare = json(res);
+    if (bare.contractId) created.push(bare.contractId);
+    check('서류 없는 회사도 계약대기로는 만들어진다', res.statusCode === 201, `${res.statusCode} ${res.body}`);
+
+    const before = await asOperator((c) =>
+      c.query(`SELECT count(*)::int n FROM public.tb_s080_contracts WHERE company_id = $1`, [tmpCompany]),
+    );
+
+    res = await op.inject({
+      method: 'POST',
+      url: '/contracts',
+      payload: body({
+        companyId: tmpCompany,
+        contractRoom: `${ROOM}-D`,
+        spaces: [vrSpace(VR3)],
+        startDate: '2027-01-02',
+        status: 'confirmed',
+        renewedFromContractId: bare.contractId,
+      }),
+    });
+    if (json(res).contractId) created.push(json(res).contractId);
+    check(
+      '★ 서류 부족으로 확정이 막힌다 — 409',
+      res.statusCode === 409 && json(res).error === 'docs_missing',
+      `${res.statusCode} ${res.body}`,
+    );
+
+    const after = await asOperator((c) =>
+      c.query(`SELECT count(*)::int n, min(status) s FROM public.tb_s080_contracts WHERE company_id = $1`, [
+        tmpCompany,
+      ]),
+    );
+    check(
+      '★★ 새 계약이 만들어지지 않았다 — 검사가 쓰기보다 앞선다',
+      after.rows[0].n === before.rows[0].n,
+      `${before.rows[0].n} → ${after.rows[0].n}`,
+    );
+    check(
+      '★★ 이전 계약이 그대로다 — 닫히지 않았다',
+      after.rows[0].s === 'draft',
+      String(after.rows[0].s),
+    );
+
+    await asOperator((c) =>
+      c.query(`DELETE FROM public.tb_s080_contracts WHERE company_id = $1`, [tmpCompany]),
+    );
+    await asOperator((c) =>
+      c.query(`DELETE FROM public.tb_s080_companies WHERE company_id = $1`, [tmpCompany]),
+    );
+    // 위에서 직접 지웠으므로 마지막 대조에서 빼 준다.
+    createdRemoved += created.filter((id) => id === bare.contractId).length;
   } finally {
     await op.close();
 
@@ -316,12 +544,16 @@ const json = (res) => {
     const del = await asOperator((c) =>
       c.query(`DELETE FROM public.tb_s080_contracts WHERE memo = $1 RETURNING contract_id`, [TAG]),
     );
-    console.log(`  계약 ${del.rowCount}건 삭제 (${created.length}건 만들었다)`);
+    console.log(`  계약 ${del.rowCount}건 삭제 (${created.length}건 만들고 ${createdRemoved}건은 도중에 지웠다)`);
     const left = await asOperator((c) =>
       c.query(`SELECT count(*)::int n FROM public.tb_s080_contracts WHERE memo = $1`, [TAG]),
     );
     check('검증 데이터가 남지 않았다', left.rows[0].n === 0, `${left.rows[0].n}행 남음`);
-    check('만든 만큼 지웠다', del.rowCount === created.length, `${del.rowCount} ≠ ${created.length}`);
+    check(
+      '만든 만큼 지웠다',
+      del.rowCount === created.length - createdRemoved,
+      `${del.rowCount} ≠ ${created.length} - ${createdRemoved}`,
+    );
     await closePool();
   }
 

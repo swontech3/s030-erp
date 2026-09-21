@@ -5,6 +5,7 @@
  *   이 파일은 서버가 준 값을 화면 문자열로 바꾸는 일만 한다.
  */
 import type { TenantFilterKey } from '@swonbiz/shared/domain/tenant-status';
+import { isContractExpired } from '@swonbiz/shared/domain/contract-status';
 import { contractStatusNameFromMap } from '@/features/contracts/contract-status-name';
 
 /** `GET /companies` 의 한 줄. */
@@ -109,7 +110,11 @@ export function contractStatusLabel(
   today: Date,
   codeNames: Readonly<Record<string, string>>,
 ): string {
-  if (contract.status === 'confirmed' && daysUntil(contract.endDate, today) < 0) return '만료';
+  // ★ 판정은 `isContractExpired` 한 곳이다 — 「기간 만료」 칩이 같은 함수를 본다.
+  //   두 벌이면 행은 만료라는데 칩에는 안 뜨는 상태가 된다.
+  if (isContractExpired({ status: contract.status, endDate: new Date(contract.endDate), today })) {
+    return '만료';
+  }
   return contractStatusNameFromMap(codeNames, contract.status);
 }
 

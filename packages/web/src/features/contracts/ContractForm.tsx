@@ -190,11 +190,26 @@ const TITLES: Record<Mode, string> = {
  */
 const ACTIONS: Record<Mode, readonly ActionKey[]> = {
   create: ['back', 'draftSave', 'confirm'],
+  // ★ 재계약은 아래 `RENEWAL_ACTIONS` 로 갈아 끼운다 — 모드는 그대로 `create` 다.
   draft: ['back', 'cancel', 'draftSave', 'confirm'],
   confirmed: ['back', 'docs', 'terminate', 'save'],
   terminated: ['back', 'docs'],
   cancelled: ['back', 'docs'],
 };
+
+/**
+ * 재계약의 헤더 버튼 — **[임시저장] 이 없다.**
+ *
+ * ★★ 재계약은 입주사가 **계약 의사를 밝힌 것**이라 작성 중 상태가 필요 없다.
+ *    임시저장을 두면 「아직 계약이 아닌 재계약」이 생기고, 그동안 이전 계약은 닫히지
+ *    않은 채 두 계약이 같은 호실을 들고 있게 된다 — 아무도 그걸 정리하지 않는다.
+ *
+ * ★ 그래서 **이전 계약을 닫는 시점도 하나**로 정해진다: 확정하는 순간.
+ *
+ * ★ 재계약하기로 했다가 안 하게 되면 **[계약종료]** 로 처리한다. 확정된 계약이라
+ *   계약취소는 없다(`assertTransition` 에 `confirmed → cancelled` 가 없다).
+ */
+const RENEWAL_ACTIONS: readonly ActionKey[] = ['back', 'confirm'];
 
 type ActionKey = 'back' | 'cancel' | 'draftSave' | 'confirm' | 'docs' | 'terminate' | 'save';
 
@@ -791,7 +806,7 @@ export function ContractForm({
             ) : null}
           </div>
           <div className={styles.headActions}>
-            {ACTIONS[mode].map((key) => {
+            {(renewal ? RENEWAL_ACTIONS : ACTIONS[mode]).map((key) => {
               const def = ACTION_DEFS[key];
               return (
                 <button
@@ -859,6 +874,8 @@ export function ContractForm({
             companyId={companyId}
             memberType={companyState.memberType}
             disabled={frozen}
+            // ★ 재계약에는 [임시저장] 이 없다 — 안내 문구가 그걸 따라간다.
+            draftable={!renewal}
             onNotify={notify}
             onBizReg={applyBizReg}
             pending={pendingDocs}
@@ -902,6 +919,13 @@ export function ContractForm({
         <ConfirmDialog
           kind={confirmKind}
           busy={busy}
+          /*
+           * ★ 저장된 종료일을 넘긴다 — **`terms` 의 계산값이 아니다.** 종료를 누르는
+           *   시점의 계약은 `confirmed` 라 섹션 2 가 잠겨 있고, 화면 값과 저장값이 같다.
+           *   그래도 닫는 근거는 **저장된 쪽**이어야 한다.
+           * ★ `toDateInput` 을 거친다 — 응답의 ISO 를 그대로 넘기면 하루가 밀린다.
+           */
+          endDate={toDateInput(contract?.endDate ?? null)}
           statusNames={statusNames}
           onClose={() => setConfirmKind(null)}
           onOk={(result) => void onConfirmOk(result)}

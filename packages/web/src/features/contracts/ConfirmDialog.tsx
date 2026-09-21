@@ -16,6 +16,7 @@
  *   구성이 다르므로 시안(화면 정본)을 따랐다. 판단이 필요한 자리라 보고 항목에 올린다.
  */
 import { useState } from 'react';
+import { terminationDefaults } from '@swonbiz/shared/domain/contract-status';
 import { Icon, type IconName } from '@/components/ds';
 import styles from './contract-form.module.css';
 
@@ -81,6 +82,14 @@ interface Props {
   kind: ConfirmKind;
   busy: boolean;
   /**
+   * 종료할 계약의 **원래 종료일** `YYYY-MM-DD` — `terminate` 에서만 쓴다.
+   *
+   * ★★ 종료일이 지난 계약이면 종료일자 기본값이 **오늘이 아니라 이 값**이다.
+   *    뒤늦게 닫는 것이라 오늘을 넣으면 계약이 실제보다 길었던 것으로 남는다.
+   *    판정과 기본값은 `terminationDefaults` 한 곳이다.
+   */
+  endDate?: string;
+  /**
    * 상태 표시명 — 코드 `CONTRACT_ST` / `use_tp='000'`.
    * 확정 버튼이 결과 상태의 이름을 그대로 쓴다(`Def.okStatus`).
    */
@@ -89,7 +98,7 @@ interface Props {
   onOk: (result: ConfirmResult) => void;
 }
 
-export function ConfirmDialog({ kind, busy, statusNames, onClose, onOk }: Props) {
+export function ConfirmDialog({ kind, busy, endDate, statusNames, onClose, onOk }: Props) {
   const def = DEFS[kind];
   /**
    * ★ 제목·설명은 그대로 둔다. 「계약을 종료하시겠습니까?」의 **종료는 동작**이고
@@ -97,9 +106,19 @@ export function ConfirmDialog({ kind, busy, statusNames, onClose, onOk }: Props)
    *   바꾸면 「계약을 계약종료하시겠습니까?」가 된다.
    */
   const okLabel = def.okStatus ? (statusNames[def.okStatus] ?? def.okLabel) : def.okLabel;
-  // 종료일 기본값은 오늘이다. 로컬 날짜로 만든다 — toISOString 은 UTC 라 저녁에 하루 밀린다.
-  const [date, setDate] = useState(() => localToday());
-  const [reason, setReason] = useState('');
+  /*
+   * 종료일자·사유의 첫 값 — **판정은 `terminationDefaults` 한 곳**이다.
+   *
+   * ★ 만료된 계약이면 원래 종료일 + 「계약기간 만료로 계약 종료」, 아직 안 끝난 계약을
+   *   중도에 닫는 것이면 오늘 + 빈 사유.
+   *
+   * ★ 「오늘」은 **로컬 날짜**로 만든다 — `toISOString` 은 UTC 라 저녁에 하루 밀린다.
+   *
+   * ★ 둘 다 **기본값일 뿐이다.** 실제 퇴실일이 다르면 운영자가 바꾼다.
+   */
+  const seed = terminationDefaults({ endDate: endDate ?? '', today: localToday() });
+  const [date, setDate] = useState(seed.terminatedDate);
+  const [reason, setReason] = useState(seed.reason);
 
   return (
     <div

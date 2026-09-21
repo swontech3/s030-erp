@@ -55,9 +55,20 @@ interface Props {
   soonDays: number;
 }
 
+/**
+ * ★★ 「기간 만료」와 「종료」는 **다르다.**
+ *   기간 만료  종료일이 지났는데 아직 계약중 — **운영자가 할 일이 남았다**
+ *   종료       종료 처리가 끝났다
+ *
+ * 자동 종료 배치를 만들지 않기로 했으므로 둘은 사람이 처리했는지로 갈린다. 한 칩에
+ * 섞으면 **처리한 곳과 안 한 곳이 뒤섞여** 어디를 봐야 하는지 알 수 없다.
+ *
+ * ★ 「만기 임박」 다음에 둔다 — 시간 순서(임박 → 만료 → 종료)로 읽힌다.
+ */
 const CHIPS: { key: TenantFilterKey; label: string }[] = [
   { key: 'active', label: '계약중' },
   { key: 'soon', label: '만기 임박' },
+  { key: 'expired', label: '기간 만료' },
   { key: 'review', label: '검토중' },
   { key: 'ended', label: '종료' },
 ];

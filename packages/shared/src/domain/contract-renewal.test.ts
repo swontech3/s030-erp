@@ -9,8 +9,11 @@
 import { describe, it, expect } from 'vitest';
 import { calcEndDate } from './contract-amounts.ts';
 import {
+  PREVIOUS_TERMINATION_REASON,
   buildRenewalSeed,
+  closesPrevious,
   rejectRenewal,
+  rejectRenewalStart,
   selfContractIds,
   type RenewalSource,
 } from './contract-renewal.ts';
@@ -191,5 +194,71 @@ describe('rejectRenewal', () => {
   it('종료·취소된 계약도 이어받을 수 있다', () => {
     expect(rejectRenewal({ companyId: 'c-1', status: 'terminated' }, 'c-1')).toBeNull();
     expect(rejectRenewal({ companyId: 'c-1', status: 'cancelled' }, 'c-1')).toBeNull();
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   시작일 검사 — 하루도 겹치지 않는다
+   ══════════════════════════════════════════════════════════════════════════
+   씨앗이 종료일 다음 날을 **기본값**으로 넣지만 운영자가 바꿀 수 있다. 그래서 검사가
+   따로 있어야 하고, 화면과 서버가 **같은 함수**를 본다 — 화면만 막으면 API 로 통과한다.
+
+   ★ 겹치면 두 계약이 같은 날 같은 호실을 동시에 들고, 그 상태는 재계약 예외
+     (`selfContractIds`)가 **허용하는 모양**이라 아무도 못 알아챈다. */
+describe('rejectRenewalStart', () => {
+  const PREV_END = '2026-12-31';
+
+  it('★ 종료일 다음 날이면 통과한다', () => {
+    expect(rejectRenewalStart('2027-01-01', PREV_END)).toBeNull();
+  });
+
+  it('그 뒤 날짜도 통과한다 — 비는 기간은 막지 않는다', () => {
+    expect(rejectRenewalStart('2027-03-01', PREV_END)).toBeNull();
+  });
+
+  /** ★★ 하루 겹침. 종료일 당일까지는 이전 계약이 살아 있다. */
+  it('★★ 종료일 당일은 막힌다', () => {
+    expect(rejectRenewalStart(PREV_END, PREV_END)).toContain('2026-12-31');
+    expect(rejectRenewalStart(PREV_END, PREV_END)).toContain('다음 날');
+  });
+
+  it('★ 종료일보다 앞이면 막힌다', () => {
+    expect(rejectRenewalStart('2026-06-01', PREV_END)).not.toBeNull();
+  });
+
+  /** ★ 검사할 근거가 없으면 통과시킨다 — 여기서 지어내지 않는다. */
+  it('이전 종료일을 모르면 검사하지 않는다', () => {
+    expect(rejectRenewalStart('2027-01-01', null)).toBeNull();
+    expect(rejectRenewalStart('2027-01-01', '')).toBeNull();
+    expect(rejectRenewalStart('2027-01-01', '2026-02-31')).toBeNull();
+  });
+
+  it('시작일을 읽을 수 없으면 여기서 막지 않는다 — 형식 검사는 다른 자리다', () => {
+    expect(rejectRenewalStart('', PREV_END)).toBeNull();
+    expect(rejectRenewalStart('2027-01-01T00:00:00.000Z', PREV_END)).toBeNull();
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   확정 한 번에 두 계약 — 이전 계약을 닫는다
+   ══════════════════════════════════════════════════════════════════════════ */
+describe('closesPrevious', () => {
+  it('★ 살아 있는 계약은 닫는다', () => {
+    expect(closesPrevious('confirmed')).toBe(true);
+    expect(closesPrevious('draft')).toBe(true);
+  });
+
+  /** ★ 이미 끝난 계약을 다시 닫으면 종료일자와 사유가 덮인다 — 남은 기록을 지운다. */
+  it('★ 이미 종료·취소된 계약은 건드리지 않는다', () => {
+    expect(closesPrevious('terminated')).toBe(false);
+    expect(closesPrevious('cancelled')).toBe(false);
+  });
+
+  it('모르는 상태는 건드리지 않는다 — 모르면 손대지 않는다', () => {
+    expect(closesPrevious('zzz')).toBe(false);
+  });
+
+  it('사유 문구가 「재계약으로 계약 종료」다', () => {
+    expect(PREVIOUS_TERMINATION_REASON).toBe('재계약으로 계약 종료');
   });
 });
