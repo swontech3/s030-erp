@@ -1158,6 +1158,10 @@ function renewalSourceOf(prev: ContractResponse): RenewalSource {
     paymentMethod: prev.paymentMethod,
     accessRoute: prev.accessRoute,
     periodMonths: prev.periodMonths,
+    // ★ 시작일 규칙이 이 값으로 갈린다(`isPreviousLive`) — 닫힌 계약이면 오늘부터다.
+    status: prev.status,
+    // ★ 특기사항 문구의 「이전 계약 기간」에 쓴다.
+    startDate: toDateInput(prev.startDate),
     endDate: toDateInput(prev.endDate),
     spaces: prev.spaces,
   };
@@ -1187,9 +1191,13 @@ function seedTerms(
         contractDate: seed.contractDate,
         months: seed.months,
         startDate: seed.startDate,
-        // ★ 특기사항은 이어받지 않는다(`buildRenewalSeed` 주석). 할인 문구는 금액에서
-        //   다시 만들어진다.
-        memo: '',
+        /*
+         * ★★ 「재계약 (이전 계약 기간 …)」. **이전 계약의 특기사항이 아니다** —
+         *    어느 계약을 이어받았는지를 계약서에 남기는 새 문장이고, 운영자가 지우거나
+         *    고칠 수 있다.
+         * ★ 할인 문구는 이 줄 **위에** 얹힌다(`withDiscountLine`) — 덮지 않는다.
+         */
+        memo: seed.memo,
       };
     }
 

@@ -379,24 +379,14 @@ export function endDateIsoOf(startDate: string, months: string): string {
   return calcEndDate(start, periodMonths).toISOString().slice(0, 10);
 }
 
-/**
- * 기준가 대비 할인 문구. 차액이 없으면 빈 문자열이다.
- * ★ 표시 문구이지 저장값이 아니다 — 시안 문자열 형식을 그대로 옮긴다(`05-logic.md` §4).
+/*
+ * ★ 할인 문구와 특기사항 자동 줄 규칙은 **shared 로 옮겼다**(2026-09-21).
+ *   재계약이 특기사항 첫 줄에 문구를 넣게 되면서 **둘이 부딪히는지** 시험해야 했는데,
+ *   여기(웹)에는 시험 러너가 없어 걸 수가 없었다. `contract-memo.ts` 를 본다.
+ *
+ * ★ 화면 쪽 호출부가 바뀌지 않도록 여기서 다시 내보낸다.
  */
-export function discountLabel(standardFee: number, monthlyFee: number): string {
-  if (!standardFee || !monthlyFee || standardFee === monthlyFee) return '';
-  const diff = monthlyFee - standardFee;
-  const pct = Math.abs((diff / standardFee) * 100).toFixed(1);
-  return `기준가 대비 ${diff < 0 ? '-' : '+'}${comma(Math.abs(diff))}원 (${pct}${diff < 0 ? '% 할인)' : '% 추가)'}`;
-}
-
-/** 할인 문구를 특기사항 **첫 줄에만** 둔다. 사용자가 쓴 줄은 보존한다. */
-export function withDiscountLine(memo: string, line: string): string {
-  const lines = memo.split('\n');
-  const hasAuto = lines[0]?.startsWith('기준가 대비 ') ?? false;
-  const rest = hasAuto ? lines.slice(1) : lines;
-  return line ? [line, ...rest].join('\n') : rest.join('\n');
-}
+export { DISCOUNT_PREFIX, discountLabel, withDiscountLine } from '@swonbiz/shared/domain/contract-memo';
 
 /** 섹션 1 대표자 이메일 — 도메인 Select 와 직접입력 중 지금 유효한 쪽. */
 export function currentDomain(c: CompanyState): string {

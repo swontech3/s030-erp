@@ -38,7 +38,7 @@ import {
 import { missingDocsMessage } from '@swonbiz/shared/domain/contract-files';
 import {
   PREVIOUS_TERMINATION_REASON,
-  closesPrevious,
+  isPreviousLive,
   rejectRenewal,
   rejectRenewalStart,
   selfContractIds,
@@ -417,12 +417,16 @@ export function registerContractRoutes(app: FastifyInstance): void {
          * 재계약 예외(`selfContractIds`)가 **일부러 허용하는 모양**이라 중복 판정에
          * 걸리지 않는다. 즉 여기서 안 막으면 **아무도 못 알아챈다.**
          *
+         * ★★★ **이전 계약이 이미 닫혔으면 검사하지 않는다.** 겹칠 상대가 없고, 지나간
+         *      종료일에 맞추라고 하면 다시 들어오는 입주사가 **과거부터 계약해야 한다.**
+         *      그 판정도 화면과 같은 함수 안에 있다(`isPreviousLive`).
+         *
          * 화면과 **같은 함수**(`rejectRenewalStart`)를 부른다.
          */
-        const startMessage = rejectRenewalStart(
-          toDay(write.contract.startDate),
-          previous && toDay(previous.end_date),
-        );
+        const startMessage = rejectRenewalStart({
+          startDate: toDay(write.contract.startDate),
+          previous: previous && { status: previous.status, endDate: toDay(previous.end_date) },
+        });
         if (startMessage) return { kind: 'bad_renewal' as const, message: startMessage };
       }
 
@@ -479,14 +483,14 @@ export function registerContractRoutes(app: FastifyInstance): void {
          ★ **확정일 때만** 닫는다. 임시저장된 재계약은 아직 계약이 아니다 —
            애초에 재계약 화면에 [임시저장] 이 없다.
 
-         ★ 이미 종료·취소된 계약은 건드리지 않는다(`closesPrevious`). 다시 닫으면
+         ★ 이미 종료·취소된 계약은 건드리지 않는다(`isPreviousLive`). 다시 닫으면
            종료일자와 사유가 덮여서 원래 왜 끝났는지가 사라진다.
 
          ★ 종료일자는 **이전 계약의 원래 종료일**이다. 오늘을 넣으면 만기 전 재계약에서
            이전 계약이 실제보다 짧았던 것으로 남고, 그 날짜가 정산에 쓰인다.
 
          ★ 상태 이력도 **두 계약 모두** 남는다. 새 계약은 위에서, 이전 계약은 여기서. */
-      if (status === 'confirmed' && previous && closesPrevious(previous.status)) {
+      if (status === 'confirmed' && previous && isPreviousLive(previous.status)) {
         await updateStatus(client, {
           contractId: previous.contract_id,
           toStatus: 'terminated',
@@ -571,10 +575,10 @@ export function registerContractRoutes(app: FastifyInstance): void {
        */
       if (contract.renewed_from_contract_id) {
         const previous = await findContract(client, contract.renewed_from_contract_id);
-        const message = rejectRenewalStart(
-          toDay(write.contract.startDate),
-          previous && toDay(previous.end_date),
-        );
+        const message = rejectRenewalStart({
+          startDate: toDay(write.contract.startDate),
+          previous: previous && { status: previous.status, endDate: toDay(previous.end_date) },
+        });
         if (message) return { kind: 'bad_renewal' as const, message };
       }
 

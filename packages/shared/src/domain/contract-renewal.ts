@@ -78,7 +78,16 @@ export interface RenewalSource {
   accessRoute: string | null;
   periodMonths: number | null;
   /**
-   * 이전 계약의 종료일 — 새 계약의 **시작일을 여기서 뽑는다**(다음 날).
+   * 이전 계약의 상태 — **시작일 규칙이 여기서 갈린다**(`isPreviousLive`).
+   *
+   *   계약중·계약대기   아직 호실을 잡고 있다 → 시작일은 **그 종료일 다음 날**
+   *   종료·취소         이어붙일 것이 없다   → 시작일은 **오늘**
+   */
+  status: string;
+  /** 이전 계약의 시작일 `YYYY-MM-DD`. **특기사항 문구의 기간**에만 쓴다. */
+  startDate: string | null;
+  /**
+   * 이전 계약의 종료일 — 살아 있는 계약이면 새 계약의 **시작일을 여기서 뽑는다**(다음 날).
    *
    * ★★ **`YYYY-MM-DD` 로 정규화해서 넘긴다.** API 응답의 날짜는
    *    `2026-12-31T15:00:00.000Z` 같은 모양으로 오고(pg 가 로컬 자정의 Date 를 주고
@@ -109,9 +118,15 @@ export interface RenewalSeed {
   /** 오늘. 오늘 맺는 계약이다. */
   contractDate: string;
   /**
-   * ★★ **이전 계약 종료일의 다음 날.** 이어지는 계약이라 하루도 비지 않고 겹치지도
-   *    않는다 — 만기 전에 미리 재계약할 때 오늘을 넣으면 **아직 살아 있는 계약의 기간
-   *    위에 새 계약이 겹쳐 시작한다.**
+   * ★★ **이전 계약 상태로 갈린다.**
+   *
+   *   계약중·계약대기   **그 종료일의 다음 날.** 이어지는 계약이라 하루도 비지 않고
+   *                     겹치지도 않는다 — 오늘을 넣으면 만기 전 재계약이 **아직 살아
+   *                     있는 계약의 기간 위에 겹쳐 시작한다.**
+   *                     ★ 기간 만료도 여기다. 상태가 `confirmed` 그대로이고 호실도 계속
+   *                       잡고 있다. **과거 날짜로 채워지지만 공백 없이 이어진다.**
+   *   종료·취소         **오늘.** 이어붙일 것이 없다 — 지나간 종료일에 맞추면 다시
+   *                     들어오는 입주사가 과거부터 계약하게 된다.
    *
    * ★ **기본값일 뿐이다.** 운영자가 화면에서 바꾼다. 이전 종료일을 읽을 수 없으면
    *   오늘로 떨어진다 — 시작일은 필수값이라 빈 칸으로 두면 저장이 막힌다.
@@ -119,27 +134,62 @@ export interface RenewalSeed {
   startDate: string;
   /** 이전과 같은 기간. 화면 상태가 문자열이라 문자열로 준다. */
   months: string;
+  /**
+   * 특기사항 — 「재계약 (이전 계약 기간 2026.01.02 ~ 2027.01.01)」.
+   *
+   * ★★ `renewed_from_contract_id` 는 **DB 안에만 있다.** 이용계약서를 받는 입주사는
+   *    그것을 볼 수 없으므로, 사람이 읽을 문장으로 특기사항에 남긴다 — 그대로 인쇄된다.
+   *
+   * ★ **기본값일 뿐이다.** 운영자가 지우거나 고칠 수 있다.
+   * ★ 첫 줄에 자동으로 얹히는 할인 문구와 부딪히지 않는다 — `withDiscountLine` 은
+   *   「기준가 대비 」로 시작하는 줄만 갈아 끼우고 나머지는 **밀어낸다**.
+   */
+  memo: string;
   spaces: RenewalSpace[];
 }
 
 /** `null` 을 화면 입력값으로 흘리지 않는다 — Select 가 값 없는 상태로 열린다. */
 const text = (value: string | null | undefined): string => (value ?? '').trim();
 
+/** `YYYY-MM-DD` → `YYYY.MM.DD`. 읽을 수 없으면 `null` — 지어내지 않는다. */
+const dotted = (iso: string): string | null =>
+  parseDay(iso) === null ? null : iso.replace(/-/g, '.');
+
+/**
+ * 특기사항 첫 값 — 「재계약 (이전 계약 기간 2026.01.02 ~ 2027.01.01)」.
+ *
+ * ★ 기간을 읽을 수 없으면 **「재계약」만** 남긴다. 모르는 날짜를 계약서에 찍지 않는다.
+ */
+export function renewalMemo(prev: Pick<RenewalSource, 'startDate' | 'endDate'>): string {
+  const from = dotted(text(prev.startDate));
+  const to = dotted(text(prev.endDate));
+  return from && to ? `재계약 (이전 계약 기간 ${from} ~ ${to})` : '재계약';
+}
+
 /**
  * 이전 계약 → 재계약 폼의 첫 값.
  *
- * ★ **특기사항(`memo`)은 이어받지 않는다.** 복사 대상은 조건과 금액이고, 특기사항은
- *   그 계약 당시의 사정을 적은 자리다. 첫 줄의 할인 문구는 어차피 금액에서 다시
- *   만들어진다(`withDiscountLine`).
+ * ★ **이전 계약의 특기사항은 이어받지 않는다.** 그 계약 당시의 사정을 적은 자리다.
+ *   대신 **어느 계약을 이어받았는지**를 새 문장으로 남긴다(`renewalMemo`) — 계약서에
+ *   그대로 인쇄되고, 운영자가 지우거나 고칠 수 있다.
  *
  * ★ 회사 정보·구성원·첨부는 여기 없다. 그것들은 **계약이 아니라 회사에 붙어 있어서**
  *   같은 회사를 열면 그대로 따라온다(3-4). 복사할 것이 아니라 이미 거기 있는 것이다.
  *
  * @param today `YYYY-MM-DD`. 「오늘」을 이 함수가 정하지 않는다 — 부르는 쪽의 시간대를
- *   여기서 추측하면 하루가 밀린다. 계약일자가 이 값이고, 이전 종료일을 읽을 수 없을 때
- *   시작일이 떨어지는 자리이기도 하다.
+ *   여기서 추측하면 하루가 밀린다. 계약일자가 이 값이고, 이전 계약이 이미 닫혔거나
+ *   종료일을 읽을 수 없을 때 시작일이 떨어지는 자리이기도 하다.
  */
 export function buildRenewalSeed(prev: RenewalSource, today: string): RenewalSeed {
+  /*
+   * ★★ 시작일만 오늘이 아닐 수 있다 — **이전 계약이 아직 살아 있을 때만**.
+   *    닫힌 계약의 종료일은 지나간 날짜라, 거기에 이어붙이면 다시 들어오는 입주사가
+   *    **과거부터 계약하게 된다.**
+   */
+  const startDate = isPreviousLive(prev.status)
+    ? (dayAfter(text(prev.endDate)) ?? today)
+    : today;
+
   return {
     companyId: prev.companyId,
     renewedFromContractId: prev.contractId,
@@ -148,9 +198,9 @@ export function buildRenewalSeed(prev: RenewalSource, today: string): RenewalSee
     paymentMethod: text(prev.paymentMethod),
     accessRoute: text(prev.accessRoute),
     contractDate: today,
-    // ★ 시작일만 오늘이 아니다 — 이전 계약이 끝난 다음 날부터다.
-    startDate: dayAfter(text(prev.endDate)) ?? today,
+    startDate,
     months: prev.periodMonths ? String(prev.periodMonths) : '',
+    memo: renewalMemo(prev),
     spaces: prev.spaces.map((s) => ({ ...s })),
   };
 }
@@ -177,15 +227,44 @@ export function rejectRenewal(
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   시작일 검사 — 하루도 겹치지 않는다
+   이전 계약이 아직 살아 있는가 — **두 규칙이 이 판정 하나를 본다**
    ══════════════════════════════════════════════════════════════════════════
-   `buildRenewalSeed` 가 종료일 다음 날을 **기본값**으로 넣지만 운영자가 바꿀 수 있다.
-   그래서 검사가 따로 필요하고, **화면과 서버가 같은 함수를 본다** — 화면만 막으면
-   API 로 통과한다.
+   ① 확정할 때 이전 계약을 **닫을지**
+   ② 새 계약 시작일을 이전 종료일에 **이어붙일지**
+
+   둘 다 「아직 호실을 잡고 있는가」 하나로 갈린다. 두 벌로 두면 한쪽만 고쳐져
+   갈리고, 그때 생기는 상태가 **닫지도 않았는데 시작일은 오늘**(기간이 겹친다)이거나
+   **닫았는데 시작일은 과거**(다시 들어오는 입주사가 과거부터 계약한다)다.
+
+   ★ 기간 만료도 **살아 있는 계약**이다. 종료일이 지나도 상태는 `confirmed` 그대로이고
+     호실을 계속 잡는다 — 자동 종료 배치를 만들지 않았기 때문이다.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 이전 계약이 아직 살아 있는가.
+ *
+ * ★ **이미 종료·취소된 계약은 건드리지 않는다.** 다시 닫으면 종료일자와 사유가
+ *   덮여서 원래 왜 끝났는지가 사라진다. 종료된 계약을 이어받는 것은 정상 경로다
+ *   (`rejectRenewal` 이 상태를 보지 않는 이유).
+ *
+ * ★ 모르는 상태도 살아 있지 않은 것으로 본다 — 모르면 손대지 않는다.
+ */
+export function isPreviousLive(previousStatus: string): boolean {
+  return previousStatus === 'confirmed' || previousStatus === 'draft';
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   시작일 검사 — 살아 있는 계약과는 하루도 겹치지 않는다
+   ══════════════════════════════════════════════════════════════════════════
+   `buildRenewalSeed` 가 기본값을 넣지만 운영자가 바꿀 수 있다. 그래서 검사가 따로
+   필요하고, **화면과 서버가 같은 함수를 본다** — 화면만 막으면 API 로 통과한다.
 
    ★★ 겹치면 두 계약이 같은 날 같은 호실·같은 계약호실을 동시에 들고, 그 상태는
       재계약 예외(`selfContractIds`)가 **일부러 허용하는 모양**이라 중복 판정에
       걸리지 않는다. 즉 **아무도 못 알아챈다.** 여기서 막아야 하는 이유다.
+
+   ★★★ **이전 계약이 닫혔으면 검사하지 않는다.** 겹칠 상대가 없고, 지나간 종료일에
+        맞추라고 하면 다시 들어오는 입주사가 **과거부터 계약해야 한다.**
    ══════════════════════════════════════════════════════════════════════════ */
 
 /**
@@ -200,9 +279,16 @@ export function rejectRenewal(
  * ★ 읽을 수 없는 날짜는 **여기서 막지 않는다.** 시작일 형식은 저장 경로가 따로 보고
  *   (`parseDate` → 400), 이전 종료일을 모르면 검사할 근거가 없다 — 지어내지 않는다.
  */
-export function rejectRenewalStart(startDate: string, previousEndDate: string | null): string | null {
-  const start = text(startDate);
-  const end = text(previousEndDate);
+export function rejectRenewalStart(args: {
+  startDate: string;
+  /** 이어받는 이전 계약. 없으면 검사할 것이 없다. */
+  previous: { status: string; endDate: string | null } | null;
+}): string | null {
+  // ★★ 닫힌 계약과는 겹칠 수 없다 — 검사 자체를 하지 않는다.
+  if (!args.previous || !isPreviousLive(args.previous.status)) return null;
+
+  const start = text(args.startDate);
+  const end = text(args.previous.endDate);
   // 읽을 수 없는 날짜는 여기서 판정하지 않는다 — 위 ★ 참조.
   if (parseDay(start) === null || parseDay(end) === null) return null;
 
@@ -225,20 +311,9 @@ export function rejectRenewalStart(startDate: string, previousEndDate: string | 
 
    ★ 종료일자는 **이전 계약의 원래 종료일**이다. 오늘을 넣으면 만기 전 재계약에서
      이전 계약이 실제보다 짧았던 것으로 남는다.
+
+   ★ 닫을지 말지는 `isPreviousLive` 가 본다 — 시작일 규칙과 **같은 판정**이다.
    ══════════════════════════════════════════════════════════════════════════ */
 
 /** 재계약 확정으로 이전 계약을 닫을 때의 사유. */
 export const PREVIOUS_TERMINATION_REASON = '재계약으로 계약 종료';
-
-/**
- * 이 이전 계약을 닫아야 하는가.
- *
- * ★ **이미 종료·취소된 계약은 건드리지 않는다.** 다시 닫으면 종료일자와 사유가
- *   덮여서 원래 왜 끝났는지가 사라진다. 종료된 계약을 이어받는 것은 정상 경로다
- *   (`rejectRenewal` 이 상태를 보지 않는 이유).
- *
- * ★ 모르는 상태도 건드리지 않는다 — 모르면 손대지 않는다.
- */
-export function closesPrevious(previousStatus: string): boolean {
-  return previousStatus === 'confirmed' || previousStatus === 'draft';
-}

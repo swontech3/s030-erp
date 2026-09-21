@@ -530,6 +530,54 @@ const json = (res) => {
     );
     // 위에서 직접 지웠으므로 마지막 대조에서 빼 준다.
     createdRemoved += created.filter((id) => id === bare.contractId).length;
+
+    /* ════════════════════════════════════════════════════════════════════════
+       11. ★★★ **종료된** 계약을 이어받을 때는 시작일을 검사하지 않는다
+       ════════════════════════════════════════════════════════════════════════
+       9번이 이전 계약을 닫아 뒀다(`prev2`). 그 계약을 다시 이어받으면 겹칠 상대가
+       없으므로 **어떤 날짜로도 저장돼야 한다.** 지나간 종료일에 맞추라고 하면 다시
+       들어오는 입주사가 과거부터 계약하게 된다.
+
+       ★ 9번이 만든 재계약(`renewal2`)이 ROOM2·VR2 를 잡고 있으므로 여기서는 다른
+         계약호실과 호실을 쓴다 — 재계약 규칙과 무관한 충돌을 피한다. */
+    console.log('\n11. ★★★ 종료된 계약을 이어받으면 시작일을 검사하지 않는다');
+    res = await op.inject({ method: 'GET', url: `/contracts/${prev2.contractId}` });
+    check(
+      "이전 계약이 'terminated' 인 상태다 (9번이 닫았다)",
+      json(res).status === 'terminated',
+      String(json(res).status),
+    );
+
+    res = await op.inject({
+      method: 'POST',
+      url: '/contracts',
+      payload: body({
+        companyId: COMPANY_A,
+        contractRoom: `${ROOM}-E`,
+        spaces: [vrSpace(VR3)],
+        // 이전 종료일(2027-01-01) 보다 **한참 앞선** 날짜다. 살아 있었다면 막혔다.
+        startDate: '2026-03-02',
+        renewedFromContractId: prev2.contractId,
+      }),
+    });
+    if (json(res).contractId) created.push(json(res).contractId);
+    check(
+      `★★★ 종료된 계약 이어받기 — 이전 종료일(${prev2End})보다 앞선 날짜도 저장된다`,
+      res.statusCode === 201,
+      `${res.statusCode} ${res.body}`,
+    );
+    check(
+      '★ 이미 종료된 계약은 다시 닫지 않는다 — closedPrevious 가 null 이다',
+      json(res).closedPrevious === null,
+      String(json(res).closedPrevious),
+    );
+
+    res = await op.inject({ method: 'GET', url: `/contracts/${prev2.contractId}` });
+    check(
+      '★ 이전 계약의 종료 사유가 덮이지 않았다',
+      json(res).terminationReason === PREVIOUS_TERMINATION_REASON,
+      String(json(res).terminationReason),
+    );
   } finally {
     await op.close();
 
