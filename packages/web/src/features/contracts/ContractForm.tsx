@@ -45,7 +45,11 @@ import { RoomPickerModal } from './RoomPickerModal';
 import { bizRegPatch, type BizRegFields } from '@swonbiz/shared/domain/biz-reg-ocr';
 import { isBizNumberFormatOk, type BizCheckResult } from '@swonbiz/shared/domain/biz-number-check';
 import { missingDocsMessage, type FilePurpose } from '@swonbiz/shared/domain/contract-files';
-import { buildRenewalSeed, selfContractIds } from '@swonbiz/shared/domain/contract-renewal';
+import {
+  buildRenewalSeed,
+  selfContractIds,
+  type RenewalSource,
+} from '@swonbiz/shared/domain/contract-renewal';
 import type { SpaceHolder } from '@swonbiz/shared/domain/space-occupancy';
 import { SectionDocs, SECTION_DOCS_ID } from './SectionDocs';
 import { SectionUsers } from './SectionUsers';
@@ -777,7 +781,9 @@ export function ContractForm({
               <div className={`${styles.pageNote} ${styles.pageNoteMuted}`}>
                 <Icon name="copy-plus" size={12} />
                 {renewal ? (
-                  '이전 계약의 조건을 이어받았습니다 — 이전 계약은 그대로 유지됩니다'
+                  // ★ 시작일이 오늘이 아닌 이유를 여기서 말한다. 안 말하면 운영자가
+                  //   날짜가 잘못 채워졌다고 읽는다.
+                  '이전 계약의 조건을 이어받았습니다 — 시작일은 이전 종료일 다음 날이고, 이전 계약은 그대로 유지됩니다'
                 ) : (
                   <Link href={`/contracts/${renewedFromId}`}>이어받은 이전 계약 보기</Link>
                 )}
@@ -1111,6 +1117,28 @@ function firstFloorOf(spaces: readonly SpaceOption[], buildId: string): string {
   return spaces.find((s) => s.buildId === buildId)?.floorId ?? '';
 }
 
+/**
+ * 계약 조회 응답 → 이어받기가 받는 모양.
+ *
+ * ★★ **`endDate` 를 `toDateInput` 에 통과시키는 것이 이 함수의 존재 이유다.**
+ *    응답의 종료일은 `2026-12-31T15:00:00.000Z` 로 오고, 새 계약의 **시작일이 거기서
+ *    나온다**(다음 날). 그대로 넘기면 `buildRenewalSeed` 가 읽지 못해 시작일이 조용히
+ *    오늘로 떨어진다 — 예전처럼 객체를 통째로 펼쳐 넘기면 그 일이 벌어진다.
+ */
+function renewalSourceOf(prev: ContractResponse): RenewalSource {
+  return {
+    contractId: prev.contractId,
+    companyId: prev.companyId,
+    buildId: prev.buildId,
+    contractRoom: prev.contractRoom,
+    paymentMethod: prev.paymentMethod,
+    accessRoute: prev.accessRoute,
+    periodMonths: prev.periodMonths,
+    endDate: toDateInput(prev.endDate),
+    spaces: prev.spaces,
+  };
+}
+
 function seedTerms(
   contract: ContractResponse | null,
   renewal: ContractResponse | null,
@@ -1125,10 +1153,7 @@ function seedTerms(
      *   하루가 밀린다 — 운영자가 보고 있는 날짜가 계약일자여야 한다.
      */
     if (renewal) {
-      const seed = buildRenewalSeed(
-        { ...renewal, spaces: renewal.spaces },
-        localToday(),
-      );
+      const seed = buildRenewalSeed(renewalSourceOf(renewal), localToday());
       return {
         buildId: seed.buildId,
         floorId: firstFloorOf(spaces, seed.buildId),
@@ -1180,7 +1205,7 @@ function seedTerms(
  */
 function seedItems(contract: ContractResponse | null, renewal: ContractResponse | null): ItemRow[] {
   if (!contract && renewal) {
-    const seed = buildRenewalSeed({ ...renewal, spaces: renewal.spaces }, '');
+    const seed = buildRenewalSeed(renewalSourceOf(renewal), '');
     return seed.spaces.length > 0 ? seed.spaces.map((s) => ({ ...s })) : [{ ...ROW_TEMPLATE }];
   }
   if (!contract || contract.spaces.length === 0) return [{ ...ROW_TEMPLATE }];

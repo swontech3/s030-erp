@@ -69,6 +69,16 @@ export interface RenewalSource {
   paymentMethod: string | null;
   accessRoute: string | null;
   periodMonths: number | null;
+  /**
+   * 이전 계약의 종료일 — 새 계약의 **시작일을 여기서 뽑는다**(다음 날).
+   *
+   * ★★ **`YYYY-MM-DD` 로 정규화해서 넘긴다.** API 응답의 날짜는
+   *    `2026-12-31T15:00:00.000Z` 같은 모양으로 오고(pg 가 로컬 자정의 Date 를 주고
+   *    JSON 이 UTC 로 바꾼다), 그걸 앞 10자로 자르면 **하루 앞선 날짜**가 나온다.
+   *    그래서 이 함수는 그런 값을 **받아 주지 않고** 오늘로 떨어뜨린다 — 조용히
+   *    하루 밀린 시작일을 만드는 것보다 낫다. 화면은 `toDateInput` 을 거쳐 넘긴다.
+   */
+  endDate: string | null;
   spaces: readonly RenewalSpace[];
 }
 
@@ -88,9 +98,16 @@ export interface RenewalSeed {
   contractRoom: string;
   paymentMethod: string;
   accessRoute: string;
-  /** 오늘. */
+  /** 오늘. 오늘 맺는 계약이다. */
   contractDate: string;
-  /** 오늘. */
+  /**
+   * ★★ **이전 계약 종료일의 다음 날.** 이어지는 계약이라 하루도 비지 않고 겹치지도
+   *    않는다 — 만기 전에 미리 재계약할 때 오늘을 넣으면 **아직 살아 있는 계약의 기간
+   *    위에 새 계약이 겹쳐 시작한다.**
+   *
+   * ★ **기본값일 뿐이다.** 운영자가 화면에서 바꾼다. 이전 종료일을 읽을 수 없으면
+   *   오늘로 떨어진다 — 시작일은 필수값이라 빈 칸으로 두면 저장이 막힌다.
+   */
   startDate: string;
   /** 이전과 같은 기간. 화면 상태가 문자열이라 문자열로 준다. */
   months: string;
@@ -99,6 +116,24 @@ export interface RenewalSeed {
 
 /** `null` 을 화면 입력값으로 흘리지 않는다 — Select 가 값 없는 상태로 열린다. */
 const text = (value: string | null | undefined): string => (value ?? '').trim();
+
+/**
+ * `YYYY-MM-DD` → 그 **다음 날**. 읽을 수 없으면 `null`.
+ *
+ * ★ UTC 로 센다. 로컬로 세면 시간대에 따라 하루가 밀린다 — 계약 시작일이 밀리면
+ *   종료일과 첫 청구월이 함께 밀린다.
+ *
+ * ★ 형식만 맞고 **없는 날짜**(`2026-02-31`)를 통과시키지 않는다. `Date.UTC` 는 그런
+ *   값을 조용히 다음 달로 넘긴다 — 시작일이 말없이 바뀌는 자리다.
+ */
+function dayAfter(iso: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
+  const at = new Date(Date.UTC(y, m - 1, d));
+  if (at.getUTCFullYear() !== y || at.getUTCMonth() !== m - 1 || at.getUTCDate() !== d) return null;
+  at.setUTCDate(at.getUTCDate() + 1);
+  return at.toISOString().slice(0, 10);
+}
 
 /**
  * 이전 계약 → 재계약 폼의 첫 값.
@@ -111,7 +146,8 @@ const text = (value: string | null | undefined): string => (value ?? '').trim();
  *   같은 회사를 열면 그대로 따라온다(3-4). 복사할 것이 아니라 이미 거기 있는 것이다.
  *
  * @param today `YYYY-MM-DD`. 「오늘」을 이 함수가 정하지 않는다 — 부르는 쪽의 시간대를
- *   여기서 추측하면 하루가 밀린다.
+ *   여기서 추측하면 하루가 밀린다. 계약일자가 이 값이고, 이전 종료일을 읽을 수 없을 때
+ *   시작일이 떨어지는 자리이기도 하다.
  */
 export function buildRenewalSeed(prev: RenewalSource, today: string): RenewalSeed {
   return {
@@ -122,7 +158,8 @@ export function buildRenewalSeed(prev: RenewalSource, today: string): RenewalSee
     paymentMethod: text(prev.paymentMethod),
     accessRoute: text(prev.accessRoute),
     contractDate: today,
-    startDate: today,
+    // ★ 시작일만 오늘이 아니다 — 이전 계약이 끝난 다음 날부터다.
+    startDate: dayAfter(text(prev.endDate)) ?? today,
     months: prev.periodMonths ? String(prev.periodMonths) : '',
     spaces: prev.spaces.map((s) => ({ ...s })),
   };

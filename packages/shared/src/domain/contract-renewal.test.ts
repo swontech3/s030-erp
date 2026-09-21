@@ -52,6 +52,7 @@ describe('buildRenewalSeed', () => {
     paymentMethod: 'M',
     accessRoute: 'E',
     periodMonths: 12,
+    endDate: '2026-12-31',
     spaces: [
       { roomType: 'VR', spaceId: 's-1', standardFee: 100000, deposit: 200000, monthlyFee: 90000, vatYn: true },
       { roomType: 'OF', spaceId: 's-2', standardFee: 500000, deposit: 1000000, monthlyFee: 500000, vatYn: false },
@@ -80,10 +81,43 @@ describe('buildRenewalSeed', () => {
     expect(seed.buildId).toBe('b-1');
   });
 
-  it('★ 계약일자와 시작일은 오늘로 새로 받는다', () => {
-    const seed = buildRenewalSeed(prev, TODAY);
-    expect(seed.contractDate).toBe(TODAY);
-    expect(seed.startDate).toBe(TODAY);
+  it('★ 계약일자는 오늘이다 — 오늘 맺는 계약이다', () => {
+    expect(buildRenewalSeed(prev, TODAY).contractDate).toBe(TODAY);
+  });
+
+  /**
+   * ★★ 시작일은 **이전 계약 종료일 다음 날**이다. 이어지는 계약이라 하루도 비지 않고,
+   *    겹치지도 않는다. 오늘로 두면 만기 전에 미리 재계약할 때 **아직 살아 있는 계약의
+   *    기간 위에 새 계약이 겹쳐 시작한다.**
+   *
+   * ★ 기본값일 뿐이다 — 운영자가 화면에서 바꿀 수 있다.
+   */
+  it('★★ 시작일은 이전 계약 종료일 다음 날이다', () => {
+    expect(buildRenewalSeed(prev, TODAY).startDate).toBe('2027-01-01');
+  });
+
+  it('★ 달을 넘긴다 — 31일 다음은 다음 달 1일이다', () => {
+    expect(buildRenewalSeed({ ...prev, endDate: '2026-01-31' }, TODAY).startDate).toBe('2026-02-01');
+  });
+
+  it('★ 윤년을 안다 — 2028-02-28 다음은 29일이다', () => {
+    expect(buildRenewalSeed({ ...prev, endDate: '2028-02-28' }, TODAY).startDate).toBe('2028-02-29');
+  });
+
+  /**
+   * ★ 종료일이 없거나 읽을 수 없으면 **오늘**로 떨어진다. 시작일은 필수값이라
+   *   빈 칸으로 두면 운영자가 왜 비었는지 모른 채 저장이 막힌다.
+   */
+  it('종료일이 없으면 오늘로 떨어진다', () => {
+    expect(buildRenewalSeed({ ...prev, endDate: null }, TODAY).startDate).toBe(TODAY);
+    expect(buildRenewalSeed({ ...prev, endDate: '' }, TODAY).startDate).toBe(TODAY);
+  });
+
+  it('없는 날짜를 조용히 다음 달로 넘기지 않는다 — 오늘로 떨어진다', () => {
+    expect(buildRenewalSeed({ ...prev, endDate: '2026-02-31' }, TODAY).startDate).toBe(TODAY);
+    expect(buildRenewalSeed({ ...prev, endDate: '2026-12-31T15:00:00.000Z' }, TODAY).startDate).toBe(
+      TODAY,
+    );
   });
 
   it('★ 기간은 이전과 같다', () => {
@@ -96,10 +130,13 @@ describe('buildRenewalSeed', () => {
    */
   it('★ 종료일을 이어받지 않는다 — 새 시작일에서 다시 계산된다', () => {
     const seed = buildRenewalSeed(prev, TODAY);
+    // 씨앗에 종료일 칸 자체가 없다 — 있으면 이전 계약의 종료일이 새 계약에 박힌다.
     expect(seed).not.toHaveProperty('endDate');
 
-    const start = new Date(Date.UTC(2026, 8, 21));
-    expect(calcEndDate(start, Number(seed.months)).toISOString().slice(0, 10)).toBe('2027-09-20');
+    // 2027-01-01 + 12개월 = 2027-12-31. **이전 종료일(2026-12-31)이 아니다.**
+    const start = new Date(Date.UTC(2027, 0, 1));
+    expect(seed.startDate).toBe('2027-01-01');
+    expect(calcEndDate(start, Number(seed.months)).toISOString().slice(0, 10)).toBe('2027-12-31');
   });
 
   /** 상태·계약번호를 이어받을 자리가 없다 — 새 계약은 처음부터 시작한다. */
