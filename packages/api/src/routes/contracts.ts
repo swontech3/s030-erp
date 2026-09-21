@@ -37,6 +37,10 @@ import {
 } from '@swonbiz/shared/domain/contract-payload';
 import { missingDocsMessage } from '@swonbiz/shared/domain/contract-files';
 import {
+  rejectRenewal,
+  selfContractIds,
+} from '@swonbiz/shared/domain/contract-renewal';
+import {
   OCCUPANCY_LIVE_STATUSES,
   occupancyBySpace,
   rejectSpacePick,
@@ -77,6 +81,13 @@ interface ContractBody {
   memo?: string | null;
   status?: string;
   spaces?: unknown[];
+  /**
+   * 재계약 — 이어받은 이전 계약(CONT-02 · CSCH-04).
+   *
+   * ★ **등록에서만 본다.** 수정에서는 저장된 값을 쓴다 — 이미 만들어진 계약의
+   *   이어받은 계약을 나중에 바꿀 수 있으면 이력이 이력이 아니다.
+   */
+  renewedFromContractId?: string | null;
 }
 
 interface StatusBody {
@@ -148,6 +159,9 @@ function toResponse(contract: ContractRow, spaces: ContractSpaceRow[]) {
     terminatedDate: contract.terminated_date,
     terminationReason: contract.termination_reason,
     memo: contract.memo,
+    /** ★ 화면이 이 값으로 「자기」 목록을 만든다(`selfContractIds`). 빼면 저장된
+     *    재계약을 다시 열었을 때 자기 이전 계약과 부딪혀 저장이 막힌다. */
+    renewedFromContractId: contract.renewed_from_contract_id,
     spaces: spaces.map((s) => ({
       seq: s.seq,
       roomType: s.room_type,
@@ -187,7 +201,7 @@ function asBadRequest(err: unknown, reply: FastifyReply): FastifyReply | never {
 async function roomConflict(
   client: Parameters<typeof listRoomHolders>[0],
   room: string | null,
-  selfContractId: string | null,
+  self: readonly string[],
 ): Promise<RoomHolder | null> {
   if (normalizeRoom(room) === '') return null;
   const rows = await listRoomHolders(client, ROOM_LIVE_STATUSES);
@@ -196,7 +210,7 @@ async function roomConflict(
     companyName: r.company_name,
     room: r.contract_room,
   }));
-  return findRoomConflict(holders, normalizeRoom(room), selfContractId);
+  return findRoomConflict(holders, normalizeRoom(room), self);
 }
 
 /**
@@ -235,13 +249,14 @@ const docsMissing = (reply: FastifyReply, message: string) =>
  * ★ **저장 트랜잭션 안에서** 부른다. 밖에서 미리 보면 그 사이에 다른 요청이 같은
  *   호실을 채울 수 있다.
  *
- * ★ `selfContractId` — 자기 계약이 잡고 있는 호실은 자기 것으로 세지 않는다.
- *   안 그러면 열어서 그대로 저장하는 것조차 막힌다.
+ * ★ `self` — 자기 계약이 잡고 있는 호실은 자기 것으로 세지 않는다.
+ *   안 그러면 열어서 그대로 저장하는 것조차 막힌다. **재계약에서는 이전 계약도
+ *   여기 들어간다**(`selfContractIds`).
  */
 async function spaceConflict(
   client: Parameters<typeof listSpaceHolders>[0],
   rows: readonly { roomType: string; spaceId: string }[],
-  selfContractId: string | null,
+  self: readonly string[],
 ): Promise<string | null> {
   if (rows.every((r) => r.spaceId === '')) return null;
 
@@ -259,7 +274,7 @@ async function spaceConflict(
 
   return rejectSpacePick(
     rows,
-    occupancyBySpace(holders, selfContractId),
+    occupancyBySpace(holders, self),
     (id) => names.get(id) ?? '',
   );
 }
@@ -372,15 +387,40 @@ export function registerContractRoutes(app: FastifyInstance): void {
 
     const contractId = randomUUID();
     const actor = String(session.s020MemberId);
+    const renewedFrom = (req.body?.renewedFromContractId ?? '').trim() || null;
 
     const created = await withCompanyScope(scopeOf(session), async (client) => {
-      // ★ 트랜잭션 **안에서** 본다. 밖에서 미리 보면 그 사이에 다른 요청이 같은
-      //   번호를 넣을 수 있다. 새 계약이라 제외할 자기 자신이 없다.
-      const conflict = await roomConflict(client, write.contract.contractRoom, null);
+      /*
+       * ★★ 재계약 — 이어받을 계약이 **정말 이 회사 것인지** 여기서 본다.
+       *
+       * `?renewFrom=` 은 주소창에 있는 값이다. 남의 계약을 가리키면 그 회사의 조건과
+       * 금액이 이 계약에 복사되고, 그 뒤엔 어디서 온 숫자인지 아무도 모른다.
+       * 판정은 화면과 **같은 함수**(`rejectRenewal`)가 한다.
+       */
+      if (renewedFrom) {
+        const previous = await findContract(client, renewedFrom);
+        const message = rejectRenewal(
+          previous && { companyId: previous.company_id, status: previous.status },
+          companyId,
+        );
+        if (message) return { kind: 'bad_renewal' as const, message };
+      }
+
+      /*
+       * ★★ 「자기」가 하나가 아니다. 새 계약이라 자기 ID 는 아직 없지만, **재계약이면
+       *    이전 계약이 자기다** — 이전 계약은 살아 있는 채로 같은 계약호실과 같은
+       *    호실을 들고 있다(자동 종료가 없다). 빼지 않으면 재계약이 자기 이전 계약과
+       *    부딪혀 저장이 막힌다.
+       *
+       * ★ 트랜잭션 **안에서** 본다. 밖에서 미리 보면 그 사이에 다른 요청이 같은
+       *   번호를 넣을 수 있다.
+       */
+      const self = selfContractIds({ contractId: null, renewedFromContractId: renewedFrom });
+
+      const conflict = await roomConflict(client, write.contract.contractRoom, self);
       if (conflict) return { kind: 'room_taken' as const, conflict };
 
-      // ★ 새 계약이라 제외할 자기 자신이 없다.
-      const spaceMessage = await spaceConflict(client, write.spaces, null);
+      const spaceMessage = await spaceConflict(client, write.spaces, self);
       if (spaceMessage) return { kind: 'space_taken' as const, message: spaceMessage };
 
       // ★ 첫 저장이 바로 확정일 수 있다(create → confirmed). 그 길도 서류를 본다.
@@ -389,7 +429,16 @@ export function registerContractRoutes(app: FastifyInstance): void {
         if (message) return { kind: 'docs_missing' as const, message };
       }
 
-      await insertContract(client, { contractId, companyId, status, write: write.contract, actor });
+      // ★ 이전 계약은 **건드리지 않는다.** 재계약을 만든다고 옛 계약이 종료되지 않는다 —
+      //   언제 닫을지는 운영자가 따로 정하는 결정이다(`contract-renewal.ts` 머리말).
+      await insertContract(client, {
+        contractId,
+        companyId,
+        status,
+        write: write.contract,
+        actor,
+        renewedFromContractId: renewedFrom,
+      });
       await replaceSpaces(client, { contractId, companyId, spaces: write.spaces, actor, newId: randomUUID });
       // 최초 생성도 이력이다. from_status 가 NULL 인 행이 그것이다.
       await insertStatusHistory(client, {
@@ -398,6 +447,9 @@ export function registerContractRoutes(app: FastifyInstance): void {
       return { kind: 'ok' as const };
     });
 
+    if (created.kind === 'bad_renewal') {
+      return reply.code(400).send({ error: 'invalid_renewal', message: created.message });
+    }
     if (created.kind === 'room_taken') return roomTaken(reply, created.conflict);
     if (created.kind === 'docs_missing') return docsMissing(reply, created.message);
     if (created.kind === 'space_taken') return spaceTaken(reply, created.message);
@@ -431,13 +483,23 @@ export function registerContractRoutes(app: FastifyInstance): void {
       // ★★ CONT-09 — 여기가 잠금의 실제 지점이다. 화면 비활성화가 아니라 이 줄이다.
       if (isContractLocked(contract.status)) return { kind: 'locked' as const };
 
-      // ★ 자기 자신은 제외한다. 안 그러면 **아무도 자기 계약을 수정할 수 없다** —
-      //   열어서 그대로 저장해도 자기 번호가 걸린다.
-      const conflict = await roomConflict(client, write.contract.contractRoom, contract.contract_id);
+      /*
+       * ★ 자기 자신은 제외한다. 안 그러면 **아무도 자기 계약을 수정할 수 없다** —
+       *   열어서 그대로 저장해도 자기 번호가 걸린다.
+       *
+       * ★★ 재계약이면 **이전 계약도 자기다.** 저장된 값(`renewed_from_contract_id`)을
+       *    쓴다 — 본문이 보낸 값을 믿으면 아무 계약이나 자기라고 주장해 남의 계약호실
+       *    위에 덮어쓸 수 있다.
+       */
+      const self = selfContractIds({
+        contractId: contract.contract_id,
+        renewedFromContractId: contract.renewed_from_contract_id,
+      });
+
+      const conflict = await roomConflict(client, write.contract.contractRoom, self);
       if (conflict) return { kind: 'room_taken' as const, conflict };
 
-      // ★ 자기 계약은 세지 않는다 — 열어서 그대로 저장하는 것까지 막히면 안 된다.
-      const spaceMessage = await spaceConflict(client, write.spaces, contract.contract_id);
+      const spaceMessage = await spaceConflict(client, write.spaces, self);
       if (spaceMessage) return { kind: 'space_taken' as const, message: spaceMessage };
 
       await updateContract(client, { contractId: contract.contract_id, write: write.contract, actor });

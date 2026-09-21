@@ -21,7 +21,8 @@
  * 쪽뿐이고 호실번호는 언제나 온전히 보인다** — 운영자가 여기서 찾는 것은 번호다.
  *
  * ★ 자기 계약도 목록에 **넣는다.** 지금 무엇이 어디 있는지가 판단 재료이기 때문이다.
- *   다만 중복으로는 보지 않는다(`findRoomConflict` 의 `selfContractId`).
+ *   다만 중복으로는 보지 않는다(`findRoomConflict` 의 `selfContractIds`). 재계약이면
+ *   **이전 계약도** 그 목록에 있다 — 이어받은 번호가 자기 자신과 부딪히면 안 된다.
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -36,8 +37,14 @@ import styles from './contract-form.module.css';
 interface Props {
   /** 지금 폼에 들어 있는 계약호실. 열 때 입력칸의 시작값이다. */
   current: string;
-  /** 편집 중인 계약. 새 계약이면 `null` — 제외할 자기 자신이 없다. */
-  selfContractId: string | null;
+  /**
+   * 이 편집이 «자기»로 보는 계약들 — 중복에서 뺀다(`selfContractIds`).
+   *
+   * ★ 새 계약이면 빈 배열이다. ★★ **재계약이면 이전 계약이 들어 있다** — 이전 계약은
+   *   살아 있는 채로 같은 번호를 들고 있어서, 빼지 않으면 재계약이 자기 이전 계약과
+   *   부딪혀 [확인] 이 눌리지 않는다.
+   */
+  selfContractIds: readonly string[];
   onClose: () => void;
   onPick: (room: string) => void;
 }
@@ -45,7 +52,7 @@ interface Props {
 /** 한 줄에 회사/호실 세 쌍 = 6열. 시안의 표 구조다. */
 const PAIRS_PER_ROW = 3;
 
-export function RoomPickerModal({ current, selfContractId, onClose, onPick }: Props) {
+export function RoomPickerModal({ current, selfContractIds, onClose, onPick }: Props) {
   const [rooms, setRooms] = useState<RoomHolder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [value, setValue] = useState(current);
@@ -75,8 +82,8 @@ export function RoomPickerModal({ current, selfContractId, onClose, onPick }: Pr
    *   운영자가 «확인했다»고 믿는다.
    */
   const conflict = useMemo(
-    () => (rooms ? findRoomConflict(rooms, typed, selfContractId) : null),
-    [rooms, typed, selfContractId],
+    () => (rooms ? findRoomConflict(rooms, typed, selfContractIds) : null),
+    [rooms, typed, selfContractIds],
   );
 
   const canConfirm = rooms !== null && typed !== '' && conflict === null;

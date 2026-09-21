@@ -32,6 +32,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { editableSections } from '@swonbiz/shared/domain/contract-status';
 import { Icon, type IconName } from '@/components/ds';
 import styles from './contract-form.module.css';
@@ -44,6 +45,7 @@ import { RoomPickerModal } from './RoomPickerModal';
 import { bizRegPatch, type BizRegFields } from '@swonbiz/shared/domain/biz-reg-ocr';
 import { isBizNumberFormatOk, type BizCheckResult } from '@swonbiz/shared/domain/biz-number-check';
 import { missingDocsMessage, type FilePurpose } from '@swonbiz/shared/domain/contract-files';
+import { buildRenewalSeed, selfContractIds } from '@swonbiz/shared/domain/contract-renewal';
 import type { SpaceHolder } from '@swonbiz/shared/domain/space-occupancy';
 import { SectionDocs, SECTION_DOCS_ID } from './SectionDocs';
 import { SectionUsers } from './SectionUsers';
@@ -92,6 +94,8 @@ export interface ContractResponse {
   terminatedDate: string | null;
   terminationReason: string | null;
   memo: string | null;
+  /** CSCH-04 — 이어받은 이전 계약. 재계약이 아니면 `null`. */
+  renewedFromContractId: string | null;
   spaces: {
     seq: number;
     roomType: string;
@@ -142,6 +146,14 @@ type Mode = 'create' | 'draft' | 'confirmed' | 'terminated' | 'cancelled';
 interface Props {
   /** `null` 이면 신규 작성(mode: create)이다. */
   contract: ContractResponse | null;
+  /**
+   * 재계약(`/contracts/new?renewFrom=`)에서 **이어받을 이전 계약**. 그 밖에는 `null`.
+   *
+   * ★ `contract` 와 동시에 오지 않는다. 이어받기는 **첫 값을 채우는 일**이라 저장된
+   *   계약을 다시 열 때는 할 일이 없다 — 그때는 저장된 `renewedFromContractId` 가
+   *   「자기」 목록을 만든다.
+   */
+  renewFrom: ContractResponse | null;
   /** 어느 입주사의 계약인지. 없으면 저장할 수 없다. */
   companyId: string | null;
   /** 섹션 1 의 저장값. 신규 작성이고 입주사가 정해지지 않았으면 `null`. */
@@ -201,10 +213,44 @@ const ACTION_DEFS: Record<ActionKey, { label: string; cls: string; icon?: IconNa
   save: { label: '저장', cls: styles.btnPrimary ?? '' },
 };
 
-export function ContractForm({ contract, companyId, company, members, spaces, codes, spaceHolders }: Props) {
+export function ContractForm({
+  contract,
+  renewFrom,
+  companyId,
+  company,
+  members,
+  spaces,
+  codes,
+  spaceHolders,
+}: Props) {
   const router = useRouter();
   const status = contract?.status ?? null;
   const mode: Mode = (contract?.status as Mode | undefined) ?? 'create';
+
+  /**
+   * ★ 이어받을 계약은 **아직 저장 전일 때만** 본다. 저장된 계약을 다시 열면
+   *   `?renewFrom=` 이 주소에 남아 있어도 값을 다시 덮으면 안 된다 — 사람이 고쳐 둔
+   *   조건이 되돌아간다.
+   */
+  const renewal = contract ? null : renewFrom;
+
+  /**
+   * ★★★ 이 편집이 «자기»로 보는 계약들. **여기가 재계약의 핵심 한 줄이다.**
+   *
+   * 재계약은 이전 계약이 살아 있는 동안 만들어진다(자동 종료가 없다). 이전 계약을
+   * 자기로 보지 않으면 **재계약이 자기 이전 계약과 부딪혀 저장이 막힌다** —
+   * 계약호실 중복에서 한 번, 호실 입주 계산에서 또 한 번.
+   *
+   * 서버도 같은 함수를 부른다(`routes/contracts.ts`). 두 벌이면 화면은 통과시키는데
+   * 서버가 거절한다.
+   */
+  /** 저장된 계약은 저장된 값이 정본이다. 저장 전에는 지금 이어받는 계약이다. */
+  const renewedFromId = contract?.renewedFromContractId ?? renewal?.contractId ?? null;
+
+  const self = selfContractIds({
+    contractId: contract?.contractId ?? null,
+    renewedFromContractId: renewedFromId,
+  });
 
   const editable = editableSections(status);
   const sec2Editable = editable.includes(2);
@@ -224,8 +270,8 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
   const [companyState, setCompany] = useState<CompanyState>(() =>
     seedCompany(company, emailDomains, memberTypes),
   );
-  const [terms, setTerms] = useState<TermsState>(() => seedTerms(contract, spaces));
-  const [items, setItems] = useState<ItemRow[]>(() => seedItems(contract));
+  const [terms, setTerms] = useState<TermsState>(() => seedTerms(contract, renewal, spaces));
+  const [items, setItems] = useState<ItemRow[]>(() => seedItems(contract, renewal));
   const [users, setUsers] = useState<UserRow[]>(() => seedUsers(members, emailDomains));
   const [invalid, setInvalid] = useState<RequiredKey[]>([]);
   const [bizCheck, setBizCheck] = useState<BizCheck>({ kind: 'idle' });
@@ -555,6 +601,13 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
       ...payload(),
       companyId: forCompany,
       status: nextStatus,
+      /*
+       * ★ 재계약 이력(CSCH-04). 서버가 이 값이 **정말 이 회사 계약인지** 다시 본다
+       *   (`rejectRenewal`) — 주소창에서 온 값이라 화면을 믿지 않는다.
+       *
+       * ★ 이전 계약은 그대로 둔다. 자동 종료가 없다.
+       */
+      renewedFromContractId: renewal?.contractId ?? null,
     });
     if (!data.contractId) throw new Error('저장은 됐는데 계약 ID 가 오지 않았습니다');
     return data.contractId;
@@ -704,13 +757,32 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
       <div className={styles.pageHead}>
         <div className={styles.pageHeadInner}>
           <div>
-            <h1 className={styles.pageTitle}>{TITLES[mode]}</h1>
+            {/*
+              ★ 재계약은 제목이 다르다. 「계약 등록」으로 보이면 값이 미리 채워져 있는
+                이유가 화면 어디에도 없고, 운영자가 남의 값이 섞였다고 의심한다.
+            */}
+            <h1 className={styles.pageTitle}>{renewal ? '재계약' : TITLES[mode]}</h1>
             <HeadNote
               mode={mode}
               missing={missing.length}
               terminatedDate={contract?.terminatedDate ?? null}
               statusNames={statusNames}
             />
+            {/*
+              ★ 이어받은 계약을 **화면에 남긴다.** DB 의 `renewed_from_contract_id` 만
+                있으면 운영자는 이 계약이 어디서 왔는지 알 방법이 없다. 저장 전에는
+                「이 계약을 이어받습니다」이고, 저장된 뒤에는 그 계약으로 가는 링크다.
+            */}
+            {renewedFromId ? (
+              <div className={`${styles.pageNote} ${styles.pageNoteMuted}`}>
+                <Icon name="copy-plus" size={12} />
+                {renewal ? (
+                  '이전 계약의 조건을 이어받았습니다 — 이전 계약은 그대로 유지됩니다'
+                ) : (
+                  <Link href={`/contracts/${renewedFromId}`}>이어받은 이전 계약 보기</Link>
+                )}
+              </div>
+            ) : null}
           </div>
           <div className={styles.headActions}>
             {ACTIONS[mode].map((key) => {
@@ -802,11 +874,11 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
             onStub={notify}
             onOpenRoomPicker={() => setRoomPickerOpen(true)}
             /*
-             * ★ 호실 셀렉트가 입주 현황을 본다. **자기 계약은 빼고** 세야 하므로 지금
-             *   계약 ID 를 함께 준다 — 신규면 `null` 이고 뺄 자기 자신이 없다.
+             * ★ 호실 셀렉트가 입주 현황을 본다. **자기 계약은 빼고** 세야 하므로
+             *   「자기」 목록을 함께 준다 — 재계약이면 이전 계약도 거기 들어 있다.
              */
             spaceHolders={spaceHolders}
-            selfContractId={contract?.contractId ?? null}
+            selfContractIds={self}
           />
 
           <SectionUsers
@@ -845,7 +917,7 @@ export function ContractForm({ contract, companyId, company, members, spaces, co
       {roomPickerOpen && sec2Editable ? (
         <RoomPickerModal
           current={terms.contractRoom}
-          selfContractId={contract?.contractId ?? null}
+          selfContractIds={self}
           onClose={() => setRoomPickerOpen(false)}
           onPick={(room) => {
             setTerms((prev) => ({ ...prev, contractRoom: room }));
@@ -1039,8 +1111,39 @@ function firstFloorOf(spaces: readonly SpaceOption[], buildId: string): string {
   return spaces.find((s) => s.buildId === buildId)?.floorId ?? '';
 }
 
-function seedTerms(contract: ContractResponse | null, spaces: readonly SpaceOption[]): TermsState {
+function seedTerms(
+  contract: ContractResponse | null,
+  renewal: ContractResponse | null,
+  spaces: readonly SpaceOption[],
+): TermsState {
   if (!contract) {
+    /*
+     * ★ 재계약 — 조건을 이어받는다. 무엇을 이어받고 무엇을 새로 받는지는
+     *   `buildRenewalSeed` 한 곳에만 있다. 여기서 다시 고르면 두 벌이 된다.
+     *
+     * ★ 「오늘」은 **화면이 정한다**(`localToday`). 서버 시간대로 계산하면 자정 근처에
+     *   하루가 밀린다 — 운영자가 보고 있는 날짜가 계약일자여야 한다.
+     */
+    if (renewal) {
+      const seed = buildRenewalSeed(
+        { ...renewal, spaces: renewal.spaces },
+        localToday(),
+      );
+      return {
+        buildId: seed.buildId,
+        floorId: firstFloorOf(spaces, seed.buildId),
+        contractRoom: seed.contractRoom,
+        paymentMethod: seed.paymentMethod,
+        accessRoute: seed.accessRoute,
+        contractDate: seed.contractDate,
+        months: seed.months,
+        startDate: seed.startDate,
+        // ★ 특기사항은 이어받지 않는다(`buildRenewalSeed` 주석). 할인 문구는 금액에서
+        //   다시 만들어진다.
+        memo: '',
+      };
+    }
+
     const buildId = spaces[0]?.buildId ?? '';
     return {
       // 건물이 하나뿐이라 첫 값을 기본으로 둔다. 비워 두면 저장이 「건물 는 필수다」로 막힌다.
@@ -1068,7 +1171,18 @@ function seedTerms(contract: ContractResponse | null, spaces: readonly SpaceOpti
   };
 }
 
-function seedItems(contract: ContractResponse | null): ItemRow[] {
+/**
+ * 호실 줄의 첫 값.
+ *
+ * ★ 재계약은 **금액째** 이어받는다(`buildRenewalSeed`). 호실의 지금 기준가로 다시
+ *   채우지 않는다 — 이어지는 계약의 조건은 이전 계약의 조건이고, 바꿀 거라면 운영자가
+ *   화면에서 고친다.
+ */
+function seedItems(contract: ContractResponse | null, renewal: ContractResponse | null): ItemRow[] {
+  if (!contract && renewal) {
+    const seed = buildRenewalSeed({ ...renewal, spaces: renewal.spaces }, '');
+    return seed.spaces.length > 0 ? seed.spaces.map((s) => ({ ...s })) : [{ ...ROW_TEMPLATE }];
+  }
   if (!contract || contract.spaces.length === 0) return [{ ...ROW_TEMPLATE }];
   return contract.spaces.map((s) => ({
     roomType: s.roomType,

@@ -54,20 +54,27 @@ export interface RoomHolder {
 /**
  * 이 번호가 이미 쓰이고 있는가.
  *
- * @param selfContractId 지금 편집 중인 계약. ★ **자기 자신은 중복이 아니다** —
- *   저장된 계약을 열어 그대로 저장하면 자기 번호가 걸린다. 그러면 아무도 자기
- *   계약을 수정할 수 없게 된다.
+ * @param selfContractIds 이 편집이 «자기»로 보는 계약들. ★ **자기 자신은 중복이
+ *   아니다** — 저장된 계약을 열어 그대로 저장하면 자기 번호가 걸린다. 그러면 아무도
+ *   자기 계약을 수정할 수 없게 된다.
+ *
+ *   ★★ **하나가 아니다.** 재계약은 이전 계약이 살아 있는 동안 만들어지고(자동 종료가
+ *   없다) 그 번호를 이어받는다. 이전 계약을 빼지 않으면 재계약이 **자기 이전 계약과
+ *   부딪혀 저장이 막힌다.** 목록을 만드는 것은 `contract-renewal` 의 `selfContractIds`
+ *   하나뿐이고, 화면과 서버가 같이 부른다.
  */
 export function findRoomConflict(
   holders: readonly RoomHolder[],
   room: string,
-  selfContractId: string | null,
+  selfContractIds: readonly string[],
 ): RoomHolder | null {
   const wanted = normalizeRoom(room);
   // ★ 빈 계약호실은 중복이 아니다. 아직 안 정한 계약이 서로 부딪히면 안 된다.
   if (wanted === '') return null;
   return (
-    holders.find((h) => normalizeRoom(h.room) === wanted && h.contractId !== selfContractId) ?? null
+    holders.find(
+      (h) => normalizeRoom(h.room) === wanted && !selfContractIds.includes(h.contractId),
+    ) ?? null
   );
 }
 

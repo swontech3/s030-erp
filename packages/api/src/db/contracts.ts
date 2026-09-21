@@ -41,6 +41,8 @@ export interface ContractRow {
   terminated_date: Date | null;
   termination_reason: string | null;
   memo: string | null;
+  /** CSCH-04 — 이 계약이 이어받은 이전 계약. 재계약이 아니면 NULL. */
+  renewed_from_contract_id: string | null;
 }
 
 export interface ContractSpaceRow {
@@ -59,7 +61,8 @@ export interface ContractSpaceRow {
 const CONTRACT_COLUMNS = `
   contract_id, company_id, build_id, status, contract_no, contract_room,
   payment_method, access_route, first_payment, contract_date, period_months,
-  start_date, end_date, terminated_date, termination_reason, memo`;
+  start_date, end_date, terminated_date, termination_reason, memo,
+  renewed_from_contract_id`;
 
 /** 계약 1건. RLS 가 거른 뒤라 **0행은 "없다"가 아니라 "볼 수 없다"도 포함**한다. */
 export async function findContract(
@@ -114,7 +117,8 @@ export async function listContracts(
  * ★ 계약호실이 빈 계약은 뺀다. 아직 안 정한 계약끼리 부딪히면 안 된다.
  *
  * ★ **자기 계약도 넣는다.** 팝업 목록에는 보여야 하고(지금 무엇이 어디 있는지가
- *   판단 재료다), 중복으로 볼지 말지는 `findRoomConflict` 가 `selfContractId` 로 가른다.
+ *   판단 재료다), 중복으로 볼지 말지는 `findRoomConflict` 가 `selfContractIds` 로
+ *   가른다 — **재계약이면 이전 계약도 그 목록에 있다.**
  */
 export async function listRoomHolders(
   client: ScopedClient,
@@ -139,7 +143,7 @@ export async function listRoomHolders(
  * ★ 「살아 있는 계약」만이다(`OCCUPANCY_LIVE_STATUSES`). 종료·취소된 계약이 잡던
  *   호실은 다시 고를 수 있다.
  *
- * ★ **자기 계약도 넣는다.** 뺄지 말지는 `occupancyBySpace` 가 `selfContractId` 로
+ * ★ **자기 계약도 넣는다.** 뺄지 말지는 `occupancyBySpace` 가 `selfContractIds` 로
  *   가른다 — 여기서 빼면 화면이 「누가 쓰고 있나」를 물을 때마다 SQL 이 달라진다.
  *
  * ★ 회사 이름을 함께 준다. 셀렉트가 「Room 1 (에스원3DP)」로 보여주기 때문이다.
@@ -175,6 +179,13 @@ export async function insertContract(
     status: string;
     write: ContractWrite['contract'];
     actor: string;
+    /**
+     * CSCH-04 재계약 이력. 재계약이 아니면 `null`.
+     *
+     * ★ **INSERT 에만 있다.** 어느 계약을 이어받았는지는 만들 때 정해지고 그 뒤로
+     *   바뀌지 않는다 — `updateContract` 가 이 칸을 건드리지 않는 것이 그 뜻이다.
+     */
+    renewedFromContractId?: string | null;
   },
 ): Promise<void> {
   const { contractId, companyId, status, write, actor } = args;
@@ -183,12 +194,13 @@ export async function insertContract(
     `INSERT INTO public.tb_s080_contracts
        (contract_id, company_id, build_id, status, contract_room, payment_method,
         access_route, first_payment, contract_date, period_months, start_date, end_date, memo,
+        renewed_from_contract_id,
         created_at, updated_at, created_by, updated_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now(), now(), $14, $14)`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now(), now(), $15, $15)`,
     [
       contractId, companyId, write.buildId, status, write.contractRoom, write.paymentMethod,
       write.accessRoute, write.firstPayment, write.contractDate, write.periodMonths,
-      write.startDate, write.endDate, write.memo, actor,
+      write.startDate, write.endDate, write.memo, args.renewedFromContractId ?? null, actor,
     ],
   );
 }

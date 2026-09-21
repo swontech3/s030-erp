@@ -38,29 +38,48 @@ describe('findRoomConflict', () => {
   ];
 
   it('같은 번호가 있으면 그 계약을 돌려준다', () => {
-    expect(findRoomConflict(holders, '6-1', null)?.contractId).toBe('k-1');
+    expect(findRoomConflict(holders, '6-1', [])?.contractId).toBe('k-1');
   });
 
   it('없는 번호는 중복이 아니다', () => {
-    expect(findRoomConflict(holders, '9-9', null)).toBeNull();
+    expect(findRoomConflict(holders, '9-9', [])).toBeNull();
   });
 
   /** ★★ 자기 자신을 막으면 **아무도 자기 계약을 수정할 수 없다.** */
   it('지금 편집 중인 그 계약은 중복이 아니다', () => {
-    expect(findRoomConflict(holders, '6-1', 'k-1')).toBeNull();
+    expect(findRoomConflict(holders, '6-1', ['k-1'])).toBeNull();
   });
 
   it('다른 계약이면 편집 중이어도 중복이다', () => {
-    expect(findRoomConflict(holders, '6-1', 'k-2')?.contractId).toBe('k-1');
+    expect(findRoomConflict(holders, '6-1', ['k-2'])?.contractId).toBe('k-1');
+  });
+
+  /**
+   * ★★ 재계약 — 「자기」가 **둘**이다.
+   *
+   * 재계약은 이전 계약이 살아 있는 동안 만들어진다(자동 종료가 없다). 아직 저장 전이라
+   * 자기 ID 는 없고, 제외할 것은 이전 계약뿐이다. 안 빼면 재계약이 **자기 이전 계약과
+   * 부딪혀 저장이 막힌다** — 「이미 사용 중 (자기 회사 이름)」이 그 모습이다.
+   */
+  it('★ 재계약 — 이어받은 이전 계약의 번호는 중복이 아니다', () => {
+    expect(findRoomConflict(holders, '6-1', ['k-1'])).toBeNull();
+  });
+
+  it('★ 저장된 재계약은 자기와 이전 계약 둘 다 제외한다', () => {
+    expect(findRoomConflict(holders, '6-1', ['k-9', 'k-1'])).toBeNull();
+  });
+
+  it('★ 제외 목록에 없는 계약은 그대로 막는다 — 남의 재계약이 통과하면 안 된다', () => {
+    expect(findRoomConflict(holders, '6-1', ['k-2', 'k-3'])?.contractId).toBe('k-1');
   });
 
   it('앞뒤 공백은 같은 번호로 본다', () => {
-    expect(findRoomConflict(holders, '  6-1 ', null)?.contractId).toBe('k-1');
+    expect(findRoomConflict(holders, '  6-1 ', [])?.contractId).toBe('k-1');
   });
 
   /** ★ 아직 안 정한 계약끼리 부딪히면 안 된다. */
   it('빈 번호는 중복이 아니다', () => {
-    expect(findRoomConflict([...holders, { contractId: 'k-3', companyName: 'x', room: '' }], '', null)).toBeNull();
+    expect(findRoomConflict([...holders, { contractId: 'k-3', companyName: 'x', room: '' }], '', [])).toBeNull();
   });
 });
 

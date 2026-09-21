@@ -6,8 +6,16 @@
  * 원본: design/handoff/prototypes/s0300200040.html
  * 명세: design/handoff/tenant-contract/03-contract-form.md · 04-status.md · 05-logic.md
  *
- * 라우트는 `/contracts/[id]` 하나다. **신규 작성은 `/contracts/new`** 이고, 그때만
- * `?companyId=` 로 어느 입주사의 계약인지 받는다 — 저장할 때 서버가 요구하는 값이다.
+ * 라우트는 `/contracts/[id]` 하나다. **신규 작성은 `/contracts/new`** 이고, 거기서
+ * 질의 하나로 세 가지 모드가 갈린다(CONT-01):
+ *
+ *   `/contracts/new`                 신규 입주사 — 빈 폼. 첫 저장이 입주사를 만든다
+ *   `/contracts/new?companyId=`      신규 계약   — 회사만 채운다
+ *   `/contracts/new?renewFrom=`      재계약     — 이전 계약에서 조건을 이어받는다
+ *
+ * ★ `renewFrom` 은 `companyId` 를 **스스로 정한다.** 재계약은 같은 회사의 다음 계약이라
+ *   회사를 따로 받을 이유가 없고, 둘이 어긋나면 어느 쪽이 맞는지 알 수 없다.
+ *   서버도 같은 것을 다시 본다(`rejectRenewal`).
  *
  * ★ 사이드바에 없는 화면이다(`lib/sidebar.ts` 의 `s0300200040: null`). 계약 목록·상세에서
  *   들어온다. 그래도 `requireScreen` 은 반드시 거친다 — 메뉴에 없다는 것은 방어가 아니고,
@@ -38,12 +46,12 @@ export default async function ContractFormPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ companyId?: string }>;
+  searchParams: Promise<{ companyId?: string; renewFrom?: string }>;
 }) {
   await requireScreen('s0300200040', '/contracts/[id]');
 
   const { id } = await params;
-  const { companyId } = await searchParams;
+  const { companyId, renewFrom } = await searchParams;
   const sid = await readSid();
 
   /*
@@ -69,9 +77,29 @@ export default async function ContractFormPage({
     contract = res.body;
   }
 
+  /*
+   * 재계약 — 이어받을 이전 계약.
+   *
+   * ★ **신규 작성일 때만 읽는다.** 저장된 계약을 열 때 주소에 `?renewFrom=` 이 남아
+   *   있어도 값을 다시 덮으면 사람이 고쳐 둔 조건이 되돌아간다.
+   *
+   * ★ 없는 계약을 가리키면 **404 다.** 조용히 빈 폼으로 떨어뜨리면 「재계약」 버튼이
+   *   신규 계약을 여는 셈이고, 운영자는 값이 왜 비었는지 알 수 없다.
+   */
+  let previous: ContractResponse | null = null;
+  if (id === NEW && renewFrom) {
+    const res = await callApi<ContractResponse>(`/contracts/${encodeURIComponent(renewFrom)}`, {
+      erpSid: sid,
+    });
+    if (res.status === 404) notFound();
+    if (!res.ok) throw new Error(`이전 계약 조회 실패(${res.status})`);
+    previous = res.body;
+  }
+
   // 섹션 1·3 의 값은 **계약이 아니라 입주사**에 붙어 있다(3-4). 계약이 어느 입주사
   // 것인지 정해진 뒤에만 읽을 수 있다 — 신규 작성인데 `companyId` 가 없으면 빈 폼이다.
-  const targetCompany = contract?.companyId ?? companyId ?? null;
+  // ★ 재계약은 이전 계약의 회사를 따른다 — 주소의 `?companyId=` 보다 앞선다.
+  const targetCompany = contract?.companyId ?? previous?.companyId ?? companyId ?? null;
   let company: CompanyResponse | null = null;
   let members: MemberResponse[] = [];
   if (targetCompany) {
@@ -96,8 +124,9 @@ export default async function ContractFormPage({
      *   서버 값으로 새로 채워진다.
      */
     <ContractForm
-      key={`${id}:${contract?.status ?? 'create'}`}
+      key={`${id}:${renewFrom ?? ''}:${contract?.status ?? 'create'}`}
       contract={contract}
+      renewFrom={previous}
       companyId={targetCompany}
       company={company}
       members={members}

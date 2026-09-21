@@ -19,7 +19,7 @@
  * [전체] 버튼이 목록을 비우는 버튼이 된다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { matchesChips, type TenantFilterKey } from '@swonbiz/shared/domain/tenant-status';
 import { Icon, type IconName } from '@/components/ds';
@@ -67,6 +67,8 @@ const DEFAULT_CHIPS: TenantFilterKey[] = ['active'];
 
 export function TenantContractsView({ tenants, total, codeNames, soonDays }: Props) {
   const searchParams = useSearchParams();
+  /** [재계약] 이동용. 행이 이미 `<Link>` 라 그 안에 링크를 또 넣을 수 없다. */
+  const router = useRouter();
   const [chips, setChips] = useState<TenantFilterKey[]>(DEFAULT_CHIPS);
   const [keyword, setKeyword] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -364,12 +366,17 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                               `stopPropagation` 만으로 부족하다 — 링크의 기본 이동도 막아야
                               [재계약] 을 눌렀을 때 계약 폼으로 새지 않는다.
                           */}
+                          {/*
+                            ★ `<Link>` 안이라 링크를 또 넣을 수 없다(중첩 링크는 무효
+                              HTML 이고 브라우저마다 다르게 고친다). 그래서 이동은
+                              `router.push` 로 하고, 바깥 링크의 기본 이동은 막는다.
+                          */}
                           <span
                             role="presentation"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              notify('재계약(이전 계약 값 복사)은 아직 연결되지 않았습니다');
+                              router.push(`/contracts/new?renewFrom=${encodeURIComponent(c.contractId)}`);
                             }}
                           >
                             <span className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}>

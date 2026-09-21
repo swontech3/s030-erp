@@ -61,8 +61,14 @@ interface Props {
    * **자기 계약도 들어 있고**, 빼는 것은 `occupancyBySpace` 가 한다.
    */
   spaceHolders: readonly SpaceHolder[];
-  /** 편집 중인 계약. 신규면 `null` — 뺄 자기 자신이 없다. */
-  selfContractId: string | null;
+  /**
+   * 이 편집이 «자기»로 보는 계약들 — 입주 계산에서 뺀다(`selfContractIds`).
+   *
+   * ★ 신규면 빈 배열이다. ★★ **재계약이면 이전 계약이 들어 있다** — 이전 계약이
+   *   살아 있는 채로 같은 호실을 들고 있어서, 빼지 않으면 비상주 호실이 「이미
+   *   사용 중」이 되어 자기 이전 계약 때문에 재계약이 막힌다.
+   */
+  selfContractIds: readonly string[];
   codes: readonly CodeOption[];
   /** 섹션 2 를 수정할 수 있는가. `editableSections()` 이 판정한 값이다. */
   editable: boolean;
@@ -91,7 +97,7 @@ export function SectionContract({
   terms,
   spaces,
   spaceHolders,
-  selfContractId,
+  selfContractIds,
   codes,
   editable,
   invalid,
@@ -123,8 +129,8 @@ export function SectionContract({
    *   들어가면 막은 의미가 없다.
    */
   const occupancy = useMemo(
-    () => occupancyBySpace(spaceHolders, selfContractId),
-    [spaceHolders, selfContractId],
+    () => occupancyBySpace(spaceHolders, selfContractIds),
+    [spaceHolders, selfContractIds],
   );
 
   const patchRow = (index: number, patch: Partial<ItemRow>) =>

@@ -72,17 +72,22 @@ export const EMPTY_OCCUPANCY: SpaceOccupancy = { count: 0, companyNames: [] };
  * ★ **회사 단위로 센다.** 한 회사가 같은 호실을 여러 줄(또는 여러 계약)로 잡고 있어도
  *   1곳이다. 줄로 세면 재계약 직후처럼 계약이 겹치는 순간에 2곳으로 보인다.
  *
- * ★ `selfContractId` 의 줄은 **빼고** 센다. 위 ★★★ 참고.
+ * ★ `selfContractIds` 의 줄은 **빼고** 센다. 위 ★★★ 참고.
+ *
+ * ★★ 「자기」가 하나가 아니다. 재계약은 이전 계약이 살아 있는 동안 만들어지고 같은
+ *    호실을 이어받는다 — 이전 계약을 빼지 않으면 비상주 호실이 「이미 사용 중」이 되어
+ *    **재계약이 자기 이전 계약 때문에 막힌다.** 목록은 `contract-renewal` 의
+ *    `selfContractIds` 가 만들고, 화면과 서버가 같이 부른다.
  */
 export function occupancyBySpace(
   holders: readonly SpaceHolder[],
-  selfContractId: string | null,
+  selfContractIds: readonly string[],
 ): Map<string, SpaceOccupancy> {
   /** spaceId → (companyId → companyName). 회사 단위로 접는 자리다. */
   const bySpace = new Map<string, Map<string, string>>();
 
   for (const h of holders) {
-    if (selfContractId !== null && h.contractId === selfContractId) continue;
+    if (selfContractIds.includes(h.contractId)) continue;
     const companies = bySpace.get(h.spaceId) ?? new Map<string, string>();
     // 이름이 비어 있으면 덮어쓰지 않는다 — 한 줄이라도 이름이 있으면 그것을 보여준다.
     if (!companies.has(h.companyId) || companies.get(h.companyId) === '') {

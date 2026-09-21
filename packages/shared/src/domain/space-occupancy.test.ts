@@ -38,7 +38,7 @@ describe('입주로 세는 상태', () => {
 
 describe('호실별 입주 현황', () => {
   it('아무도 없으면 비어 있다', () => {
-    expect(occupancyBySpace([], null).size).toBe(0);
+    expect(occupancyBySpace([], []).size).toBe(0);
   });
 
   it('회사 수를 센다', () => {
@@ -47,7 +47,7 @@ describe('호실별 입주 현황', () => {
         holder({ companyId: 'c1', companyName: '가나' }),
         holder({ contractId: 'k2', companyId: 'c2', companyName: '다라' }),
       ],
-      null,
+      [],
     );
     expect(occ.get('sp1')).toEqual({ count: 2, companyNames: ['가나', '다라'] });
   });
@@ -55,21 +55,42 @@ describe('호실별 입주 현황', () => {
   it('★ 한 회사가 두 줄을 잡아도 1곳이다 — 줄로 세면 재계약 때 2곳으로 보인다', () => {
     const occ = occupancyBySpace(
       [holder({ contractId: 'k1' }), holder({ contractId: 'k2' })],
-      null,
+      [],
     );
     expect(occ.get('sp1')?.count).toBe(1);
   });
 
   it('★★ 자기 계약은 세지 않는다 — 열어서 그대로 저장할 때 자기 호실이 사라진다', () => {
     const holders = [holder({ contractId: 'mine' })];
-    expect(occupancyBySpace(holders, 'mine').get('sp1')).toBeUndefined();
-    expect(occupancyBySpace(holders, null).get('sp1')?.count).toBe(1);
+    expect(occupancyBySpace(holders, ['mine']).get('sp1')).toBeUndefined();
+    expect(occupancyBySpace(holders, []).get('sp1')?.count).toBe(1);
+  });
+
+  /**
+   * ★★ 재계약 — 「자기」가 **둘**이다. 이전 계약이 살아 있는 채로 같은 호실을 들고
+   *    있으므로, 빼지 않으면 비상주 호실이 「이미 사용 중」이 되어 **재계약이 자기
+   *    이전 계약 때문에 막힌다.**
+   */
+  it('★ 재계약 — 이어받은 이전 계약도 빼고 센다', () => {
+    const occ = occupancyBySpace(
+      [holder({ contractId: 'prev' }), holder({ contractId: 'k9', companyId: 'c2', companyName: '남' })],
+      ['prev'],
+    );
+    expect(occ.get('sp1')).toEqual({ count: 1, companyNames: ['남'] });
+  });
+
+  it('★ 저장된 재계약은 자기와 이전 계약 둘 다 뺀다', () => {
+    const holders = [
+      holder({ contractId: 'mine' }),
+      holder({ contractId: 'prev', companyId: 'c2', companyName: '이전' }),
+    ];
+    expect(occupancyBySpace(holders, ['mine', 'prev']).get('sp1')).toBeUndefined();
   });
 
   it('자기 계약을 빼도 남이 있으면 그대로 센다', () => {
     const occ = occupancyBySpace(
       [holder({ contractId: 'mine' }), holder({ contractId: 'k2', companyId: 'c2', companyName: '남' })],
-      'mine',
+      ['mine'],
     );
     expect(occ.get('sp1')).toEqual({ count: 1, companyNames: ['남'] });
   });
@@ -77,7 +98,7 @@ describe('호실별 입주 현황', () => {
   it('호실이 다르면 따로 센다', () => {
     const occ = occupancyBySpace(
       [holder({ spaceId: 'a' }), holder({ spaceId: 'b', contractId: 'k2', companyId: 'c2' })],
-      null,
+      [],
     );
     expect(occ.get('a')?.count).toBe(1);
     expect(occ.get('b')?.count).toBe(1);
