@@ -20,7 +20,8 @@
     "tokens:check": "node scripts/build-tokens.js",
     "design:links": "node scripts/check-design-links.js",
     "icons:check": "node scripts/build-icons.js",
-    "ds:compare": "tsx scripts/compare-ds.tsx"
+    "ds:compare": "tsx scripts/compare-ds.tsx",
+    "verify:print": "node scripts/verify-print.js"
   },
   "devDependencies": {
     "tsx": "^4.23.13",

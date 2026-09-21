@@ -73,8 +73,31 @@ const CHIPS: { key: TenantFilterKey; label: string }[] = [
   { key: 'ended', label: '종료' },
 ];
 
-/** 시안: 기본은 「계약중」만 켜져 있다. */
-const DEFAULT_CHIPS: TenantFilterKey[] = ['active'];
+/**
+ * ★★ 첫 화면은 **할 일이 있는 입주사**만 보여준다 — 「만기 임박」 + 「기간 만료」.
+ *
+ * 시안은 「계약중」이 기본이었다. 그건 «전부»에 가까워서 이 화면을 열자마자 눈에 띄는
+ * 것이 없었다 — 운영자가 매일 여기서 찾는 것은 **연락해야 할 곳과 닫아야 할 계약**이다.
+ * 둘 다 사람이 움직여야 끝나고(자동 종료 배치를 만들지 않았다), 놓치면 호실이 묶인 채
+ * 남는다.
+ *
+ * ★ 그 대가로 **아무 할 일이 없으면 목록이 빈다.** 빈 목록은 «고장»처럼 보이므로
+ *   안내와 [전체 보기]를 같이 낸다 — 아래 `chipEmptyLead` 참조.
+ *
+ * ★ 시안에 없는 결정이다 — `doc/DESIGN_HANDOFF_DIFF.md` §M-1.
+ */
+const DEFAULT_CHIPS: TenantFilterKey[] = ['soon', 'expired'];
+
+/**
+ * 켜진 칩 때문에 목록이 빈 경우의 안내 문구.
+ *
+ * ★ **어느 칩이 켜져 있는지 문구에 그대로 적는다.** 「입주사가 없습니다」라고만 하면
+ *   등록이 0건인 줄 알고 신규 등록을 누른다. 실제로는 걸러졌을 뿐이다.
+ */
+function chipEmptyLead(on: readonly TenantFilterKey[]): string {
+  const names = CHIPS.filter((c) => on.includes(c.key)).map((c) => c.label);
+  return `${names.join('·')} 입주사가 없습니다`;
+}
 
 export function TenantContractsView({ tenants, total, codeNames, soonDays }: Props) {
   const searchParams = useSearchParams();
@@ -253,6 +276,19 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                 sub="다른 검색어를 입력해 보세요"
                 action={{ label: '검색 초기화', kind: 'ghost', onClick: () => setKeyword('') }}
               />
+            ) : visible.length === 0 && chips.length > 0 ? (
+              /*
+               * ★★ 칩 때문에 빈 목록. 「등록된 입주사가 없습니다」와 **다른 상태**다 —
+               *    저쪽은 신규 등록을 권하지만 여기서는 걸러졌을 뿐이라 필터를 풀면 된다.
+               *    기본 칩이 「만기 임박·기간 만료」라 이 화면은 **평소에 자주 보인다**
+               *    (할 일이 없다는 좋은 소식이다). 고장처럼 보이지 않게 말로 적는다.
+               */
+              <PanelEmpty
+                icon="circle-check"
+                lead={chipEmptyLead(chips)}
+                sub="지금 처리할 계약이 없습니다"
+                action={{ label: '전체 보기', kind: 'ghost', onClick: () => setChips([]) }}
+              />
             ) : (
               visible.map((t) => (
                 <button
@@ -428,9 +464,14 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
   );
 }
 
-/** 시안 `statusBadgeClass` — 만기 임박만 warning 이고 완료·정상은 인디고다. */
+/**
+ * 시안 `statusBadgeClass` — 만기 임박만 warning 이고 완료·정상은 인디고다.
+ *
+ * ★ 「계약중(만료)」는 회색(neutral)이 아니다. 아직 **계약중**이고 호실도 잡고 있다 —
+ *   끝난 것처럼 보이는 회색으로 칠하면 뱃지 문구를 「계약중」으로 고친 뜻이 없어진다.
+ */
 function badgeClass(status: string): string {
-  if (status === '검토중' || status === '만료' || status === '종료') return styles.badgeNeutral ?? '';
+  if (status === '검토중' || status === '종료') return styles.badgeNeutral ?? '';
   if (status.startsWith('D-')) return styles.badgeWarning ?? '';
   return styles.badgeIndigo ?? '';
 }

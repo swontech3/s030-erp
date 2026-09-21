@@ -147,6 +147,17 @@ export interface MemberResponse {
 
 type Mode = 'create' | 'draft' | 'confirmed' | 'terminated' | 'cancelled';
 
+/**
+ * Navigation API 중 [이전] 이 쓰는 부분만. `lib.dom` 에 아직 없어서 여기서 좁게 적는다.
+ *
+ * ★ 전부 물음표다 — 이 API 가 없는 브라우저면 [이전] 은 목록으로 간다. 그게 지금까지의
+ *   동작이라 나빠지지 않는다.
+ */
+interface NavigationLike {
+  currentEntry?: { index: number };
+  entries?: () => { url?: string }[];
+}
+
 interface Props {
   /** `null` 이면 신규 작성(mode: create)이다. */
   contract: ContractResponse | null;
@@ -738,10 +749,38 @@ export function ContractForm({
       router.refresh();
     });
 
+  /**
+   * [이전] — **온 곳으로 되돌아간다.**
+   *
+   * 늘 `/tenants/contracts` 로 밀어 넣으면 호실 현황이나 대시보드에서 계약을 연
+   * 운영자가 엉뚱한 화면에 떨어진다. 그래서 히스토리를 한 칸 뒤로 간다.
+   *
+   * ★★ 다만 **되돌아갈 곳이 있을 때만**이다. 주소를 직접 치거나 새 탭으로 연 계약에서
+   *    `back()` 을 부르면 이 앱 바깥(빈 탭·다른 사이트)으로 나가 버린다. 그때는
+   *    입주사 목록으로 보내되 **그 입주사가 골라진 채로**(`?companyId=`) 연다 —
+   *    목록 맨 위로 떨어뜨리면 방금 보던 회사를 다시 찾아야 한다.
+   *
+   * ★ 판정은 Navigation API 다. `history.length` 로는 알 수 없다 — 새 탭에서도 1 이
+   *   아닐 수 있고, 앱 안에서 몇 번 움직였는지와 무관하다(실제로 확인했다).
+   *   `entries()[i-1].url` 은 **같은 출처일 때만** 문자열이라, 앞 화면이 남의 사이트면
+   *   저절로 거짓이 된다.
+   */
+  const goBack = () => {
+    const nav = (window as unknown as { navigation?: NavigationLike }).navigation;
+    const here = nav?.currentEntry?.index ?? -1;
+    const prev = here > 0 ? nav?.entries?.()[here - 1] : undefined;
+    if (typeof prev?.url === 'string' && prev.url.startsWith(window.location.origin)) {
+      router.back();
+      return;
+    }
+    const target = contract?.companyId ?? renewal?.companyId ?? companyId ?? null;
+    router.push(target ? `/tenants/contracts?companyId=${encodeURIComponent(target)}` : '/tenants/contracts');
+  };
+
   const onAction = (key: ActionKey) => {
     switch (key) {
       case 'back':
-        router.push('/tenants/contracts');
+        goBack();
         return;
       case 'draftSave':
         void onDraftSave();

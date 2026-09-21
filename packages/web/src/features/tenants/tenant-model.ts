@@ -5,7 +5,7 @@
  *   이 파일은 서버가 준 값을 화면 문자열로 바꾸는 일만 한다.
  */
 import type { TenantFilterKey } from '@swonbiz/shared/domain/tenant-status';
-import { isContractExpired } from '@swonbiz/shared/domain/contract-status';
+import { EXPIRED_LABEL, isContractExpired } from '@swonbiz/shared/domain/contract-status';
 import { contractStatusNameFromMap } from '@/features/contracts/contract-status-name';
 
 /** `GET /companies` 의 한 줄. */
@@ -101,9 +101,12 @@ export function isExpiringSoon(contract: ContractSummaryResponse, today: Date, s
  *   `codeNames` 는 s0300200030 이 들고 있는 `카테고리:코드 → 이름` 사전이다.
  *   코드를 못 받으면 그쪽 기본값이 받는다. **빈 칸이 되지 않는다.**
  *
- * ★ 만료는 상태값이 아니라 **날짜**다. `confirmed` 인데 종료일이 지났으면 「만료」다.
- *   저장된 상태는 그대로 `confirmed` 이므로 **코드 테이블에 넣지 않았다** — 저장되지
- *   않는 이름이 코드 목록에 끼면 상태가 다섯 개인 것처럼 보인다.
+ * ★ 만료는 상태값이 아니라 **날짜**다. `confirmed` 인데 종료일이 지났으면
+ *   「계약중(만료)」다. 저장된 상태는 그대로 `confirmed` 이므로 **코드 테이블에 넣지
+ *   않았다** — 저장되지 않는 이름이 코드 목록에 끼면 상태가 다섯 개인 것처럼 보인다.
+ *
+ * ★ 문구는 `EXPIRED_LABEL` 하나다 — 입주사 목록 뱃지가 같은 상수를 쓴다. 왼쪽 카드는
+ *   「계약중(만료)」인데 오른쪽 계약 행은 「만료」인 화면이 되면 안 된다.
  */
 export function contractStatusLabel(
   contract: ContractSummaryResponse,
@@ -113,7 +116,7 @@ export function contractStatusLabel(
   // ★ 판정은 `isContractExpired` 한 곳이다 — 「기간 만료」 칩이 같은 함수를 본다.
   //   두 벌이면 행은 만료라는데 칩에는 안 뜨는 상태가 된다.
   if (isContractExpired({ status: contract.status, endDate: new Date(contract.endDate), today })) {
-    return '만료';
+    return EXPIRED_LABEL;
   }
   return contractStatusNameFromMap(codeNames, contract.status);
 }

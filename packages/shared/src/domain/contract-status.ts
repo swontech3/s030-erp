@@ -156,6 +156,20 @@ export function isContractExpired(args: { status: string; endDate: Date; today: 
   return daysBetweenLocal(args.today, args.endDate) < 0;
 }
 
+/**
+ * 만료된 계약의 **뱃지 문구**.
+ *
+ * ★★ 「만료」가 아니라 「계약중(만료)」다. 상태는 아직 `confirmed` 이고 **호실도 그대로
+ *    잡고 있다.** 「만료」라고만 적으면 끝난 계약으로 읽혀서, 그 호실이 비어 있는 줄 알고
+ *    다른 회사에 내주려다 중복으로 막힌다. 괄호 앞의 「계약중」이 그 사실을 말한다.
+ *
+ * ★ 칩 이름은 「기간 만료」 그대로다 — 칩은 «찾는 이름»이고 뱃지는 «지금 무엇인가»다.
+ *
+ * ★ 입주사 목록 뱃지와 계약 행의 상태가 **이 상수 하나**를 쓴다. 판정도
+ *   `isContractExpired` 하나다. 문구가 두 벌이면 같은 상태가 화면마다 다른 이름이 된다.
+ */
+export const EXPIRED_LABEL = '계약중(만료)';
+
 /** 기간 만료로 닫을 때의 사유. 화면이 기본값으로 채우고 운영자가 고칠 수 있다. */
 export const EXPIRED_TERMINATION_REASON = '계약기간 만료로 계약 종료';
 

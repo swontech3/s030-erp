@@ -52,10 +52,23 @@ describe('deriveTenantStatus', () => {
    *    운영자가 어디를 처리해야 하는지 알 수 없었기 때문이다. 자동 종료 배치가 없으니
    *    이 상태는 **할 일이 남았다는 뜻**이고, 칩이 그 목록이다.
    */
-  it('★★ 어제 끝났는데 아직 계약중이면 「기간 만료」다 — 「종료」가 아니다', () => {
+  it('★★ 어제 끝났는데 아직 계약중이면 「계약중(만료)」다 — 「종료」가 아니다', () => {
     const s = deriveTenantStatus({ contracts: [confirmed('2026-09-17')], today: TODAY });
-    expect(s.label).toBe('기간 만료');
+    expect(s.label).toBe('계약중(만료)');
     expect(s.filters).toEqual(['expired']);
+  });
+
+  /**
+   * ★★ 뱃지가 **「계약중」으로 시작한다.** 만료된 계약도 상태는 `confirmed` 이고
+   *    **호실을 그대로 잡고 있다.** 「만료」라고만 적으면 끝난 계약으로 읽혀서, 그 호실이
+   *    비었다고 생각한 운영자가 다른 회사에 내주려다 중복으로 막힌다.
+   *
+   * ★ 칩 이름은 「기간 만료」 그대로다 — 이 시험이 그 둘을 헷갈리지 않게 붙잡는다.
+   */
+  it('★★ 뱃지는 「계약중」으로 시작한다 — 호실을 아직 잡고 있다는 뜻이다', () => {
+    const s = deriveTenantStatus({ contracts: [confirmed('2026-09-17')], today: TODAY });
+    expect(s.label.startsWith('계약중')).toBe(true);
+    expect(s.label).not.toBe('기간 만료');
   });
 
   it('★ 종료 처리를 끝내면 「종료」로 옮겨간다', () => {
@@ -79,7 +92,7 @@ describe('deriveTenantStatus', () => {
     });
     expect(s.filters).toEqual(['active', 'expired']);
     // 뱃지는 **할 일 쪽**을 보여준다 — 계약중인 것은 칩으로 이미 찾을 수 있다.
-    expect(s.label).toBe('기간 만료');
+    expect(s.label).toBe('계약중(만료)');
   });
 
   /**
@@ -92,7 +105,7 @@ describe('deriveTenantStatus', () => {
       today: TODAY,
     });
     expect(s.filters).toEqual(['active', 'soon', 'expired']);
-    expect(s.label).toBe('기간 만료');
+    expect(s.label).toBe('계약중(만료)');
     expect(s.remainingDays).toBe(9);
   });
 
@@ -129,7 +142,7 @@ describe('deriveTenantStatus', () => {
       contracts: [confirmed('2026-09-17'), { status: 'draft', endDate: day('2027-06-30') }],
       today: TODAY,
     });
-    expect(s.label).toBe('기간 만료');
+    expect(s.label).toBe('계약중(만료)');
     expect(s.filters).toEqual(['expired']);
   });
 

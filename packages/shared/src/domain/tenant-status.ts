@@ -28,7 +28,7 @@
  * 사업자번호가 없다는 표시이지 상태가 아니다.
  */
 
-import { isContractExpired } from './contract-status.ts';
+import { EXPIRED_LABEL, isContractExpired } from './contract-status.ts';
 import { daysBetweenLocal } from './day.ts';
 
 /** 만기 임박으로 보는 잔여일. `02-master-detail.md` 「만기 30일 이내」. */
@@ -111,13 +111,13 @@ export function deriveTenantStatus(args: {
      *
      * ★ 시안의 뱃지 문구가 `D-9` 다. 「만기 임박」은 칩 이름이지 뱃지 문구가 아니다.
      */
-    const label = hasExpired ? '기간 만료' : soon ? `D-${remainingDays}` : '계약중';
+    const label = hasExpired ? EXPIRED_LABEL : soon ? `D-${remainingDays}` : '계약중';
     return { label, filters, remainingDays };
   }
 
   // ★ 살아 있는 계약이 없고 만료된 계약만 있다 — 재계약 의사를 확인하고 닫을 자리다.
   //   **호실은 그대로 잡고 있다**(상태가 `confirmed` 이므로). 자동으로 풀지 않는다.
-  if (hasExpired) return { label: '기간 만료', filters: ['expired'], remainingDays: null };
+  if (hasExpired) return { label: EXPIRED_LABEL, filters: ['expired'], remainingDays: null };
 
   // ★ 「종료」는 **계약이 성립했다가 끝난** 것이다. `draft`(작성 중)와 `cancelled`(성립 전
   //   취소)는 여기 들어가지 않는다 — 임시저장만 해 둔 입주사가 「종료」로 보이면
