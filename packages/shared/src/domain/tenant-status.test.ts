@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EXPIRY_SOON_DAYS,
+  compareTenants,
   deriveTenantStatus,
   matchesChips,
   type TenantContractFact,
@@ -186,5 +187,56 @@ describe('matchesChips', () => {
   it('하나라도 겹치면 통과한다', () => {
     expect(matchesChips(['active', 'soon'], ['soon'])).toBe(true);
     expect(matchesChips(['active'], ['soon'])).toBe(false);
+  });
+});
+
+describe('sortDays · compareTenants — 만료 임박 정렬', () => {
+  it('★ 종료일이 지나면 음수다 — 그래서 오름차순 하나로 맨 위에 온다', () => {
+    expect(deriveTenantStatus({ contracts: [confirmed('2026-09-10')], today: TODAY }).sortDays).toBe(-8);
+    expect(deriveTenantStatus({ contracts: [confirmed('2026-09-27')], today: TODAY }).sortDays).toBe(9);
+  });
+
+  it('★ remainingDays 와 다르다 — 지난 계약에서 저쪽은 null 이고 이쪽은 음수다', () => {
+    const s = deriveTenantStatus({ contracts: [confirmed('2026-09-10')], today: TODAY });
+    expect(s.remainingDays).toBeNull();
+    expect(s.sortDays).toBe(-8);
+  });
+
+  it('확정된 계약이 없으면 null 이다', () => {
+    expect(deriveTenantStatus({ contracts: [], today: TODAY }).sortDays).toBeNull();
+    expect(
+      deriveTenantStatus({ contracts: [{ status: 'terminated', endDate: day('2026-09-10') }], today: TODAY })
+        .sortDays,
+    ).toBeNull();
+  });
+
+  it('여러 계약이면 가장 가까운 종료일을 쓴다', () => {
+    const s = deriveTenantStatus({ contracts: [confirmed('2027-01-14'), confirmed('2026-09-27')], today: TODAY });
+    expect(s.sortDays).toBe(9);
+  });
+
+  it('★★ 기간 만료가 맨 위, 그다음 만기 임박, 그다음 여유 — null 은 맨 뒤', () => {
+    const rows = [
+      { companyName: '여유', sortDays: 200 },
+      { companyName: '할일없음', sortDays: null },
+      { companyName: '많이지남', sortDays: -40 },
+      { companyName: '임박', sortDays: 9 },
+      { companyName: '조금지남', sortDays: -2 },
+    ];
+    expect([...rows].sort(compareTenants).map((r) => r.companyName)).toEqual([
+      '많이지남',
+      '조금지남',
+      '임박',
+      '여유',
+      '할일없음',
+    ]);
+  });
+
+  it('같은 날짜면 회사명으로 가른다 — 새로고침마다 순서가 흔들리면 안 된다', () => {
+    const rows = [
+      { companyName: '나회사', sortDays: 5 },
+      { companyName: '가회사', sortDays: 5 },
+    ];
+    expect([...rows].sort(compareTenants).map((r) => r.companyName)).toEqual(['가회사', '나회사']);
   });
 });

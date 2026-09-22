@@ -174,6 +174,8 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
           provisional: !c.biz_number,
           statusLabel: status.label,
           filters: status.filters,
+          /** 정렬용 — 종료일이 가장 가까운 확정 계약까지의 일수. 지났으면 음수다. */
+          sortDays: status.sortDays,
           contractCount: contracts.length,
           roomSummary: room
             ? [room.room_name, room.contract_room ? `(${room.contract_room})` : null]
@@ -388,31 +390,51 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
     const companyName = text(req.body?.companyName);
 
     const actor = String(session.s020MemberId);
-    const result = await withCompanyScope(scopeOf(session), async (client) => {
-      const company = await findCompany(client, req.params.id);
-      if (!company) return 'not_found' as const;
 
-      await updateCompany(client, {
-        companyId: company.company_id,
-        actor,
-        patch: {
-          companyName,
-          bizNumber: text(req.body?.bizNumber),
-          corpNumber: text(req.body?.corpNumber),
-          ceoName: text(req.body?.ceoName),
-          businessType: text(req.body?.businessType),
-          businessItem: text(req.body?.businessItem),
-          memberType: text(req.body?.memberType),
-          tel: text(req.body?.tel),
-          email: text(req.body?.email),
-          ceoZipCode: text(req.body?.ceoZipCode),
-          ceoAddress: text(req.body?.ceoAddress),
-          ceoAddressDetail: text(req.body?.ceoAddressDetail),
-          memo: text(req.body?.memo),
-        },
+    /**
+     * ★ 등록(POST)과 **같은 자리에서 같은 모양으로** 받는다. `biz_number` 는 UNIQUE 라
+     *   남의 번호로 고치면 여기서 23505 가 난다 — 운영자가 실제로 하는 일이다(번호를
+     *   잘못 옮겨 적었다가 고치는 중에 이미 있는 회사의 번호를 친다).
+     *
+     * ★★ try/catch 가 `withCompanyScope` **밖**이어야 한다. 안에서 삼키면 이미 abort 된
+     *   트랜잭션에 COMMIT 을 부른다 — 등록 쪽 주석에 그 이유가 적혀 있다.
+     */
+    let result: 'ok' | 'not_found';
+    try {
+      result = await withCompanyScope(scopeOf(session), async (client) => {
+        const company = await findCompany(client, req.params.id);
+        if (!company) return 'not_found' as const;
+
+        await updateCompany(client, {
+          companyId: company.company_id,
+          actor,
+          patch: {
+            companyName,
+            bizNumber: text(req.body?.bizNumber),
+            corpNumber: text(req.body?.corpNumber),
+            ceoName: text(req.body?.ceoName),
+            businessType: text(req.body?.businessType),
+            businessItem: text(req.body?.businessItem),
+            memberType: text(req.body?.memberType),
+            tel: text(req.body?.tel),
+            email: text(req.body?.email),
+            ceoZipCode: text(req.body?.ceoZipCode),
+            ceoAddress: text(req.body?.ceoAddress),
+            ceoAddressDetail: text(req.body?.ceoAddressDetail),
+            memo: text(req.body?.memo),
+          },
+        });
+        return 'ok' as const;
       });
-      return 'ok' as const;
-    });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        return reply.code(409).send({
+          error: 'duplicate',
+          message: '이미 등록된 사업자등록번호입니다. 입주사 목록에서 찾아 주세요',
+        });
+      }
+      throw err;
+    }
 
     if (result === 'not_found') return notFound(reply);
     return reply.send({ companyId: req.params.id });

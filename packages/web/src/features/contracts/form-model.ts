@@ -26,6 +26,7 @@ import {
   calcTotals,
   type ContractTotals,
 } from '@swonbiz/shared/domain/contract-amounts';
+import { caretForMasked } from '@swonbiz/shared/domain/masked-caret';
 
 /** 계약 항목 한 줄. 금액은 전부 원 단위 정수이고, 안 채운 칸은 0 이다. */
 export interface ItemRow {
@@ -300,6 +301,38 @@ export function maskValue(kind: 'bizno' | 'corpno' | 'phone', raw: string): stri
   if (d.length > mid) return `${d.slice(0, 3)}-${d.slice(3, mid)}-${d.slice(mid)}`;
   return d.length > 3 ? `${d.slice(0, 3)}-${d.slice(3)}` : d;
 }
+
+/**
+ * 마스킹 칸의 `onChange` — **값을 바꾸면서 커서를 제자리에 둔다** (CONT-19).
+ *
+ * ★★ 제어 컴포넌트에 마스크를 씌우면 중간을 고칠 때 **커서가 맨 끝으로 튄다.**
+ *    React 가 새 값을 인풋에 써 넣고, 값을 쓰면 브라우저가 커서를 뒤로 보내기 때문이다.
+ *    실측: `111-22-85905` 의 2번 자리에서 `9` → 커서 12(맨 끝). 앞자리를 이어서
+ *    고칠 수 없다.
+ *
+ * ★ 그래서 **여기서 먼저** `el.value` 에 마스크된 값을 써 넣고 커서를 잡아 둔다.
+ *   뒤이어 React 가 렌더할 때 값이 이미 같으므로 인풋을 건드리지 않고, 커서가 남는다.
+ *   금액 칸이 예전부터 쓰던 수법과 같다(`formatMoneyInput`).
+ *
+ * ★ 자리 계산은 shared 의 `caretForMasked` 다 — 시험이 거기 붙어 있다.
+ */
+export function maskInput(el: HTMLInputElement, kind: 'bizno' | 'corpno' | 'phone' | 'emailId'): string {
+  const raw = el.value;
+  const caret = el.selectionStart ?? raw.length;
+  const masked = kind === 'emailId' ? maskEmailId(raw) : maskValue(kind, raw);
+  el.value = masked;
+  const pos = caretForMasked({ raw, caret, masked, keep: kind === 'emailId' ? EMAIL_KEEP : DIGIT });
+  try {
+    el.setSelectionRange(pos, pos);
+  } catch {
+    /* detached */
+  }
+  return masked;
+}
+
+const DIGIT = /\d/;
+/** `maskEmailId` 가 남기는 글자와 **같아야** 한다 — 갈리면 커서가 한 칸씩 어긋난다. */
+const EMAIL_KEEP = /[A-Za-z0-9._-]/;
 
 /**
  * 콤마를 다시 넣으면 커서가 맨 앞으로 튄다 — 길이 차이만큼 되돌린다.

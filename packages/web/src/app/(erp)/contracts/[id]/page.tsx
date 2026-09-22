@@ -78,6 +78,29 @@ export default async function ContractFormPage({
   }
 
   /*
+   * 확정·취소가 **언제** 있었는지 — 계약 폼 머리의 「2026.09.21 계약중」.
+   *
+   * ★ 계약 행에는 그 날짜가 없다. 종료만 `terminated_date` 로 따로 남는데, 그것은
+   *   사람이 고르는 «언제까지 쓰는가»이지 «언제 눌렀는가»가 아니다. 확정·취소는
+   *   고를 날짜가 없으므로 상태 이력(CONT-11)에서 읽는다.
+   *
+   * ★★ 이력 조회가 실패해도 **화면은 연다.** 날짜만 빠지고 「계약중」은 그대로
+   *   나온다 — 보조 안내 한 줄 때문에 계약을 못 열면 그게 더 나쁘다.
+   */
+  let statusChangedAt: string | null = null;
+  if (contract && (contract.status === 'confirmed' || contract.status === 'cancelled')) {
+    const res = await callApi<{ history: { toStatus: string; changedAt: string }[] }>(
+      `/contracts/${encodeURIComponent(id)}/status-history`,
+      { erpSid: sid },
+    );
+    if (res.ok) {
+      // ★ **마지막** 것을 쓴다. 같은 상태로 두 번 들어올 수 있다(종료했다가 되돌리는 등).
+      const hit = [...res.body.history].reverse().find((h) => h.toStatus === contract.status);
+      statusChangedAt = hit?.changedAt ?? null;
+    }
+  }
+
+  /*
    * 재계약 — 이어받을 이전 계약.
    *
    * ★ **신규 작성일 때만 읽는다.** 저장된 계약을 열 때 주소에 `?renewFrom=` 이 남아
@@ -126,6 +149,7 @@ export default async function ContractFormPage({
     <ContractForm
       key={`${id}:${renewFrom ?? ''}:${contract?.status ?? 'create'}`}
       contract={contract}
+      statusChangedAt={statusChangedAt}
       renewFrom={previous}
       companyId={targetCompany}
       company={company}

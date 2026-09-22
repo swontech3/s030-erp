@@ -162,6 +162,14 @@ interface Props {
   /** `null` 이면 신규 작성(mode: create)이다. */
   contract: ContractResponse | null;
   /**
+   * 지금 상태가 된 시각 — 확정·취소의 날짜다(상태 이력에서 읽는다, CONT-11).
+   *
+   * ★ **종료는 여기 오지 않는다.** 종료는 사람이 고른 `terminatedDate` 를 쓴다 —
+   *   「언제까지 쓰는가」와 「언제 눌렀는가」는 다르고, 계약서·정산이 보는 것은 앞쪽이다.
+   * ★ 이력을 못 읽었으면 `null` 이고, 그때는 날짜 없이 상태 이름만 나온다.
+   */
+  statusChangedAt: string | null;
+  /**
    * 재계약(`/contracts/new?renewFrom=`)에서 **이어받을 이전 계약**. 그 밖에는 `null`.
    *
    * ★ `contract` 와 동시에 오지 않는다. 이어받기는 **첫 값을 채우는 일**이라 저장된
@@ -245,6 +253,7 @@ const ACTION_DEFS: Record<ActionKey, { label: string; cls: string; icon?: IconNa
 
 export function ContractForm({
   contract,
+  statusChangedAt,
   renewFrom,
   companyId,
   company,
@@ -824,6 +833,7 @@ export function ContractForm({
               mode={mode}
               missing={missing.length}
               terminatedDate={contract?.terminatedDate ?? null}
+              statusChangedAt={statusChangedAt}
               statusNames={statusNames}
             />
             {/*
@@ -1055,11 +1065,14 @@ function HeadNote({
   mode,
   missing,
   terminatedDate,
+  statusChangedAt,
   statusNames,
 }: {
   mode: Mode;
   missing: number;
   terminatedDate: string | null;
+  /** 확정·취소가 있었던 시각. 종료는 `terminatedDate` 를 쓴다. */
+  statusChangedAt: string | null;
   /** 상태 표시명 — 코드 `CONTRACT_ST`. 예전에는 「종료 / 취소 / 계약 확정」이 박혀 있었다. */
   statusNames: Readonly<Record<string, string>>;
 }) {
@@ -1073,18 +1086,17 @@ function HeadNote({
       <div className={`${styles.pageNote} ${styles.pageNoteMuted}`}>{day ? `${day} ${name}` : name}</div>
     );
   }
-  if (mode === 'cancelled') {
+  /*
+   * ★ 확정·취소는 **상태 이력의 시각**을 붙인다(`statusChangedAt`). 종료(위)와 달리
+   *   계약 행에 날짜가 없어서다 — 고를 날짜가 없는 전이라 「언제 눌렀는가」가 곧 그 날짜다.
+   * ★ 못 읽었으면 날짜 없이 이름만 낸다. 「 계약중」처럼 앞이 빈 줄이 나오지 않게
+   *   종료 쪽과 같은 모양으로 가른다.
+   */
+  if (mode === 'cancelled' || mode === 'confirmed') {
+    const name = contractStatusName(statusNames, mode);
+    const day = statusChangedAt ? formatDot(statusChangedAt) : '';
     return (
-      <div className={`${styles.pageNote} ${styles.pageNoteMuted}`}>
-        {contractStatusName(statusNames, 'cancelled')}
-      </div>
-    );
-  }
-  if (mode === 'confirmed') {
-    return (
-      <div className={`${styles.pageNote} ${styles.pageNoteMuted}`}>
-        {contractStatusName(statusNames, 'confirmed')}
-      </div>
+      <div className={`${styles.pageNote} ${styles.pageNoteMuted}`}>{day ? `${day} ${name}` : name}</div>
     );
   }
   if (missing > 0) {

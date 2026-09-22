@@ -19,6 +19,11 @@ export interface TenantCard {
   provisional: boolean;
   statusLabel: string;
   filters: TenantFilterKey[];
+  /**
+   * 정렬용 — 종료일이 가장 가까운 «확정» 계약까지의 일수. **지났으면 음수**이고,
+   * 확정된 계약이 없으면 `null` 이다. 규칙과 이유는 `tenant-status` 의 `sortDays`.
+   */
+  sortDays: number | null;
   contractCount: number;
   roomSummary: string;
 }

@@ -54,6 +54,18 @@ export interface TenantStatus {
   filters: TenantFilterKey[];
   /** 유효 계약 중 가장 빨리 끝나는 것의 잔여일. 없으면 `null`. */
   remainingDays: number | null;
+  /**
+   * 목록 정렬용 — **확정된** 계약 중 종료일이 가장 가까운 것까지의 일수.
+   *
+   * ★★ `remainingDays` 와 **다르다.** 저쪽은 아직 안 끝난 계약만 보므로 종료일이
+   *    지나면 `null` 이 된다. 이쪽은 지난 것도 세고 그때 **음수**가 된다 —
+   *    그래서 그냥 오름차순으로 세우면 「기간 만료가 맨 위, 그다음 만기 임박」이
+   *    저절로 나온다. 기간 만료를 따로 앞으로 끌어내는 코드가 필요 없다.
+   *
+   * ★ 확정된 계약이 하나도 없으면(`종료`·`검토중`) `null` — 정렬에서 맨 뒤다.
+   *   할 일이 없는 입주사이고, 날짜로 줄 세울 근거도 없다.
+   */
+  sortDays: number | null;
 }
 
 export interface TenantContractFact {
@@ -92,6 +104,15 @@ export function deriveTenantStatus(args: {
     isContractExpired({ status: c.status, endDate: c.endDate, today }),
   );
 
+  /*
+   * 정렬 키 — **확정된 계약만** 본다. 지난 것은 음수로 남겨 둔다(위 `sortDays` 참조).
+   * terminated·cancelled·draft 는 세지 않는다 — 닫혔거나 아직 계약이 아니다.
+   */
+  const confirmedDays = contracts
+    .filter((c) => c.status === 'confirmed')
+    .map((c) => daysBetweenLocal(today, c.endDate));
+  const sortDays = confirmedDays.length > 0 ? Math.min(...confirmedDays) : null;
+
   if (live.length > 0) {
     const remainingDays = Math.min(...live);
     const soon = remainingDays <= EXPIRY_SOON_DAYS;
@@ -112,21 +133,21 @@ export function deriveTenantStatus(args: {
      * ★ 시안의 뱃지 문구가 `D-9` 다. 「만기 임박」은 칩 이름이지 뱃지 문구가 아니다.
      */
     const label = hasExpired ? EXPIRED_LABEL : soon ? `D-${remainingDays}` : '계약중';
-    return { label, filters, remainingDays };
+    return { label, filters, remainingDays, sortDays };
   }
 
   // ★ 살아 있는 계약이 없고 만료된 계약만 있다 — 재계약 의사를 확인하고 닫을 자리다.
   //   **호실은 그대로 잡고 있다**(상태가 `confirmed` 이므로). 자동으로 풀지 않는다.
-  if (hasExpired) return { label: EXPIRED_LABEL, filters: ['expired'], remainingDays: null };
+  if (hasExpired) return { label: EXPIRED_LABEL, filters: ['expired'], remainingDays: null, sortDays };
 
   // ★ 「종료」는 **계약이 성립했다가 끝난** 것이다. `draft`(작성 중)와 `cancelled`(성립 전
   //   취소)는 여기 들어가지 않는다 — 임시저장만 해 둔 입주사가 「종료」로 보이면
   //   운영자가 끝난 회사로 읽는다.
   const everLive = contracts.some((c) => c.status === 'confirmed' || c.status === 'terminated');
-  if (everLive) return { label: '종료', filters: ['ended'], remainingDays: null };
+  if (everLive) return { label: '종료', filters: ['ended'], remainingDays: null, sortDays };
 
   // 유효 계약에 이르지 못했다 — 계약이 아예 없거나, 임시저장·취소뿐이다. 위 ★ 참조.
-  return { label: '검토중', filters: ['review'], remainingDays: null };
+  return { label: '검토중', filters: ['review'], remainingDays: null, sortDays };
 }
 
 /**
@@ -138,4 +159,28 @@ export function deriveTenantStatus(args: {
 export function matchesChips(filters: readonly TenantFilterKey[], on: readonly TenantFilterKey[]): boolean {
   if (on.length === 0) return true;
   return filters.some((f) => on.includes(f));
+}
+
+/**
+ * 목록 정렬 — **종료일이 가까운 순.** 지난 것(기간 만료)이 맨 위다.
+ *
+ * ★★ 기간 만료를 따로 앞으로 끌어내지 않는다. `sortDays` 가 지난 계약에서 음수라
+ *    오름차순 하나로 「많이 지난 것 → 조금 지난 것 → 곧 끝나는 것 → 여유 있는 것」이
+ *    나온다. 규칙이 둘이면(그룹 나누기 + 날짜 정렬) 나중에 한쪽만 고쳐진다.
+ *
+ * ★ `sortDays` 가 `null` 인 곳(종료·검토중)은 **맨 뒤**다. 할 일이 없고, 날짜로 줄
+ *   세울 근거도 없다.
+ *
+ * ★ 같은 날짜면 **회사명**으로 가른다. 안 그러면 새로고침할 때마다 순서가 흔들려
+ *   운영자가 방금 본 줄을 다시 못 찾는다.
+ */
+export function compareTenants(
+  a: { sortDays: number | null; companyName: string },
+  b: { sortDays: number | null; companyName: string },
+): number {
+  if (a.sortDays === null && b.sortDays === null) return a.companyName.localeCompare(b.companyName, 'ko');
+  if (a.sortDays === null) return 1;
+  if (b.sortDays === null) return -1;
+  if (a.sortDays !== b.sortDays) return a.sortDays - b.sortDays;
+  return a.companyName.localeCompare(b.companyName, 'ko');
 }

@@ -17,11 +17,26 @@
  * =============================================================================
  * 판정은 `matchesChips()` 가 한다(shared). 전부 해제를 「아무것도 안 보임」으로 읽으면
  * [전체] 버튼이 목록을 비우는 버튼이 된다.
+ *
+ * =============================================================================
+ * ★★ 걸러 놓은 상태는 **주소에 있다** — 화면 안에만 두면 [이전] 에 살아남지 못한다
+ * =============================================================================
+ * 켜진 칩·검색어·선택한 입주사는 `?chips=&q=&companyId=` 로 적힌다. 규칙과 그 이유는
+ * `@swonbiz/shared/domain/tenant-list-params` 머리말에 있고, 거기에 시험이 붙어 있다
+ * (웹에는 시험 러너가 없어서 판정 규칙을 화면에 두지 않는다).
+ *
+ * 그전에는 계약 폼으로 넘어가는 순간 이 셋이 사라져서, [이전] 으로 돌아오면 **기본 칩의
+ * 첫 화면**이 다시 그려졌다. 주소는 그대로라 「온 곳으로 돌아간다」는 검사는 통과했다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { matchesChips, type TenantFilterKey } from '@swonbiz/shared/domain/tenant-status';
+import {
+  parseTenantListParams,
+  tenantListSearch,
+  type TenantListState,
+} from '@swonbiz/shared/domain/tenant-list-params';
+import { compareTenants, matchesChips, type TenantFilterKey } from '@swonbiz/shared/domain/tenant-status';
 import { Icon, type IconName } from '@/components/ds';
 import {
   contractStatusLabel,
@@ -89,6 +104,16 @@ const CHIPS: { key: TenantFilterKey; label: string }[] = [
 const DEFAULT_CHIPS: TenantFilterKey[] = ['soon', 'expired'];
 
 /**
+ * 왼쪽 목록의 스크롤 위치.
+ *
+ * ★ 주소에 넣지 않는다 — 공유한 링크에 남의 스크롤 위치가 따라가는 것은 뜻이 없고,
+ *   칩을 바꾸면 목록 길이가 달라져 숫자가 금방 거짓이 된다. **한 탭 안에서만** 쓴다.
+ * ★ 사생활 모드·저장소 차단에서 읽기도 쓰기도 던질 수 있다. 실패해도 화면은 그대로
+ *   그려져야 하므로 전부 try/catch 로 감싼다.
+ */
+const CARDS_SCROLL_KEY = 'swonbiz:tenants:cards-scroll';
+
+/**
  * 켜진 칩 때문에 목록이 빈 경우의 안내 문구.
  *
  * ★ **어느 칩이 켜져 있는지 문구에 그대로 적는다.** 「입주사가 없습니다」라고만 하면
@@ -103,9 +128,21 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
   const searchParams = useSearchParams();
   /** [재계약] 이동용. 행이 이미 `<Link>` 라 그 안에 링크를 또 넣을 수 없다. */
   const router = useRouter();
-  const [chips, setChips] = useState<TenantFilterKey[]>(DEFAULT_CHIPS);
-  const [keyword, setKeyword] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  /**
+   * ★★ 첫 값은 **주소에서** 온다. [이전]·새로고침·링크가 전부 이 한 줄에 걸린다.
+   *
+   * ★ 주소가 가리키는 입주사가 목록에 없으면(지워졌거나 남의 것) 고르지 않는다 —
+   *   오른쪽만 채워지고 왼쪽에는 눌린 카드가 없는 화면이 되면 무엇을 보는 중인지 읽히지 않는다.
+   */
+  const [state, setState] = useState<TenantListState>(() => {
+    const s = parseTenantListParams(searchParams, DEFAULT_CHIPS);
+    const known = s.companyId && tenants.some((t) => t.companyId === s.companyId);
+    return { ...s, companyId: known ? s.companyId : null };
+  });
+  const { chips, keyword, companyId: selectedId } = state;
+  const patch = useCallback((next: Partial<TenantListState>) => setState((prev) => ({ ...prev, ...next })), []);
+
   const [contracts, setContracts] = useState<TenantContract[] | null>(null);
   const [loadingContracts, setLoadingContracts] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -117,7 +154,17 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
 
   const selected = tenants.find((t) => t.companyId === selectedId) ?? null;
 
-  const visible = tenants.filter((t) => matchesChips(t.filters, chips) && matchesSearch(t, keyword));
+  /*
+   * ★★ **종료일이 가까운 순**으로 세운다 — 기간 만료가 맨 위, 그다음 만기 임박.
+   *    운영자가 이 화면에서 매일 찾는 것이 「연락할 곳과 닫을 계약」이라(기본 칩도
+   *    같은 이유로 그 둘이다) 그 순서가 곧 할 일 순서다.
+   *
+   * ★ 규칙은 shared 의 `compareTenants` 하나다. `sort` 는 제자리에서 뒤집지만 앞의
+   *   `filter` 가 이미 새 배열을 주므로 서버가 준 `tenants` 는 건드리지 않는다.
+   */
+  const visible = tenants
+    .filter((t) => matchesChips(t.filters, chips) && matchesSearch(t, keyword))
+    .sort(compareTenants);
   const searching = keyword.trim().length > 0;
 
   const counts = useMemo(() => {
@@ -140,10 +187,15 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
     [],
   );
 
-  /** 카드를 고르면 그 입주사의 계약만 가져온다. 좌측 목록은 다시 부르지 않는다. */
-  const select = useCallback(
+  /**
+   * 고른 입주사의 계약만 가져온다. 좌측 목록은 다시 부르지 않는다.
+   *
+   * ★ 누를 때가 아니라 **고른 값이 바뀔 때** 부른다(아래 effect). 그래야 [이전] 로
+   *   돌아와 주소에서 되살아난 선택도 같은 길로 채워진다 — 예전에는 클릭 경로에만
+   *   붙어 있어서 「카드는 눌려 있는데 오른쪽이 비는」 상태가 될 수 있었다.
+   */
+  const loadContracts = useCallback(
     async (companyId: string) => {
-      setSelectedId(companyId);
       setContracts(null);
       setLoadingContracts(true);
       try {
@@ -174,24 +226,66 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
   );
 
   /**
-   * ★ `?companyId=` 로 들어오면 그 입주사를 골라 둔다.
-   *
-   *   계약 폼의 [확인] 이 「이미 계약중인 입주사입니다」와 함께 이 링크를 준다 —
-   *   이름만 알려 주고 찾는 일을 운영자에게 떠넘기지 않으려고 넣었다.
-   *
-   * ★ **한 번만** 고른다. 이후 사람이 다른 카드를 누른 것을 이 effect 가 되돌리면
-   *   목록이 눌리지 않는 화면이 된다.
+   * 고른 입주사가 바뀌면 오른쪽을 채운다. 첫 렌더에도 돈다 — 주소에 `companyId` 가
+   * 있으면([이전]·새로고침·짚어 주는 링크) 그 입주사의 계약이 바로 실린다.
    */
-  const deepLinked = useRef(false);
   useEffect(() => {
-    if (deepLinked.current) return;
-    const wanted = searchParams.get('companyId');
-    if (!wanted || !tenants.some((t) => t.companyId === wanted)) return;
-    deepLinked.current = true;
-    void select(wanted);
-    // 칩이 「계약중」만 켜져 있으면 종료된 입주사가 목록에서 걸러져 고른 것이 안 보인다.
-    setChips([]);
-  }, [searchParams, tenants, select]);
+    if (!selectedId) {
+      setContracts(null);
+      return;
+    }
+    void loadContracts(selectedId);
+  }, [selectedId, loadContracts]);
+
+  /**
+   * 화면 상태를 주소에 적는다 — **떠났다 돌아올 자리를 만드는 일이다.**
+   *
+   * ★★ `history.replaceState` 다. `router.replace` 가 아니다. 이유 둘:
+   *   ① **기록을 쌓지 않는다.** push 면 칩을 세 번 누르고 계약에 들어간 사람이 목록으로
+   *      나오는 데 [이전] 을 네 번 눌러야 한다
+   *   ② **서버를 다시 돌리지 않는다.** `router.replace` 는 같은 주소라도 이 라우트를
+   *      다시 렌더해 `/companies` 를 부른다 — 검색어를 한 자 칠 때마다 목록을 새로 받는다
+   *
+   * ★ Next 가 `history.replaceState` 를 감싸 두어 `useSearchParams()` 도 같이 따라온다
+   *   (공식 문서가 필터·정렬에 권하는 길이다).
+   */
+  useEffect(() => {
+    const next = window.location.pathname + tenantListSearch(state);
+    if (next !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, '', next);
+    }
+  }, [state]);
+
+  /**
+   * 왼쪽 목록의 스크롤 위치 — 떠날 때 적고 돌아오면 그 자리로.
+   *
+   * ★ 두 effect 를 하나로 합치지 않는다. 복원은 **한 번**이고(돌아온 직후), 저장은
+   *   **계속**이다(사람이 굴리는 동안). 합치면 복원이 저장을 덮거나 그 반대가 된다.
+   */
+  const cardsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = cardsRef.current;
+    if (!el) return;
+    try {
+      const saved = Number(window.sessionStorage.getItem(CARDS_SCROLL_KEY));
+      if (Number.isFinite(saved) && saved > 0) el.scrollTop = saved;
+    } catch {
+      /* 저장소가 막혀 있으면 맨 위에서 시작한다 — 화면은 그대로 그려진다 */
+    }
+  }, []);
+  useEffect(() => {
+    const el = cardsRef.current;
+    if (!el) return;
+    const save = () => {
+      try {
+        window.sessionStorage.setItem(CARDS_SCROLL_KEY, String(el.scrollTop));
+      } catch {
+        /* 위와 같다 */
+      }
+    };
+    el.addEventListener('scroll', save, { passive: true });
+    return () => el.removeEventListener('scroll', save);
+  }, []);
 
   return (
     <div className={styles.page}>
@@ -226,12 +320,12 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                   className={styles.search}
                   placeholder="회사명, 대표자 검색"
                   value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
+                  onChange={(e) => patch({ keyword: e.target.value })}
                 />
               </span>
               <span className={styles.count}>{total}곳</span>
               {/* 칩 전체 해제 — 목록을 비우는 버튼이 아니라 필터를 끄는 버튼이다. */}
-              <button type="button" className={styles.reset} onClick={() => setChips([])}>
+              <button type="button" className={styles.reset} onClick={() => patch({ chips: [] })}>
                 전체
               </button>
             </div>
@@ -245,9 +339,9 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                     type="button"
                     className={`${styles.chip}${on ? ` ${styles.chipOn}` : ''}`}
                     onClick={() =>
-                      setChips((prev) =>
-                        prev.includes(chip.key) ? prev.filter((k) => k !== chip.key) : [...prev, chip.key],
-                      )
+                      patch({
+                        chips: on ? chips.filter((k) => k !== chip.key) : [...chips, chip.key],
+                      })
                     }
                   >
                     <span className={styles.chipCheck}>
@@ -260,7 +354,7 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
             </div>
           </div>
 
-          <div className={styles.cards}>
+          <div className={styles.cards} ref={cardsRef}>
             {tenants.length === 0 ? (
               <PanelEmpty
                 icon="building-2"
@@ -274,7 +368,7 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                 icon="search-x"
                 lead="검색 결과가 없습니다"
                 sub="다른 검색어를 입력해 보세요"
-                action={{ label: '검색 초기화', kind: 'ghost', onClick: () => setKeyword('') }}
+                action={{ label: '검색 초기화', kind: 'ghost', onClick: () => patch({ keyword: '' }) }}
               />
             ) : visible.length === 0 && chips.length > 0 ? (
               /*
@@ -287,7 +381,7 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                 icon="circle-check"
                 lead={chipEmptyLead(chips)}
                 sub="지금 처리할 계약이 없습니다"
-                action={{ label: '전체 보기', kind: 'ghost', onClick: () => setChips([]) }}
+                action={{ label: '전체 보기', kind: 'ghost', onClick: () => patch({ chips: [] }) }}
               />
             ) : (
               visible.map((t) => (
@@ -295,7 +389,7 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                   key={t.companyId}
                   type="button"
                   className={`${styles.card}${t.companyId === selectedId ? ` ${styles.cardSelected}` : ''}`}
-                  onClick={() => void select(t.companyId)}
+                  onClick={() => patch({ companyId: t.companyId })}
                 >
                   <span className={styles.cardRow1}>
                     <span className={styles.cardName}>

@@ -93,6 +93,35 @@ export async function findSpaces(
   return rows;
 }
 
+export interface StatusHistoryRow {
+  from_status: string | null;
+  to_status: string;
+  changed_at: Date;
+  changed_by: string | null;
+}
+
+/**
+ * 상태 이력 — 오래된 것부터.
+ *
+ * ★ `history_id` 를 두 번째 정렬 키로 둔다. `changed_at` 이 `now()` 라 **같은
+ *   트랜잭션 안의 두 줄이 같은 시각**이다(재계약 확정이 그렇다 — 새 계약 확정과
+ *   이전 계약 종료가 한 번에 쓰인다). 시각만으로 세우면 그 두 줄의 순서가 흔들린다.
+ */
+export async function listStatusHistory(
+  client: ScopedClient,
+  contractId: string,
+): Promise<StatusHistoryRow[]> {
+  const { rows } = await q<StatusHistoryRow>(
+    client,
+    `SELECT from_status, to_status, changed_at, changed_by
+       FROM public.tb_s080_contract_status_history
+      WHERE contract_id = $1
+      ORDER BY changed_at, history_id`,
+    [contractId],
+  );
+  return rows;
+}
+
 /** 목록. `companyId` 를 주면 그 입주사 것만 — 안 줘도 RLS 가 한 겹 더 거른다. */
 export async function listContracts(
   client: ScopedClient,

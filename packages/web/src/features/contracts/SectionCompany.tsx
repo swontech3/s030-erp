@@ -31,8 +31,7 @@ import {
   NOT_SAVEABLE_BADGE,
   NOT_SAVEABLE_NOTICE,
   isCorpMemberType,
-  maskEmailId,
-  maskValue,
+  maskInput,
   type CodeOption,
   type CompanyState,
   type RequiredKey,
@@ -154,7 +153,7 @@ export function SectionCompany({
               placeholder="000-00-00000 (사업자등록 전이면 비워두세요)"
               value={value.bizno}
               disabled={disabled}
-              onChange={(e) => onChange({ bizno: maskValue('bizno', e.target.value) })}
+              onChange={(e) => onChange({ bizno: maskInput(e.currentTarget, 'bizno') })}
             />
             <button
               type="button"
@@ -210,7 +209,7 @@ export function SectionCompany({
             placeholder="000000-0000000"
             value={corpEnabled ? value.corpno : ''}
             disabled={!corpEnabled}
-            onChange={(e) => onChange({ corpno: maskValue('corpno', e.target.value) })}
+            onChange={(e) => onChange({ corpno: maskInput(e.currentTarget, 'corpno') })}
           />
         </label>
 
@@ -258,7 +257,7 @@ export function SectionCompany({
             placeholder="010-0000-0000"
             value={value.phone}
             disabled={disabled}
-            onChange={(e) => onChange({ phone: maskValue('phone', e.target.value) })}
+            onChange={(e) => onChange({ phone: maskInput(e.currentTarget, 'phone') })}
           />
           {bad('phone') ? <span className={styles.fieldError}>필수 입력 항목입니다</span> : null}
         </label>
@@ -274,7 +273,7 @@ export function SectionCompany({
               disabled={disabled}
               // ★ 한글·공백·@ 는 들어오는 즉시 떨어진다(`maskEmailId`). 저장 직전에
               //   막으면 이미 여러 칸을 채운 뒤라 되돌리기가 번거롭다.
-              onChange={(e) => onChange({ emailId: maskEmailId(e.target.value) })}
+              onChange={(e) => onChange({ emailId: maskInput(e.currentTarget, 'emailId') })}
             />
             <span style={{ flex: '0 0 auto', color: 'var(--text-muted)' }}>@</span>
             {/* ★ Select 를 숨기지 않는다. 직접입력 인풋의 표시 여부를 매 렌더마다

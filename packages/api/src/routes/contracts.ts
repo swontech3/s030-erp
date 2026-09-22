@@ -63,6 +63,7 @@ import {
   listContracts,
   listRoomHolders,
   listSpaceHolders,
+  listStatusHistory,
   replaceSpaces,
   updateContract,
   updateStatus,
@@ -366,6 +367,46 @@ export function registerContractRoutes(app: FastifyInstance): void {
     });
     if (!found) return notFound(reply);
     return reply.send(toResponse(found.contract, found.spaces));
+  });
+
+  /**
+   * ── 상태 이력 조회 (CONT-11) ──────────────────────────────────────────
+   *
+   * 계약 폼 머리의 「2026.09.21 계약중」이 이것을 읽는다. 확정·취소가 **언제** 있었는지는
+   * 계약 행에 없다 — 종료만 `terminated_date` 로 따로 남는다(종료일은 사람이 고르는
+   * 값이라 «언제 눌렀는가»와 다르기 때문이다).
+   *
+   * ★★ **운영사 전용이다.** 누가 언제 무엇을 바꿨는지는 감사 기록이고, 입주사가 볼
+   *    자리가 아니다. 지금은 입주사 세션이 계약 폼 화면 자체를 못 열지만, 화면이
+   *    막는 것과 API 가 막는 것은 다른 일이다 — CONT-18(입주사용 계약 조회)이
+   *    생기면 이 구분이 실제로 쓰인다.
+   *
+   * ★ `changed_by` 는 **내려주지 않는다.** 삐용 회원 ID 숫자일 뿐이라 화면에 쓸 이름이
+   *   없고, 지금 필요한 것은 날짜뿐이다. 이름이 필요해지면 그때 삐용에 물어 붙인다.
+   */
+  app.get<{ Params: { id: string } }>('/contracts/:id/status-history', async (req, reply) => {
+    const session = requireSession(req);
+    if (session.role !== WRITE_ROLE) {
+      return reply
+        .code(403)
+        .send({ error: 'forbidden', message: '계약 상태 이력은 운영사만 볼 수 있습니다' });
+    }
+
+    const found = await withCompanyScope(scopeOf(session), async (client) => {
+      // ★ 계약을 먼저 확인한다 — 없는 계약에 빈 배열을 주면 «이력이 없는 계약»과
+      //   «없는 계약»이 같아 보인다.
+      if (!(await findContract(client, req.params.id))) return null;
+      return listStatusHistory(client, req.params.id);
+    });
+    if (!found) return notFound(reply);
+
+    return reply.send({
+      history: found.map((h) => ({
+        fromStatus: h.from_status,
+        toStatus: h.to_status,
+        changedAt: h.changed_at,
+      })),
+    });
   });
 
   // ── 등록 ────────────────────────────────────────────────────────────────

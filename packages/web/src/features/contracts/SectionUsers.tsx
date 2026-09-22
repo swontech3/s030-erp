@@ -27,8 +27,7 @@ import {
   NOT_SAVEABLE_NOTICE,
   USER_TEMPLATE,
   currentDomain,
-  maskEmailId,
-  maskValue,
+  maskInput,
   type CompanyState,
   type UserRow,
 } from './form-model';
@@ -139,7 +138,7 @@ export function SectionUsers({
                   readOnly={readOnly}
                   style={readOnly ? { background: 'var(--surface-alt)' } : undefined}
                   value={first ? company.phone : user.phone}
-                  onChange={(e) => patch(i, { phone: maskValue('phone', e.target.value) })}
+                  onChange={(e) => patch(i, { phone: maskInput(e.currentTarget, 'phone') })}
                 />
               </span>
 
@@ -150,7 +149,7 @@ export function SectionUsers({
                   style={readOnly ? { background: 'var(--surface-alt)' } : undefined}
                   value={first ? company.emailId : user.mailId}
                   // 섹션 1 과 같은 마스크다 — 같은 종류의 칸이 서로 다르게 굴면 안 된다.
-                  onChange={(e) => patch(i, { mailId: maskEmailId(e.target.value) })}
+                  onChange={(e) => patch(i, { mailId: maskInput(e.currentTarget, 'emailId') })}
                 />
                 <span className={styles.mailAt}>@</span>
                 {first ? (

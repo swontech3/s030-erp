@@ -8,9 +8,24 @@
  *   덮어쓰면 서버가 그린 첫 화면과 브라우저가 그린 화면이 갈라진다.
  */
 
+/*
+ * ★★★ `height` 다 — `min-height` 가 아니다. 이 한 글자에 셸 전체가 걸려 있다.
+ *
+ * `min-height:100vh` 이면 셸의 높이는 **내용이 정한다.** 내용이 길어지면 셸이 같이
+ * 늘어나고, `.main` 의 `overflow:auto` 는 넘칠 일이 없어 **한 번도 스크롤 상자가 되지
+ * 않는다** — 대신 문서(html)가 스크롤된다. 그러면 사이드바도 상단바도, 화면 안에서
+ * `position:sticky` 로 붙여 둔 페이지 머리도 **전부 같이 위로 사라진다.**
+ * (실측: 계약 폼을 끝까지 내리면 머리 top 이 -1480px 이었다.)
+ *
+ * `height:100vh` 로 못 박으면 `.main` 이 비로소 넘쳐서 진짜 스크롤 상자가 되고,
+ * 그 안의 sticky 가 작동한다. 셸(사이드바·상단바)은 제자리에 남는다.
+ *
+ * ★ `overflow:hidden` 은 주지 않는다 — `min-width:1440px` 보다 좁은 창에서
+ *   **가로 스크롤은 남아야** 한다. 세로만 `.main` 이 맡는다.
+ */
 .shell {
   min-width: 1440px;
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   background: var(--surface-alt);
 }
