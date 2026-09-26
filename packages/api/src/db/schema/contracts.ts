@@ -81,7 +81,7 @@ export const contracts = pgTable('tb_s080_contracts', {
   /** 시작일 + 기간(월) − 1일. */
   endDate: timestamp('end_date', { mode: 'date' }).notNull(),
 
-  /** 청구 생성 기준일. `contract-invoices.ts` 가 읽는다. */
+  /** 청구 생성 기준일. `invoice-plan.ts` 가 읽는다. */
   billingDay: integer('billing_day').notNull().default(1),
 
   terminatedDate: timestamp('terminated_date', { mode: 'date' }),

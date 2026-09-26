@@ -50,6 +50,7 @@ import {
   rejectSpacePick,
   type SpaceHolder,
 } from '@swonbiz/shared/domain/space-occupancy';
+import { billOnConfirm, settleOnTerminate } from '../billing/contractBilling.ts';
 import { requireSession } from '../session/hook.ts';
 import { findCompany } from '../db/companies.ts';
 import { listSpaces } from '../db/lookups.ts';
@@ -434,7 +435,7 @@ export function registerContractRoutes(app: FastifyInstance): void {
     const actor = String(session.s020MemberId);
     const renewedFrom = (req.body?.renewedFromContractId ?? '').trim() || null;
 
-    const created = await withCompanyScope(scopeOf(session), async (client) => {
+    const run = () => withCompanyScope(scopeOf(session), async (client) => {
       /*
        * ★★ 재계약 — 이어받을 계약이 **정말 이 회사 것인지** 여기서 본다.
        *
@@ -516,6 +517,19 @@ export function registerContractRoutes(app: FastifyInstance): void {
       });
 
       /* ══════════════════════════════════════════════════════════════════════
+         ★★ 청구서 — **확정과 같은 트랜잭션이다**
+         ══════════════════════════════════════════════════════════════════════
+         첫 저장이 바로 확정인 길(create → confirmed)과 재계약 확정이 둘 다 여기다.
+         `billOnConfirm` 이 던지면(모르는 납부방법 등) ROLLBACK 되어 **계약도 안
+         만들어진다.** 청구서 없이 확정된 계약은 아무도 청구하지 않는 계약이 되고,
+         그 사실은 한 달 뒤 돈이 안 들어와야 드러난다 — 차라리 여기서 막는다. */
+      let invoiceCount = 0;
+      if (status === 'confirmed') {
+        const billed = await billOnConfirm(client, { contractId, actor, newId: randomUUID });
+        if (billed.kind === 'created') invoiceCount = billed.invoiceCount;
+      }
+
+      /* ══════════════════════════════════════════════════════════════════════
          ★★★ 재계약 확정 — **같은 트랜잭션에서** 이전 계약을 닫는다
          ══════════════════════════════════════════════════════════════════════
          하나만 바뀌고 멈추면 두 계약이 동시에 계약중이거나(호실이 이중으로 잡힌다)
@@ -546,11 +560,23 @@ export function registerContractRoutes(app: FastifyInstance): void {
           toStatus: 'terminated',
           actor,
         });
-        return { kind: 'ok' as const, closedPrevious: previous.contract_id };
+        return { kind: 'ok' as const, closedPrevious: previous.contract_id, invoiceCount };
       }
 
-      return { kind: 'ok' as const, closedPrevious: null };
+      return { kind: 'ok' as const, closedPrevious: null, invoiceCount };
     });
+
+    /*
+     * ★ 청구서 생성이 던진 `RangeError` 를 400 으로 바꾼다 — 모르는 납부방법,
+     *   읽을 수 없는 시작일 같은 것들이다. 그 외의 예외는 그대로 올려 500 이 된다.
+     *   어느 쪽이든 트랜잭션은 이미 ROLLBACK 됐다 — **계약도 안 만들어졌다.**
+     */
+    let created: Awaited<ReturnType<typeof run>>;
+    try {
+      created = await run();
+    } catch (err) {
+      return asBadRequest(err, reply);
+    }
 
     if (created.kind === 'bad_renewal') {
       return reply.code(400).send({ error: 'invalid_renewal', message: created.message });
@@ -570,6 +596,8 @@ export function registerContractRoutes(app: FastifyInstance): void {
       status,
       warnings: write.warnings,
       closedPrevious: created.closedPrevious,
+      // ★ 만든 청구서 장수. 화면은 아직 안 쓰지만 검증 스크립트가 이 값을 본다.
+      invoiceCount: created.invoiceCount,
     });
   });
 
@@ -671,7 +699,19 @@ export function registerContractRoutes(app: FastifyInstance): void {
       return asBadRequest(err, reply);
     }
 
-    const result = await withCompanyScope(scopeOf(session), async (client) => {
+    /*
+     * ★★ 종료는 **종료일자가 있어야 한다.** 정산과 일할이 그 날짜 하나에 달려 있고,
+     *    없으면 지어낼 방법이 없다. 화면은 늘 보낸다(`terminationDefaults` 가 기본값을
+     *    채운다) — 안 보내는 것은 API 를 직접 부른 경우뿐이다.
+     */
+    if (to === 'terminated' && terminatedDate === null) {
+      return reply.code(400).send({
+        error: 'invalid_request',
+        message: '계약 종료에는 종료일자가 필요합니다',
+      });
+    }
+
+    const run = () => withCompanyScope(scopeOf(session), async (client) => {
       const contract = await findContract(client, req.params.id);
       if (!contract) return { kind: 'not_found' as const };
 
@@ -704,14 +744,59 @@ export function registerContractRoutes(app: FastifyInstance): void {
         toStatus: to,
         actor,
       });
-      return { kind: 'ok' as const };
+
+      /* ══════════════════════════════════════════════════════════════════════
+         ★★ 청구 — 상태 전이와 **같은 트랜잭션이다**
+         ══════════════════════════════════════════════════════════════════════
+         계약대기 → 확정: 계약기간 전체의 청구서를 만든다.
+         확정 → 종료:     남은 청구서를 취소하고, 해지 달을 일할로 낮추고,
+                          정산 한 줄을 남긴다. 종료일자가 원래 종료일과 같으면
+                          아무것도 건드리지 않는다(기간 만료·재계약이 그 길이다). */
+      let invoiceCount = 0;
+      let billing: string = 'none';
+      if (to === 'confirmed') {
+        const billed = await billOnConfirm(client, {
+          contractId: contract.contract_id, actor, newId: randomUUID,
+        });
+        billing = billed.kind;
+        if (billed.kind === 'created') invoiceCount = billed.invoiceCount;
+      } else if (to === 'terminated') {
+        const settled = await settleOnTerminate(client, {
+          contractId: contract.contract_id,
+          // ★ `parseDate` 가 UTC 자정으로 고정했으므로 `toDay` 가 같은 날을 돌려준다.
+          terminatedDay: toDay(terminatedDate as Date),
+          actor,
+          newId: randomUUID,
+        });
+        billing = settled.kind;
+      }
+
+      return { kind: 'ok' as const, invoiceCount, billing };
     });
+
+    /*
+     * ★ 종료일자가 원래 종료일보다 뒤면 `planTerminationChanges` 가 던진다 —
+     *   규칙이 없어서 멈추는 것이다. 400 으로 바꿔 사람에게 말한다.
+     */
+    let result: Awaited<ReturnType<typeof run>>;
+    try {
+      result = await run();
+    } catch (err) {
+      return asBadRequest(err, reply);
+    }
 
     if (result.kind === 'not_found') return notFound(reply);
     if (result.kind === 'docs_missing') return docsMissing(reply, result.message);
     if (result.kind === 'rejected') {
       return reply.code(400).send({ error: 'invalid_transition', message: result.message });
     }
-    return reply.send({ contractId: req.params.id, status: to });
+    // ★ `billing` 은 청구 쪽에서 무슨 일이 있었는지다 — created / already / untouched /
+    //   settled / no_invoices / none. 화면은 아직 안 쓰고 검증 스크립트가 본다.
+    return reply.send({
+      contractId: req.params.id,
+      status: to,
+      invoiceCount: result.invoiceCount,
+      billing: result.billing,
+    });
   });
 }
