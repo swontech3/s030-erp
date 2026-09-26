@@ -167,21 +167,35 @@ export async function listContractInvoices(
   return rows;
 }
 
+export interface InvoiceLineRow {
+  invoice_line_id: string;
+  seq: number;
+  pay_item: string;
+  contract_space_id: string | null;
+  is_free: boolean;
+  quantity: number;
+  unit_price: number;
+  supply_amount: number;
+  vat_amount: number;
+  total_amount: number;
+  /** 호실 이름 — [내역] 창이 줄마다 적는다. 계약 밖 줄이면 `null`. */
+  room_name: string | null;
+}
+
 export async function listInvoiceLines(
   client: ScopedClient,
   invoiceId: string,
-): Promise<{ invoice_line_id: string; seq: number; pay_item: string; contract_space_id: string | null; is_free: boolean; quantity: number; unit_price: number; supply_amount: number; vat_amount: number; total_amount: number }[]> {
-  const { rows } = await q<{
-    invoice_line_id: string; seq: number; pay_item: string; contract_space_id: string | null;
-    is_free: boolean;
-    quantity: number; unit_price: number; supply_amount: number; vat_amount: number; total_amount: number;
-  }>(
+): Promise<InvoiceLineRow[]> {
+  const { rows } = await q<InvoiceLineRow>(
     client,
-    `SELECT invoice_line_id, seq, pay_item, contract_space_id, is_free,
-            quantity, unit_price, supply_amount, vat_amount, total_amount
-       FROM public.tb_s080_invoice_lines
-      WHERE invoice_id = $1
-      ORDER BY seq, pay_item`,
+    `SELECT il.invoice_line_id, il.seq, il.pay_item, il.contract_space_id, il.is_free,
+            il.quantity, il.unit_price, il.supply_amount, il.vat_amount, il.total_amount,
+            s.room_name
+       FROM public.tb_s080_invoice_lines il
+       LEFT JOIN public.tb_s080_contract_spaces cs ON cs.contract_space_id = il.contract_space_id
+       LEFT JOIN public.tb_s080_spaces s           ON s.space_id = cs.space_id
+      WHERE il.invoice_id = $1
+      ORDER BY il.seq, il.pay_item`,
     [invoiceId],
   );
   return rows;
@@ -196,7 +210,7 @@ export async function listInvoicePayments(
     `SELECT payment_id, to_char(paid_on, 'YYYY-MM-DD') AS paid_day, amount, pay_method, memo
        FROM public.tb_s080_payments
       WHERE invoice_id = $1
-      ORDER BY paid_on, payment_id`,
+      ORDER BY paid_on, created_at, payment_id`,  // ★ 같은 날이면 넣은 순서 — payment_id 는 난수라 순서가 흔들린다
     [invoiceId],
   );
   return rows;
@@ -487,4 +501,192 @@ export async function updatePayment(
 
 export async function deletePayment(client: ScopedClient, paymentId: string): Promise<void> {
   await q(client, `DELETE FROM public.tb_s080_payments WHERE payment_id = $1`, [paymentId]);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   화면 조회 — 월별 청구(s0300200070) · 입주사 청구 탭(s0300200030)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 청구 목록 한 줄 — 입주사 이름과 호실까지 붙인 것.
+ *
+ * ★ 상태는 **저장값(P/E/C)만** 준다. 미납·부분납부는 화면이 `displayInvoiceStatus`
+ *   하나로 판정한다 — 여기서도 판정하면 서버와 화면이 서로 다른 「오늘」을 쓴다.
+ */
+export interface BillingListRow {
+  invoice_id: string;
+  company_id: string;
+  company_name: string;
+  contract_id: string | null;
+  year_month: string;
+  /** `YYYY-MM-DD`. */
+  due_day: string;
+  total_amount: number;
+  paid_amount: number;
+  status: string;
+  /** 줄의 호실 이름, 줄 순서대로 ` / ` 로 잇는다. 계약 밖 줄이면 없다. */
+  room_names: string | null;
+  /** 무상 줄이 있는가. 무상 달의 청구서는 줄 전부가 무상이다. */
+  has_free: boolean;
+  /** 무상 줄의 단가 합 — **얼마짜리를 무상으로 줬는지**(부가세 제외). */
+  free_supply: number;
+}
+
+/**
+ * 청구 목록 — 월 하나, 또는 입주사 하나.
+ *
+ * ★ 둘 다 `null` 이면 던진다. 청구서 전체를 한 번에 내리는 길은 두지 않는다 —
+ *   계약 하나가 12장을 만들어서 금방 수천 장이 된다.
+ */
+export async function listBillingInvoices(
+  client: ScopedClient,
+  args: { yearMonth: string | null; companyId: string | null },
+): Promise<BillingListRow[]> {
+  if (args.yearMonth === null && args.companyId === null) {
+    throw new RangeError('청구 월이나 입주사 중 하나는 있어야 한다');
+  }
+  const { rows } = await q<BillingListRow>(
+    client,
+    `SELECT i.invoice_id, i.company_id, c.company_name, i.contract_id, i.year_month,
+            to_char(i.due_date, 'YYYY-MM-DD') AS due_day,
+            i.total_amount, i.paid_amount, i.status,
+            l.room_names,
+            coalesce(l.has_free, false)  AS has_free,
+            coalesce(l.free_supply, 0)   AS free_supply
+       FROM public.tb_s080_invoices i
+       JOIN public.tb_s080_companies c ON c.company_id = i.company_id
+       LEFT JOIN LATERAL (
+         SELECT string_agg(s.room_name, ' / ' ORDER BY il.seq)                  AS room_names,
+                bool_or(il.is_free)                                             AS has_free,
+                (sum(il.unit_price * il.quantity) FILTER (WHERE il.is_free))::int AS free_supply
+           FROM public.tb_s080_invoice_lines il
+           LEFT JOIN public.tb_s080_contract_spaces cs ON cs.contract_space_id = il.contract_space_id
+           LEFT JOIN public.tb_s080_spaces s           ON s.space_id = cs.space_id
+          WHERE il.invoice_id = i.invoice_id
+       ) l ON true
+      WHERE ($1::text IS NULL OR i.year_month = $1)
+        AND ($2::text IS NULL OR i.company_id = $2)
+      ORDER BY i.year_month, c.company_name, i.contract_id, i.invoice_id`,
+    [args.yearMonth, args.companyId],
+  );
+  return rows;
+}
+
+/** 정산 원장 한 줄 — 화면이 보는 칸 전부. 날짜는 문자열이다(머리말 참조). */
+export interface SettlementRow {
+  settlement_id: string;
+  company_id: string;
+  contract_id: string;
+  /** `YYYY-MM-DD`. */
+  terminate_day: string;
+  payment_method: string | null;
+  total_paid: number;
+  usage_charge: number;
+  deposit_return: number;
+  discount_clawback: number;
+  free_clawback: number;
+  net_amount: number;
+  settle_type: string;
+  /** `YYYY-MM-DD`. `null` 이면 처리 대기. */
+  processed_day: string | null;
+  processed_amount: number | null;
+  processed_method: string | null;
+  processed_memo: string | null;
+  processed_payment_id: string | null;
+  /** 계약 머리 — 어느 계약의 정산인지 읽히게. */
+  start_day: string;
+  end_day: string;
+  room_names: string | null;
+}
+
+const SETTLEMENT_SELECT = `
+  SELECT st.settlement_id, st.company_id, st.contract_id,
+         to_char(st.terminate_date, 'YYYY-MM-DD') AS terminate_day,
+         st.payment_method, st.total_paid, st.usage_charge, st.deposit_return,
+         st.discount_clawback, st.free_clawback, st.net_amount, st.settle_type,
+         to_char(st.processed_on, 'YYYY-MM-DD') AS processed_day,
+         st.processed_amount, st.processed_method, st.processed_memo, st.processed_payment_id,
+         to_char(k.start_date, 'YYYY-MM-DD') AS start_day,
+         to_char(k.end_date,   'YYYY-MM-DD') AS end_day,
+         (SELECT string_agg(s.room_name, ' / ' ORDER BY cs.seq)
+            FROM public.tb_s080_contract_spaces cs
+            LEFT JOIN public.tb_s080_spaces s ON s.space_id = cs.space_id
+           WHERE cs.contract_id = st.contract_id) AS room_names
+    FROM public.tb_s080_settlements st
+    JOIN public.tb_s080_contracts k ON k.contract_id = st.contract_id`;
+
+export async function listCompanySettlements(
+  client: ScopedClient,
+  companyId: string,
+): Promise<SettlementRow[]> {
+  const { rows } = await q<SettlementRow>(
+    client,
+    `${SETTLEMENT_SELECT} WHERE st.company_id = $1 ORDER BY st.terminate_date DESC, st.settlement_id`,
+    [companyId],
+  );
+  return rows;
+}
+
+export async function findContractSettlement(
+  client: ScopedClient,
+  contractId: string,
+): Promise<SettlementRow | null> {
+  const { rows } = await q<SettlementRow>(client, `${SETTLEMENT_SELECT} WHERE st.contract_id = $1`, [
+    contractId,
+  ]);
+  return rows[0] ?? null;
+}
+
+/**
+ * 이용료 차액을 넣을 청구서 — **해지 달 청구서**.
+ *
+ * 취소되지 않은 장 가운데 해지 달 **이하**에서 가장 늦은 장이다. 월납이면 해지 달
+ * 그 장이고(일할로 낮춘 장), 일시불이면 한 장뿐인 그 장이다(해지 달보다 앞 달이다).
+ */
+export async function findSettlementInvoice(
+  client: ScopedClient,
+  args: { contractId: string; terminateDay: string },
+): Promise<InvoiceRow | null> {
+  const { rows } = await q<InvoiceRow>(
+    client,
+    `SELECT ${INVOICE_COLUMNS}
+       FROM public.tb_s080_invoices
+      WHERE contract_id = $1 AND status <> 'C' AND year_month <= substr($2, 1, 7)
+      ORDER BY year_month DESC
+      LIMIT 1`,
+    [args.contractId, args.terminateDay],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * 정산 처리 기록을 남긴다. 이미 처리된 줄은 건드리지 않는다 — 고친 행 수가 0 이면
+ * 부르는 쪽이 「이미 처리됨」으로 읽는다(두 사람이 동시에 누른 경우).
+ */
+export async function markSettlementProcessed(
+  client: ScopedClient,
+  args: {
+    settlementId: string;
+    /** `YYYY-MM-DD`. */
+    processedOn: string;
+    amount: number;
+    method: string;
+    memo: string | null;
+    paymentId: string | null;
+    actor: string;
+  },
+): Promise<boolean> {
+  const res = await q(
+    client,
+    `UPDATE public.tb_s080_settlements
+        SET processed_on = $2::date, processed_amount = $3, processed_method = $4,
+            processed_memo = $5, processed_payment_id = $6,
+            processed_at = now(), processed_by = $7
+      WHERE settlement_id = $1 AND processed_on IS NULL`,
+    [
+      args.settlementId, args.processedOn, args.amount, args.method, args.memo,
+      args.paymentId, args.actor,
+    ],
+  );
+  return (res.rowCount ?? 0) === 1;
 }

@@ -208,6 +208,24 @@ export const settlements = pgTable('tb_s080_settlements', {
   memo: text('memo'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   createdBy: text('created_by'),
+
+  /*
+   * ── 처리 기록 — 023 ─────────────────────────────────────────────────────
+   * ★★ 이용료 차액만 청구서에 수납으로 들어가고(장마다 남은 금액만큼 · 023 머리말),
+   *    예치금 반환·환수까지 **실제로 주고받은 금액**은 여기에만 남는다.
+   *    순정산금을 통째로 청구서에 넣으면 청구서 상태와 월별 미수금이 틀어진다.
+   */
+  /** 처리한 날. `null` 이면 처리 대기. */
+  processedOn: date('processed_on'),
+  /** 실제 주고받은 금액. 부호는 `netAmount` 와 같다(양수 환불 / 음수 추가청구 받음). */
+  processedAmount: integer('processed_amount'),
+  /** 코드 `PAY_METHOD` — B 계좌이체 / C 카드. */
+  processedMethod: varchar('processed_method', { length: 1 }),
+  processedMemo: text('processed_memo'),
+  /** 정산 처리가 넣은 수납 중 해지 달 장의 것(대표). 없거나 지웠으면 `null`. */
+  processedPaymentId: text('processed_payment_id'),
+  processedAt: timestamp('processed_at'),
+  processedBy: text('processed_by'),
 }, (t) => [
   uniqueIndex('tb_s080_settlements_contract_id_key').on(t.contractId),
   index('tb_s080_settlements_company_id_idx').on(t.companyId),
