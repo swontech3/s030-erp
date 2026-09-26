@@ -32,6 +32,13 @@ import { withCompanyScope } from '../packages/api/src/db/withCompanyScope.ts';
  */
 const asOperator = (fn) => withCompanyScope({ role: 'operator', companyId: null }, fn);
 
+const { itemCountGate } = require('./verify-count.js');
+
+/**
+ * 기대 항목 수 — 모자라면 **실패**다. 항목이 조용히 사라지는 것을 막는 유일한 장치이고,
+ * 경위는 `verify-count.js` 머리말에 있다. 항목을 늘리면 끝에서 이 수를 고치라고 알려 준다.
+ */
+const EXPECTED_ITEMS = 35;
 let pass = 0;
 let fail = 0;
 const failures = [];
@@ -304,6 +311,23 @@ const json = (res) => {
     console.log('\n정리');
     // ★ 스코프 안에서 지운다. GUC 없이 DELETE 하면 RLS 가 0행을 골라 **조용히 아무것도
     //   지우지 않는다** — 실제로 한 번 그렇게 나서 시험 계약 2건이 DB 에 남았다.
+    /*
+     * ★★ **청구 기록을 먼저 지운다.** 021 이 청구서·수납·정산·예치금 장부를 만들면서
+     *    계약을 참조하는 FK 가 늘었고, 그것들은 **CASCADE 가 아니다**(일부러 그렇다 —
+     *    계약을 지운다고 청구 기록이 조용히 사라지면 안 된다). 순서를 안 지키면
+     *    정리 단계에서 FK 위반으로 **스크립트가 죽고**, 요약도 못 찍고 시험 데이터가
+     *    DB 에 남는다 — 2026-09-27 에 실제로 그 상태였다(순서는 `verify-billing` 과 같다).
+     */
+    const ids = created;
+    if (ids.length > 0) {
+      await asOperator(async (c) => {
+        await c.query(`DELETE FROM public.tb_s080_payments p USING public.tb_s080_invoices i
+                        WHERE i.invoice_id = p.invoice_id AND i.contract_id = ANY($1::text[])`, [ids]);
+        await c.query(`DELETE FROM public.tb_s080_invoices WHERE contract_id = ANY($1::text[])`, [ids]);
+        await c.query(`DELETE FROM public.tb_s080_settlements WHERE contract_id = ANY($1::text[])`, [ids]);
+        await c.query(`DELETE FROM public.tb_s080_deposit_ledger WHERE contract_id = ANY($1::text[])`, [ids]);
+      });
+    }
     const del = await asOperator((c) =>
       c.query(`DELETE FROM public.tb_s080_contracts WHERE memo = $1 RETURNING contract_id`, [TAG]),
     );
@@ -318,11 +342,13 @@ const json = (res) => {
 
   console.log(`\n${'='.repeat(50)}`);
   console.log(`검사 ${pass + fail}항목 — 통과 ${pass} · 실패 ${fail}`);
+  // ★ 항목이 사라졌는지 본다 — 통과·실패만 세면 **덜 돈 것**을 알 수 없다.
+  const short = itemCountGate({ expected: EXPECTED_ITEMS, actual: pass + fail, script: 'verify-4-3.js' });
   if (fail > 0) {
     console.log('실패 항목:');
     for (const f of failures) console.log(`  · ${f}`);
-    process.exit(1);
   }
+  if (fail > 0 || short) process.exit(1);
   console.log('✔ 4-3 검증 전부 통과');
 })().catch(async (e) => {
   console.error('✘ 검증 중 오류:', e.stack || e.message);

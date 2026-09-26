@@ -11,6 +11,11 @@
  */
 import { pool, closePool } from '../src/db/pool.ts';
 import { withCompanyScope, type ScopedClient } from '../src/db/withCompanyScope.ts';
+// ★ 항목 수 문지기는 저장소에 한 벌이다 — 다른 verify 스크립트와 같은 규칙·같은 문구.
+import { itemCountGate } from '../../../scripts/verify-count.js';
+
+/** 기대 항목 수 — 모자라면 **실패**다(`scripts/verify-count.js` 머리말). */
+const EXPECTED_ITEMS = 8;
 
 type Attempt = { ok: boolean; n?: number; code?: string };
 const attempt = async (sql: string): Promise<Attempt> => {
@@ -25,7 +30,10 @@ const rows = async (c: ScopedClient, sql: string) =>
   (await c.query(sql)) as { rows: Record<string, unknown>[]; rowCount: number | null };
 
 let failed = 0;
+/** ★ 몇 항목이 **돌았는가** — 이것이 없으면 항목이 사라진 것을 알 수 없다. */
+let ran = 0;
 const check = (cond: boolean, id: string, name: string, detail: string) => {
+  ran++;
   if (cond) console.log(`OK  ${id} ${name} — ${detail}`);
   else { failed++; console.error(`X   ${id} ${name} — ${detail}`); }
 };
@@ -67,5 +75,7 @@ const after = (await pool.query<{ company_id: string }>(
 check(after !== null && after === linked, 'B3', 'mock 연결(org 9001) 무결', String(after));
 
 await closePool();
-console.log(failed === 0 ? '\n전체 통과' : `\n실패 ${failed}건`);
-process.exit(failed === 0 ? 0 : 1);
+console.log(failed === 0 ? `\n통과 ${ran}항목` : `\n실패 ${failed}건 / ${ran}항목`);
+// ★ 항목이 사라졌는지 본다 — 통과·실패만 세면 **덜 돈 것**을 알 수 없다.
+const short = itemCountGate({ expected: EXPECTED_ITEMS, actual: ran, script: 'verify-006.mts' });
+process.exit(failed === 0 && !short ? 0 : 1);

@@ -24,9 +24,16 @@ const env = Object.fromEntries(
 
 const c = new Client({ host: env.DB_HOST, port: +env.DB_PORT, user: env.DB_USER, password: env.DB_PASSWORD, database: env.DB_NAME });
 
+const { itemCountGate } = require('./verify-count.js');
+
+/** 기대 항목 수 — 모자라면 **실패**다(`verify-count.js` 머리말). */
+const EXPECTED_ITEMS = 21;
+
 let failed = 0;
-const ok = (id, name, detail) => console.log(`OK  ${id} ${name}${detail ? ' — ' + detail : ''}`);
-const bad = (id, name, detail) => { failed++; console.error(`X   ${id} ${name}${detail ? ' — ' + detail : ''}`); };
+/** ★ 몇 항목이 **돌았는가** — 통과·실패를 같이 센다. 이것이 없으면 덜 돈 것을 알 수 없다. */
+let ran = 0;
+const ok = (id, name, detail) => { ran++; console.log(`OK  ${id} ${name}${detail ? ' — ' + detail : ''}`); };
+const bad = (id, name, detail) => { ran++; failed++; console.error(`X   ${id} ${name}${detail ? ' — ' + detail : ''}`); };
 const check = (cond, id, name, detail) => (cond ? ok : bad)(id, name, detail);
 
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
@@ -171,8 +178,10 @@ async function apiLogin(email) {
   }
 
   await c.end();
-  console.log(failed === 0 ? '\n전체 통과' : `\n실패 ${failed}건`);
-  process.exit(failed === 0 ? 0 : 1);
+  console.log(failed === 0 ? `\n통과 ${ran}항목` : `\n실패 ${failed}건 / ${ran}항목`);
+  // ★ 항목이 사라졌는지 본다 — 통과·실패만 세면 **덜 돈 것**을 알 수 없다.
+  const short = itemCountGate({ expected: EXPECTED_ITEMS, actual: ran, script: 'verify-2-8.js' });
+  process.exit(failed === 0 && !short ? 0 : 1);
 })().catch(async e => {
   console.error('X 검증 중 오류:', e.message);
   try { await c.end(); } catch {}

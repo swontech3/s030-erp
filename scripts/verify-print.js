@@ -46,6 +46,11 @@ const GAP = 0.6;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const { itemCountGate } = require('./verify-count.js');
+
+/** 기대 항목 수 — 모자라면 **실패**다(`verify-count.js` 머리말). */
+const EXPECTED_ITEMS = 16;
+
 const results = [];
 const check = (name, ok, detail = '') => {
   results.push({ name, ok });
@@ -419,9 +424,11 @@ const DOCS = [
   const bad = results.filter((r) => !r.ok).length;
   console.log(`\n${'='.repeat(50)}`);
   console.log(`검사 ${results.length}항목 — 통과 ${results.length - bad} · 실패 ${bad}`);
+  // ★ 항목이 사라졌는지 본다 — 통과·실패만 세면 **덜 돈 것**을 알 수 없다.
+  const short = itemCountGate({ expected: EXPECTED_ITEMS, actual: results.length, script: 'verify-print.js' });
   if (bad > 0) {
     console.log('✘ 인쇄 검증 실패 — doc/CONTRACT_DOCUMENTS.md §I 를 볼 것');
-    process.exit(1);
   }
+  if (bad > 0 || short) process.exit(1);
   console.log('✔ 인쇄 검증 전부 통과');
 })().catch((e) => { console.error('ERR', e.message); process.exit(1); });

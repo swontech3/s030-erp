@@ -28,6 +28,13 @@ const admin = readEnv(process.argv[2] || '.env');
 const app = readEnv(process.argv[3] || 'packages/api/.env');
 
 const TABLE = 'public.tb_s080_contract_status_history';
+const { itemCountGate } = require('./verify-count.js');
+
+/**
+ * 기대 항목 수 — 모자라면 **실패**다. 항목이 조용히 사라지는 것을 막는 유일한 장치이고,
+ * 경위는 `verify-count.js` 머리말에 있다. 항목을 늘리면 끝에서 이 수를 고치라고 알려 준다.
+ */
+const EXPECTED_ITEMS = 14;
 let pass = 0;
 let fail = 0;
 
@@ -221,7 +228,9 @@ function check(label, ok, detail) {
 
   console.log(`\n${'='.repeat(50)}`);
   console.log(`검사 ${pass + fail}항목 — 통과 ${pass} · 실패 ${fail}`);
-  if (fail > 0) process.exit(1);
+  // ★ 항목이 사라졌는지 본다 — 통과·실패만 세면 **덜 돈 것**을 알 수 없다.
+  const short = itemCountGate({ expected: EXPECTED_ITEMS, actual: pass + fail, script: 'verify-010.js' });
+  if (fail > 0 || short) process.exit(1);
   console.log('✔ 010 검증 전부 통과');
 })().catch((e) => {
   console.error('✘ 검증 중 오류:', e.message);

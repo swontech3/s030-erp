@@ -23,6 +23,13 @@ const readEnv = (p) =>
 
 const env = readEnv(process.argv[2] || '.env');
 
+const { itemCountGate } = require('./verify-count.js');
+
+/**
+ * 기대 항목 수 — 모자라면 **실패**다. 항목이 조용히 사라지는 것을 막는 유일한 장치이고,
+ * 경위는 `verify-count.js` 머리말에 있다. 항목을 늘리면 끝에서 이 수를 고치라고 알려 준다.
+ */
+const EXPECTED_ITEMS = 4;
 let pass = 0;
 let fail = 0;
 
@@ -84,8 +91,10 @@ function check(label, ok, detail) {
   check('P 의 이름이 여전히 개인사업자다', !!pName && pName.name === '개인사업자', pName ? pName.name : '행 없음');
 
   console.log(`\n통과 ${pass} · 실패 ${fail}`);
+  // ★ 항목이 사라졌는지 본다 — 통과·실패만 세면 **덜 돈 것**을 알 수 없다.
+  const short = itemCountGate({ expected: EXPECTED_ITEMS, actual: pass + fail, script: 'verify-018.js' });
   await c.end();
-  process.exit(fail ? 1 : 0);
+  process.exit(fail || short ? 1 : 0);
 })().catch((e) => {
   console.error('ERR', e.message);
   process.exit(1);

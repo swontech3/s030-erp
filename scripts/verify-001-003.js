@@ -23,6 +23,14 @@ const c = new Client({
 });
 const q = (s, p) => c.query(s, p).then(r => r.rows);
 
+const { itemCountGate } = require('./verify-count.js');
+
+/**
+ * 기대 항목 수 — 모자라면 **실패**다. 이 장치가 없어서 16항목이 조용히 안 돌던 것이
+ * 이 스크립트였다(`verify-count.js` 머리말). ★ **보류도 「돈 것」으로 센다.**
+ */
+const EXPECTED_ITEMS = 23;
+
 const results = [];
 const ok = (id, name, detail) => {
   results.push({ 항목: id, 내용: name, 결과: '통과', 비고: detail || '' });
@@ -32,6 +40,38 @@ const ng = (id, name, detail) => {
   results.push({ 항목: id, 내용: name, 결과: '실패', 비고: detail || '' });
   console.log(`NG  ${id} ${name} — ${detail}`);
 };
+/** 보류 — 시험할 **조건이 갖춰지지 않았다.** 통과도 실패도 아니고, 요약이 따로 센다. */
+const hold = (id, name, detail) => {
+  results.push({ 항목: id, 내용: name, 결과: '보류', 비고: detail || '' });
+  console.log(`--  ${id} ${name} — 보류: ${detail}`);
+};
+
+/**
+ * 한 항목이 예외로 죽어도 **뒤 항목은 계속 돈다.**
+ *
+ * =============================================================================
+ * ★★★ 2026-09-27 에 넣었다 — 검증이 중간에 죽는 것이 가장 나쁜 실패 방식이다
+ * =============================================================================
+ * 예약 행 하나가 없어서 이 스크립트가 116행에서 TypeError 로 죽었고, 그 뒤
+ * **16항목(V6·V7·V8·V9·A1~A7d·X1·X2)이 조용히 안 돌았다.** 007 이 예약 2행을 지운
+ * 뒤로 아무도 RLS·권한 검사 결과를 본 적이 없었는데, 화면에는 「NG 1건」만 보여서
+ * 아무도 몰랐다.
+ *
+ * ★ 그래서 규칙 둘 —
+ *   ① 남의 데이터가 **있어야** 도는 검증을 만들지 않는다. 필요한 행은 시험이 직접
+ *      만들고 롤백한다(`tryInTx`).
+ *   ② 그래도 예외가 나면 그 항목만 실패로 적고 **넘어간다.** 이 함수가 그것이다.
+ */
+const step = async (id, name, fn) => {
+  try {
+    await fn();
+  } catch (e) {
+    ng(id, name, `예외 — ${e.message}`);
+  }
+};
+
+/** 첫 행이나 `null`. **`[0].컬럼` 으로 바로 꺼내지 않는다** — 빈 표에서 죽는다. */
+const firstRow = async (sql, params) => (await q(sql, params))[0] ?? null;
 
 /** 트랜잭션 안에서 실행하고 무조건 롤백. 에러코드를 돌려준다. */
 async function tryInTx(sqls) {
@@ -88,19 +128,38 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
     ? ok('V3a', 'contracts 확장 3컬럼 (billing_start_date 는 022 에서 삭제)', c3.map(r => r.column_name).join(', '))
     : ng('V3a', 'contracts 확장 3컬럼', `${c3.length}개만 존재`);
 
-  const oneC = await q(`SELECT contract_id FROM public.tb_s080_contracts LIMIT 1`);
-  const r3 = await tryInTx([
-    `UPDATE public.tb_s080_contracts SET deposit_return_status='X' WHERE contract_id='${oneC[0].contract_id}'`]);
-  r3.code === '23514'
-    ? ok('V3b', "deposit_return_status='X' → CHECK 위반", '23514 check_violation')
-    : ng('V3b', "deposit_return_status='X' → CHECK 위반", `기대 23514, 실제 ${r3.code || '성공(막히지 않음)'}`);
+  /*
+   * ★ 계약이 한 건도 없으면 **보류다.** 예전에는 `oneC[0].contract_id` 로 바로 꺼내서
+   *   빈 표에서 스크립트가 죽었다 — 그러면 뒤 항목이 전부 안 돈다(`step` 머리말).
+   */
+  /** 기준 계약 한 건 — V3b 와 V9 가 같이 쓴다. **없을 수 있다**(빈 개발계). */
+  const oneC = await firstRow(`SELECT contract_id FROM public.tb_s080_contracts LIMIT 1`);
+
+  await step('V3b', "deposit_return_status='X' → CHECK 위반", async () => {
+    if (!oneC) {
+      hold('V3b', "deposit_return_status='X' → CHECK 위반", '계약이 0건 — 고칠 행이 없다');
+      return;
+    }
+    const r3 = await tryInTx([
+      `UPDATE public.tb_s080_contracts SET deposit_return_status='X' WHERE contract_id='${oneC.contract_id}'`]);
+    r3.code === '23514'
+      ? ok('V3b', "deposit_return_status='X' → CHECK 위반", '23514 check_violation')
+      : ng('V3b', "deposit_return_status='X' → CHECK 위반", `기대 23514, 실제 ${r3.code || '성공(막히지 않음)'}`);
+  });
 
   // V4 ------------------------------------------------------------------
   const t4 = await q(`SELECT to_regclass('public.tb_s080_contract_status_history') t`);
   const fk4 = await q(`SELECT conname FROM pg_constraint
     WHERE conrelid='public.tb_s080_contract_status_history'::regclass AND contype='f'`);
+  /*
+   * ★★ `to_status` 는 **어휘 안의 값**이어야 한다. 010 이 CHECK 를 붙였고
+   *    (`draft`·`confirmed`·`terminated`·`cancelled`), Postgres 는 CHECK 를 행 삽입
+   *    시점에 보고 FK 는 문장 끝 트리거로 본다 — 그래서 예전의 `'A'` 는 **FK 까지 가지도
+   *    못하고** 23514(CHECK 위반)로 끝났다. 여기서 보려는 것은 FK 이므로 어휘 안의 값을
+   *    쓴다. 어휘 밖 값이 막히는지는 010 머리말의 검증 3번이 따로 적어 두었다.
+   */
   const r4 = await tryInTx([`INSERT INTO public.tb_s080_contract_status_history(history_id,contract_id,to_status)
-    VALUES ('vtest','no-such-contract','A')`]);
+    VALUES ('vtest','no-such-contract','draft')`]);
   (t4[0].t && fk4.length && r4.code === '23503')
     ? ok('V4', 'contract_status_history 존재 + FK 동작', `FK ${fk4.length}건, 없는 계약 INSERT → 23503`)
     : ng('V4', 'contract_status_history 존재 + FK 동작', `테이블=${t4[0].t} FK=${fk4.length} 코드=${r4.code}`);
@@ -112,31 +171,76 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
     ? ok('V5', 'tb_s080_auth_session 존재', `컬럼 ${t5.length}개`)
     : ng('V5', 'tb_s080_auth_session 존재', `컬럼 ${t5.length}개`);
 
-  // V6 / V7 -------------------------------------------------------------
-  const base = (await q(`SELECT reservation_id FROM public.tb_s080_reservations LIMIT 1`))[0].reservation_id;
-  const clone = (id, status, s, e) => `INSERT INTO public.tb_s080_reservations
-    SELECT (json_populate_record(NULL::public.tb_s080_reservations, src.j)).*
-    FROM (
-      SELECT (row_to_json(t)::jsonb
-              || '{"reservation_id":"${id}","status":"${status}","start_at":"${s}","end_at":"${e}"}'::jsonb)::json AS j
-      FROM public.tb_s080_reservations t WHERE reservation_id='${base}'
-    ) src`;
+  /* ── V6 / V7 — 예약 배타 제약 ─────────────────────────────────────────────
+     ★★★ **시험이 쓸 행을 시험이 직접 만든다.** 예전에는 기존 예약 한 건을
+        `row_to_json` 으로 복제해서 썼는데, 007(시험 데이터 정리)이 그 2행을 지운 뒤로
+        `[0]` 이 undefined 가 되어 **스크립트가 여기서 죽었다** — 그리고 뒤 16항목이
+        조용히 안 돌았다(`step` 머리말).
 
-  const r6 = await tryInTx([
-    clone('vtest_a', 'confirmed', '2099-01-01 10:00:00', '2099-01-01 11:00:00'),
-    clone('vtest_b', 'confirmed', '2099-01-01 10:30:00', '2099-01-01 11:30:00'),
-  ]);
-  r6.code === '23P01'
-    ? ok('V6', '겹치는 confirmed 예약 → 배타 제약 위반', '23P01 exclusion_violation')
-    : ng('V6', '겹치는 confirmed 예약 → 배타 제약 위반', `기대 23P01, 실제 ${r6.code || '성공(막히지 않음)'}`);
+     ★ 시설까지 만든다. 남의 회의실을 빌려 쓰면 ① 그 회의실이 없는 환경에서 또 죽고
+       ② 실제 예약과 시간이 겹쳐 23P01 이 **엉뚱한 이유로** 나올 수 있다.
+       배타 제약은 `facility_id` 단위라, 우리 시설 안에서는 우리 두 행만 다툰다.
 
-  const r7 = await tryInTx([
-    clone('vtest_c', 'confirmed', '2099-02-01 10:00:00', '2099-02-01 11:00:00'),
-    clone('vtest_d', 'cancelled', '2099-02-01 10:30:00', '2099-02-01 11:30:00'),
-  ]);
-  r7.code === null
-    ? ok('V7', 'cancelled와 시간이 겹쳐도 INSERT 성공', '제약이 confirmed에만 걸림')
-    : ng('V7', 'cancelled와 시간이 겹쳐도 INSERT 성공', `실패 ${r7.code} ${r7.message}`);
+     ★ 전부 `tryInTx` 안이라 **롤백된다** — 건물 한 채만 빌리고 아무것도 남기지 않는다. */
+  const bldg = await firstRow(`SELECT build_id FROM public.tb_s080_buildings LIMIT 1`);
+  /** 예약 탐침용 시설 — 트랜잭션 안에서만 산다. */
+  const PROBE_FAC = 'vtest-facility';
+  const mkFacility = `INSERT INTO public.tb_s080_facilities
+    (facility_id, building_id, name, facility_type, updated_at)
+    VALUES ('${PROBE_FAC}', '${bldg?.build_id}', 'vtest 회의실', 'MEETING', now())`;
+  const mkRes = (id, status, s, e) => `INSERT INTO public.tb_s080_reservations
+    (reservation_id, build_id, facility_id, title, start_at, end_at, status, created_at, updated_at)
+    VALUES ('${id}', '${bldg?.build_id}', '${PROBE_FAC}', 'vtest', '${s}', '${e}', '${status}', now(), now())`;
+
+  await step('V6', '겹치는 confirmed 예약 → 배타 제약 위반', async () => {
+    if (!bldg) {
+      hold('V6', '겹치는 confirmed 예약 → 배타 제약 위반', '건물이 0건 — 예약을 걸 곳이 없다');
+      return;
+    }
+    const r6 = await tryInTx([
+      mkFacility,
+      mkRes('vtest_a', 'confirmed', '2099-01-01 10:00:00', '2099-01-01 11:00:00'),
+      mkRes('vtest_b', 'confirmed', '2099-01-01 10:30:00', '2099-01-01 11:30:00'),
+    ]);
+    r6.code === '23P01'
+      ? ok('V6', '겹치는 confirmed 예약 → 배타 제약 위반', '23P01 exclusion_violation')
+      : ng('V6', '겹치는 confirmed 예약 → 배타 제약 위반', `기대 23P01, 실제 ${r6.code || '성공(막히지 않음)'}`);
+  });
+
+  await step('V7', 'cancelled와 시간이 겹쳐도 INSERT 성공', async () => {
+    if (!bldg) {
+      hold('V7', 'cancelled와 시간이 겹쳐도 INSERT 성공', '건물이 0건 — 예약을 걸 곳이 없다');
+      return;
+    }
+    const r7 = await tryInTx([
+      mkFacility,
+      mkRes('vtest_c', 'confirmed', '2099-02-01 10:00:00', '2099-02-01 11:00:00'),
+      mkRes('vtest_d', 'cancelled', '2099-02-01 10:30:00', '2099-02-01 11:30:00'),
+    ]);
+    r7.code === null
+      ? ok('V7', 'cancelled와 시간이 겹쳐도 INSERT 성공', '제약이 confirmed에만 걸림')
+      : ng('V7', 'cancelled와 시간이 겹쳐도 INSERT 성공', `실패 ${r7.code} ${r7.message}`);
+  });
+
+  /*
+   * ★ V7b — 붙는 예약(10~11 · 11~12)은 **겹치지 않는다.** 제약이 `tsrange` 의 기본
+   *   경계 `[)` 를 쓰기 때문이고, 회의실을 연달아 빌리는 흔한 경우가 여기 달려 있다.
+   *   `[]` 로 바뀌면 조용히 막히기 시작한다 — 그래서 시험으로 박아 둔다.
+   */
+  await step('V7b', '붙는 예약(10~11 · 11~12)은 막히지 않는다', async () => {
+    if (!bldg) {
+      hold('V7b', '붙는 예약(10~11 · 11~12)은 막히지 않는다', '건물이 0건 — 예약을 걸 곳이 없다');
+      return;
+    }
+    const r = await tryInTx([
+      mkFacility,
+      mkRes('vtest_e', 'confirmed', '2099-03-01 10:00:00', '2099-03-01 11:00:00'),
+      mkRes('vtest_f', 'confirmed', '2099-03-01 11:00:00', '2099-03-01 12:00:00'),
+    ]);
+    r.code === null
+      ? ok('V7b', '붙는 예약(10~11 · 11~12)은 막히지 않는다', 'tsrange 경계가 [) 다')
+      : ng('V7b', '붙는 예약(10~11 · 11~12)은 막히지 않는다', `실패 ${r.code} ${r.message}`);
+  });
 
   // V8 ------------------------------------------------------------------
   await c.query('BEGIN');
@@ -152,7 +256,9 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
     : ng('V8', 'anon 역할로 contracts SELECT → 거부', `기대 42501, 실제 ${v8 || '성공(조회됨)'}`);
 
   // V9 — 기존 앱이 쓰는 접속(postgres)으로 데이터 경로 스모크 --------------
-  try {
+  // ★ 계약이 0건이면 스모크할 경로가 없다 — 보류다(실패가 아니다).
+  if (!oneC) hold('V9', '기존 앱 데이터 경로 스모크(postgres)', '계약이 0건 — 스모크할 데이터가 없다');
+  else try {
     const list = await q(`SELECT ct.contract_id, ct.contract_no, ct.status, ct.start_date, ct.end_date, ct.company_id
       FROM public.tb_s080_contracts ct
       LEFT JOIN public.tb_s080_companies co ON co.company_id = ct.company_id
@@ -160,7 +266,7 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
       ORDER BY ct.created_at DESC LIMIT 20`);
     const detail = await q(`SELECT ct.*,
         (SELECT count(*)::int FROM public.tb_s080_invoices i WHERE i.contract_id=ct.contract_id) inv
-      FROM public.tb_s080_contracts ct WHERE ct.contract_id=$1`, [oneC[0].contract_id]);
+      FROM public.tb_s080_contracts ct WHERE ct.contract_id=$1`, [oneC.contract_id]);
     (list.length && detail.length)
       ? ok('V9', '기존 앱 데이터 경로 스모크(postgres)', `목록 ${list.length}건 · 상세 1건(청구 ${detail[0].inv}건)`)
       : ng('V9', '기존 앱 데이터 경로 스모크(postgres)', `목록 ${list.length} 상세 ${detail.length}`);
@@ -217,9 +323,17 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
   };
 
   // 원본(스코프 없는) 수치는 postgres 로 재고, 비교 대상만 erp_app 으로 잰다
-  const target = (await q(`SELECT company_id, count(*)::int n FROM public.tb_s080_contracts
-    WHERE company_id IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 1`))[0];
+  /*
+   * 비교 대상 입주사 — 계약을 가장 많이 든 회사. ★ **없을 수 있다.** 계약이 0건이면
+   * A3·A6·A7d 는 보류다(스코프를 잴 기준이 없다). 예전에는 `[0]` 을 그대로 써서
+   * 빈 개발계에서 스크립트가 죽었고, 그러면 뒤 항목이 전부 안 돌았다.
+   */
+  const target = await firstRow(`SELECT company_id, count(*)::int n FROM public.tb_s080_contracts
+    WHERE company_id IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 1`);
   const totalContracts = (await q(`SELECT count(*)::int n FROM public.tb_s080_contracts`))[0].n;
+  if (!target) {
+    console.log('\n  ※ A3·A6·A7d 보류 — 입주사가 딸린 계약이 0건이라 스코프를 잴 기준이 없다.');
+  }
 
   if (erpReady) {
     // A2 GUC 없이 → 0건 (fail-closed)
@@ -233,15 +347,23 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
       : ng('A2', 'erp_app + GUC 없음 → 전 테이블 0건', a2.filter(r => r.행수).map(r => `${r.테이블}=${r.행수}`).join(', '));
 
     // A3 tenant 스코프
-    await ec.query('BEGIN');
-    await setScope('tenant', target.company_id);
-    const a3 = (await eq(`SELECT count(*)::int n FROM public.tb_s080_contracts`))[0].n;
-    const a3other = (await eq(`SELECT count(*)::int n FROM public.tb_s080_contracts
-      WHERE company_id <> '${target.company_id}'`))[0].n;
-    await ec.query('ROLLBACK');
-    (a3 === target.n && a3other === 0)
-      ? ok('A3', 'erp_app + tenant → 자기 회사만', `${a3}건 (전체 ${totalContracts}건 중), 타사 0건`)
-      : ng('A3', 'erp_app + tenant → 자기 회사만', `기대 ${target.n}, 실제 ${a3}, 타사 ${a3other}`);
+    await step('A3', 'erp_app + tenant → 자기 회사만', async () => {
+      if (!target) {
+        hold('A3', 'erp_app + tenant → 자기 회사만', '입주사가 딸린 계약이 0건');
+        return;
+      }
+      await ec.query('BEGIN');
+      let a3, a3other;
+      try {
+        await setScope('tenant', target.company_id);
+        a3 = (await eq(`SELECT count(*)::int n FROM public.tb_s080_contracts`))[0].n;
+        a3other = (await eq(`SELECT count(*)::int n FROM public.tb_s080_contracts
+          WHERE company_id <> '${target.company_id}'`))[0].n;
+      } finally { await ec.query('ROLLBACK'); }
+      (a3 === target.n && a3other === 0)
+        ? ok('A3', 'erp_app + tenant → 자기 회사만', `${a3}건 (전체 ${totalContracts}건 중), 타사 0건`)
+        : ng('A3', 'erp_app + tenant → 자기 회사만', `기대 ${target.n}, 실제 ${a3}, 타사 ${a3other}`);
+    });
 
     // A4 operator 전체
     await ec.query('BEGIN');
@@ -259,18 +381,24 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
       : ng('A5', 'RLS 비대상 테이블(spaces)은 erp_app이 정상 조회', `${a5}건`);
 
     // A6 WITH CHECK — 남의 회사로 바꿔치기 시도
-    await ec.query('BEGIN');
-    let a6;
-    try {
-      await setScope('tenant', target.company_id);
-      await ec.query(`UPDATE public.tb_s080_contracts SET company_id='남의회사'
-        WHERE company_id='${target.company_id}'`);
-      a6 = null;
-    } catch (e) { a6 = e.code; }
-    await ec.query('ROLLBACK');
-    a6 === '42501'
-      ? ok('A6', 'tenant 가 남의 company_id 로 UPDATE → WITH CHECK 위반', '42501')
-      : ng('A6', 'tenant 가 남의 company_id 로 UPDATE → WITH CHECK 위반', `기대 42501, 실제 ${a6 || '성공(막히지 않음)'}`);
+    await step('A6', 'tenant 가 남의 company_id 로 UPDATE → WITH CHECK 위반', async () => {
+      if (!target) {
+        hold('A6', 'tenant 가 남의 company_id 로 UPDATE → WITH CHECK 위반', '입주사가 딸린 계약이 0건');
+        return;
+      }
+      await ec.query('BEGIN');
+      let a6;
+      try {
+        await setScope('tenant', target.company_id);
+        await ec.query(`UPDATE public.tb_s080_contracts SET company_id='남의회사'
+          WHERE company_id='${target.company_id}'`);
+        a6 = null;
+      } catch (e) { a6 = e.code; }
+      await ec.query('ROLLBACK');
+      a6 === '42501'
+        ? ok('A6', 'tenant 가 남의 company_id 로 UPDATE → WITH CHECK 위반', '42501')
+        : ng('A6', 'tenant 가 남의 company_id 로 UPDATE → WITH CHECK 위반', `기대 42501, 실제 ${a6 || '성공(막히지 않음)'}`);
+    });
 
     // ---- A7. erp_app 으로 INSERT 가 실제로 되는가 -------------------------
     // 테이블 GRANT 와 시퀀스 GRANT 는 별개다. 시퀀스 USAGE 가 없으면
@@ -317,25 +445,38 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
       ? ok('A7c', '세션 행 INSERT (tb_s080_auth_session)', '2-8 이 쓸 경로 통과')
       : ng('A7c', '세션 행 INSERT (tb_s080_auth_session)', a7c);
 
-    // A7d — RLS 대상 테이블 INSERT: 자기 회사는 되고 남의 회사는 막히는가
-    const rbase = (await q(`SELECT build_id, facility_id FROM public.tb_s080_reservations LIMIT 1`))[0];
-    // 시간대를 서로 다르게 준다 — 같은 시간이면 EXCLUDE 제약(23P01)이 먼저 걸려
-    // RLS 의 WITH CHECK 를 시험하지 못한다.
-    const insRes = (companyId, day) => `INSERT INTO public.tb_s080_reservations
-      (reservation_id, build_id, facility_id, company_id, title, start_at, end_at, status, updated_at)
-      VALUES ('vtest-res-${Math.random().toString(36).slice(2, 8)}', '${rbase.build_id}', '${rbase.facility_id}',
-              '${companyId}', 'vtest', '2098-03-${day} 10:00', '2098-03-${day} 11:00', 'confirmed', now())`;
-    await ec.query('BEGIN');
-    let a7dOwn, a7dOther;
-    try {
-      await setScope('tenant', target.company_id);
-      try { await ec.query(insRes(target.company_id, '01')); a7dOwn = null; } catch (e) { a7dOwn = e.code; }
-      try { await ec.query(insRes('남의회사', '02')); a7dOther = null; } catch (e) { a7dOther = e.code; }
-    } finally { await ec.query('ROLLBACK'); }
-    (a7dOwn === null && a7dOther === '42501')
-      ? ok('A7d', 'RLS 테이블 INSERT — 자기 회사 성공 / 남의 회사 차단', '42501 (WITH CHECK)')
-      : ng('A7d', 'RLS 테이블 INSERT — 자기 회사 성공 / 남의 회사 차단',
-           `자기회사=${a7dOwn || '성공'} 남의회사=${a7dOther || '★성공(막히지 않음)'}`);
+    /* A7d — RLS 대상 테이블 INSERT: 자기 회사는 되고 남의 회사는 막히는가
+       ★★ 여기도 **기존 예약 행을 빌려 쓰지 않는다**(V6/V7 과 같은 이유 — 007 이 지운
+          뒤로 죽는다). 건물은 빌리고 시설은 만들고, 전부 롤백한다.
+       ★ 시설을 만드는 것은 `erp_app` 접속이다 — facilities 는 RLS 대상이 아니라 들어간다.
+       ★ 시간대를 서로 다르게 준다 — 같은 시간이면 EXCLUDE(23P01)가 먼저 걸려
+         RLS 의 WITH CHECK 를 시험하지 못한다. */
+    await step('A7d', 'RLS 테이블 INSERT — 자기 회사 성공 / 남의 회사 차단', async () => {
+      if (!target || !bldg) {
+        hold('A7d', 'RLS 테이블 INSERT — 자기 회사 성공 / 남의 회사 차단',
+             !target ? '입주사가 딸린 계약이 0건' : '건물이 0건');
+        return;
+      }
+      const facId = `vtest-fac-${Math.random().toString(36).slice(2, 8)}`;
+      const insRes = (companyId, day) => `INSERT INTO public.tb_s080_reservations
+        (reservation_id, build_id, facility_id, company_id, title, start_at, end_at, status, updated_at)
+        VALUES ('vtest-res-${Math.random().toString(36).slice(2, 8)}', '${bldg.build_id}', '${facId}',
+                '${companyId}', 'vtest', '2098-03-${day} 10:00', '2098-03-${day} 11:00', 'confirmed', now())`;
+      await ec.query('BEGIN');
+      let a7dOwn, a7dOther;
+      try {
+        await ec.query(`INSERT INTO public.tb_s080_facilities
+          (facility_id, building_id, name, facility_type, updated_at)
+          VALUES ('${facId}', '${bldg.build_id}', 'vtest 회의실', 'MEETING', now())`);
+        await setScope('tenant', target.company_id);
+        try { await ec.query(insRes(target.company_id, '01')); a7dOwn = null; } catch (e) { a7dOwn = e.code; }
+        try { await ec.query(insRes('남의회사', '02')); a7dOther = null; } catch (e) { a7dOther = e.code; }
+      } finally { await ec.query('ROLLBACK'); }
+      (a7dOwn === null && a7dOther === '42501')
+        ? ok('A7d', 'RLS 테이블 INSERT — 자기 회사 성공 / 남의 회사 차단', '42501 (WITH CHECK)')
+        : ng('A7d', 'RLS 테이블 INSERT — 자기 회사 성공 / 남의 회사 차단',
+             `자기회사=${a7dOwn || '성공'} 남의회사=${a7dOther || '★성공(막히지 않음)'}`);
+    });
   }
 
   // ===== 교차 스키마 =====================================================
@@ -380,8 +521,11 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
   const fails = results.filter(r => r.결과 === '실패');
   const held = results.filter(r => r.결과 === '보류');
   console.log(`통과 ${results.length - fails.length - held.length}건 · 보류 ${held.length}건 · 실패 ${fails.length}건 (총 ${results.length}건)`);
+  // ★ 보류는 **돈 것**이다 — 안 돈 것과 구분해야 한다(`verify-count.js` 머리말).
+  // ★ 항목이 사라졌는지 본다 — 통과·실패만 세면 **덜 돈 것**을 알 수 없다.
+  const short = itemCountGate({ expected: EXPECTED_ITEMS, actual: results.length, script: 'verify-001-003.js' });
   await c.end();
-  process.exit(fails.length ? 1 : 0);
+  process.exit(fails.length || short ? 1 : 0);
 })().catch(async e => {
   console.error('VERIFY ERROR:', e.message);
   console.error(e.stack);
