@@ -472,7 +472,7 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
 
               {tab === 'billing' ? (
                 <div className={styles.detailBody}>
-                  <CompanyBillingTab companyId={selected.companyId} notify={notify} />
+                  <CompanyBillingTab companyId={selected.companyId} />
                 </div>
               ) : loadingContracts ? (
                 <PanelEmpty icon="file-text" lead="계약을 불러오는 중입니다" />

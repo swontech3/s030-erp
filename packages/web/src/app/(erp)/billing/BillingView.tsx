@@ -15,12 +15,23 @@
  *
  * ★ 월·검색어·상태는 주소에 적는다(`?ym=&q=&st=`) — [이전]·새로고침에 살아남는다.
  *   방식은 s0300200030 과 같다(`history.replaceState`, 기록을 쌓지 않는다).
+ *
+ * =============================================================================
+ * ★★ 한 업무는 한 화면에서 (CLAUDE.md) — 돈을 만지는 처리는 전부 이 화면에 있다
+ * =============================================================================
+ * 수납 입력·수정·삭제([수납]·[내역]) · 정산 처리 · 정산서 · 예치금 반환. 입주사 청구 탭과
+ * 계약 폼은 조회 + 링크(`billingHref`)로 여기에 보낸다.
+ *
+ *   ?company=  그 입주사로 거른다 — ★ 월을 넘기지 않고 그 입주사의 **전 기간**을 보인다
+ *              (입주사 청구 탭에서 넘어올 때). 정산 탭도 그 입주사 것만 보인다.
+ *   ?contract= 정산 탭에서 그 계약의 정산 상세를 연다(계약 폼 「정산 결과 보기」).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { DisplayStatus } from '@swonbiz/shared/domain/invoice-status';
 import { Icon } from '@/components/ds';
 import { BillingEmpty, BillingTable } from '@/features/billing/BillingTable';
+import { SettlementQueue } from '@/features/billing/SettlementQueue';
 import styles from '@/features/billing/billing.module.css';
 import {
   STATUS_LABEL,
@@ -50,6 +61,17 @@ export function BillingView() {
     return isStatus(v) ? v : null;
   });
 
+  /**
+   * 「월별 청구 | 정산」 — 정산 탭은 중도해지 정산 대기와 예치금 반환 대기(`SettlementQueue`).
+   * ★ 주소에 적는다(`?tab=settle`) — 정산서를 보고 [이전] 으로 돌아와도 같은 탭이다.
+   */
+  const [tab, setTab] = useState<'month' | 'settle'>(() => (params.get('tab') === 'settle' ? 'settle' : 'month'));
+  /** 입주사로 거르기 — 있으면 월 대신 그 입주사의 전 기간. */
+  const [company, setCompany] = useState<string | null>(() => params.get('company') || null);
+  const [companyName, setCompanyName] = useState<string | null>(null);
+  /** 정산 탭에서 상세를 연 계약. */
+  const [contract, setContract] = useState<string | null>(() => params.get('contract') || null);
+
   const [items, setItems] = useState<BillingItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -63,11 +85,16 @@ export function BillingView() {
    *   있고, 그러면 제목은 10월인데 표는 9월이 된다 — 카드와 제목이 어긋나는 가장 쉬운 길이다.
    */
   const seq = useRef(0);
-  const load = useCallback(async (month: string) => {
+  const load = useCallback(async (month: string, companyId: string | null) => {
     const mine = ++seq.current;
     setError(null);
     try {
-      const res = await fetch(`/api/billing/invoices?yearMonth=${encodeURIComponent(month)}`);
+      // ★ 입주사로 걸렀으면 그 입주사의 전 기간(입주사 청구 API) — 월 조건을 붙이지 않는다.
+      const res = await fetch(
+        companyId
+          ? `/api/companies/${encodeURIComponent(companyId)}/billing`
+          : `/api/billing/invoices?yearMonth=${encodeURIComponent(month)}`,
+      );
       const body = (await res.json()) as { invoices?: BillingItem[]; message?: string };
       if (!res.ok) throw new Error(body.message ?? '청구를 불러오지 못했습니다');
       if (mine === seq.current) setItems(body.invoices ?? []);
@@ -81,17 +108,38 @@ export function BillingView() {
 
   useEffect(() => {
     setItems(null);
-    void load(ym);
-  }, [ym, load]);
+    void load(ym, company);
+  }, [ym, company, load]);
+
+  // 거른 입주사의 이름 — 제목과 거르기 칩에 쓴다(청구서가 한 장도 없어도 보이게 따로 받는다).
+  useEffect(() => {
+    setCompanyName(null);
+    if (!company) return;
+    let alive = true;
+    void fetch(`/api/companies/${encodeURIComponent(company)}`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ companyName?: string }>) : null))
+      .then((b) => {
+        if (alive) setCompanyName(b?.companyName ?? '알 수 없는 입주사');
+      })
+      .catch(() => {
+        if (alive) setCompanyName('알 수 없는 입주사');
+      });
+    return () => {
+      alive = false;
+    };
+  }, [company]);
 
   useEffect(() => {
     const sp = new URLSearchParams();
+    if (tab === 'settle') sp.set('tab', 'settle');
+    if (company) sp.set('company', company);
+    if (tab === 'settle' && contract) sp.set('contract', contract);
     sp.set('ym', ym);
     if (keyword) sp.set('q', keyword);
     if (status) sp.set('st', status);
     const next = `${window.location.pathname}?${sp.toString()}`;
     if (next !== window.location.pathname + window.location.search) window.history.replaceState(null, '', next);
-  }, [ym, keyword, status]);
+  }, [tab, company, contract, ym, keyword, status]);
 
   useEffect(
     () => () => {
@@ -100,14 +148,18 @@ export function BillingView() {
     [],
   );
 
+  const toastOnly = useCallback((message: string) => {
+    setToast(message);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2800);
+  }, []);
+
   const notify = useCallback(
     (message: string) => {
-      setToast(message);
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-      toastTimer.current = setTimeout(() => setToast(null), 2800);
-      void load(ym);
+      toastOnly(message);
+      void load(ym, company);
     },
-    [load, ym],
+    [load, toastOnly, ym, company],
   );
 
   const all = items ?? [];
@@ -134,16 +186,38 @@ export function BillingView() {
     <div className={styles.page}>
       <div className={styles.head}>
         <div>
-          <h1 className={styles.title}>{yearMonthLabel(ym)} 청구</h1>
+          <h1 className={styles.title}>
+            {tab === 'settle' ? '정산' : company ? `${companyName ?? '입주사'} 청구` : `${yearMonthLabel(ym)} 청구`}
+          </h1>
           <p className={styles.sub}>
-            {items === null
+            {tab === 'settle'
+              ? '중도해지 정산 · 기간 만료 예치금 반환'
+              : items === null
               ? '불러오는 중입니다'
-              : `${monthSum.count}건 · 미납 ${monthSum.unpaidCount}건${
+              : `${company ? '전 기간 · ' : ''}${monthSum.count}건 · 미납 ${monthSum.unpaidCount}건${
                   counts.get('canceled') ? ` · 취소 ${counts.get('canceled')}건` : ''
                 }`}
           </p>
         </div>
-        <div className={styles.monthNav}>
+        {company ? (
+          // ★ 입주사로 걸렀을 때는 월 넘기기 대신 거르기 칩 — ✕ 로 풀면 월별로 돌아간다.
+          <div className={styles.monthNav}>
+            <span className={`${styles.chip} ${styles.chipOn}`} data-company-filter={company}>
+              입주사 · {companyName ?? '…'}
+            </span>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost}`}
+              onClick={() => {
+                setCompany(null);
+                setContract(null);
+              }}
+            >
+              거르기 해제
+            </button>
+          </div>
+        ) : (
+        <div className={styles.monthNav} style={tab === 'settle' ? { visibility: 'hidden' } : undefined}>
           <button type="button" className={styles.iconBtn} aria-label="이전 달" onClick={() => setYm(shiftYearMonth(ym, -1))}>
             <Icon name="chevron-left" size={18} />
           </button>
@@ -167,11 +241,50 @@ export function BillingView() {
             이번 달
           </button>
         </div>
+        )}
       </div>
 
+      <div className={styles.tabs} role="tablist">
+        {(
+          [
+            ['month', '월별 청구'],
+            ['settle', '정산'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={`${styles.tab}${tab === key ? ` ${styles.tabOn}` : ''}`}
+            onClick={() => {
+              setTab(key);
+              if (key !== 'settle') setContract(null);
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'settle' ? (
+        <div className={styles.panel}>
+          <SettlementQueue notify={toastOnly} company={company} selected={contract} onSelect={setContract} />
+        </div>
+      ) : (
+      <>
       <div className={styles.cards}>
         <SummaryCard label="총 청구액" value={won(sum.total)} filtered={filtered} />
-        <SummaryCard label="수납 완료" value={won(sum.paid)} filtered={filtered} />
+        {/*
+          ★ 수납 완료는 **청구에 들어간 몫**만이다. 과납분(돌려줄 돈)은 여기에도 미수금에도
+            섞지 않고 아래 줄에 따로 적는다 — 섞으면 다른 입주사의 미수금이 깎여 보인다.
+        */}
+        <SummaryCard
+          label="수납 완료"
+          value={won(sum.received)}
+          filtered={filtered}
+          note={sum.overpaidCount > 0 ? `과납 ${won(sum.overpaid)} · 정산 대기 ${sum.overpaidCount}건 별도` : undefined}
+        />
         <SummaryCard label="미수금" value={won(sum.outstanding)} filtered={filtered} />
         <div className={styles.card}>
           <div className={styles.cardLabel}>미납</div>
@@ -224,13 +337,18 @@ export function BillingView() {
         ) : error ? (
           <BillingEmpty lead={error} />
         ) : all.length === 0 ? (
-          <BillingEmpty lead={`${yearMonthLabel(ym)} 청구가 없습니다`} sub="청구서는 계약을 확정하면 계약기간 전체가 만들어집니다" />
+          <BillingEmpty
+            lead={company ? '이 입주사의 청구서가 없습니다' : `${yearMonthLabel(ym)} 청구가 없습니다`}
+            sub="청구서는 계약을 확정하면 계약기간 전체가 만들어집니다"
+          />
         ) : visible.length === 0 ? (
           <BillingEmpty lead="조건에 맞는 청구가 없습니다" sub="검색어나 상태 필터를 바꿔 보세요" />
         ) : (
-          <BillingTable items={visible} mode="month" asOf={asOf} onChanged={notify} />
+          <BillingTable items={visible} mode={company ? 'company' : 'month'} asOf={asOf} onChanged={notify} />
         )}
       </div>
+      </>
+      )}
 
       {toast ? (
         <div className={styles.toast}>
@@ -242,11 +360,22 @@ export function BillingView() {
   );
 }
 
-function SummaryCard({ label, value, filtered }: { label: string; value: string; filtered: boolean }) {
+function SummaryCard({
+  label,
+  value,
+  filtered,
+  note,
+}: {
+  label: string;
+  value: string;
+  filtered: boolean;
+  note?: string;
+}) {
   return (
     <div className={styles.card}>
       <div className={styles.cardLabel}>{label}</div>
       <div className={styles.cardValue}>{value}</div>
+      {note ? <div className={styles.cardNote}>{note}</div> : null}
       {filtered ? <div className={styles.cardNote}>필터 적용</div> : null}
     </div>
   );

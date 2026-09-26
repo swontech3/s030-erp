@@ -13,6 +13,8 @@
  *   (`day.ts` 머리말). `parseDay` 는 UTC 자정이라 시간대가 음수인 곳에서는 하루 밀린다.
  */
 import { displayInvoiceStatus, type DisplayStatus } from '@swonbiz/shared/domain/invoice-status';
+import { localDayOf, summarizeInvoices, type InvoiceSummary } from '@swonbiz/shared/domain/invoice-summary';
+import type { DepositEntryKind } from '@swonbiz/shared/domain/deposit-ledger';
 
 /** 청구 목록 한 줄 — `GET /billing/invoices` · `GET /companies/:id/billing` 이 같은 모양이다. */
 export interface BillingItem {
@@ -91,6 +93,14 @@ export interface Settlement {
   settleType: string;
   /** 청구서에 들어가는 몫 = 총수납 − 실이용료. */
   rentNet: number;
+  companyName: string;
+  bizNumber: string;
+  contractRoom: string;
+  freeMonths: number;
+  /** 부가세 포함 월액 — 실이용료를 「개월 + 일할」로 나누어 보여 줄 때 쓴다. */
+  monthlyTotal: number;
+  /** 환불 계좌 — **전체 번호**. 정산 카드와 정산서에서만 보인다. */
+  refund: { bank: string; account: string; holder: string } | null;
   processed: {
     processedOn: string;
     amount: number;
@@ -101,7 +111,7 @@ export interface Settlement {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   상태
+   상태 — 판정은 shared 의 `displayInvoiceStatus` 하나
    ══════════════════════════════════════════════════════════════════════════ */
 
 export const STATUS_LABEL: Record<DisplayStatus, string> = {
@@ -110,19 +120,14 @@ export const STATUS_LABEL: Record<DisplayStatus, string> = {
   unpaid: '미납',
   paid: '납부완료',
   canceled: '취소',
+  // ★ 받은 것이 청구보다 많다 — 돌려줄 돈이 남았다. 「납부완료」로 보이면 끝난 장처럼 읽힌다.
+  overpaid: '과납 · 정산 대기',
 };
 
 /** 필터 순서 — 할 일이 있는 것부터. */
-export const STATUS_ORDER: readonly DisplayStatus[] = ['unpaid', 'partial', 'pending', 'paid', 'canceled'];
+export const STATUS_ORDER: readonly DisplayStatus[] = ['unpaid', 'overpaid', 'partial', 'pending', 'paid', 'canceled'];
 
-/** `YYYY-MM-DD` → **로컬 자정** `Date`. 읽을 수 없으면 `null`. */
-export function localDay(iso: string): Date | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) return null;
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-}
-
-/** 화면 상태 — 판정은 `displayInvoiceStatus` 한 곳이다. */
+/** 화면 상태 — 판정은 `displayInvoiceStatus` 한 곳이다. 납부일은 로컬 자정(`localDayOf`). */
 export function statusOf(
   item: Pick<BillingItem, 'status' | 'paidAmount' | 'totalAmount' | 'dueDate'>,
   asOf: Date,
@@ -131,51 +136,43 @@ export function statusOf(
     status: item.status,
     paidAmount: item.paidAmount,
     totalAmount: item.totalAmount,
-    dueDate: localDay(item.dueDate),
+    dueDate: localDayOf(item.dueDate),
     asOf,
   });
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
    합계 — 요약 카드와 표의 합계 줄이 **같은 함수**를 쓴다
-   ══════════════════════════════════════════════════════════════════════════ */
+   ══════════════════════════════════════════════════════════════════════════
+   규칙과 시험은 shared 의 `invoice-summary.ts` 에 있다(웹에는 시험 러너가 없다).
+   ★ 과납은 미수금에 더하지도 빼지도 않는다 — 다른 입주사의 미수금이 깎여 보였다(2026-09-26). */
 
-export interface BillingSummary {
-  /** 취소를 뺀 장 수. */
-  count: number;
-  total: number;
-  paid: number;
-  /** 미수금 = 청구 − 수납. */
-  outstanding: number;
-  unpaidCount: number;
-  unpaidAmount: number;
+export type BillingSummary = InvoiceSummary;
+
+export function summarize(items: readonly BillingItem[], asOf: Date): BillingSummary {
+  return summarizeInvoices(items, asOf);
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   청구 화면으로 가는 주소
+   ══════════════════════════════════════════════════════════════════════════ */
+
 /**
- * ★ **취소된 장은 합계에 넣지 않는다.** 받지 않기로 한 돈이다 — 넣으면 중도해지한
- *   계약의 남은 달이 전부 미수금으로 잡힌다.
+ * 사이드바 「청구」(/billing) 주소 — 다른 화면이 처리를 **여기로 보낼 때** 쓴다.
  *
- * ★ 미수금은 `청구 − 수납` 이다. 줄마다 음수를 0 으로 자르지 않는다 — 자르면
- *   카드의 세 숫자(청구·수납·미수)가 서로 더해지지 않는다.
+ *   company  그 입주사로 거른다(월을 넘기지 않고 전 기간)
+ *   tab      'settle' 이면 정산 탭
+ *   contract 정산 탭에서 그 계약의 정산 상세를 연다
  *
- * ★ 예치금·환수는 여기에 **들어올 길이 없다.** 청구서에 있는 돈만 세고, 정산의 예치금
- *   반환과 환수는 정산 원장에만 있다(023). 정산 처리가 청구서에 넣는 것은 이용료 차액뿐이다.
+ * ★ 한 업무는 한 화면에서(CLAUDE.md) — 입주사 청구 탭·계약 폼은 버튼 대신 이 링크를 둔다.
  */
-export function summarize(items: readonly BillingItem[], asOf: Date): BillingSummary {
-  const sum: BillingSummary = { count: 0, total: 0, paid: 0, outstanding: 0, unpaidCount: 0, unpaidAmount: 0 };
-  for (const item of items) {
-    const st = statusOf(item, asOf);
-    if (st === 'canceled') continue;
-    sum.count += 1;
-    sum.total += item.totalAmount;
-    sum.paid += item.paidAmount;
-    if (st === 'unpaid') {
-      sum.unpaidCount += 1;
-      sum.unpaidAmount += item.totalAmount - item.paidAmount;
-    }
-  }
-  sum.outstanding = sum.total - sum.paid;
-  return sum;
+export function billingHref(p: { tab?: 'settle'; company?: string; contract?: string }): string {
+  const sp = new URLSearchParams();
+  if (p.tab) sp.set('tab', p.tab);
+  if (p.company) sp.set('company', p.company);
+  if (p.contract) sp.set('contract', p.contract);
+  const q = sp.toString();
+  return q ? `/billing?${q}` : '/billing';
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -246,4 +243,30 @@ export function formatMoneyInput(s: string): string {
   const digits = s.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
   if (digits === '') return negative ? '-' : '';
   return `${negative ? '-' : ''}${Number(digits).toLocaleString('ko-KR')}`;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   예치금 · 정산 탭
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** 입주사의 예치금 — 계약마다. 보유액은 서버가 기록의 합으로 낸다(`depositBalance`). */
+export interface ContractDeposit {
+  contractId: string;
+  balance: number;
+  entries: { kind: DepositEntryKind; amount: number; entryOn: string; memo: string }[];
+}
+
+/** 정산 탭의 한 줄. `amount` 는 양수 = 돌려줄 돈 / 음수 = 받을 돈(순정산금과 같은 부호). */
+export interface QueueItem {
+  kind: 'settlement' | 'deposit';
+  contractId: string;
+  companyId: string;
+  companyName: string;
+  roomNames: string;
+  terminatedDate: string;
+  amount: number;
+  /** 처리 완료 줄에만. */
+  processedOn?: string;
+  /** 처리 완료 줄에만 — **가린** 계좌번호. */
+  account?: string;
 }

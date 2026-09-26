@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * 청구 표 — 월별 청구(s0300200070)와 입주사 청구 탭이 **같은 표, 같은 창**을 쓴다.
+ * 청구 표 — 월별 청구(s0300200070)와 입주사 청구 탭이 **같은 표**를 쓴다.
  *
- * ★ [수납]·[내역] 창을 이 컴포넌트가 들고 있다. 두 화면이 각자 창을 열면 한쪽만
- *   고쳐지고, 「같은 청구서인데 여기서 넣으면 되고 저기서 넣으면 안 된다」가 생긴다.
+ * ★ [수납]·[내역] 창은 **청구 화면에서만** 연다(한 업무는 한 화면에서 — CLAUDE.md).
+ *   입주사 청구 탭은 `readOnly` 로 같은 표를 버튼 없이 보여 주고, 처리는 링크로 보낸다.
  *
  * ★ 합계 줄은 `summarize` 가 낸다 — 요약 카드와 **같은 함수**다. 그래서 카드 합계와
  *   표 합계가 다를 수 없다.
@@ -30,15 +30,17 @@ interface Props {
   /** `month` — 첫 열이 입주사. `company` — 첫 열이 청구 월(입주사는 이미 골랐다). */
   mode: 'month' | 'company';
   asOf: Date;
-  /** 수납이 바뀌었다 — 부르는 쪽이 목록을 다시 받는다. */
-  onChanged: (message: string) => void;
+  /** 수납이 바뀌었다 — 부르는 쪽이 목록을 다시 받는다. `readOnly` 면 부르지 않는다. */
+  onChanged?: (message: string) => void;
+  /** 조회 전용 — [수납]·[내역] 칸이 없다. 입주사 청구 탭이 쓴다. */
+  readOnly?: boolean;
 }
 
-export function BillingTable({ items, mode, asOf, onChanged }: Props) {
+export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly = false }: Props) {
   const [paying, setPaying] = useState<BillingItem | null>(null);
   const [viewing, setViewing] = useState<BillingItem | null>(null);
   const sum = summarize(items, asOf);
-  const grid = mode === 'company' ? `${styles.tCompany}` : '';
+  const grid = `${mode === 'company' ? styles.tCompany : ''}${readOnly ? ` ${styles.tReadOnly}` : ''}`;
 
   return (
     <>
@@ -48,7 +50,7 @@ export function BillingTable({ items, mode, asOf, onChanged }: Props) {
         <span className={styles.right}>청구액</span>
         <span className={styles.right}>납부일</span>
         <span className={styles.center}>상태</span>
-        <span />
+        {readOnly ? null : <span />}
       </div>
 
       {items.map((item) => {
@@ -79,6 +81,11 @@ export function BillingTable({ items, mode, asOf, onChanged }: Props) {
                     <span className={`${styles.amountSub} ${styles.amountSubDanger}`}>
                       미수 {won(item.outstanding)}
                     </span>
+                  ) : st === 'overpaid' ? (
+                    // ★ 돌려줄 돈 — 미수금이 아니다. 정산 처리가 음수 수납으로 0 을 만든다.
+                    <span className={`${styles.amountSub} ${styles.amountSubWarn}`}>
+                      과납 {won(item.paidAmount - item.totalAmount)}
+                    </span>
                   ) : st === 'paid' && item.paidAmount !== item.totalAmount ? (
                     <span className={styles.amountSub}>수납 {won(item.paidAmount)}</span>
                   ) : null}
@@ -89,6 +96,7 @@ export function BillingTable({ items, mode, asOf, onChanged }: Props) {
             <span className={styles.center}>
               <span className={`${styles.badge} ${styles[`st_${st}`]}`}>{STATUS_LABEL[st]}</span>
             </span>
+            {readOnly ? null : (
             <span className={styles.actions}>
               <button
                 type="button"
@@ -107,6 +115,7 @@ export function BillingTable({ items, mode, asOf, onChanged }: Props) {
                 내역
               </button>
             </span>
+            )}
           </div>
         );
       })}
@@ -120,8 +129,13 @@ export function BillingTable({ items, mode, asOf, onChanged }: Props) {
           <span className={styles.right}>
             <span className={styles.amount}>{won(sum.total)}</span>
           </span>
-          <span className={styles.right} style={{ gridColumn: 'span 3', fontWeight: 400 }}>
-            수납 <b className={styles.mono}>{won(sum.paid)}</b> · 미수 <b className={styles.mono}>{won(sum.outstanding)}</b>
+          <span className={styles.right} style={{ gridColumn: readOnly ? 'span 2' : 'span 3', fontWeight: 400 }}>
+            수납 <b className={styles.mono}>{won(sum.received)}</b> · 미수 <b className={styles.mono}>{won(sum.outstanding)}</b>
+            {sum.overpaidCount > 0 ? (
+              <>
+                {' '}· 과납 <b className={styles.mono}>{won(sum.overpaid)}</b>
+              </>
+            ) : null}
           </span>
         </div>
       ) : null}

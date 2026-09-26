@@ -23,7 +23,7 @@
  *           예전에는 DB 에서 확정 계약을 골랐는데, 개발계에 확정 계약이 없으면 돌지 않았다.
  *
  * ★ 중도해지 정산서(s0300200070p3)도 뽑는다 — 검증용 계약을 중도 해지해 정산을 만들고,
- *   입주사·계약 화면의 청구 탭에서 [정산서] 를 눌러 **진짜 인쇄 경로**를 탄다.
+ *   사이드바 「청구」 정산 탭에서 그 계약의 상세를 열고 [정산서] 를 눌러 **진짜 인쇄 경로**를 탄다.
  */
 const fs = require('fs');
 const os = require('os');
@@ -209,7 +209,8 @@ async function printDoc(send, contractId, kind) {
 /* ══════════════════════════════════════════════════════════════════════════ */
 
 /**
- * 중도해지 정산서(s0300200070p3) — 입주사·계약 화면 청구 탭의 [정산서] 를 눌러 뽑는다.
+ * 중도해지 정산서(s0300200070p3) — 청구 화면 정산 탭(그 계약의 상세)에서 [정산서] 를 눌러 뽑는다.
+ * ★ 정산서는 **이 화면에만** 있다(한 업무는 한 화면에서 — CLAUDE.md).
  *
  * ★ 인쇄 규칙은 계약서와 같다(`print.css` 의 `data-printing='contract-doc'`). 그래서 같은
  *   검사(가로선이 뒤에 칠해지는 배경에 맞닿는가)를 그대로 건다.
@@ -235,13 +236,13 @@ async function printSettlement(send, companyId, contractId) {
   const status = await ev(`fetch('/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:${JSON.stringify(JSON.stringify(LOGIN))}}).then(r=>r.status)`, true);
   if (status !== 200) throw new Error(`로그인 실패 ${status}`);
 
-  await goto(`${WEB}/tenants/contracts?chips=all&companyId=${encodeURIComponent(companyId)}&tab=billing`);
+  await goto(`${WEB}/billing?tab=settle&company=${encodeURIComponent(companyId)}&contract=${encodeURIComponent(contractId)}`);
   let opened = 'NO';
   for (let i = 0; i < 40 && opened !== 'OK'; i++) {
     await sleep(250);
     opened = await ev(`(() => { const card=document.querySelector('[data-settlement-card="${contractId}"]'); if(!card) return 'NO'; const b=[...card.querySelectorAll('button')].find(x=>x.textContent.includes('정산서')); if(!b) return 'NO'; b.click(); return 'OK'; })()`);
   }
-  if (opened !== 'OK') throw new Error('청구 탭에 정산 카드의 [정산서] 가 없다');
+  if (opened !== 'OK') throw new Error('정산 탭 상세에 [정산서] 가 없다');
   await sleep(900);
 
   const text = await ev(`(() => { const p=document.querySelector('[data-doc-page="settlement"]'); return p ? p.innerText : 'NONE'; })()`);

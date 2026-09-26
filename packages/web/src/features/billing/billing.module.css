@@ -282,6 +282,23 @@
     84px 92px 150px;
 }
 
+/* 조회 전용 — 마지막 [수납][내역] 칸이 없다 */
+.tHead.tReadOnly,
+.tRow.tReadOnly,
+.tFoot.tReadOnly {
+  grid-template-columns:
+    minmax(150px, 1.3fr) minmax(140px, 1.2fr) minmax(120px, 0.9fr)
+    84px 92px;
+}
+
+.tHead.tCompany.tReadOnly,
+.tRow.tCompany.tReadOnly,
+.tFoot.tCompany.tReadOnly {
+  grid-template-columns:
+    72px minmax(140px, 1.3fr) minmax(120px, 0.9fr)
+    84px 92px;
+}
+
 .tHead {
   height: 44px;
   background: var(--surface-alt);
@@ -366,6 +383,10 @@
   color: var(--color-danger);
 }
 
+.amountSubWarn {
+  color: var(--color-warning-text);
+}
+
 .muted {
   color: var(--text-muted);
 }
@@ -397,7 +418,8 @@
   color: var(--color-primary-hover);
 }
 
-.st_partial {
+.st_partial,
+.st_overpaid {
   background: var(--color-warning-bg);
   color: var(--color-warning-text);
 }
@@ -718,4 +740,160 @@ div.wideModal {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-heading);
+}
+
+/* ── 정산서 (s0300200070p3) ── 표·제목은 계약서 것을 쓴다. 여기는 머리·꼬리만 ── */
+.docHeadTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.docFoot {
+  margin: 20px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+/* 정산 카드 — 계약 기간 · 실제 이용 기간을 나란히 */
+.settlePeriods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.settlePeriods .factKey {
+  margin-right: 6px;
+}
+
+/* 환불 계좌 세 칸 */
+.accountRow {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1fr;
+  gap: 8px;
+}
+
+/* 입주사 청구 탭 — 예치금 한 줄 */
+/* 입주사 청구 탭 머리 — 조회 전용 안내 + 청구 화면으로 가는 링크 */
+.readOnlyBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.readOnlyBar a,
+.settleLine a {
+  color: var(--color-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.settleLine {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.depositList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-heading);
+}
+
+/* ── 청구 화면 탭 — 월별 청구 | 정산 ── 입주사 화면의 탭과 같은 모양 ── */
+.tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  position: relative;
+  border: 0;
+  background: transparent;
+  padding: 10px 0 12px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tabOn {
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.tabOn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-primary);
+}
+
+/* 정산 탭 표 */
+.qHead,
+.qRow {
+  display: grid;
+  grid-template-columns: 150px minmax(150px, 1.2fr) minmax(120px, 1fr) 100px minmax(170px, 1fr) 190px;
+  align-items: center;
+  column-gap: 12px;
+  padding: 0 20px;
+}
+
+.qHead {
+  height: 44px;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-caption);
+}
+
+.qRow {
+  min-height: 56px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-heading);
+}
+
+/* 정산 행 — 눌러서 그 아래에 정산 상세를 연다 */
+.qRowClickable {
+  cursor: pointer;
+}
+
+.qRowClickable:hover,
+.qRowOn {
+  background: var(--surface-alt);
+}
+
+.qRowClickable:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.sectionLabel {
+  margin: 0;
+  padding: 14px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+  border-bottom: 1px solid var(--border);
 }

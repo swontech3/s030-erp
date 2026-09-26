@@ -118,6 +118,14 @@
   }
 
   /*
+   * ★ 중도해지 정산서(s0300200070p3) — 이용계약서처럼 **한 장짜리**라 같은 여백을 안쪽에 준다.
+   *   같은 `data-printing='contract-doc'` 규칙을 타므로 나머지(형제 감추기 · 껍데기 풀기)는 그대로다.
+   */
+  body[data-printing='contract-doc'] [data-doc-page='settlement'] {
+    padding: 12mm 13mm !important;
+  }
+
+  /*
    * ★ 전대차 — 3장이라 여백을 `@page sublease` 가 준다(매 장에 붙어야 한다).
    *   그래서 문서 자신의 padding 은 0 이다. 둘 다 주면 첫 장만 여백이 두 배가 된다.
    */

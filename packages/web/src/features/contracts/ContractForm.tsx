@@ -51,6 +51,7 @@ import {
   type RenewalSource,
 } from '@swonbiz/shared/domain/contract-renewal';
 import type { SpaceHolder } from '@swonbiz/shared/domain/space-occupancy';
+import { billingHref } from '@/features/billing/billing-model';
 import { SectionDocs, SECTION_DOCS_ID } from './SectionDocs';
 import { SectionUsers } from './SectionUsers';
 import {
@@ -103,6 +104,11 @@ export interface ContractResponse {
   memo: string | null;
   /** CSCH-04 — 이어받은 이전 계약. 재계약이 아니면 `null`. */
   renewedFromContractId: string | null;
+  /**
+   * 종료된 계약의 정산 상태 — 처리 대기 / 처리 완료 / 정산할 것 없음(`null`).
+   * 판정은 정산 탭과 같은 `pendingKind`(서버). 계약 폼 머리의 「정산 결과 보기」가 쓴다.
+   */
+  settlementState?: 'pending' | 'done' | null;
   spaces: {
     seq: number;
     roomType: string;
@@ -872,6 +878,23 @@ export function ContractForm({
                 ) : (
                   <Link href={`/contracts/${renewedFromId}`}>이어받은 이전 계약 보기</Link>
                 )}
+              </div>
+            ) : null}
+            {/*
+              ★ 종료된 계약 — 정산 결과로 가는 길. 정산 상세는 사이드바 「청구」 정산 탭에만
+                있다(한 업무는 한 화면에서 — CLAUDE.md). 그 계약의 상세를 연 채로 보낸다.
+                처리 대기면 눈에 띄게 적는다 — 종료만 누르고 정산을 잊으면 예치금이 그대로 묶여 있다.
+            */}
+            {mode === 'terminated' && contract?.settlementState ? (
+              <div
+                className={`${styles.pageNote}${contract.settlementState === 'pending' ? '' : ` ${styles.pageNoteMuted}`}`}
+                data-settlement-link={contract.settlementState}
+              >
+                <Icon name={contract.settlementState === 'pending' ? 'circle-alert' : 'receipt'} size={12} />
+                {contract.settlementState === 'pending' ? <b>정산 처리 대기</b> : null}
+                <Link href={billingHref({ tab: 'settle', company: contract.companyId, contract: contract.contractId })}>
+                  정산 결과 보기
+                </Link>
               </div>
             ) : null}
           </div>
