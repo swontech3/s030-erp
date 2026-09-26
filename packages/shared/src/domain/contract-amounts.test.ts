@@ -234,6 +234,131 @@ describe('calcFirstPayment', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 무상 개월수 — 첫달납부액이 갈린다
+// ═══════════════════════════════════════════════════════════════════════════
+describe('calcFirstPayment — 무상 개월수', () => {
+  const totals = calcTotals([row(500_000, { seq: 1, deposit: 1_000_000 })]);
+  // monthlyPayment 550,000 · deposit 1,000,000
+
+  /*
+   * ★★ 무상 달에는 받을 돈이 없다. 월납에서 첫 달이 무상이면 첫달납부액은
+   *    **예치금뿐**이다. 여기에 월납부액을 더하면 무상인데 돈을 받는 계약서가 된다.
+   */
+  it('★ 월납 + 무상이 있으면 예치금뿐이다', () => {
+    expect(
+      calcFirstPayment({
+        totals,
+        paymentMethod: PAYMENT_METHOD.MONTHLY,
+        periodMonths: 12,
+        freeMonths: 1,
+      }),
+    ).toBe(1_000_000);
+  });
+
+  it('월납 + 무상이 여러 달이어도 예치금뿐이다 (첫 달이 무상인 것은 같다)', () => {
+    expect(
+      calcFirstPayment({
+        totals,
+        paymentMethod: PAYMENT_METHOD.MONTHLY,
+        periodMonths: 12,
+        freeMonths: 3,
+      }),
+    ).toBe(1_000_000);
+  });
+
+  it('월납 + 무상 0 이면 지금 그대로다', () => {
+    expect(
+      calcFirstPayment({
+        totals,
+        paymentMethod: PAYMENT_METHOD.MONTHLY,
+        periodMonths: 12,
+        freeMonths: 0,
+      }),
+    ).toBe(1_550_000);
+  });
+
+  it('★ 일시불은 (기간 − 무상) × 월납부액 + 예치금이다', () => {
+    expect(
+      calcFirstPayment({
+        totals,
+        paymentMethod: PAYMENT_METHOD.LUMP_SUM,
+        periodMonths: 12,
+        freeMonths: 1,
+      }),
+    ).toBe(550_000 * 11 + 1_000_000);
+  });
+
+  it('무상을 안 넘기면 0 으로 본다 — 기존 호출이 그대로 돈다', () => {
+    expect(calcFirstPayment({ totals, paymentMethod: PAYMENT_METHOD.MONTHLY, periodMonths: 12 })).toBe(
+      1_550_000,
+    );
+  });
+
+  /*
+   * ★ 무상이 기간 이상이면 계약 전체가 무상이다. 그건 이용계약이 아니라 다른 것이고,
+   *   일시불에서는 청구액이 0 이나 음수가 된다. 화면도 같은 검사를 한다.
+   */
+  it('★ 무상이 기간과 같으면 던진다', () => {
+    expect(() =>
+      calcFirstPayment({
+        totals,
+        paymentMethod: PAYMENT_METHOD.MONTHLY,
+        periodMonths: 12,
+        freeMonths: 12,
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it('★ 무상이 기간보다 크면 던진다', () => {
+    expect(() =>
+      calcFirstPayment({
+        totals,
+        paymentMethod: PAYMENT_METHOD.LUMP_SUM,
+        periodMonths: 6,
+        freeMonths: 7,
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it('무상이 음수면 던진다', () => {
+    expect(() =>
+      calcFirstPayment({
+        totals,
+        paymentMethod: PAYMENT_METHOD.MONTHLY,
+        periodMonths: 12,
+        freeMonths: -1,
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it('무상이 정수가 아니면 던진다', () => {
+    expect(() =>
+      calcFirstPayment({
+        totals,
+        paymentMethod: PAYMENT_METHOD.MONTHLY,
+        periodMonths: 12,
+        freeMonths: 1.5,
+      }),
+    ).toThrow(RangeError);
+  });
+
+  /*
+   * ★ 기간을 아직 안 적은 상태(0)로도 월납 첫달납부액이 나와야 한다 — 화면이
+   *   입력 도중에 계속 부른다. 무상이 0 이면 비교할 것이 없으므로 통과시킨다.
+   */
+  it('무상 0 이면 기간이 아직 0 이어도 월납은 던지지 않는다', () => {
+    expect(
+      calcFirstPayment({
+        totals,
+        paymentMethod: PAYMENT_METHOD.MONTHLY,
+        periodMonths: 0,
+        freeMonths: 0,
+      }),
+    ).toBe(1_550_000);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // 종료일 = 시작일 + 기간(월) − 1일
 // ═══════════════════════════════════════════════════════════════════════════
 describe('calcEndDate', () => {

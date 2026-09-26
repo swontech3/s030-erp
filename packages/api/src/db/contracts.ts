@@ -36,6 +36,7 @@ export interface ContractRow {
   first_payment: number;
   contract_date: string | null;
   period_months: number | null;
+  free_months: number;
   start_date: Date;
   end_date: Date;
   terminated_date: Date | null;
@@ -60,7 +61,7 @@ export interface ContractSpaceRow {
 
 const CONTRACT_COLUMNS = `
   contract_id, company_id, build_id, status, contract_no, contract_room,
-  payment_method, access_route, first_payment, contract_date, period_months,
+  payment_method, access_route, first_payment, contract_date, period_months, free_months,
   start_date, end_date, terminated_date, termination_reason, memo,
   renewed_from_contract_id`;
 
@@ -222,13 +223,13 @@ export async function insertContract(
     client,
     `INSERT INTO public.tb_s080_contracts
        (contract_id, company_id, build_id, status, contract_room, payment_method,
-        access_route, first_payment, contract_date, period_months, start_date, end_date, memo,
-        renewed_from_contract_id,
+        access_route, first_payment, contract_date, period_months, free_months,
+        start_date, end_date, memo, renewed_from_contract_id,
         created_at, updated_at, created_by, updated_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now(), now(), $15, $15)`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now(), now(), $16, $16)`,
     [
       contractId, companyId, write.buildId, status, write.contractRoom, write.paymentMethod,
-      write.accessRoute, write.firstPayment, write.contractDate, write.periodMonths,
+      write.accessRoute, write.firstPayment, write.contractDate, write.periodMonths, write.freeMonths,
       write.startDate, write.endDate, write.memo, args.renewedFromContractId ?? null, actor,
     ],
   );
@@ -243,12 +244,12 @@ export async function updateContract(
     client,
     `UPDATE public.tb_s080_contracts
         SET build_id=$2, contract_room=$3, payment_method=$4, access_route=$5,
-            first_payment=$6, contract_date=$7, period_months=$8,
-            start_date=$9, end_date=$10, memo=$11, updated_at=now(), updated_by=$12
+            first_payment=$6, contract_date=$7, period_months=$8, free_months=$9,
+            start_date=$10, end_date=$11, memo=$12, updated_at=now(), updated_by=$13
       WHERE contract_id=$1`,
     [
       contractId, write.buildId, write.contractRoom, write.paymentMethod, write.accessRoute,
-      write.firstPayment, write.contractDate, write.periodMonths,
+      write.firstPayment, write.contractDate, write.periodMonths, write.freeMonths,
       write.startDate, write.endDate, write.memo, actor,
     ],
   );

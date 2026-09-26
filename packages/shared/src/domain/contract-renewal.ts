@@ -135,6 +135,17 @@ export interface RenewalSeed {
   /** 이전과 같은 기간. 화면 상태가 문자열이라 문자열로 준다. */
   months: string;
   /**
+   * 무상 개월수 — **언제나 `0`** 이다.
+   *
+   * ★★ 무상은 처음 들어올 때 주는 혜택이라 **이어받지 않는다.** 자동으로 또 주면
+   *    운영자가 의도하지 않은 무상이 조용히 따라붙고, 그건 중도 해지 환수 금액까지
+   *    바꾼다. 필요하면 운영자가 화면에서 다시 넣는다.
+   *
+   * ★ `RenewalSource` 에 무상 칸을 **두지 않는 것**이 그 규칙의 표현이다 —
+   *   이어받을 값이 애초에 없으니 실수로 이어받을 수도 없다.
+   */
+  freeMonths: string;
+  /**
    * 특기사항 — 「재계약 (이전 계약 기간 2026.01.02 ~ 2027.01.01)」.
    *
    * ★★ `renewed_from_contract_id` 는 **DB 안에만 있다.** 이용계약서를 받는 입주사는
@@ -200,6 +211,8 @@ export function buildRenewalSeed(prev: RenewalSource, today: string): RenewalSee
     contractDate: today,
     startDate,
     months: prev.periodMonths ? String(prev.periodMonths) : '',
+    // ★ 이어받지 않는다. 위 `RenewalSeed.freeMonths` 주석 참조.
+    freeMonths: '0',
     memo: renewalMemo(prev),
     spaces: prev.spaces.map((s) => ({ ...s })),
   };

@@ -84,14 +84,31 @@ export const contracts = pgTable('tb_s080_contracts', {
   /** 청구 생성 기준일. `invoice-plan.ts` 가 읽는다. */
   billingDay: integer('billing_day').notNull().default(1),
 
+  /**
+   * 무상 개월수 — 계약 시작월부터 이 달 수만큼 0원 청구다.
+   *
+   * ★★ **계약 개월수보다 작아야 한다**(DB CHECK + `requireFreeMonths`).
+   *    같으면 계약 전체가 무상이고 그건 이용계약이 아니다.
+   *
+   * ★★ 무상은 **중도 해지 환수와 한 쌍이다.** 무상 달은 0원으로 청구되고, 중도
+   *    해지하면 `tb_s080_settlements.free_clawback` 으로 받는다. 그래서 실이용료
+   *    (`computeTerminationSettlement`)는 무상 달을 **세지 않는다** — 세면 같은 달을
+   *    두 번 받는다. 두 규칙을 따로 고치지 않는다.
+   */
+  freeMonths: smallint('free_months').notNull().default(0),
+
   terminatedDate: timestamp('terminated_date', { mode: 'date' }),
   terminationReason: text('termination_reason'),
   /** 특기사항 — 할인이 있으면 첫 줄에 자동 기재된다(시안 551행). */
   memo: text('memo'),
 
   // ── 001 이 넣은 CSCH-01~04. 요구사항이라 유지한다 ──────────────────────────
-  /** CSCH-01 무상기간 — 청구 시작일. NULL 이면 `start_date` 부터 청구. */
-  billingStartDate: date('billing_start_date'),
+  /*
+   * ★ CSCH-01 무상기간의 `billing_start_date` 는 **022 에서 지웠다.**
+   *   001 이 만든 뒤로 읽는 코드도 쓰는 코드도 없었고 11행 전부 NULL 이었다.
+   *   무상기간은 날짜가 아니라 위의 `free_months`(개월수)로 정했다 — 장수·납부일·
+   *   환수 기간이 개월수에서 바로 나온다. 두 칸을 함께 두면 무상이 두 군데서 정해진다.
+   */
   /** CSCH-02 보증금 반환 상태. H 보유 / R 반환 / D 차감 / P 일부차감.
    *  ★ 금액은 이제 `contract_spaces.deposit` 의 합이다 — 계약의 `deposit` 은 드롭했다. */
   depositReturnStatus: varchar('deposit_return_status', { length: 1 }),

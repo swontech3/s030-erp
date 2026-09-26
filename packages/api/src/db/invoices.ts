@@ -25,6 +25,7 @@
 import type { ScopedClient } from './withCompanyScope.ts';
 import type { InvoicePlan, ProratedLine } from '@swonbiz/shared/domain/invoice-plan';
 import type { TerminationSettlementResult } from '@swonbiz/shared/domain/contract-settlement';
+import type { ClawbackResult } from '@swonbiz/shared/domain/contract-clawback';
 import { computeStoredStatus } from '@swonbiz/shared/domain/invoice-recalc';
 
 interface Rows<T> {
@@ -46,6 +47,8 @@ export interface BillingContract {
   status: string;
   payment_method: string | null;
   period_months: number | null;
+  /** 무상 개월수. 계약 시작월부터 이 달 수만큼 0원 청구다. */
+  free_months: number;
   /** `YYYY-MM-DD`. */
   start_day: string;
   /** `YYYY-MM-DD`. */
@@ -60,7 +63,7 @@ export async function findBillingContract(
 ): Promise<BillingContract | null> {
   const { rows } = await q<BillingContract>(
     client,
-    `SELECT contract_id, company_id, build_id, status, payment_method, period_months,
+    `SELECT contract_id, company_id, build_id, status, payment_method, period_months, free_months,
             to_char(start_date,    'YYYY-MM-DD') AS start_day,
             to_char(end_date,      'YYYY-MM-DD') AS end_day,
             to_char(contract_date, 'YYYY-MM-DD') AS contract_day
@@ -74,7 +77,7 @@ export async function findBillingContract(
 export interface BillingSpace {
   contract_space_id: string;
   seq: number;
-  /** 기준가. */
+  /** 기준가 — **중도 해지 할인 환수**가 이 값과 계약가의 차이를 본다. */
   standard_fee: number;
   deposit: number;
   monthly_fee: number;
@@ -167,13 +170,14 @@ export async function listContractInvoices(
 export async function listInvoiceLines(
   client: ScopedClient,
   invoiceId: string,
-): Promise<{ invoice_line_id: string; seq: number; pay_item: string; contract_space_id: string | null; quantity: number; unit_price: number; supply_amount: number; vat_amount: number; total_amount: number }[]> {
+): Promise<{ invoice_line_id: string; seq: number; pay_item: string; contract_space_id: string | null; is_free: boolean; quantity: number; unit_price: number; supply_amount: number; vat_amount: number; total_amount: number }[]> {
   const { rows } = await q<{
     invoice_line_id: string; seq: number; pay_item: string; contract_space_id: string | null;
+    is_free: boolean;
     quantity: number; unit_price: number; supply_amount: number; vat_amount: number; total_amount: number;
   }>(
     client,
-    `SELECT invoice_line_id, seq, pay_item, contract_space_id,
+    `SELECT invoice_line_id, seq, pay_item, contract_space_id, is_free,
             quantity, unit_price, supply_amount, vat_amount, total_amount
        FROM public.tb_s080_invoice_lines
       WHERE invoice_id = $1
@@ -259,12 +263,12 @@ export async function insertInvoicePlans(
       await q(
         client,
         `INSERT INTO public.tb_s080_invoice_lines
-           (invoice_line_id, invoice_id, company_id, seq, pay_item, contract_space_id,
+           (invoice_line_id, invoice_id, company_id, seq, pay_item, contract_space_id, is_free,
             quantity, unit_price, supply_amount, vat_amount, total_amount,
             created_at, updated_at, created_by, updated_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), now(), $12, $12)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now(), now(), $13, $13)`,
         [
-          newId(), invoiceId, companyId, line.seq, line.payItem, line.contractSpaceId,
+          newId(), invoiceId, companyId, line.seq, line.payItem, line.contractSpaceId, line.isFree,
           line.quantity, line.unitPrice, line.supplyAmount, line.vatAmount, line.totalAmount,
           actor,
         ],
@@ -389,20 +393,28 @@ export async function insertSettlement(
     paymentMethod: string | null;
     totalPaid: number;
     settlement: TerminationSettlementResult;
+    /**
+     * 중도 해지 환수 — 할인과 무상을 **나누어** 적는다.
+     *
+     * ★ 순정산금(`settlement.netAmount`)에서는 이미 둘의 합이 빠져 있다. 여기 적는
+     *   것은 「얼마를 무엇으로 환수했는가」의 내역이고, 분쟁에서 필요한 것이 그것이다.
+     */
+    clawback: ClawbackResult;
     actor: string;
   },
 ): Promise<void> {
-  const { settlement } = args;
+  const { settlement, clawback } = args;
   await q(
     client,
     `INSERT INTO public.tb_s080_settlements
        (settlement_id, build_id, company_id, contract_id, terminate_date, payment_method,
-        total_paid, deposit_return,
+        total_paid, deposit_return, discount_clawback, free_clawback,
         usage_charge, net_amount, settle_type, created_at, created_by)
-     VALUES ($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11, now(), $12)`,
+     VALUES ($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11,$12,$13, now(), $14)`,
     [
       args.settlementId, args.buildId, args.companyId, args.contractId, args.terminateDay,
       args.paymentMethod, args.totalPaid, settlement.depositReturn,
+      clawback.discountClawback, clawback.freeClawback,
       settlement.usageCharge, settlement.netAmount, settlement.settleType, args.actor,
     ],
   );

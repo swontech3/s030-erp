@@ -28,6 +28,7 @@ import {
   calcFirstPayment,
   calcTotals,
   reconcileRowAmounts,
+  requireFreeMonths,
   type AmountMismatch,
   type ContractSpaceAmounts,
   type RowAmounts,
@@ -63,6 +64,13 @@ export type ContractInput = {
   /** `YYYY-MM-DD`. 계약일자는 날짜만 쓴다. */
   contractDate?: string | null;
   periodMonths: number;
+  /**
+   * 무상 개월수 — 계약 시작월부터 이 달 수만큼은 0원 청구다. 안 보내면 0.
+   *
+   * ★ **계약 개월수보다 작아야 한다**(`requireFreeMonths`). 같으면 계약 전체가
+   *   무상이고 그건 이용계약이 아니다. 화면도 같은 함수로 막는다.
+   */
+  freeMonths?: number;
   startDate: Date;
   memo?: string | null;
   spaces: readonly ContractSpaceInput[];
@@ -76,6 +84,8 @@ export type ContractRowWrite = {
   accessRoute: string | null;
   contractDate: string | null;
   periodMonths: number;
+  /** 무상 개월수. 안 보냈으면 0 이다. */
+  freeMonths: number;
   startDate: Date;
   /** ★ 서버 계산. */
   endDate: Date;
@@ -158,6 +168,7 @@ export function buildContractWrite(input: ContractInput): ContractWrite {
     totals,
     paymentMethod: input.paymentMethod,
     periodMonths: input.periodMonths,
+    freeMonths: input.freeMonths,
   });
   // ★ 월납은 기간을 안 봐서 calcFirstPayment 가 기간을 검사하지 않는다.
   //   종료일은 어느 납부방법이든 필요하므로 여기서 걸린다(기간 0 이면 던진다).
@@ -171,6 +182,7 @@ export function buildContractWrite(input: ContractInput): ContractWrite {
       accessRoute: optionalText(input.accessRoute),
       contractDate: optionalText(input.contractDate),
       periodMonths: input.periodMonths,
+      freeMonths: requireFreeMonths(input.freeMonths, input.periodMonths),
       startDate: input.startDate,
       endDate,
       firstPayment,

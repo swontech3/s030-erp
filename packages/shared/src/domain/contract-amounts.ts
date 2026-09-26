@@ -116,12 +116,23 @@ function requireWon(value: number, name: string): number {
  */
 export function calcRowAmounts(row: Pick<ContractSpaceAmounts, 'monthlyFee' | 'vatYn'>): RowAmounts {
   const monthlyFee = requireWon(row.monthlyFee, 'monthlyFee');
-
-  // 정수 연산만 쓴다 — 위 주석 "부동소수점을 쓰지 않는다" 참조.
-  const product = monthlyFee * VAT_RATE.numerator;
-  const vatAmount = row.vatYn ? (product - (product % VAT_RATE.denominator)) / VAT_RATE.denominator : 0;
-
+  const vatAmount = calcVat(monthlyFee, row.vatYn);
   return { vatAmount, paymentAmount: monthlyFee + vatAmount };
+}
+
+/**
+ * 공급가에 붙는 부가세액 — **버림**이다.
+ *
+ * ★ 정수 연산만 쓴다(위 머리말 「부동소수점을 쓰지 않는다」). `0.1` 을 곱하면
+ *   `99999 * 0.1 === 9999.900000000001` 이 된다.
+ *
+ * ★ 계약 줄과 **중도 해지 환수**가 같은 함수를 쓴다. 두 벌로 두면 같은 금액에
+ *   서로 다른 부가세가 붙고, 그 차이는 원 단위라 아무도 못 알아챈다.
+ */
+export function calcVat(supplyAmount: number, vatYn: boolean): number {
+  if (!vatYn) return 0;
+  const product = supplyAmount * VAT_RATE.numerator;
+  return (product - (product % VAT_RATE.denominator)) / VAT_RATE.denominator;
 }
 
 /**
@@ -160,8 +171,11 @@ export function calcFirstPayment(args: {
   totals: ContractTotals;
   paymentMethod: string;
   periodMonths: number;
+  /** 무상 개월수. 안 넘기면 0. */
+  freeMonths?: number;
 }): number {
   const { totals, paymentMethod, periodMonths } = args;
+  const freeMonths = requireFreeMonths(args.freeMonths, periodMonths);
 
   if (paymentMethod !== PAYMENT_METHOD.MONTHLY && paymentMethod !== PAYMENT_METHOD.LUMP_SUM) {
     throw new RangeError(
@@ -170,11 +184,38 @@ export function calcFirstPayment(args: {
   }
 
   if (paymentMethod === PAYMENT_METHOD.MONTHLY) {
-    return totals.monthlyPayment + totals.deposit;
+    /*
+     * ★★ 첫 달이 무상이면 **예치금뿐**이다. 무상 달에는 받을 돈이 없다.
+     *    여기에 월납부액을 더하면 「무상인데 첫 달에 돈을 받는」 계약서가 나온다.
+     */
+    return freeMonths > 0 ? totals.deposit : totals.monthlyPayment + totals.deposit;
   }
 
   requirePeriod(periodMonths);
-  return totals.monthlyPayment * periodMonths + totals.deposit;
+  // ★ 일시불은 전 기간을 한 번에 받는다 — 무상 달만큼 빼고 받는다.
+  return totals.monthlyPayment * (periodMonths - freeMonths) + totals.deposit;
+}
+
+/**
+ * 무상 개월수 검사 — **화면과 서버가 같은 규칙을 본다**.
+ *
+ * ★★ 무상은 **계약 개월수보다 작아야 한다.** 같거나 크면 계약 전체가 무상이고,
+ *    그건 이용계약이 아니라 다른 것이다. 일시불에서는 청구액이 0 이나 음수가 된다.
+ *
+ * ★ 무상이 0 이면 기간을 보지 않는다. 화면이 기간을 아직 안 적은 상태(0)에서도
+ *   월납 첫달납부액을 계속 부르기 때문이다 — 거기서 던지면 입력 도중에 화면이 죽는다.
+ */
+export function requireFreeMonths(freeMonths: number | undefined, periodMonths: number): number {
+  const value = freeMonths ?? 0;
+  if (!Number.isInteger(value) || value < 0) {
+    throw new RangeError(`무상 개월수는 0 이상의 정수여야 한다: ${value}`);
+  }
+  if (value > 0 && !(value < periodMonths)) {
+    throw new RangeError(
+      `무상 개월수는 계약 개월수보다 작아야 한다: 무상 ${value}개월 / 기간 ${periodMonths}개월`,
+    );
+  }
+  return value;
 }
 
 function requirePeriod(periodMonths: number): number {

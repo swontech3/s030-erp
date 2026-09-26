@@ -146,6 +146,7 @@ const json = (res) => {
         contractRoom: nextRoom(),
         paymentMethod: 'M',
         periodMonths: 12,
+        freeMonths: 0,
         contractDate: '2026-02-25',
         startDate: '2026-03-15',
         status: 'confirmed',
@@ -555,6 +556,289 @@ const json = (res) => {
       } finally {
         await tenant.close();
       }
+    }
+
+    /* ═══ 14. ★ 무상 1개월 · 12개월 월납 ═══════════════════════════════════ */
+    console.log('\n14. ★ 무상 1개월 · 12개월 월납');
+    {
+      const { body } = await createContract({ freeMonths: 1, periodMonths: 12 });
+      const invs = await invoicesOf(body.contractId);
+
+      check('장수는 그대로 12장이다', invs.length === 12, `${invs.length}장`);
+      check(
+        '★ 첫 장이 0원 납부완료(E)다',
+        invs[0]?.totalAmount === 0 && invs[0]?.status === 'E',
+        `${invs[0]?.totalAmount}원 / ${invs[0]?.status}`,
+      );
+      check(
+        '★ 둘째 장(첫 유료 달)은 납부대기(P)이고 만액이다',
+        invs[1]?.status === 'P' && invs[1]?.totalAmount === 550_000,
+        `${invs[1]?.status} / ${invs[1]?.totalAmount}`,
+      );
+
+      const first = json(await op.inject({ method: 'GET', url: `/invoices/${invs[0].invoiceId}` }));
+      check('★ 수납이 한 건도 안 생겼다', first.payments?.length === 0, JSON.stringify(first.payments));
+      check(
+        '★ 무상 줄이 남아 있고 단가는 그대로다 — 얼마짜리를 무상으로 줬는지가 남는다',
+        first.lines?.[0]?.isFree === true &&
+          first.lines?.[0]?.unitPrice === 500_000 &&
+          first.lines?.[0]?.totalAmount === 0,
+        JSON.stringify(first.lines?.[0]),
+      );
+
+      const second = json(await op.inject({ method: 'GET', url: `/invoices/${invs[1].invoiceId}` }));
+      check(
+        '유료 달의 줄에는 무상 표시가 없다',
+        second.lines?.[0]?.isFree === false,
+        String(second.lines?.[0]?.isFree),
+      );
+
+      const k = await asOperator((c) =>
+        c.query(
+          `SELECT free_months, first_payment FROM public.tb_s080_contracts WHERE contract_id = $1`,
+          [body.contractId],
+        ),
+      );
+      check('무상 개월수가 계약에 저장됐다', k.rows[0]?.free_months === 1, String(k.rows[0]?.free_months));
+      check(
+        '★ 첫달납부액이 예치금(100,000)만으로 바뀌었다',
+        k.rows[0]?.first_payment === 100_000,
+        String(k.rows[0]?.first_payment),
+      );
+    }
+
+    /* ═══ 15. 무상 0 이면 지금 그대로 ═════════════════════════════════════ */
+    console.log('\n15. 무상 0 — 예전 그대로');
+    {
+      const { body } = await createContract({ freeMonths: 0, periodMonths: 3 });
+      const invs = await invoicesOf(body.contractId);
+      const first = json(await op.inject({ method: 'GET', url: `/invoices/${invs[0].invoiceId}` }));
+      check(
+        '첫 장 납부완료 + 수납 1건',
+        invs[0]?.status === 'E' && first.payments?.length === 1,
+        `${invs[0]?.status} / 수납 ${first.payments?.length}건`,
+      );
+      const k = await asOperator((c) =>
+        c.query(`SELECT first_payment FROM public.tb_s080_contracts WHERE contract_id = $1`, [
+          body.contractId,
+        ]),
+      );
+      check(
+        '첫달납부액 = 예치금 + 월납부액 = 650,000',
+        k.rows[0]?.first_payment === 650_000,
+        String(k.rows[0]?.first_payment),
+      );
+    }
+
+    /* ═══ 16. 일시불 + 무상 ═══════════════════════════════════════════════ */
+    console.log('\n16. 일시불 + 무상 1개월');
+    {
+      const { body } = await createContract({ paymentMethod: 'C', periodMonths: 12, freeMonths: 1 });
+      const invs = await invoicesOf(body.contractId);
+      check('1장이다', invs.length === 1, `${invs.length}장`);
+      check('★ (12 − 1) × 월액이다', invs[0]?.totalAmount === 550_000 * 11, String(invs[0]?.totalAmount));
+      const only = json(await op.inject({ method: 'GET', url: `/invoices/${invs[0].invoiceId}` }));
+      check(
+        '줄의 수량이 11(청구하는 개월수)이다',
+        only.lines?.[0]?.quantity === 11,
+        String(only.lines?.[0]?.quantity),
+      );
+      check('그 1장은 납부완료이고 수납이 붙는다', invs[0]?.status === 'E' && only.payments?.length === 1);
+    }
+
+    /* ═══ 17. ★★ 중도 해지 환수 — 지시서의 실제 사례 ═════════════════════ */
+    console.log('\n17. ★★ 중도 해지 환수 (기준가 300,000 · 계약가 270,000 · 무상 1 · 3개월)');
+    {
+      const space = nextSpace();
+      const res = await op.inject({
+        method: 'POST',
+        url: '/contracts',
+        payload: {
+          companyId: COMPANY,
+          buildId: BUILD_ID,
+          contractRoom: nextRoom(),
+          paymentMethod: 'M',
+          periodMonths: 3,
+          freeMonths: 1,
+          contractDate: '2026-02-25',
+          startDate: '2026-03-01',
+          status: 'confirmed',
+          memo: TAG,
+          spaces: [
+            {
+              roomType: space.room_type,
+              spaceId: space.space_id,
+              standardFee: 300_000,
+              deposit: 0,
+              monthlyFee: 270_000,
+              vatYn: true,
+            },
+          ],
+        },
+      });
+      const body = json(res);
+      if (body.contractId) created.push(body.contractId);
+      check('확정이 201 이다', res.statusCode === 201, `${res.statusCode} ${res.body}`);
+
+      const before = await invoicesOf(body.contractId);
+      check(
+        '청구서 3장 — 3월 0원 · 4·5월 297,000',
+        JSON.stringify(before.map((i) => i.totalAmount)) === JSON.stringify([0, 297_000, 297_000]),
+        JSON.stringify(before.map((i) => i.totalAmount)),
+      );
+
+      const term = await op.inject({
+        method: 'POST',
+        url: `/contracts/${body.contractId}/status`,
+        payload: { to: 'terminated', terminatedDate: '2026-05-15', terminationReason: '검증 중도해지' },
+      });
+      check('종료가 200 이다', term.statusCode === 200, `${term.statusCode} ${term.body}`);
+
+      const st = await asOperator((c) =>
+        c.query(
+          `SELECT discount_clawback, free_clawback, usage_charge, net_amount, settle_type
+             FROM public.tb_s080_settlements WHERE contract_id = $1`,
+          [body.contractId],
+        ),
+      );
+      check(
+        '★ 할인 환수 81,967 — round(30,000 × 2.4839) = 74,516 + 부가세 7,451',
+        st.rows[0]?.discount_clawback === 81_967,
+        String(st.rows[0]?.discount_clawback),
+      );
+      check(
+        '★ 무상 환수 297,000 — 계약가 270,000 + 부가세 27,000',
+        st.rows[0]?.free_clawback === 297_000,
+        String(st.rows[0]?.free_clawback),
+      );
+      check(
+        '★ 실이용료에 무상 달이 안 들어갔다 — 유료 1달 297,000 + 5월 일할 143,710',
+        st.rows[0]?.usage_charge === 440_710,
+        String(st.rows[0]?.usage_charge),
+      );
+      check(
+        '★ 순정산금 = −실이용료 − 환수 합계 = −819,677 (추가청구)',
+        st.rows[0]?.net_amount === -819_677 && st.rows[0]?.settle_type === 'charge',
+        `${st.rows[0]?.net_amount} ${st.rows[0]?.settle_type}`,
+      );
+
+      const after = await invoicesOf(body.contractId);
+      check(
+        '★ 환수는 청구서를 건드리지 않는다 — 3·4월 그대로, 5월만 일할',
+        after[0]?.totalAmount === 0 &&
+          after[1]?.totalAmount === 297_000 &&
+          after[2]?.totalAmount === 143_710,
+        JSON.stringify(after.map((i) => i.totalAmount)),
+      );
+    }
+
+    /* ═══ 17-2. ★★★ 불변식 — 무상 달만 쓰고 나가면 환수 합계가 기준가다 ═══ */
+    console.log('\n17-2. ★★★ 불변식 — 무상 달만 쓰고 나가면 환수 합계 = 기준가');
+    {
+      /*
+       * 무상 1개월 계약을 **그 달 말일**에 끝낸다. 사용 기간이 정확히 1개월이라
+       *   할인 환수 = (300,000 − 270,000) × 1 = 30,000
+       *   무상 환수 = 270,000 × 1           = 270,000
+       * 둘을 합치면 **기준가 300,000**(+부가세 30,000)이다. 중도 해지하면 「깎아 준
+       * 것도 공짜로 준 것도 없던 일」이 된다는 규칙이 이 한 줄로 드러난다.
+       * 한쪽만 틀리면 바로 깨진다.
+       */
+      const space = nextSpace();
+      const res = await op.inject({
+        method: 'POST',
+        url: '/contracts',
+        payload: {
+          companyId: COMPANY,
+          buildId: BUILD_ID,
+          contractRoom: nextRoom(),
+          paymentMethod: 'M',
+          periodMonths: 3,
+          freeMonths: 1,
+          contractDate: '2026-02-25',
+          startDate: '2026-03-01',
+          status: 'confirmed',
+          memo: TAG,
+          spaces: [
+            {
+              roomType: space.room_type,
+              spaceId: space.space_id,
+              standardFee: 300_000,
+              deposit: 0,
+              monthlyFee: 270_000,
+              vatYn: true,
+            },
+          ],
+        },
+      });
+      const body = json(res);
+      if (body.contractId) created.push(body.contractId);
+
+      await op.inject({
+        method: 'POST',
+        url: `/contracts/${body.contractId}/status`,
+        payload: { to: 'terminated', terminatedDate: '2026-03-31', terminationReason: '무상 달 해지' },
+      });
+
+      const st = await asOperator((c) =>
+        c.query(
+          `SELECT discount_clawback, free_clawback, usage_charge
+             FROM public.tb_s080_settlements WHERE contract_id = $1`,
+          [body.contractId],
+        ),
+      );
+      check(
+        '할인 환수 33,000 (30,000 + 부가세 3,000)',
+        st.rows[0]?.discount_clawback === 33_000,
+        String(st.rows[0]?.discount_clawback),
+      );
+      check(
+        '무상 환수 297,000 (270,000 + 부가세 27,000)',
+        st.rows[0]?.free_clawback === 297_000,
+        String(st.rows[0]?.free_clawback),
+      );
+      check(
+        '★★★ 합치면 기준가 + 부가세 = 330,000',
+        st.rows[0]?.discount_clawback + st.rows[0]?.free_clawback === 300_000 + 30_000,
+        `${st.rows[0]?.discount_clawback} + ${st.rows[0]?.free_clawback}`,
+      );
+      check(
+        '★ 그 달은 무상이라 실이용료가 0 이다 — 환수로만 받는다(이중 아님)',
+        st.rows[0]?.usage_charge === 0,
+        String(st.rows[0]?.usage_charge),
+      );
+    }
+
+    /* ═══ 18. ★ 기간 만료로 끝내면 환수가 없다 ═══════════════════════════ */
+    console.log('\n18. ★ 기간 만료 종료 — 환수 0');
+    {
+      const { body } = await createContract({ periodMonths: 3, freeMonths: 1, startDate: '2026-03-01' });
+      const res = await op.inject({
+        method: 'POST',
+        url: `/contracts/${body.contractId}/status`,
+        // 2026-03-01 + 3개월 − 1일 = 2026-05-31
+        payload: { to: 'terminated', terminatedDate: '2026-05-31', terminationReason: '기간 만료' },
+      });
+      check('청구 처리 결과가 untouched 다', json(res).billing === 'untouched', String(json(res).billing));
+      const st = await asOperator((c) =>
+        c.query(`SELECT count(*)::int n FROM public.tb_s080_settlements WHERE contract_id = $1`, [
+          body.contractId,
+        ]),
+      );
+      check('★ 정산도 환수도 기록하지 않았다', st.rows[0].n === 0, `${st.rows[0].n}줄`);
+    }
+
+    /* ═══ 19. ★ 무상이 기간 이상이면 막힌다 ══════════════════════════════ */
+    console.log('\n19. ★ 무상 >= 기간');
+    {
+      const { res } = await createContract({ periodMonths: 3, freeMonths: 3 });
+      check('400 으로 막힌다', res.statusCode === 400, `${res.statusCode} ${res.body}`);
+      const left = await asOperator((c) =>
+        c.query(
+          `SELECT count(*)::int n FROM public.tb_s080_contracts WHERE memo = $1 AND free_months >= 3`,
+          [TAG],
+        ),
+      );
+      check('계약이 안 만들어졌다', left.rows[0].n === 0, `${left.rows[0].n}건`);
     }
   } finally {
     await op.close();

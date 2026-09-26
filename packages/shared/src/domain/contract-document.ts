@@ -116,12 +116,28 @@ export function dayOfMonthLabel(iso: string): string {
   return parts(iso)?.d ?? '';
 }
 
-/** 이용기간 — 「2026.01.15 ~ 2026.07.14 (6개월)」. 기간이 없으면 괄호를 빼고 적는다. */
-export function periodLabel(startIso: string, endIso: string, months: number | null): string {
+/**
+ * 이용기간 — 「2026.01.15 ~ 2026.07.14 (6개월)」. 기간이 없으면 괄호를 빼고 적는다.
+ *
+ * ★ 무상이 있으면 「(12개월, 무상 1개월)」이 된다. **계약 내용이라 계약서에 찍힌다** —
+ *   적지 않으면 나중에 입주사와 우리가 서로 다른 것을 기억한다.
+ *
+ * ★ 이 줄은 **이용계약서에만** 있다. 전대차계약서의 3조는 개월수 없이 시작일·종료일
+ *   날짜만 적으므로 무상을 넣을 자리가 없다 — 전대차는 손대지 않는다.
+ */
+export function periodLabel(
+  startIso: string,
+  endIso: string,
+  months: number | null,
+  freeMonths?: number | null,
+): string {
   const dot = (iso: string) => (parts(iso) ? iso.replace(/-/g, '.') : '');
   const range = `${dot(startIso)} ~ ${dot(endIso)}`;
   if (range.trim() === '~') return '';
-  return months && months > 0 ? `${range} (${months}개월)` : range;
+  if (!months || months <= 0) return range;
+
+  const free = freeMonths && freeMonths > 0 ? `, 무상 ${freeMonths}개월` : '';
+  return `${range} (${months}개월${free})`;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

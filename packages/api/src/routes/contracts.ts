@@ -83,6 +83,8 @@ interface ContractBody {
   accessRoute?: string | null;
   contractDate?: string | null;
   periodMonths?: number;
+  /** 무상 개월수. 안 보내면 0 이다. */
+  freeMonths?: number;
   startDate?: string;
   memo?: string | null;
   status?: string;
@@ -135,6 +137,8 @@ function toContractInput(body: ContractBody): ContractInput {
     accessRoute: body.accessRoute ?? null,
     contractDate: body.contractDate ?? null,
     periodMonths: Number(body.periodMonths),
+    // ★ 안 보내면 0. `requireFreeMonths` 가 「기간보다 작아야 한다」를 마지막으로 막는다.
+    freeMonths: Number(body.freeMonths ?? 0),
     startDate: parseDate(body.startDate, '시작일'),
     memo: body.memo ?? null,
     spaces: (body.spaces ?? []) as ContractInput['spaces'],
@@ -160,6 +164,7 @@ function toResponse(contract: ContractRow, spaces: ContractSpaceRow[]) {
     firstPayment: contract.first_payment,
     contractDate: contract.contract_date,
     periodMonths: contract.period_months,
+    freeMonths: contract.free_months,
     startDate: contract.start_date,
     endDate: contract.end_date,
     terminatedDate: contract.terminated_date,

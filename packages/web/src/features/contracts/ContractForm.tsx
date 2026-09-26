@@ -65,6 +65,7 @@ import {
   discountLabel,
   endDateIsoOf,
   joinEmail,
+  freeMonthsError,
   missingForDraft,
   missingRequired,
   userDomain,
@@ -93,6 +94,8 @@ export interface ContractResponse {
   firstPayment: number;
   contractDate: string | null;
   periodMonths: number | null;
+  /** 무상 개월수. 서버가 늘 보낸다(기본 0). */
+  freeMonths: number;
   startDate: string;
   endDate: string;
   terminatedDate: string | null;
@@ -500,6 +503,7 @@ export function ContractForm({
     accessRoute: terms.accessRoute || null,
     contractDate: terms.contractDate || null,
     periodMonths: toNumber(terms.months),
+    freeMonths: toNumber(terms.freeMonths),
     startDate: terms.startDate,
     memo: terms.memo || null,
     spaces: items.map((row) => ({
@@ -684,6 +688,21 @@ export function ContractForm({
   };
 
   /**
+   * 무상 개월수가 틀렸으면 저장을 막고 **사람에게 할 말**을 띄운다. 막았으면 `true`.
+   *
+   * ★★ 서버도 같은 규칙으로 막는다(`requireFreeMonths` → 400). 화면에서 먼저 말해
+   *    주지 않으면 운영자가 개발자 말투의 예외 문구를 보게 된다.
+   * ★ 임시저장에도 건다 — 저장해 두면 확정할 때 이유 없이 막힌다.
+   */
+  const blockOnFreeMonths = (): boolean => {
+    const message = freeMonthsError(terms.months, terms.freeMonths);
+    if (!message) return false;
+    setInvalid([]);
+    setSaveError(message);
+    return true;
+  };
+
+  /**
    * 임시저장 — **대표자 · 연락처 · 이메일** 셋만 본다(`missingForDraft`).
    *
    * ★ 회사명·사업자등록번호를 보지 않는 것이 핵심이다. 사업자등록 신청 중인 가계약은
@@ -691,6 +710,7 @@ export function ContractForm({
    */
   const onDraftSave = () => {
     if (blockOnMissing(missingForDraft(companyState))) return;
+    if (blockOnFreeMonths()) return;
     return run(async () => {
       // 회사·사용자를 먼저 저장한다. 계약 쪽이 필수값 때문에 막히더라도 여기까지는
       // 남는다 — 임시저장의 뜻이 그거다.
@@ -715,6 +735,7 @@ export function ContractForm({
    */
   const openConfirm = () => {
     if (blockOnMissing(missing)) return;
+    if (blockOnFreeMonths()) return;
     if (docsMissingText) {
       setDocsChecked(true);
       setSaveError(docsMissingText);
@@ -1033,6 +1054,8 @@ export function ContractForm({
             //   계약서의 이용기간이 「2026.01.15 ~ (6개월)」처럼 **종료일 없이** 인쇄된다.
             endDate: endDateIsoOf(terms.startDate, terms.months),
             periodMonths: Number(terms.months) || null,
+            // ★ 이용기간 줄에 「(12개월, 무상 1개월)」로 찍힌다. 전대차는 개월수를 안 쓴다.
+            freeMonths: Number(terms.freeMonths) || null,
             paymentMethod: terms.paymentMethod,
             contractRoom: terms.contractRoom || null,
             memo: terms.memo,
@@ -1241,6 +1264,8 @@ function seedTerms(
         accessRoute: seed.accessRoute,
         contractDate: seed.contractDate,
         months: seed.months,
+        // ★ 이어받지 않는다 — 언제나 '0' 이다(`buildRenewalSeed` 머리말).
+        freeMonths: seed.freeMonths,
         startDate: seed.startDate,
         /*
          * ★★ 「재계약 (이전 계약 기간 …)」. **이전 계약의 특기사항이 아니다** —
@@ -1262,6 +1287,7 @@ function seedTerms(
       accessRoute: '',
       contractDate: localToday(),
       months: '',
+      freeMonths: '0',
       startDate: localToday(),
       memo: '',
     };
@@ -1274,6 +1300,7 @@ function seedTerms(
     accessRoute: contract.accessRoute ?? '',
     contractDate: toDateInput(contract.contractDate),
     months: contract.periodMonths ? String(contract.periodMonths) : '',
+    freeMonths: String(contract.freeMonths ?? 0),
     startDate: toDateInput(contract.startDate),
     memo: contract.memo ?? '',
   };

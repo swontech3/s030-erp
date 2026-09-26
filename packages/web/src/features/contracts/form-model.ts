@@ -94,6 +94,13 @@ export interface TermsState {
   contractDate: string;
   /** 문자열이다 — 비워 두는 상태가 있어야 해서 숫자로 두지 않는다. */
   months: string;
+  /**
+   * 무상 개월수. 기본 `'0'` 이고 문자열이다(`months` 와 같은 이유).
+   *
+   * ★ **계약 개월수보다 작아야 한다.** 화면 검사는 `freeMonthsError` 하나이고
+   *   서버도 같은 규칙(`requireFreeMonths`)을 본다.
+   */
+  freeMonths: string;
   startDate: string;
   memo: string;
 }
@@ -378,11 +385,40 @@ export function totalsOf(rows: readonly ItemRow[]): ContractTotals {
  * 첫달납부액. **아직 못 내는 상태가 있다** — 납부방법이 비었거나, 일시불인데 기간이 없을 때다.
  * 그때 0 을 보여주면 「0원을 내면 된다」로 읽힌다. `null` 로 두고 화면이 빈 칸을 그린다.
  */
-export function firstPaymentOf(totals: ContractTotals, paymentMethod: string, months: string): number | null {
+export function firstPaymentOf(
+  totals: ContractTotals,
+  paymentMethod: string,
+  months: string,
+  freeMonths = '0',
+): number | null {
   const periodMonths = toNumber(months);
   if (paymentMethod !== PAYMENT_METHOD.MONTHLY && paymentMethod !== PAYMENT_METHOD.LUMP_SUM) return null;
   if (paymentMethod === PAYMENT_METHOD.LUMP_SUM && periodMonths < 1) return null;
-  return calcFirstPayment({ totals, paymentMethod, periodMonths });
+  /*
+   * ★ 무상이 기간 이상이면 `calcFirstPayment` 가 던진다. 입력 도중에 잠깐 그 상태가
+   *   되는 것은 정상이라(기간을 지우는 중) 화면을 죽이지 않고 빈 칸을 보여준다.
+   *   저장을 막는 것은 `freeMonthsError` 다.
+   */
+  try {
+    return calcFirstPayment({ totals, paymentMethod, periodMonths, freeMonths: toNumber(freeMonths) });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 무상 개월수가 틀렸으면 **사람에게 할 말**, 통과면 `null`.
+ *
+ * ★★ 문구를 여기 한 곳에만 둔다. 화면이 막고 서버도 막지만(`requireFreeMonths`),
+ *    사람이 읽는 문장은 화면이 낸다 — 서버 예외 문구가 그대로 뜨면 개발자 말투가 된다.
+ */
+export function freeMonthsError(months: string, freeMonths: string): string | null {
+  const free = toNumber(freeMonths);
+  if (free === 0) return null;
+  const period = toNumber(months);
+  if (period < 1) return '기간을 먼저 입력해 주세요';
+  if (free >= period) return `무상 개월수는 기간(${period}개월)보다 작아야 합니다`;
+  return null;
 }
 
 /**

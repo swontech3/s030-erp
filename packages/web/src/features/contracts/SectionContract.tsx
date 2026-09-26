@@ -38,6 +38,7 @@ import {
   endDateOf,
   firstPaymentOf,
   formatMoneyInput,
+  freeMonthsError,
   rowAmounts,
   totalsOf,
   toNumber,
@@ -108,7 +109,9 @@ export function SectionContract({
 }: Props) {
   const locked = !editable;
   const totals = totalsOf(items);
-  const firstPayment = firstPaymentOf(totals, terms.paymentMethod, terms.months);
+  const firstPayment = firstPaymentOf(totals, terms.paymentMethod, terms.months, terms.freeMonths);
+  // ★ 무상 검사 문구는 `freeMonthsError` 한 곳에서 나온다. 서버도 같은 규칙을 본다.
+  const freeError = freeMonthsError(terms.months, terms.freeMonths);
   const endDate = endDateOf(terms.startDate, terms.months);
   const discount = discountLabel(totals.standardFee, totals.monthlyFee);
 
@@ -574,6 +577,34 @@ export function SectionContract({
             />
             <span className={styles.suffix}>개월</span>
           </span>
+        </div>
+
+        {/*
+          ★ 무상 개월수 — 기간 바로 옆이다. 기간과 한 쌍으로 읽혀야 「12개월 중 1개월
+            무상」이 한눈에 들어온다.
+          ★★ **계약 개월수보다 작아야 한다.** 화면이 먼저 막고 서버도 막는다
+             (`requireFreeMonths`). 판정 문구는 `freeMonthsError` 한 곳에서 나온다.
+        */}
+        <div className={styles.field}>
+          <span className={styles.label}>무상</span>
+          <span className={styles.suffixWrap}>
+            <input
+              className={`${styles.input} ${styles.inputMoney}${freeError ? ` ${styles.isInvalid}` : ''}`}
+              inputMode="numeric"
+              style={{ paddingRight: 44 }}
+              value={terms.freeMonths}
+              disabled={locked}
+              onChange={(e) =>
+                onTerms({ freeMonths: e.target.value.replace(/\D/g, '').slice(0, 3) || '0' })
+              }
+              // 비우고 다시 치는 도중에 빈 칸이 되면 저장 값이 흔들린다 — 나가면 0 으로 굳힌다.
+              onBlur={(e) => {
+                if (e.target.value.trim() === '') onTerms({ freeMonths: '0' });
+              }}
+            />
+            <span className={styles.suffix}>개월</span>
+          </span>
+          {freeError ? <span className={styles.err}>{freeError}</span> : null}
         </div>
 
         <label className={styles.field}>

@@ -19,7 +19,8 @@ describe("computeTerminationSettlement — 일시불(C)", () => {
       monthlyRent: RENT,
       taxFee: TAX,
       deposit: 1_000_000,
-      discountAmount: 100_000,
+      clawbackTotal: 100_000,
+      freeMonths: 0,
       totalRentPaid: MONTHLY * 12, // 일시불 전액 선납
     });
     expect(r.fullUsedMonths).toBe(5);                 // 1~5월 온전 사용
@@ -38,7 +39,8 @@ describe("computeTerminationSettlement — 일시불(C)", () => {
       monthlyRent: RENT,
       taxFee: TAX,
       deposit: 0,
-      discountAmount: 2_000_000,
+      clawbackTotal: 2_000_000,
+      freeMonths: 0,
       totalRentPaid: MONTHLY * 12,
     });
     expect(r.usageCharge).toBe(MONTHLY * 11);
@@ -57,7 +59,8 @@ describe("computeTerminationSettlement — 월납(M)", () => {
       monthlyRent: RENT,
       taxFee: TAX,
       deposit: 1_000_000,
-      discountAmount: 100_000,
+      clawbackTotal: 100_000,
+      freeMonths: 0,
       totalRentPaid: MONTHLY, // 첫 달만
     });
     // 1월 31일 중 15일 사용
@@ -78,7 +81,8 @@ describe("computeTerminationSettlement — 월납(M)", () => {
       monthlyRent: RENT,
       taxFee: TAX,
       deposit: 0,
-      discountAmount: 0,
+      clawbackTotal: 0,
+      freeMonths: 0,
       totalRentPaid: MONTHLY, // 첫 달만
     });
     const termCharge = Math.round((MONTHLY * 20) / 31); // 3월 20/31
@@ -98,7 +102,8 @@ describe("computeTerminationSettlement — 경계", () => {
       monthlyRent: RENT,
       taxFee: TAX,
       deposit: 0,
-      discountAmount: 0,
+      clawbackTotal: 0,
+      freeMonths: 0,
       totalRentPaid: MONTHLY,
     });
     expect(r.fullUsedMonths).toBe(0);
@@ -114,12 +119,93 @@ describe("computeTerminationSettlement — 경계", () => {
       monthlyRent: RENT,
       taxFee: TAX,
       deposit: 0,
-      discountAmount: 0,
+      clawbackTotal: 0,
+      freeMonths: 0,
       totalRentPaid: MONTHLY, // 2월 한 달 완납
     });
     expect(r.terminationMonthCharge).toBe(MONTHLY); // 28/28 전액
     expect(r.usageCharge).toBe(MONTHLY);
     expect(r.netAmount).toBe(0);
     expect(r.settleType).toBe("none");
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ★★★ 무상 개월수 — **실이용료에서 빠져야 한다**
+   ══════════════════════════════════════════════════════════════════════════
+   무상 달은 0원으로 청구됐다. 실이용료가 그 달을 정상 월액으로 세면
+   `rentNet = 총수납 − 실이용료` 가 그만큼 더 마이너스가 되고, 거기에 **무상 환수**가
+   또 더해져 **같은 달을 두 번 받는다.**
+
+   무상 달은 실이용료에서 0 이고, 그 달의 값은 `contract-clawback.ts` 의 무상 환수가
+   따로 계산한다. 두 곳이 정확히 한 번씩 세는 것이 이 두 시험의 뜻이다.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("computeTerminationSettlement — 무상 개월수", () => {
+  it("★ 무상 달에 해지하면 실이용료가 0 이다", () => {
+    // 2026-01-01 시작, 1월이 무상. 1월 15일 해지 → 낼 것이 없다
+    const r = computeTerminationSettlement({
+      startDate: d(2026, 1, 1),
+      terminateDate: d(2026, 1, 15),
+      monthlyRent: RENT,
+      taxFee: TAX,
+      deposit: 500_000,
+      clawbackTotal: 0,
+      freeMonths: 1,
+      totalRentPaid: 0, // 무상이라 확정 때 수납이 없다
+    });
+    expect(r.terminationMonthCharge).toBe(0);
+    expect(r.usageCharge).toBe(0);
+    expect(r.rentNet).toBe(0);
+    expect(r.netAmount).toBe(500_000); // 예치금만 돌려준다
+    expect(r.settleType).toBe("refund");
+  });
+
+  it("★ 무상 1개월 — 온전히 쓴 달에서 무상 달만큼을 뺀다", () => {
+    // 2026-01-01 시작(1월 무상), 3월 15일 해지
+    //   온전히 쓴 달 = 1·2월 2개월 → 그중 1개월이 무상 → 유료 온전 1개월(2월)
+    //   3월 일할 = round(1,100,000 × 15/31) = 532,258
+    const r = computeTerminationSettlement({
+      startDate: d(2026, 1, 1),
+      terminateDate: d(2026, 3, 15),
+      monthlyRent: RENT,
+      taxFee: TAX,
+      deposit: 0,
+      clawbackTotal: 0,
+      freeMonths: 1,
+      totalRentPaid: MONTHLY, // 2월분만 받았다
+    });
+    expect(r.fullUsedMonths).toBe(2); // 실제로 지나간 달 수는 그대로 2 다
+    expect(r.terminationMonthCharge).toBe(532_258);
+    expect(r.usageCharge).toBe(MONTHLY + 532_258);
+    expect(r.rentNet).toBe(-532_258);
+  });
+
+  it("무상 0 이면 실이용료가 예전 그대로다", () => {
+    const withFree = computeTerminationSettlement({
+      startDate: d(2026, 1, 1),
+      terminateDate: d(2026, 3, 15),
+      monthlyRent: RENT,
+      taxFee: TAX,
+      deposit: 0,
+      clawbackTotal: 0,
+      freeMonths: 0,
+      totalRentPaid: 0,
+    });
+    expect(withFree.usageCharge).toBe(MONTHLY * 2 + 532_258);
+  });
+
+  it("★ 환수 합계는 순정산금에서 빠진다", () => {
+    const r = computeTerminationSettlement({
+      startDate: d(2026, 1, 1),
+      terminateDate: d(2026, 1, 31),
+      monthlyRent: RENT,
+      taxFee: TAX,
+      deposit: 1_000_000,
+      clawbackTotal: 300_000,
+      freeMonths: 1,
+      totalRentPaid: 0,
+    });
+    // 무상 달이라 실이용료 0, 총수납 0 → 예치금 1,000,000 − 환수 300,000
+    expect(r.netAmount).toBe(700_000);
   });
 });

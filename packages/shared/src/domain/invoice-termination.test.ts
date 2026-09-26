@@ -30,7 +30,7 @@ function twelveMonthlyInvoices() {
   return rows;
 }
 
-/** 기준가 = 계약가 — 할인이 없는 호실이다. */
+/** 기준가 = 계약가 — 할인이 없는 호실이라 환수도 0 이다. */
 const SPACE = {
   seq: 1,
   standardFee: MONTHLY_FEE,
@@ -43,6 +43,7 @@ const 월납계약 = {
   startDate: utc(2026, 3, 1),
   endDate: utc(2027, 2, 28),
   paymentMethod: 'M',
+  freeMonths: 0,
   spaces: [SPACE],
 };
 
@@ -172,6 +173,7 @@ describe('planTerminationChanges — 일시불(C)', () => {
     startDate: utc(2026, 3, 1),
     endDate: utc(2027, 2, 28),
     paymentMethod: 'C',
+    freeMonths: 0,
     spaces: [SPACE],
   };
   const 해지 = () =>
@@ -210,6 +212,7 @@ describe('planTerminationChanges — 월액이 0원인 계약', () => {
       startDate: utc(2026, 3, 1),
       endDate: utc(2027, 2, 28),
       paymentMethod: 'C',
+      freeMonths: 0,
       spaces: [{ seq: 1, standardFee: 0, deposit: 0, monthlyFee: 0, vatYn: false }],
       terminatedDate: utc(2026, 6, 15),
       totalPaid: 0,
@@ -223,5 +226,130 @@ describe('planTerminationChanges — 월액이 0원인 계약', () => {
     });
     expect(r.settlement?.netAmount).toBe(0);
     expect(r.settlement?.settleType).toBe('none');
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ★★★ 중도 해지 환수 — 정산 원장에만 들어간다
+   ══════════════════════════════════════════════════════════════════════════
+   금액 자체는 `contract-clawback.ts` 가 정한다. 여기서 보는 것은
+   **언제 부르고 · 순정산금에 어떻게 반영되고 · 청구서를 안 건드리는가**다.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** 기준가 300,000 · 계약가 270,000 — 월 30,000 할인. 예치금 0. */
+const 할인호실 = {
+  seq: 1,
+  standardFee: 300_000,
+  deposit: 0,
+  monthlyFee: 270_000,
+  vatYn: true,
+};
+
+describe('planTerminationChanges — 환수', () => {
+  /** 2026-03-01 시작 3개월(무상 1) → 2026-05-31 종료 예정. 2026-05-15 해지. */
+  const 해지 = (freeMonths: number) =>
+    planTerminationChanges({
+      startDate: utc(2026, 3, 1),
+      endDate: utc(2026, 5, 31),
+      terminatedDate: utc(2026, 5, 15),
+      paymentMethod: 'M',
+      freeMonths,
+      spaces: [할인호실],
+      totalPaid: 0,
+      invoices: [
+        { invoiceId: 'inv-2026-03', yearMonth: '2026-03', status: 'E' },
+        { invoiceId: 'inv-2026-04', yearMonth: '2026-04', status: 'P' },
+        { invoiceId: 'inv-2026-05', yearMonth: '2026-05', status: 'P' },
+      ],
+    });
+
+  it('★ 지시서 사례 — 할인 환수 81,967 · 무상 환수 297,000', () => {
+    const c = 해지(1).clawback;
+    expect(c?.discountClawback).toBe(74_516 + 7_451);
+    expect(c?.freeClawback).toBe(270_000 + 27_000);
+  });
+
+  it('★ 환수 합계가 순정산금에서 빠진다', () => {
+    const r = 해지(1);
+    // 실이용료 = 유료 온전 1달(4월) 297,000 + 5월 일할 round(297,000 × 15/31) = 143,710
+    //   → 440,710 · 총수납 0 → rentNet = −440,710
+    // 예치금 0 − 실이용료 440,710 − 환수(81,967 + 297,000)
+    expect(r.settlement?.usageCharge).toBe(297_000 + 143_710);
+    expect(r.settlement?.netAmount).toBe(-440_710 - 81_967 - 297_000);
+    expect(r.settlement?.settleType).toBe('charge');
+  });
+
+  it('무상이 0 이면 무상 환수도 0 이고 할인 환수만 남는다', () => {
+    const c = 해지(0).clawback;
+    expect(c?.freeClawback).toBe(0);
+    expect(c?.discountClawback).toBe(74_516 + 7_451);
+  });
+
+  /*
+   * ★★ 환수는 **청구서를 건드리지 않는다.** 이미 나간 청구서를 소급해 고치면
+   *    「그때 얼마를 청구했는지」가 사라지고 수납과도 어긋난다. 정산 원장이 말하고,
+   *    실제로 받는 것은 운영자가 수납으로 넣는다.
+   */
+  it('★ 환수가 있어도 취소 목록과 일할 금액은 달라지지 않는다', () => {
+    const 무상있음 = 해지(1);
+    const 무상없음 = 해지(0);
+    expect(무상있음.cancelInvoiceIds).toEqual(무상없음.cancelInvoiceIds);
+    // 해지 달(5월)은 유료 달이라 두 경우 모두 일할이 같다
+    expect(무상있음.prorate).toEqual(무상없음.prorate);
+  });
+
+  it('★ 기간 만료(종료일자 = 원래 종료일)면 환수가 없다', () => {
+    const r = planTerminationChanges({
+      startDate: utc(2026, 3, 1),
+      endDate: utc(2026, 5, 31),
+      terminatedDate: utc(2026, 5, 31),
+      paymentMethod: 'M',
+      freeMonths: 1,
+      spaces: [할인호실],
+      totalPaid: 0,
+      invoices: [{ invoiceId: 'inv-2026-03', yearMonth: '2026-03', status: 'E' }],
+    });
+    expect(r.untouched).toBe(true);
+    expect(r.clawback).toBeNull();
+    expect(r.settlement).toBeNull();
+  });
+});
+
+describe('planTerminationChanges — 무상 달에 해지', () => {
+  /** 무상 1개월인데 그 달(3월) 15일에 나간다. */
+  const 해지 = () =>
+    planTerminationChanges({
+      startDate: utc(2026, 3, 1),
+      endDate: utc(2026, 5, 31),
+      terminatedDate: utc(2026, 3, 15),
+      paymentMethod: 'M',
+      freeMonths: 1,
+      spaces: [할인호실],
+      totalPaid: 0,
+      invoices: [
+        { invoiceId: 'inv-2026-03', yearMonth: '2026-03', status: 'E' },
+        { invoiceId: 'inv-2026-04', yearMonth: '2026-04', status: 'P' },
+        { invoiceId: 'inv-2026-05', yearMonth: '2026-05', status: 'P' },
+      ],
+    });
+
+  it('★ 실이용료가 0 이다 — 무상 달이라 낼 것이 없다', () => {
+    expect(해지().settlement?.usageCharge).toBe(0);
+  });
+
+  it('★ 해지 달 청구서 일할도 0 이다 (원래 0원 장이었다)', () => {
+    expect(해지().prorate?.totalAmount).toBe(0);
+  });
+
+  it('뒤 두 달은 취소된다', () => {
+    expect(해지().cancelInvoiceIds).toEqual(['inv-2026-04', 'inv-2026-05']);
+  });
+
+  it('★ 쓴 만큼은 환수로 받는다 — 무상 15/31 + 할인 15/31', () => {
+    const c = 해지().clawback;
+    // 할인 round(30,000 × 15/31) = 14,516 + vat 1,451
+    expect(c?.discountClawback).toBe(14_516 + 1_451);
+    // 무상 round(270,000 × 15/31) = 130,645 + vat 13,064
+    expect(c?.freeClawback).toBe(130_645 + 13_064);
   });
 });

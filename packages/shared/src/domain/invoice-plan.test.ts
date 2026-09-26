@@ -204,6 +204,7 @@ describe('planInvoices — 줄', () => {
       seq: 1,
       payItem: PAY_ITEM.MONTHLY_FEE,
       contractSpaceId: 'cs-a',
+      isFree: false,
       quantity: 1,
       unitPrice: 500_000,
       supplyAmount: 500_000,
@@ -306,6 +307,154 @@ describe('planInvoices — 막는 것', () => {
         paymentMethod: 'M',
         contractDate: null,
         spaces: [],
+      }),
+    ).toThrow(RangeError);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   무상 개월수 — 0원 청구서
+   ══════════════════════════════════════════════════════════════════════════ */
+describe('planInvoices — 무상 개월수 (월납)', () => {
+  const 무상1 = () =>
+    planInvoices({
+      startDate: utc(2026, 3, 1),
+      periodMonths: 12,
+      paymentMethod: 'M',
+      contractDate: '2026-02-25',
+      freeMonths: 1,
+      spaces: [ROOM_A],
+    });
+
+  it('장수는 그대로 12장이다 — 무상이라고 빠지지 않는다', () => {
+    expect(무상1()).toHaveLength(12);
+  });
+
+  it('★ 첫 장이 0원이다', () => {
+    const first = 무상1()[0];
+    expect(first?.supplyAmount).toBe(0);
+    expect(first?.vatAmount).toBe(0);
+    expect(first?.totalAmount).toBe(0);
+  });
+
+  it('★ 첫 장은 납부완료(E)다 — 받을 것이 없으니 끝난 장이다', () => {
+    expect(무상1()[0]?.status).toBe('E');
+  });
+
+  /*
+   * ★★ 여기가 제일 틀리기 쉽다. 무상 달인데 수납을 만들면 **0원 수납**이 생기거나
+   *    (DB 가 막는다) 받지도 않은 돈이 기록된다. 첫 유료 달은 아직 안 받았으므로
+   *    납부대기다 — 확정 시점에 돈이 오가지 않는다.
+   */
+  it('★ 첫 달이 무상이면 수납을 하나도 만들지 않는다', () => {
+    expect(무상1().every((p) => p.payment === null)).toBe(true);
+  });
+
+  it('★ 첫 유료 달(둘째 장)은 납부대기(P)다', () => {
+    const plans = 무상1();
+    expect(plans[1]?.status).toBe('P');
+    expect(plans[1]?.totalAmount).toBe(550_000);
+    expect(plans[1]?.payment).toBeNull();
+  });
+
+  it('★ 줄은 남는다 — 무상 표시가 붙고 단가는 그대로다', () => {
+    const line = 무상1()[0]?.lines[0];
+    expect(line).toEqual({
+      seq: 1,
+      payItem: PAY_ITEM.MONTHLY_FEE,
+      contractSpaceId: 'cs-a',
+      isFree: true,
+      quantity: 1,
+      // ★ 단가는 지운 값이 아니라 **얼마짜리를 무상으로 줬는지**다
+      unitPrice: 500_000,
+      supplyAmount: 0,
+      vatAmount: 0,
+      totalAmount: 0,
+    });
+  });
+
+  it('유료 달의 줄에는 무상 표시가 없다', () => {
+    expect(무상1()[1]?.lines[0]?.isFree).toBe(false);
+  });
+
+  it('무상 2개월이면 앞 두 장이 0원이고 셋째 장부터 청구한다', () => {
+    const plans = planInvoices({
+      startDate: utc(2026, 3, 1),
+      periodMonths: 6,
+      paymentMethod: 'M',
+      contractDate: null,
+      freeMonths: 2,
+      spaces: [ROOM_A],
+    });
+    expect(plans.map((p) => p.totalAmount)).toEqual([0, 0, 550_000, 550_000, 550_000, 550_000]);
+    expect(plans.map((p) => p.status)).toEqual(['E', 'E', 'P', 'P', 'P', 'P']);
+    expect(plans.every((p) => p.payment === null)).toBe(true);
+  });
+
+  it('무상 0 이면 지금 그대로다 — 첫 장 납부완료 + 수납 1건', () => {
+    const plans = planInvoices({
+      startDate: utc(2026, 3, 1),
+      periodMonths: 3,
+      paymentMethod: 'M',
+      contractDate: '2026-02-25',
+      freeMonths: 0,
+      spaces: [ROOM_A],
+    });
+    expect(plans[0]?.status).toBe('E');
+    expect(plans[0]?.totalAmount).toBe(550_000);
+    expect(plans[0]?.payment).toEqual({ paidOn: '2026-02-25', amount: 550_000 });
+  });
+
+  it('무상을 안 넘기면 0 으로 본다', () => {
+    const plans = planInvoices({
+      startDate: utc(2026, 3, 1),
+      periodMonths: 3,
+      paymentMethod: 'M',
+      contractDate: null,
+      spaces: [ROOM_A],
+    });
+    expect(plans[0]?.payment).not.toBeNull();
+  });
+});
+
+describe('planInvoices — 무상 개월수 (일시불)', () => {
+  const 무상1 = () =>
+    planInvoices({
+      startDate: utc(2026, 3, 15),
+      periodMonths: 12,
+      paymentMethod: 'C',
+      contractDate: '2026-03-10',
+      freeMonths: 1,
+      spaces: [ROOM_A],
+    });
+
+  it('★ (기간 − 무상) × 월액 한 장이다', () => {
+    const plans = 무상1();
+    expect(plans).toHaveLength(1);
+    expect(plans[0]?.totalAmount).toBe(550_000 * 11);
+    expect(plans[0]?.lines[0]?.quantity).toBe(11);
+  });
+
+  it('그 한 장은 납부완료이고 수납이 붙는다 — 확정 때 다 받는다', () => {
+    expect(무상1()[0]?.status).toBe('E');
+    expect(무상1()[0]?.payment).toEqual({ paidOn: '2026-03-10', amount: 550_000 * 11 });
+  });
+
+  it('줄에 무상 표시가 없다 — 무상분을 빼고 청구한 장이다', () => {
+    expect(무상1()[0]?.lines[0]?.isFree).toBe(false);
+  });
+});
+
+describe('planInvoices — 무상 개월수 검사', () => {
+  it('★ 무상이 기간 이상이면 던진다', () => {
+    expect(() =>
+      planInvoices({
+        startDate: utc(2026, 3, 1),
+        periodMonths: 3,
+        paymentMethod: 'M',
+        contractDate: null,
+        freeMonths: 3,
+        spaces: [ROOM_A],
       }),
     ).toThrow(RangeError);
   });

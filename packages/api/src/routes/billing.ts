@@ -150,6 +150,11 @@ export function registerBillingRoutes(app: FastifyInstance): void {
         seq: line.seq,
         payItem: line.pay_item,
         contractSpaceId: line.contract_space_id,
+        /**
+         * ★ 무상 달의 줄인가. 금액은 0 이지만 `unitPrice` 에 **얼마짜리를 무상으로
+         *   줬는지**가 남아 있다 — 화면이 「무상」이라고 쓸 근거다.
+         */
+        isFree: line.is_free,
         quantity: line.quantity,
         unitPrice: line.unit_price,
         supplyAmount: line.supply_amount,

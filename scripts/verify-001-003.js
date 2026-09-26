@@ -75,13 +75,18 @@ const RLS_TABLES = ['tb_s080_contracts', 'tb_s080_invoices', 'tb_s080_payments',
     : ng('V2', '같은 link_s020_org_id 두 번째 → UNIQUE 위반', `기대 23505, 실제 ${r2.code || '성공(막히지 않음)'}`);
 
   // V3 ------------------------------------------------------------------
+  /*
+   * ★ 001 이 만든 확장 컬럼은 넷이었지만 `billing_start_date` 는 **022 에서 지웠다.**
+   *   001 이후 읽는 코드도 쓰는 코드도 생기지 않았고(11행 전부 NULL), 무상기간을
+   *   날짜가 아니라 `free_months`(개월수)로 정했기 때문이다. 그래서 여기서 셋을 본다.
+   */
   const c3 = await q(`SELECT column_name FROM information_schema.columns
     WHERE table_schema='public' AND table_name='tb_s080_contracts'
-      AND column_name IN ('billing_start_date','deposit_return_status','biz_info_snapshot','renewed_from_contract_id')
+      AND column_name IN ('deposit_return_status','biz_info_snapshot','renewed_from_contract_id')
     ORDER BY 1`);
-  c3.length === 4
-    ? ok('V3a', 'contracts 확장 4컬럼', c3.map(r => r.column_name).join(', '))
-    : ng('V3a', 'contracts 확장 4컬럼', `${c3.length}개만 존재`);
+  c3.length === 3
+    ? ok('V3a', 'contracts 확장 3컬럼 (billing_start_date 는 022 에서 삭제)', c3.map(r => r.column_name).join(', '))
+    : ng('V3a', 'contracts 확장 3컬럼', `${c3.length}개만 존재`);
 
   const oneC = await q(`SELECT contract_id FROM public.tb_s080_contracts LIMIT 1`);
   const r3 = await tryInTx([

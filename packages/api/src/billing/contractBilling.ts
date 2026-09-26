@@ -40,7 +40,12 @@ import {
   type BillingSpace,
 } from '../db/invoices.ts';
 
-/** 계약 항목 행 → 금액 계산이 보는 모양. 합계는 `planTerminationChanges` 가 낸다. */
+/**
+ * 계약 항목 행 → 금액·환수 계산이 보는 모양.
+ *
+ * ★ 합계를 미리 내서 넘기지 않는다. **환수는 줄마다** 계산해야 하고(부가세가 줄
+ *   단위로 버려진다), 실이용료가 쓰는 합계도 같은 목록에서 나와야 둘이 같은 계약을 본다.
+ */
 const toAmounts = (row: BillingSpace) => ({
   seq: row.seq,
   standardFee: row.standard_fee,
@@ -92,6 +97,11 @@ export async function billOnConfirm(
     periodMonths: contract.period_months ?? 0,
     paymentMethod: contract.payment_method ?? '',
     contractDate: contract.contract_day,
+    /*
+     * ★★ 무상 달은 0원 청구서가 되고, 첫 달이 무상이면 **확정 시 수납을 만들지
+     *    않는다.** 그 규칙은 전부 `planInvoices` 안에 있다.
+     */
+    freeMonths: contract.free_months,
     spaces: spaces.map((row) => ({
       seq: row.seq,
       contractSpaceId: row.contract_space_id,
@@ -154,6 +164,12 @@ export async function settleOnTerminate(
     endDate: requireDay(contract.end_day, '계약 종료일'),
     terminatedDate: requireDay(terminatedDay, '종료일자'),
     paymentMethod: contract.payment_method ?? '',
+    /*
+     * ★★★ 무상은 **두 곳에 동시에** 걸린다. 실이용료에서 무상 달이 빠지고
+     *    (`computeTerminationSettlement`), 그 달은 무상 환수로 받는다
+     *    (`computeClawback`). 둘 중 하나만 빠지면 같은 달을 두 번 받거나 아예 못 받는다.
+     */
+    freeMonths: contract.free_months,
     spaces: spaces.map(toAmounts),
     totalPaid,
     invoices: invoices.map((row) => ({
@@ -194,7 +210,13 @@ export async function settleOnTerminate(
     await recalcInvoice(client, changes.prorate.invoiceId);
   }
 
-  if (changes.settlement) {
+  /*
+   * ★★ 환수는 **정산 원장에만** 들어간다. 위에서 청구서를 취소하고 일할로 낮췄지만
+   *    환수는 그 어느 쪽도 건드리지 않았다 — 이미 나간 청구서를 소급해 고치면
+   *    「그때 얼마를 청구했는지」가 사라지고 수납과도 어긋난다.
+   *    실제로 받는 것은 운영자가 수납으로 넣는다.
+   */
+  if (changes.settlement && changes.clawback) {
     await insertSettlement(client, {
       settlementId: newId(),
       buildId: contract.build_id,
@@ -204,6 +226,7 @@ export async function settleOnTerminate(
       paymentMethod: contract.payment_method,
       totalPaid,
       settlement: changes.settlement,
+      clawback: changes.clawback,
       actor,
     });
   }

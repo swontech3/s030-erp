@@ -26,8 +26,10 @@
 import {
   PAYMENT_METHOD,
   calcTotals,
+  requireFreeMonths,
   type ContractSpaceAmounts,
 } from './contract-amounts.ts';
+import { computeClawback, type ClawbackResult } from './contract-clawback.ts';
 import {
   computeTerminationSettlement,
   type TerminationSettlementResult,
@@ -72,9 +74,17 @@ export type InvoiceLinePlan = {
   /** `PAY_ITEM` 코드. */
   payItem: string;
   contractSpaceId: string;
-  /** 월납이면 1, 일시불이면 기간(개월). */
+  /**
+   * 무상 달의 줄인가.
+   *
+   * ★ 줄을 **지우지 않고 남기는** 이유 — 무상 달에도 어느 호실을 썼는지가 남아야 한다.
+   *   금액만 0 이고 `unitPrice` 에는 **얼마짜리를 무상으로 줬는지**가 그대로 있다.
+   *   중도 해지 무상 환수가 그 값을 되짚을 근거이기도 하다.
+   */
+  isFree: boolean;
+  /** 월납이면 1, 일시불이면 **청구하는** 개월수(기간 − 무상). */
   quantity: number;
-  /** 단가 = 월 이용료. */
+  /** 단가 = 월 이용료. 무상 줄에서도 **지우지 않는다**. */
   unitPrice: number;
   supplyAmount: number;
   vatAmount: number;
@@ -137,9 +147,21 @@ export function planInvoices(args: {
   /** 코드 `PAYMENT_METHOD` — `M` 월납 / `C` 일시불. */
   paymentMethod: string;
   contractDate: string | null;
+  /**
+   * 무상 개월수 — 계약 시작월부터 이 달 수만큼은 0원 청구다. 안 넘기면 0.
+   *
+   * ★★ 월납이면 앞의 `freeMonths` 장이 0원이고, **첫 유료 달이 첫 청구**다.
+   *    그래서 첫 달이 무상이면 확정 시 **수납을 하나도 만들지 않는다** —
+   *    0원 수납은 기록이 아니고(DB 가 막는다), 첫 유료 달은 아직 안 받은 돈이다.
+   *
+   * ★★ 일시불이면 장이 하나뿐이라 **(기간 − 무상) × 월액**을 한 번에 받는다.
+   *    그 장에는 무상 표시가 없다 — 무상분을 이미 빼고 청구한 장이기 때문이다.
+   */
+  freeMonths?: number;
   spaces: readonly InvoiceSourceRow[];
 }): InvoicePlan[] {
   const { startDate, periodMonths, paymentMethod, contractDate, spaces } = args;
+  const freeMonths = requireFreeMonths(args.freeMonths, periodMonths);
 
   const monthly = paymentMethod === PAYMENT_METHOD.MONTHLY;
   const lumpSum = paymentMethod === PAYMENT_METHOD.LUMP_SUM;
@@ -160,11 +182,20 @@ export function planInvoices(args: {
   const billingDay = startDate.getUTCDate();
   const firstMonthIndex = startDate.getUTCFullYear() * 12 + startDate.getUTCMonth();
 
-  /** 일시불은 전 기간을 1장으로 묶는다 — 줄의 수량이 개월수가 된다. */
-  const quantity = lumpSum ? periodMonths : 1;
+  /** 일시불은 전 기간을 1장으로 묶는다 — 줄의 수량이 **청구하는** 개월수가 된다. */
+  const quantity = lumpSum ? periodMonths - freeMonths : 1;
   const sheets = lumpSum ? 1 : periodMonths;
 
   const paidOn = contractDate ?? toDay(startDate);
+
+  /*
+   * ★★ 확정과 동시에 수납이 붙는 장은 **하나뿐이고, 무상이 있으면 아예 없다.**
+   *    · 일시불 — 장이 하나뿐이고 확정 때 전액을 받는다
+   *    · 월납 + 무상 0 — 첫 달을 확정 때 받는다
+   *    · 월납 + 무상 있음 — **아무것도 안 받는다.** 첫 장은 0원이고, 첫 유료 달은
+   *      아직 안 받은 돈이다
+   */
+  const prepaidOffset = lumpSum || freeMonths === 0 ? 0 : -1;
 
   const plans: InvoicePlan[] = [];
   for (let offset = 0; offset < sheets; offset += 1) {
@@ -172,31 +203,39 @@ export function planInvoices(args: {
     const year = Math.floor(monthIndex / 12);
     const month = (monthIndex % 12) + 1;
 
+    // 월납의 앞 `freeMonths` 장이 무상이다. 일시불은 무상분을 이미 빼고 청구한다.
+    const free = !lumpSum && offset < freeMonths;
+
     const lines: InvoiceLinePlan[] = spaces.map((row) => ({
       seq: row.seq,
       payItem: PAY_ITEM.MONTHLY_FEE,
       contractSpaceId: row.contractSpaceId,
+      isFree: free,
       quantity,
+      // ★ 무상 줄에서도 단가는 지우지 않는다 — 얼마짜리를 무상으로 줬는지가 남는다.
       unitPrice: row.monthlyFee,
-      supplyAmount: row.monthlyFee * quantity,
-      vatAmount: row.vatAmount * quantity,
-      totalAmount: row.paymentAmount * quantity,
+      supplyAmount: free ? 0 : row.monthlyFee * quantity,
+      vatAmount: free ? 0 : row.vatAmount * quantity,
+      totalAmount: free ? 0 : row.paymentAmount * quantity,
     }));
 
     const supplyAmount = lines.reduce((sum, line) => sum + line.supplyAmount, 0);
     const vatAmount = lines.reduce((sum, line) => sum + line.vatAmount, 0);
     const totalAmount = lines.reduce((sum, line) => sum + line.totalAmount, 0);
 
+    /*
+     * ★ 무상 장은 **납부완료(E)** 다. 받을 것이 없으니 이미 끝난 장이고, 납부대기로
+     *   두면 0원짜리가 영원히 미납 목록에 남는다.
+     */
     plans.push({
       yearMonth: `${year}-${String(month).padStart(2, '0')}`,
       dueDate: billingDueDate({ year, month, billingDay }),
-      // ★ 확정과 동시에 수납이 붙는 장은 **첫 장 하나뿐**이다 — 일시불은 전액, 월납은 첫 달.
-      status: offset === 0 ? 'E' : 'P',
+      status: free || offset === prepaidOffset ? 'E' : 'P',
       supplyAmount,
       vatAmount,
       totalAmount,
       lines,
-      payment: offset === 0 ? { paidOn, amount: totalAmount } : null,
+      payment: offset === prepaidOffset ? { paidOn, amount: totalAmount } : null,
     });
   }
 
@@ -231,6 +270,12 @@ export type TerminationChanges = {
   cancelInvoiceIds: string[];
   /** 일할로 낮출 청구서 한 장. 대상이 없으면 `null`. */
   prorate: ProratedInvoice | null;
+  /**
+   * 중도 해지 환수 — 할인 환수와 무상 환수. `untouched` 면 `null`(환수 없음).
+   *
+   * ★ **정산 원장에만 들어간다.** 청구서를 소급해 고치지 않는다.
+   */
+  clawback: ClawbackResult | null;
   /** 정산 원장에 남길 한 줄. `untouched` 면 `null`. */
   settlement: TerminationSettlementResult | null;
 };
@@ -346,13 +391,22 @@ export function planTerminationChanges(args: {
   terminatedDate: Date;
   /** 코드 `PAYMENT_METHOD`. */
   paymentMethod: string;
-  /** 계약 항목 전부. 합계는 여기서 `calcTotals` 로 낸다 — 계약 저장과 같은 계산이다. */
+  /** 무상 개월수. 실이용료에서 빠지고, 환수에서 따로 받는다. */
+  freeMonths: number;
+  /**
+   * 계약 항목 전부 — 기준가·계약가·예치금·부가세 여부.
+   *
+   * ★ 합계를 미리 계산해 넘기지 않는다. **환수는 줄마다 계산해야** 하고(부가세가
+   *   줄 단위로 버려진다), 합계도 같은 목록에서 `calcTotals` 로 낸다 — 한 곳에서 나온
+   *   값이라야 실이용료와 환수가 같은 계약을 본다.
+   */
   spaces: readonly ContractSpaceAmounts[];
   /** 이 계약에 지금까지 들어온 수납 합계. */
   totalPaid: number;
   invoices: readonly ExistingInvoice[];
 }): TerminationChanges {
-  const { startDate, endDate, terminatedDate, paymentMethod, spaces, totalPaid, invoices } = args;
+  const { startDate, endDate, terminatedDate, paymentMethod, freeMonths, spaces, totalPaid, invoices } =
+    args;
 
   const totals = calcTotals(spaces);
   const monthlyFee = totals.monthlyFee;
@@ -377,8 +431,15 @@ export function planTerminationChanges(args: {
   // ★ 원래 종료일 그대로 끝나는 길이다(기간 만료·재계약으로 인한 종료).
   //   청구서는 이미 마지막 달까지 맞게 만들어져 있다. 손대면 오히려 틀어진다.
   if (termAt === endAt) {
-    return { untouched: true, cancelInvoiceIds: [], prorate: null, settlement: null };
+    return { untouched: true, cancelInvoiceIds: [], prorate: null, clawback: null, settlement: null };
   }
+
+  /*
+   * ★★★ 환수는 **중도 해지에서만** 생긴다. 위에서 이미 「원래 종료일과 같으면
+   *    돌아간다」로 걸렀으므로, 여기 오면 계약을 다 못 채운 것이 확정이다.
+   *    계약을 다 채웠는데 환수하면 할인해 준 적이 없는 셈이 된다.
+   */
+  const clawback = computeClawback({ startDate, terminateDate: terminatedDate, freeMonths, spaces });
 
   const settlement = computeTerminationSettlement({
     startDate,
@@ -386,7 +447,9 @@ export function planTerminationChanges(args: {
     monthlyRent: monthlyFee,
     taxFee: vatAmount,
     deposit,
-    discountAmount: 0,
+    // ★ 환수 합계가 순정산금에서 빠진다. 나누어 보관하는 것은 정산 원장의 일이다.
+    clawbackTotal: clawback.total,
+    freeMonths,
     totalRentPaid: totalPaid,
   });
 
@@ -402,6 +465,7 @@ export function planTerminationChanges(args: {
       prorate: sheet
         ? { invoiceId: sheet.invoiceId, ...splitSupplyVat(settlement.usageCharge, monthlyFee, monthlyTotal) }
         : null,
+      clawback,
       settlement,
     };
   }
@@ -424,6 +488,7 @@ export function planTerminationChanges(args: {
           ...splitSupplyVat(settlement.terminationMonthCharge, monthlyFee, monthlyTotal),
         }
       : null,
+    clawback,
     settlement,
   };
 }

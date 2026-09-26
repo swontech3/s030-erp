@@ -96,6 +96,8 @@ export interface DocumentTerms {
   startDate: string;
   endDate: string;
   periodMonths: number | null;
+  /** 무상 개월수. 이용기간 줄과 첫달납부액이 본다. ★ 전대차계약서는 쓰지 않는다. */
+  freeMonths: number | null;
   paymentMethod: string;
   contractRoom: string | null;
   memo: string | null;
@@ -155,7 +157,12 @@ export function ContractDocumentModal({ company, terms, items, spaces, codes, on
   const filled = items.filter((r) => r.spaceId !== '');
 
   const totals = totalsOf(filled);
-  const firstPayment = firstPaymentOf(totals, terms.paymentMethod, String(terms.periodMonths ?? ''));
+  const firstPayment = firstPaymentOf(
+    totals,
+    terms.paymentMethod,
+    String(terms.periodMonths ?? ''),
+    String(terms.freeMonths ?? 0),
+  );
 
   /**
    * ★★ 전대차 월회비. **분기를 여기서 쓰지 않는다** — 함수 하나를 부른다.
@@ -415,7 +422,10 @@ function UsageDocument(props: {
         <div className={styles.tr} data-no-break="1">
           <Th>이용기간</Th>
           <span data-td="1" className={`${styles.td} ${styles.tdLast} ${styles.tdWide}`}>
-            <Blank value={periodLabel(terms.startDate, terms.endDate, terms.periodMonths)} width={240} />
+            <Blank
+              value={periodLabel(terms.startDate, terms.endDate, terms.periodMonths, terms.freeMonths)}
+              width={240}
+            />
             <span data-note="1" className={styles.note}>
               * 년단위 계약의 경우 이용기간 만료 1개월 전까지 별도의 서면 해지의사가 없으면 원계약
               단위로 자동연장됩니다.

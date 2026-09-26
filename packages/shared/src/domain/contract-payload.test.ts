@@ -73,6 +73,26 @@ describe('buildContractWrite — 저장할 행을 만든다', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // ★ 파생값은 서버가 다시 계산한다 (CONT-10)
 // ═══════════════════════════════════════════════════════════════════════════
+describe('buildContractWrite — 무상 개월수', () => {
+  it('안 보내면 0 이다', () => {
+    expect(buildContractWrite(input()).contract.freeMonths).toBe(0);
+  });
+
+  it('보낸 값을 그대로 저장한다', () => {
+    expect(buildContractWrite(input({ freeMonths: 2 })).contract.freeMonths).toBe(2);
+  });
+
+  it('★ 무상이 있으면 월납 첫달납부액이 예치금뿐이다', () => {
+    // 예치금 900,000 / 월납부액 440,000
+    expect(buildContractWrite(input({ freeMonths: 1 })).contract.firstPayment).toBe(900_000);
+    expect(buildContractWrite(input()).contract.firstPayment).toBe(1_340_000);
+  });
+
+  it('★ 무상이 기간 이상이면 던진다 — 서버가 마지막 방어선이다', () => {
+    expect(() => buildContractWrite(input({ periodMonths: 6, freeMonths: 6 }))).toThrow(RangeError);
+  });
+});
+
 describe('buildContractWrite — 화면 값을 믿지 않는다', () => {
   it('★ No(seq)는 서버가 배열 순서로 매긴다', () => {
     const { spaces } = buildContractWrite(

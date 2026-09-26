@@ -369,3 +369,40 @@ describe('isPreviousLive', () => {
     expect(PREVIOUS_TERMINATION_REASON).toBe('재계약으로 계약 종료');
   });
 });
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ★ 무상 개월수는 이어받지 않는다
+   ══════════════════════════════════════════════════════════════════════════
+   무상은 **처음 들어올 때 주는 혜택**이다. 재계약 때 자동으로 또 주면 운영자가
+   의도하지 않은 무상이 조용히 따라붙고, 그건 중도 해지 환수 금액까지 바꾼다.
+   필요하면 운영자가 화면에서 다시 넣는다.
+
+   ★ `RenewalSource` 에 무상 칸을 **두지 않는 것**이 그 규칙의 표현이다 — 이어받을
+     값이 애초에 없으니 실수로 이어받을 수도 없다.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe('buildRenewalSeed — 무상 개월수', () => {
+  const prev = {
+    contractId: 'k-0',
+    companyId: 'c-1',
+    buildId: 'b-1',
+    contractRoom: '6-1',
+    paymentMethod: 'M',
+    accessRoute: 'E',
+    periodMonths: 12,
+    status: 'confirmed',
+    startDate: '2026-01-02',
+    endDate: '2027-01-01',
+    spaces: [
+      { roomType: 'VR', spaceId: 's-1', standardFee: 100000, deposit: 200000, monthlyFee: 90000, vatYn: true },
+    ],
+  };
+
+  it('★ 언제나 0 으로 시작한다', () => {
+    expect(buildRenewalSeed(prev, '2027-01-02').freeMonths).toBe('0');
+  });
+
+  it('★ 이전 계약이 닫혀 있어도 0 이다', () => {
+    expect(buildRenewalSeed({ ...prev, status: 'terminated' }, '2027-01-02').freeMonths).toBe('0');
+  });
+});
