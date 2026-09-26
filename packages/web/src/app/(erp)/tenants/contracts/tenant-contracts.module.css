@@ -450,6 +450,46 @@
   overflow-y: auto;
 }
 
+/* ── 「계약 | 청구」 탭 ── 시안 입주사 상세 탭(15px · 선택 시 2px 밑줄)과 같은 모양 ── */
+.tabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 24px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  position: relative;
+  border: 0;
+  background: transparent;
+  padding: 14px 0 12px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--text-heading);
+}
+
+.tabOn {
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.tabOn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-primary);
+}
+
 /* ── 계약 테이블 ── 헤더와 행이 같은 열 정의를 쓴다 ── */
 .tableHead,
 .row {

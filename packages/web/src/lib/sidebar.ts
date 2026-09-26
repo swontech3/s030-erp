@@ -29,6 +29,7 @@ const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
   s0300200020: null, // 입주사 상세 — 목록에서 들어간다. 사이드바 항목이 아니다
   s0300200030: 'file-pen-line',
   s0300200040: null, // 계약 폼 — 상세에서 들어간다
+  s0300200070: 'receipt',
   s0300500010: null, // 랜딩 — 공개 화면
   s0300500060: null, // 회의실 현황판 — 공개 화면(키오스크)
   s0300600010: 'calendar-check',

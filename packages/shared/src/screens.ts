@@ -46,6 +46,10 @@ export const SCREENS = {
   s0300200020: { route: '/tenants/[id]',   name: '입주사 상세',     group: '020' },
   s0300200030: { route: '/tenants/contracts', name: '입주사·계약',  group: '020' },
   s0300200040: { route: '/contracts/[id]', name: '계약 폼',         group: '020' },
+  // ★ 시안(ErpTenants 「청구」)과 화면 목록(SWONBIZ_SCREEN_LIST)은 3차였지만 청구 1단계와 함께 당겼다.
+  //   **삐용 화면 시드 2차 제출 대상**이다(BBIYONG_SCREEN_SEED_1.md §0-1).
+  // ★ 이름이 곧 사이드바 문구다 — 시안 사이드바가 「청구」다(화면 목록 이름은 「월별 청구 관리」).
+  s0300200070: { route: '/billing',        name: '청구',            group: '020' },
 
   // --- 050 공개 화면 (인증 없음) ---
   s0300500010: { route: '/',               name: '랜딩',            group: '050', public: true },

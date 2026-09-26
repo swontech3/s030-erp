@@ -1,0 +1,721 @@
+/*
+ * 청구·납부 — 월별 청구(s0300200070) · 입주사 청구 탭 · 수납/내역 창 · 정산 결과.
+ *
+ * 구성은 시안(design/erp-tenants/ErpTenants.dc.html 「청구」 뷰 · 「청구 이력」 탭),
+ * 모양은 지금 화면들(design/handoff — s0300200030 목록 · s0300200040 확인 모달)에 맞췄다.
+ * 값은 토큰만 쓴다. ★ 녹색 금지(PLAT-05) — 납부완료도 인디고다.
+ *
+ * ★ 확인 창의 뼈대(overlay · modal · 아이콘 · 버튼 · 입력)는 `contract-form.module.css`
+ *   의 것을 그대로 쓴다. 여기에는 청구 쪽에만 있는 것만 둔다.
+ */
+
+/* ── 페이지 ── */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.title {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.018em;
+  color: var(--text-heading);
+}
+
+.sub {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* 월 이동 — [‹] 2026년 9월 [›] [이번 달] */
+.monthNav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monthInput {
+  height: 40px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-heading);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+}
+
+.monthInput:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.iconBtn {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-heading);
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  background: var(--surface-alt);
+}
+
+/* ── 버튼 (s0300200030 과 같은 규격) ── */
+.btn {
+  position: relative;
+  height: 40px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: background var(--dur) var(--ease-out);
+  text-decoration: none;
+}
+
+.btnPrimary {
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  box-shadow: var(--shadow-primary);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btnGhost {
+  background: var(--surface);
+  color: var(--text-heading);
+  border-color: var(--border);
+}
+
+.btnGhost:hover:not(:disabled) {
+  background: var(--surface-alt);
+}
+
+.btnXs {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── 요약 카드 4개 ── 시안 그대로(흰 카드 · 13px 캡션 · 24px 숫자) ── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.card {
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.cardLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.cardValue {
+  margin-top: 6px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cardValueRow {
+  margin-top: 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.cardCount {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-danger);
+}
+
+.cardCountZero {
+  color: var(--text-heading);
+}
+
+.cardNote {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 표 상자 ── */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.searchWrap {
+  position: relative;
+  flex: 0 1 320px;
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  display: flex;
+  color: var(--text-caption);
+  pointer-events: none;
+}
+
+.search {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px 0 40px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-heading);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+}
+
+.search:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.chipRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  height: 28px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chipOn {
+  background: var(--color-accent-bg);
+  border-color: var(--color-primary);
+  color: var(--color-primary-hover);
+  font-weight: 700;
+}
+
+/* 표 — 헤더·행·합계가 같은 열 정의를 쓴다 */
+.tHead,
+.tRow,
+.tFoot {
+  display: grid;
+  grid-template-columns:
+    minmax(150px, 1.3fr) minmax(140px, 1.2fr) minmax(120px, 0.9fr)
+    84px 92px 150px;
+  align-items: center;
+  column-gap: 12px;
+  padding: 0 20px;
+}
+
+/* 입주사 청구 탭 — 첫 열이 입주사가 아니라 청구 월이다 */
+.tCompany {
+  grid-template-columns:
+    72px minmax(140px, 1.3fr) minmax(120px, 0.9fr)
+    84px 92px 150px;
+}
+
+.tHead {
+  height: 44px;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.tHead span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-caption);
+}
+
+.tRow {
+  min-height: 60px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-heading);
+}
+
+.tRow:hover {
+  background: var(--surface-alt);
+}
+
+.tRowCanceled {
+  color: var(--text-caption);
+}
+
+.tRowCanceled .amount {
+  text-decoration: line-through;
+}
+
+.tFoot {
+  height: 52px;
+  background: var(--surface-alt);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.right {
+  text-align: right;
+}
+
+.center {
+  text-align: center;
+  display: flex;
+  justify-content: center;
+}
+
+.ellipsis {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.strong {
+  font-weight: 700;
+}
+
+.amount {
+  display: block;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.amountSub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.amountSubDanger {
+  color: var(--color-danger);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* ── 뱃지 ── */
+.badge {
+  height: 24px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.st_paid {
+  background: var(--color-accent-bg);
+  color: var(--color-primary-hover);
+}
+
+.st_partial {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.st_unpaid {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.st_pending,
+.st_canceled {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+/* 무상 — 금액 칸에 뜬다. 0원이라고만 보이지 않게 */
+.free {
+  height: 24px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── 빈 상태 ── */
+.empty {
+  padding: 56px 24px;
+  text-align: center;
+}
+
+.emptyIcon {
+  color: var(--text-caption);
+}
+
+.emptyLead {
+  margin: 12px 0 0;
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.emptySub {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-caption);
+}
+
+/* ── 창 (확인 모달 뼈대 위에 얹는 것) ── */
+
+/* 내역 창은 표가 들어가 확인 모달(480px)보다 넓다.
+   ★ `div.` 을 붙인다 — 확인 모달의 `.modal` 과 우선순위가 같으면 CSS 가 실리는 순서로
+     갈리고, 실제로 480px 가 이겨서 수납 표가 눌렸다. */
+div.wideModal {
+  width: 640px;
+  max-width: 100%;
+}
+
+/* 창 안의 요약 3칸 — 청구 · 수납 · 남은 금액 */
+.facts {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.fact {
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.fact + .fact {
+  border-left: 1px solid var(--border);
+}
+
+.factKey {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.factValue {
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.section {
+  margin-top: 20px;
+  text-align: left;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.miniTable {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.miniRow {
+  display: grid;
+  align-items: center;
+  column-gap: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-heading);
+  border-bottom: 1px solid var(--border);
+}
+
+.miniRow:last-child {
+  border-bottom: 0;
+}
+
+.miniHead {
+  background: var(--surface-alt);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-caption);
+}
+
+.linesGrid {
+  grid-template-columns: minmax(0, 1.4fr) 56px 1fr 1fr 1fr;
+}
+
+.paysGrid {
+  grid-template-columns: 92px 1fr 72px minmax(0, 1.2fr) 112px;
+}
+
+.miniEmpty {
+  padding: 16px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.negative {
+  color: var(--color-danger);
+}
+
+/* 결제수단 — 두 칸짜리 선택 */
+.segment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.segBtn {
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.segOn {
+  border-color: var(--color-primary);
+  background: var(--color-accent-bg);
+  color: var(--color-primary-hover);
+  font-weight: 700;
+}
+
+.formGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-body);
+  text-align: left;
+}
+
+.formError {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-danger);
+  text-align: left;
+}
+
+/* ── 정산 결과 ── */
+.settleList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settleCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.settleHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.settleTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.settleMeta {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settleGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.settleCell {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settleCell:not(:nth-child(3n + 1)) {
+  border-left: 1px solid var(--border);
+}
+
+.settleNet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.settleNetValue {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.settleProcessed {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-body);
+}
+
+/* ── 토스트 ── */
+.toast {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 380px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+.toastDot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--color-primary);
+}
+
+.toastMsg {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}

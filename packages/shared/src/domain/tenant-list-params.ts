@@ -34,10 +34,13 @@ export const TENANT_LIST_PARAM = {
   chips: 'chips',
   keyword: 'q',
   company: 'companyId',
+  tab: 'tab',
 } as const;
 
 /** 「아무것도 거르지 않는다」 — 빈 문자열은 도구·프록시가 지우기 쉬워 이름을 준다. */
 export const ALL_CHIPS = 'all';
+
+export type TenantDetailTab = 'contracts' | 'billing';
 
 /** 칩의 정본 순서. 주소 문자열이 누를 때마다 뒤섞이지 않게 여기서 한 번 정한다. */
 export const CHIP_ORDER: readonly TenantFilterKey[] = ['active', 'soon', 'expired', 'review', 'ended'];
@@ -46,6 +49,15 @@ export interface TenantListState {
   chips: readonly TenantFilterKey[];
   keyword: string;
   companyId: string | null;
+  /**
+   * 오른쪽 패널의 탭 — 「계약 | 청구」. 없으면 계약이다.
+   *
+   * ★ 이것도 주소에 둔다. 청구 탭에서 [수납]을 넣고 계약 폼에 다녀오면 [이전] 이
+   *   **청구 탭으로** 돌아와야 한다 — 칩·검색·선택과 같은 이유다.
+   * ★ 기본값(계약)은 주소에 적지 않고 읽을 때도 `undefined` 로 둔다. 그래서 탭이 생기기
+   *   전에 만든 주소·시험이 그대로 같은 상태로 읽힌다.
+   */
+  tab?: TenantDetailTab;
 }
 
 /** `useSearchParams()` 와 `URLSearchParams` 둘 다 이 모양이라 그것만 받는다. */
@@ -88,7 +100,8 @@ export function parseTenantListParams(
     chips = sortChips(raw.split(',').map((s) => s.trim()).filter(isChipKey));
   }
 
-  return { chips, keyword: params.get(TENANT_LIST_PARAM.keyword) ?? '', companyId };
+  const tab = params.get(TENANT_LIST_PARAM.tab) === 'billing' ? ('billing' as const) : undefined;
+  return { chips, keyword: params.get(TENANT_LIST_PARAM.keyword) ?? '', companyId, tab };
 }
 
 /**
@@ -102,6 +115,7 @@ export function tenantListSearch(state: TenantListState): string {
   sp.set(TENANT_LIST_PARAM.chips, state.chips.length ? sortChips(state.chips).join(',') : ALL_CHIPS);
   if (state.keyword !== '') sp.set(TENANT_LIST_PARAM.keyword, state.keyword);
   if (state.companyId) sp.set(TENANT_LIST_PARAM.company, state.companyId);
+  if (state.tab === 'billing') sp.set(TENANT_LIST_PARAM.tab, 'billing');
   const s = sp.toString();
   return s ? `?${s}` : '';
 }

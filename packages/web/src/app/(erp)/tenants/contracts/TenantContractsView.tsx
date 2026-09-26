@@ -21,7 +21,7 @@
  * =============================================================================
  * ★★ 걸러 놓은 상태는 **주소에 있다** — 화면 안에만 두면 [이전] 에 살아남지 못한다
  * =============================================================================
- * 켜진 칩·검색어·선택한 입주사는 `?chips=&q=&companyId=` 로 적힌다. 규칙과 그 이유는
+ * 켜진 칩·검색어·선택한 입주사·오른쪽 탭은 `?chips=&q=&companyId=&tab=` 로 적힌다. 규칙과 그 이유는
  * `@swonbiz/shared/domain/tenant-list-params` 머리말에 있고, 거기에 시험이 붙어 있다
  * (웹에는 시험 러너가 없어서 판정 규칙을 화면에 두지 않는다).
  *
@@ -38,6 +38,7 @@ import {
 } from '@swonbiz/shared/domain/tenant-list-params';
 import { compareTenants, matchesChips, type TenantFilterKey } from '@swonbiz/shared/domain/tenant-status';
 import { Icon, type IconName } from '@/components/ds';
+import { CompanyBillingTab } from '@/features/billing/CompanyBillingTab';
 import {
   contractStatusLabel,
   formatDate,
@@ -141,6 +142,8 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
     return { ...s, companyId: known ? s.companyId : null };
   });
   const { chips, keyword, companyId: selectedId } = state;
+  /** 오른쪽 탭 — 「계약 | 청구」. 주소의 `?tab=billing` 이 청구다(없으면 계약). */
+  const tab = state.tab ?? 'contracts';
   const patch = useCallback((next: Partial<TenantListState>) => setState((prev) => ({ ...prev, ...next })), []);
 
   const [contracts, setContracts] = useState<TenantContract[] | null>(null);
@@ -442,7 +445,36 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                 </Link>
               </div>
 
-              {loadingContracts ? (
+              {/*
+                ★ 「계약 | 청구」 탭 — 시안 입주사 상세의 「계약 · 청구 이력」 탭 구성이다.
+                  탭도 주소에 적힌다(`?tab=billing`). 청구 탭에서 계약 폼에 다녀와도 [이전] 이
+                  같은 탭·같은 입주사·같은 칩으로 돌아온다.
+              */}
+              <div className={styles.tabs} role="tablist">
+                {(
+                  [
+                    ['contracts', '계약'],
+                    ['billing', '청구'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === key}
+                    className={`${styles.tab}${tab === key ? ` ${styles.tabOn}` : ''}`}
+                    onClick={() => patch({ tab: key === 'billing' ? 'billing' : undefined })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {tab === 'billing' ? (
+                <div className={styles.detailBody}>
+                  <CompanyBillingTab companyId={selected.companyId} notify={notify} />
+                </div>
+              ) : loadingContracts ? (
                 <PanelEmpty icon="file-text" lead="계약을 불러오는 중입니다" />
               ) : contracts && contracts.length === 0 ? (
                 <div className={styles.detailBody}>

@@ -107,6 +107,18 @@ describe('왕복', () => {
     });
   }
 
+  it('★ 청구 탭이 왕복에서 살아남는다 — [이전] 이 청구 탭으로 돌아온다', () => {
+    const s: TenantListState = { chips: ['active'], keyword: '', companyId: 'c-1', tab: 'billing' };
+    expect(tenantListSearch(s)).toBe('?chips=active&companyId=c-1&tab=billing');
+    expect(parse(tenantListSearch(s))).toEqual(s);
+  });
+
+  it('계약 탭(기본)은 주소에 적지 않는다 — 탭 이전의 주소와 같다', () => {
+    const s: TenantListState = { chips: ['active'], keyword: '', companyId: 'c-1', tab: 'contracts' };
+    expect(tenantListSearch(s)).toBe('?chips=active&companyId=c-1');
+    expect(parse('chips=active&companyId=c-1&tab=zzz').tab).toBeUndefined();
+  });
+
   it('★★ [전체] 로 비운 상태가 왕복에서 기본 칩으로 되살아나지 않는다', () => {
     const emptied: TenantListState = { chips: [], keyword: '', companyId: null };
     expect(parse(tenantListSearch(emptied)).chips).toEqual([]);
