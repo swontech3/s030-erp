@@ -449,13 +449,21 @@ export function endDateIsoOf(startDate: string, months: string): string {
 }
 
 /*
- * ★ 할인 문구와 특기사항 자동 줄 규칙은 **shared 로 옮겼다**(2026-09-21).
+ * ★ 할인·무상 문구와 특기사항 자동 줄 규칙은 **shared 로 옮겼다**(2026-09-21).
  *   재계약이 특기사항 첫 줄에 문구를 넣게 되면서 **둘이 부딪히는지** 시험해야 했는데,
  *   여기(웹)에는 시험 러너가 없어 걸 수가 없었다. `contract-memo.ts` 를 본다.
  *
+ * ★ 자동 줄은 이제 둘이다 — 할인 → 무상 순서는 `ContractForm` 이 정한다.
+ *
  * ★ 화면 쪽 호출부가 바뀌지 않도록 여기서 다시 내보낸다.
  */
-export { DISCOUNT_PREFIX, discountLabel, withDiscountLine } from '@swonbiz/shared/domain/contract-memo';
+export {
+  DISCOUNT_PREFIX,
+  FREE_LINE,
+  discountLabel,
+  freeLabel,
+  withAutoLines,
+} from '@swonbiz/shared/domain/contract-memo';
 
 /** 섹션 1 대표자 이메일 — 도메인 Select 와 직접입력 중 지금 유효한 쪽. */
 export function currentDomain(c: CompanyState): string {

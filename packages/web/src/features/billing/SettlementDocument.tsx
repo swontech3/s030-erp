@@ -14,10 +14,15 @@
  * ★★ 금액을 여기서 계산하지 않는다. 전부 정산 원장의 값이고, 나누어 보여 주는 것
  *    (실이용료의 「개월 + 일할」 · 방향 이름)은 shared 의 함수가 한다.
  *
- * ★ 환수 줄의 근거는 **전대차계약서 제8조 3항**이다(「월회비 할인률이 적용된 경우 …
+ * ★ **할인** 환수의 근거는 **전대차계약서 제8조 3항**이다(「월회비 할인률이 적용된 경우 …
  *   할인 받은 총금액을 최종 정산시 일괄 반환한다」). 지시서에는 「제5조 3항」으로 적혀
  *   있었는데 우리 전대차계약서의 5조는 회비 지급(2항까지)이다 — 실제 문구가 있는 조항을
- *   적었다. 무상 환수를 직접 말하는 조항은 계약서에 없다(보고 항목).
+ *   적었다.
+ *
+ * ★★ **무상** 환수를 말하는 조항은 계약서에 없다. 그래서 근거를 **특기사항**으로
+ *    가리킨다(`FREE_CLAWBACK_BASIS`) — 무상이 있는 계약이면 특기사항 맨 위에
+ *    「무상 n개월 제공 — … 정산 시 반환한다」가 자동으로 찍혀 나간다
+ *    (`contract-memo.ts` 의 `freeLabel`). 그 줄이 곧 이 환수의 약정이다.
  */
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -29,8 +34,16 @@ import docStyles from '@/features/contracts/contract-document.module.css';
 import styles from './billing.module.css';
 import { dotDate, localTodayIso, type Settlement } from './billing-model';
 
-/** 환수의 근거 조항 — 정산 카드와 정산서가 같은 문구를 쓴다. */
+/** 할인 환수의 근거 조항 — 정산 카드와 정산서가 같은 문구를 쓴다. */
 export const CLAWBACK_BASIS = '전대차계약서 제8조 3항';
+
+/**
+ * 무상 환수의 근거 — **조항이 아니라 특기사항**이다(머리말 ★★).
+ *
+ * ★ 계약서에 무상 환수 조항이 없어서, 무상이 있는 계약의 특기사항에 자동으로 찍히는
+ *   「무상 n개월 제공 — … 정산 시 반환한다」 줄을 가리킨다(`freeLabel`).
+ */
+export const FREE_CLAWBACK_BASIS = '전대차계약서 특기사항';
 
 const wonText = (n: number) => `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('ko-KR')}원`;
 
@@ -136,7 +149,11 @@ export function SettlementDocument({ s, onClose }: { s: Settlement; onClose: () 
             <div className={docStyles.table} data-doc-table="1">
               <Row th="예치금 반환" td={wonText(s.depositReturn)} wide />
               <Row th="할인 환수" td={`${wonText(-s.discountClawback)}  (근거: ${CLAWBACK_BASIS})`} wide />
-              <Row th="무상 환수" td={`${wonText(-s.freeClawback)}  (근거: ${CLAWBACK_BASIS})`} wide />
+              <Row
+                th="무상 환수"
+                td={`${wonText(-s.freeClawback)}  (근거: ${FREE_CLAWBACK_BASIS})`}
+                wide
+              />
               <Row th={dir.label} td={dir.kind === 'none' ? '0원' : wonText(dir.amount)} wide strong />
             </div>
 

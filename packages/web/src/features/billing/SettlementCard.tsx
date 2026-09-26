@@ -34,7 +34,7 @@ import {
   won,
   type Settlement,
 } from './billing-model';
-import { CLAWBACK_BASIS, SettlementDocument } from './SettlementDocument';
+import { CLAWBACK_BASIS, FREE_CLAWBACK_BASIS, SettlementDocument } from './SettlementDocument';
 
 export function SettlementCard({ s, onProcessed }: { s: Settlement; onProcessed: (message: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -47,7 +47,8 @@ export function SettlementCard({ s, onProcessed }: { s: Settlement; onProcessed:
     { key: '이용료 차액', value: s.rentNet, note: '받은 이용료 − 실제 이용료 · 청구서에 들어가는 몫' },
     { key: '예치금 반환', value: s.depositReturn },
     { key: '할인 환수', value: s.discountClawback, note: `근거: ${CLAWBACK_BASIS}` },
-    { key: '무상 환수', value: s.freeClawback, note: `근거: ${CLAWBACK_BASIS}` },
+    // ★ 무상 환수만 근거가 다르다 — 조항이 없어 특기사항의 자동 줄을 가리킨다.
+    { key: '무상 환수', value: s.freeClawback, note: `근거: ${FREE_CLAWBACK_BASIS}` },
   ];
 
   return (

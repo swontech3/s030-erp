@@ -628,7 +628,8 @@ export function SectionContract({
 
         <label className={`${styles.field} ${styles.span4}`}>
           <span className={styles.label}>특기사항</span>
-          <span className={styles.hint}>할인이 있으면 첫 줄에 자동 기재됩니다</span>
+          {/* ★ 자동 줄은 둘이다 — 할인 → 무상 순으로 맨 위에 얹힌다(`withAutoLines`). */}
+          <span className={styles.hint}>할인·무상이 있으면 맨 위에 자동 기재됩니다</span>
           <textarea
             className={styles.textarea}
             rows={2}

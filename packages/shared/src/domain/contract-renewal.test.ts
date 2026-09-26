@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { calcEndDate } from './contract-amounts.ts';
-import { discountLabel, withDiscountLine } from './contract-memo.ts';
+import { discountLabel, freeLabel, withAutoLines } from './contract-memo.ts';
 import {
   PREVIOUS_TERMINATION_REASON,
   buildRenewalSeed,
@@ -217,16 +217,16 @@ describe('buildRenewalSeed', () => {
   });
 
   /**
-   * ★★ 화면은 금액이 바뀔 때마다 **첫 줄에** 할인 문구를 얹는다(`withDiscountLine`).
-   *    재계약 문구가 첫 줄에 있으니 덮이는지가 문제인데 — **덮이지 않는다.**
-   *    `withDiscountLine` 은 「기준가 대비 」로 시작하는 줄만 갈아 끼우기 때문이다.
+   * ★★ 화면은 금액·무상 개월수가 바뀔 때마다 **맨 위에** 자동 줄을 얹는다
+   *    (`withAutoLines`). 재계약 문구가 첫 줄에 있으니 덮이는지가 문제인데 —
+   *    **덮이지 않는다.** 자동 줄의 표식에 걸리는 줄만 갈아 끼우기 때문이다.
    *
    * ★ 그 규칙과 이 문구가 **같은 저장소**(shared)에 있어야 이 시험이 성립한다.
-   *   예전에는 `withDiscountLine` 이 웹에만 있어서 둘을 함께 걸 수 없었다.
+   *   예전에는 자동 줄 규칙이 웹에만 있어서 둘을 함께 걸 수 없었다.
    */
   it('★★ 할인 문구가 얹혀도 재계약 문구가 살아남는다', () => {
     const memo = buildRenewalSeed(prev, TODAY).memo;
-    const withDiscount = withDiscountLine(memo, discountLabel(100_000, 90_000));
+    const withDiscount = withAutoLines(memo, [discountLabel(100_000, 90_000)]);
 
     expect(withDiscount.split('\n')[0]).toBe('기준가 대비 -10,000원 (10.0% 할인)');
     expect(withDiscount.split('\n')[1]).toBe(memo);
@@ -234,9 +234,23 @@ describe('buildRenewalSeed', () => {
 
   it('★ 할인이 사라져도 재계약 문구는 남는다', () => {
     const memo = buildRenewalSeed(prev, TODAY).memo;
-    const once = withDiscountLine(memo, discountLabel(100_000, 90_000));
+    const once = withAutoLines(memo, [discountLabel(100_000, 90_000)]);
     // 금액을 기준가로 되돌리면 할인 문구가 빠진다 — 그때 재계약 문구까지 지우면 안 된다.
-    expect(withDiscountLine(once, discountLabel(100_000, 100_000))).toBe(memo);
+    expect(withAutoLines(once, [discountLabel(100_000, 100_000)])).toBe(memo);
+  });
+
+  /**
+   * ★★ 무상은 이어받지 않으므로(`freeMonths` 는 언제나 `'0'`) 재계약 씨앗에는 무상
+   *    줄이 없다. 운영자가 무상을 다시 넣으면 **할인 다음**에 붙고, 재계약 문구는
+   *    두 줄 아래로 밀린다 — 사라지지 않는다.
+   */
+  it('★★ 할인·무상이 다 얹혀도 재계약 문구는 밀려 내려갈 뿐이다', () => {
+    const memo = buildRenewalSeed(prev, TODAY).memo;
+    const both = withAutoLines(memo, [discountLabel(100_000, 90_000), freeLabel(1)]);
+
+    expect(both.split('\n')[0]).toBe('기준가 대비 -10,000원 (10.0% 할인)');
+    expect(both.split('\n')[1]).toBe(freeLabel(1));
+    expect(both.split('\n')[2]).toBe(memo);
   });
 });
 

@@ -66,6 +66,7 @@ import {
   discountLabel,
   endDateIsoOf,
   joinEmail,
+  freeLabel,
   freeMonthsError,
   missingForDraft,
   missingRequired,
@@ -73,7 +74,7 @@ import {
   splitEmail,
   toNumber,
   totalsOf,
-  withDiscountLine,
+  withAutoLines,
   type CodeOption,
   type CompanyState,
   type ItemRow,
@@ -334,18 +335,23 @@ export function ContractForm({
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
-   * ★ 할인 문구는 특기사항 **첫 줄에만** 자동으로 들어간다. 사용자가 쓴 줄은 보존한다.
-   *   금액이 바뀔 때만 손대고, 할인이 사라지면 첫 줄을 지운다(05-logic §4).
+   * ★ 자동 줄(할인 · 무상)은 특기사항 **맨 위에만** 들어간다. 사용자가 쓴 줄은
+   *   보존한다. 금액·무상 개월수가 바뀔 때만 손대고, 그 혜택이 사라지면 그 줄만
+   *   빠진다(05-logic §4).
+   *
+   * ★★ **순서는 할인이 먼저다.** 할인은 계약서 제8조 3항이 이미 말하는 것이고,
+   *    무상 줄은 그 조항이 없어 특기사항이 유일한 근거다(`freeLabel` 머리말).
    */
   const totals = totalsOf(items);
   const discount = discountLabel(totals.standardFee, totals.monthlyFee);
+  const free = freeLabel(toNumber(terms.freeMonths));
   useEffect(() => {
     if (!sec2Editable) return; // 잠긴 계약의 저장값을 화면이 고쳐 쓰지 않는다
     setTerms((prev) => {
-      const next = withDiscountLine(prev.memo, discount);
+      const next = withAutoLines(prev.memo, [discount, free]);
       return next === prev.memo ? prev : { ...prev, memo: next };
     });
-  }, [discount, sec2Editable]);
+  }, [discount, free, sec2Editable]);
 
   useEffect(
     () => () => {
@@ -1294,7 +1300,7 @@ function seedTerms(
          * ★★ 「재계약 (이전 계약 기간 …)」. **이전 계약의 특기사항이 아니다** —
          *    어느 계약을 이어받았는지를 계약서에 남기는 새 문장이고, 운영자가 지우거나
          *    고칠 수 있다.
-         * ★ 할인 문구는 이 줄 **위에** 얹힌다(`withDiscountLine`) — 덮지 않는다.
+         * ★ 할인·무상 문구는 이 줄 **위에** 얹힌다(`withAutoLines`) — 덮지 않는다.
          */
         memo: seed.memo,
       };

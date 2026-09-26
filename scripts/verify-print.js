@@ -402,7 +402,9 @@ const DOCS = [
 
     // 내용 — 인쇄 직전의 문서에서 읽는다(PDF 글자는 글꼴 부호라 읽기 어렵다)
     check('실제 이용 기간 「2026.09.01 ~ 2026.09.10 (10일)」', text.includes('2026.09.01 ~ 2026.09.10 (10일)'));
-    check('환수 근거 조항 「전대차계약서 제8조 3항」', text.includes('전대차계약서 제8조 3항'));
+    check('할인 환수 근거 조항 「전대차계약서 제8조 3항」', text.includes('전대차계약서 제8조 3항'));
+    // ★ 무상 환수는 조항이 없다 — 근거가 특기사항의 자동 줄이다(`FREE_CLAWBACK_BASIS`).
+    check('무상 환수 근거 「전대차계약서 특기사항」', text.includes('전대차계약서 특기사항'));
     check('환불할 금액 466,667원', text.includes('환불할 금액') && text.includes('466,667원'));
     check('환불 계좌 — 전체 번호', text.includes('신한은행 110-123-456789'));
     check('서명란이 없다', !text.includes('서명') && !text.includes('(인)'));
