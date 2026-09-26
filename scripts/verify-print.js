@@ -321,7 +321,8 @@ async function createTempContract() {
     /** 정산 처리 — 환불 계좌가 정산서에 찍히는지 보려고 처리까지 한다. */
     process: async () => {
       const r = await api('POST', `/api/contracts/${contractId}/settlement/process`, {
-        paidOn: '2026-09-26', amount: 466667, payMethod: 'B',
+        // ★ 10원 미만을 버린 값이다(2026-09-26) — 원장·정산서·정산 카드가 같은 466,660 이다.
+        paidOn: '2026-09-26', amount: 466660, payMethod: 'B',
         refundBank: '신한은행', refundAccount: '110-123-456789', refundHolder: '인쇄검증',
       });
       if (r.status !== 200) throw new Error(`정산 처리 실패 ${r.status} ${JSON.stringify(r.body)}`);
@@ -405,7 +406,9 @@ const DOCS = [
     check('할인 환수 근거 조항 「전대차계약서 제8조 3항」', text.includes('전대차계약서 제8조 3항'));
     // ★ 무상 환수는 조항이 없다 — 근거가 특기사항의 자동 줄이다(`FREE_CLAWBACK_BASIS`).
     check('무상 환수 근거 「전대차계약서 특기사항」', text.includes('전대차계약서 특기사항'));
-    check('환불할 금액 466,667원', text.includes('환불할 금액') && text.includes('466,667원'));
+    // ★★ 순정산금은 10원 미만을 버린다 — 466,667 → 466,660. 절사 줄도 같이 찍힌다.
+    check('환불할 금액 466,660원 (10원 미만 버림)', text.includes('환불할 금액') && text.includes('466,660원'));
+    check('절사 줄 — 7원 · 10원 미만 버림', text.includes('절사') && text.includes('10원 미만 버림'));
     check('환불 계좌 — 전체 번호', text.includes('신한은행 110-123-456789'));
     check('서명란이 없다', !text.includes('서명') && !text.includes('(인)'));
   });

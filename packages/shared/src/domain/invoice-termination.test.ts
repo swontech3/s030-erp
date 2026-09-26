@@ -275,7 +275,13 @@ describe('planTerminationChanges — 환수', () => {
     //   → 440,710 · 총수납 0 → rentNet = −440,710
     // 예치금 0 − 실이용료 440,710 − 환수(81,967 + 297,000)
     expect(r.settlement?.usageCharge).toBe(297_000 + 143_710);
-    expect(r.settlement?.netAmount).toBe(-440_710 - 81_967 - 297_000);
+    expect(r.settlement?.netAmountRaw).toBe(-440_710 - 81_967 - 297_000); // −819,677
+    /*
+     * ★★ 순정산금은 **10원 미만을 버린다**(2026-09-26 · `trimSettlementNet`).
+     *    −819,677 → **−819,670**. −819,680 이 아니다 — 고객이 더 내는 쪽으로 버리지 않는다.
+     */
+    expect(r.settlement?.netAmount).toBe(-819_670);
+    expect(r.settlement?.netTrim).toBe(7);
     expect(r.settlement?.settleType).toBe('charge');
   });
 

@@ -36,6 +36,16 @@ export interface BillingItem {
   isFree: boolean;
   /** 무상으로 준 이용료(부가세 제외). */
   freeSupply: number;
+  /* ── 아래 넷은 **그 계약의 값**이다 — 청구서의 값이 아니다 ──────────────────
+     한 입주사가 계약을 여러 건 들고 있으면 줄마다 다르다. 계약 없는 청구서는 0·null. */
+  /** 예치금 **장부 잔액** — 반환·차감하면 줄고, 반환 뒤에는 0 이다(사용자 결정). */
+  deposit: number;
+  /** 이용 시작일 `YYYY-MM-DD`. */
+  usageStart: string | null;
+  /** 이용 종료일 `YYYY-MM-DD` — 중도해지면 **종료일자**다. */
+  usageEnd: string | null;
+  /** 중도해지로 끝난 계약 — 종료일 뒤에 「해지」를 붙인다. */
+  terminated: boolean;
 }
 
 export interface InvoiceLine {
@@ -88,8 +98,15 @@ export interface Settlement {
   depositReturn: number;
   discountClawback: number;
   freeClawback: number;
-  /** 양수 = 환불 / 음수 = 추가청구. */
+  /**
+   * 양수 = 환불 / 음수 = 추가청구. **10원 미만을 버린 값**이다.
+   *
+   * ★★ 원장에 저장된 값이고 화면은 그대로 보인다 — 정산서·정산 카드·정산 처리 기본값이
+   *    다 이것이다. 화면이 따로 버리면 원장과 갈린다(`trimSettlementNet`, shared).
+   */
   netAmount: number;
+  /** 버린 금액(0 이상). 0 보다 크면 카드·정산서에 「절사」 줄을 보인다. */
+  netTrim: number;
   settleType: string;
   /** 청구서에 들어가는 몫 = 총수납 − 실이용료. */
   rentNet: number;
@@ -263,6 +280,8 @@ export interface QueueItem {
   companyId: string;
   companyName: string;
   roomNames: string;
+  /** 계약 시작일 `YYYY-MM-DD` — 목록의 「시작일」. */
+  startDate: string;
   terminatedDate: string;
   amount: number;
   /** 처리 완료 줄에만. */

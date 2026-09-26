@@ -4,11 +4,13 @@
  * s0300200070 월별 청구 — 월 선택 · 입주사 검색 · 상태 필터 · 요약 카드 4개 · 표.
  *
  * =============================================================================
- * ★★ 카드와 표는 **같은 줄들**에서 나온다
+ * ★★ 요약과 표는 **같은 줄들**에서 나온다 — 그려진 줄이 아니라 **조건에 맞는 전체**
  * =============================================================================
- * 요약 카드와 표의 합계 줄이 모두 `summarize(visible)` 다. 걸러 놓은 상태에서 카드만
- * 월 전체를 세면 「카드 합계 ≠ 표 합계」가 되고, 운영자는 어느 쪽이 틀렸는지 모른다.
- * 거르고 있으면 카드 아래에 그렇다고 적는다.
+ * 요약 띠와 표의 합계 줄이 모두 `summarize(visible)` 다. `visible` 은 검색어·상태에 맞는
+ * **전체**이고, 표가 그리는 것은 그중 앞 40줄(`drawn`)이다 — 스크롤하면 늘어난다.
+ *
+ * ★★★ **합계를 `drawn` 으로 내면 스크롤할 때마다 합계가 커진다.** 그래서 표에 「그릴 줄」과
+ *    「합계를 낼 줄」을 따로 넘긴다(`items` · `total`). 거르고 있으면 그렇다고 적는다.
  *
  * ★ 상태는 `statusOf`(= `displayInvoiceStatus`) 하나로 판정한다. 필터·뱃지·카드의
  *   「미납」이 전부 그 함수를 거친다.
@@ -45,6 +47,14 @@ import {
   yearMonthLabel,
   type BillingItem,
 } from '@/features/billing/billing-model';
+
+/**
+ * 한 번에 그리는 줄 수.
+ *
+ * ★ 40줄이면 화면 두세 개 분량이라 스크롤이 한 번은 있어야 다음 묶음이 온다 —
+ *   너무 작으면(10) 스크롤마다 끊기고, 너무 크면(200) 처음 그리는 것이 무겁다.
+ */
+const PAGE = 40;
 
 const isStatus = (s: string | null): s is DisplayStatus =>
   s !== null && (STATUS_ORDER as readonly string[]).includes(s);
@@ -173,6 +183,43 @@ export function BillingView() {
   const monthSum = summarize(all, asOf);
   const filtered = q !== '' || status !== null;
 
+  /*
+   * ══════════════════════════════════════════════════════════════════════════
+   * ★★★ 한 번에 다 그리지 않는다 — **그리는 줄 수만** 늘린다
+   * ══════════════════════════════════════════════════════════════════════════
+   * 입주사가 늘면 한 달에 수백 장이 된다. 줄을 전부 DOM 에 올리면 월을 넘길 때마다
+   * 눈에 보이게 멈춘다.
+   *
+   * ★★ **요약과 합계는 `visible` 전체에서 낸다 — 그려진 것만 세지 않는다.** 40줄만
+   *    그려도 카드는 그 달(또는 거른 조건) 전체의 합이다. 그려진 것만 세면 스크롤할
+   *    때마다 합계가 커지는, 아무도 믿을 수 없는 숫자가 된다.
+   *
+   * ★ 서버 페이지 나누기가 아니다. 월 한 달치 JSON 은 수백 줄이어도 가볍고, 무거운 것은
+   *   DOM 이다. 그래서 받는 것은 그대로 두고 **그리는 것만** 끊는다 — 덕분에 검색·상태
+   *   필터와 요약이 여전히 월 전체를 본다.
+   */
+  const [shown, setShown] = useState(PAGE);
+  // 월·입주사·검색어·상태가 바뀌면 처음부터 다시 그린다
+  useEffect(() => setShown(PAGE), [ym, company, keyword, status, items]);
+  const drawn = visible.slice(0, shown);
+  const rest = visible.length - drawn.length;
+
+  /** 바닥에 닿으면 더 그린다. `IntersectionObserver` 가 없거나 안 걸리면 [더 보기] 가 같은 일을 한다. */
+  const sentinel = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || rest <= 0 || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setShown((n) => n + PAGE);
+      },
+      // ★ 닿기 전에 미리 — 바닥에 정확히 닿아야 늘어나면 스크롤이 한 번 걸린다.
+      { rootMargin: '300px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [rest]);
+
   const counts = useMemo(() => {
     const map = new Map<DisplayStatus, number>();
     for (const it of items ?? []) {
@@ -273,28 +320,29 @@ export function BillingView() {
         </div>
       ) : (
       <>
-      <div className={styles.cards}>
-        <SummaryCard label="총 청구액" value={won(sum.total)} filtered={filtered} />
+      <div className={styles.summaryBar} data-summary="1">
+        <SumCell label="총 청구액" value={won(sum.total)} note={filtered ? '필터 적용' : undefined} />
         {/*
           ★ 수납 완료는 **청구에 들어간 몫**만이다. 과납분(돌려줄 돈)은 여기에도 미수금에도
-            섞지 않고 아래 줄에 따로 적는다 — 섞으면 다른 입주사의 미수금이 깎여 보인다.
+            섞지 않는다 — 섞으면 다른 입주사의 미수금이 깎여 보인다. 옆의 「환불액」이 그 몫이다.
         */}
-        <SummaryCard
-          label="수납 완료"
-          value={won(sum.received)}
-          filtered={filtered}
-          note={sum.overpaidCount > 0 ? `과납 ${won(sum.overpaid)} · 정산 대기 ${sum.overpaidCount}건 별도` : undefined}
+        <SumCell label="수납 완료" value={won(sum.received)} />
+        <SumCell label="미수금" value={won(sum.outstanding)} />
+        {/*
+          ★★ 환불액 — **과납 합계**다(받은 것이 청구보다 많은 장). 미수금과 반대 방향이고
+             절대 섞지 않는다. 정산 처리가 음수 수납으로 0 을 만든다.
+        */}
+        <SumCell
+          label="환불액 (과납)"
+          value={won(sum.overpaid)}
+          note={sum.overpaidCount > 0 ? `정산 대기 ${sum.overpaidCount}건` : '없음'}
         />
-        <SummaryCard label="미수금" value={won(sum.outstanding)} filtered={filtered} />
-        <div className={styles.card}>
-          <div className={styles.cardLabel}>미납</div>
-          <div className={styles.cardValueRow}>
-            <span className={`${styles.cardCount}${sum.unpaidCount === 0 ? ` ${styles.cardCountZero}` : ''}`}>
-              {sum.unpaidCount}건
-            </span>
-            <span className={styles.cardNote}>{sum.unpaidCount > 0 ? won(sum.unpaidAmount) : '없음'}</span>
+        <div className={styles.sumCell}>
+          <div className={styles.sumLabel}>미납</div>
+          <div className={`${styles.sumValue} ${sum.unpaidCount === 0 ? styles.sumCountZero : styles.sumCount}`}>
+            {sum.unpaidCount}건
           </div>
-          {filtered ? <div className={styles.cardNote}>필터 적용</div> : null}
+          <div className={styles.sumNote}>{sum.unpaidCount > 0 ? won(sum.unpaidAmount) : '없음'}</div>
         </div>
       </div>
 
@@ -344,7 +392,30 @@ export function BillingView() {
         ) : visible.length === 0 ? (
           <BillingEmpty lead="조건에 맞는 청구가 없습니다" sub="검색어나 상태 필터를 바꿔 보세요" />
         ) : (
-          <BillingTable items={visible} mode={company ? 'company' : 'month'} asOf={asOf} onChanged={notify} />
+          <>
+            {/* ★ 표에 넘기는 것은 **그릴 줄**이지만, 합계는 `visible` 전체에서 낸다(아래). */}
+            <BillingTable
+              items={drawn}
+              mode={company ? 'company' : 'month'}
+              asOf={asOf}
+              onChanged={notify}
+              total={visible}
+            />
+            {rest > 0 ? (
+              <div className={styles.more} ref={sentinel} data-more={rest}>
+                <span className={styles.moreText}>
+                  {visible.length}건 중 {drawn.length}건 표시 · 스크롤하면 더 나옵니다
+                </span>
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+                  onClick={() => setShown((n) => n + PAGE)}
+                >
+                  {Math.min(PAGE, rest)}건 더 보기
+                </button>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
       </>
@@ -360,23 +431,13 @@ export function BillingView() {
   );
 }
 
-function SummaryCard({
-  label,
-  value,
-  filtered,
-  note,
-}: {
-  label: string;
-  value: string;
-  filtered: boolean;
-  note?: string;
-}) {
+/** 요약 한 칸 — 한 줄 요약 띠의 셀. 값은 `summarize` 가 낸다(표 합계와 같은 함수). */
+function SumCell({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <div className={styles.card}>
-      <div className={styles.cardLabel}>{label}</div>
-      <div className={styles.cardValue}>{value}</div>
-      {note ? <div className={styles.cardNote}>{note}</div> : null}
-      {filtered ? <div className={styles.cardNote}>필터 적용</div> : null}
+    <div className={styles.sumCell} data-sum={label}>
+      <div className={styles.sumLabel}>{label}</div>
+      <div className={styles.sumValue}>{value}</div>
+      {note ? <div className={styles.sumNote}>{note}</div> : null}
     </div>
   );
 }

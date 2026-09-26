@@ -23,6 +23,8 @@
  * (같은 함정이 `day.ts` 머리말에 적혀 있다. 거기는 비교 규칙, 여기는 읽기 규칙이다.)
  */
 import type { ScopedClient } from './withCompanyScope.ts';
+// ★ 예치금 보유액 식은 장부 쪽 한 곳에 있다 — 청구 목록도 그것을 쓴다(두 벌로 쓰지 않는다).
+import { BALANCE_SQL } from './deposits.ts';
 import type { InvoicePlan, ProratedLine } from '@swonbiz/shared/domain/invoice-plan';
 import type { TerminationSettlementResult } from '@swonbiz/shared/domain/contract-settlement';
 import type { ClawbackResult } from '@swonbiz/shared/domain/contract-clawback';
@@ -533,6 +535,26 @@ export interface BillingListRow {
   has_free: boolean;
   /** 무상 줄의 단가 합 — **얼마짜리를 무상으로 줬는지**(부가세 제외). */
   free_supply: number;
+  /**
+   * ★★ 아래 셋은 **청구서가 아니라 그 계약의 값**이다(2026-09-26).
+   *
+   * 한 입주사가 계약을 여러 건 들고 있으면 줄마다 다를 수 있다 — 그래서 청구서 줄에
+   * 붙여서 내려보낸다. 계약 없는 청구서(외부인 회의실 등)는 전부 `null`·0 이다.
+   *
+   * ★ 예치금은 **장부 잔액**이다(사용자 결정) — 반환·차감하면 줄어들고 반환 뒤에는 0 이다.
+   *   계약서에 적힌 금액이 아니라 **지금 우리가 들고 있는 돈**이 목록에서 쓸모 있다.
+   *   024 이전에 확정된 계약은 장부가 없어 0 으로 보인다.
+   */
+  deposit_balance: number;
+  /** 계약 시작일 `YYYY-MM-DD`. */
+  start_day: string | null;
+  /**
+   * 이용 종료일 `YYYY-MM-DD` — 중도해지면 **종료일자**, 아니면 계약 종료일(사용자 결정).
+   * 정산이 보는 날과 같은 날이다.
+   */
+  usage_end_day: string | null;
+  /** 중도해지로 끝난 계약인가 — 화면이 「해지」 표시를 붙인다. */
+  terminated: boolean;
 }
 
 /**
@@ -555,9 +577,18 @@ export async function listBillingInvoices(
             i.total_amount, i.paid_amount, i.status,
             l.room_names,
             coalesce(l.has_free, false)  AS has_free,
-            coalesce(l.free_supply, 0)   AS free_supply
+            coalesce(l.free_supply, 0)   AS free_supply,
+            -- ★ 계약의 값 셋 — 예치금 장부 잔액 · 이용 시작일 · 이용 종료일.
+            --   계약 없는 청구서(외부인 회의실)는 LEFT JOIN 이라 0 · null 이 된다.
+            coalesce(
+              (SELECT ${BALANCE_SQL} FROM public.tb_s080_deposit_ledger d
+                WHERE d.contract_id = i.contract_id), 0) AS deposit_balance,
+            to_char(k.start_date, 'YYYY-MM-DD') AS start_day,
+            to_char(coalesce(k.terminated_date, k.end_date), 'YYYY-MM-DD') AS usage_end_day,
+            (k.terminated_date IS NOT NULL) AS terminated
        FROM public.tb_s080_invoices i
        JOIN public.tb_s080_companies c ON c.company_id = i.company_id
+       LEFT JOIN public.tb_s080_contracts k ON k.contract_id = i.contract_id
        LEFT JOIN LATERAL (
          SELECT string_agg(s.room_name, ' / ' ORDER BY il.seq)                  AS room_names,
                 bool_or(il.is_free)                                             AS has_free,

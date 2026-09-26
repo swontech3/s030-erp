@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeTerminationSettlement } from "./contract-settlement";
+import { SETTLE_TRIM_UNIT, computeTerminationSettlement, trimSettlementNet } from "./contract-settlement";
 
 // 정상월액 = 1,000,000 + 100,000 = 1,100,000
 const RENT = 1_000_000;
@@ -69,7 +69,10 @@ describe("computeTerminationSettlement — 월납(M)", () => {
     expect(r.terminationMonthCharge).toBe(termCharge);
     expect(r.usageCharge).toBe(termCharge);
     expect(r.rentNet).toBe(MONTHLY - termCharge);     // 과납
-    expect(r.netAmount).toBe(1_000_000 + (MONTHLY - termCharge) - 100_000);
+    // ★ 10원 미만은 버린다 — 1,467,742 → 1,467,740. 버리기 전 값은 netAmountRaw 다.
+    expect(r.netAmountRaw).toBe(1_000_000 + (MONTHLY - termCharge) - 100_000); // 1,467,742
+    expect(r.netAmount).toBe(1_467_740);
+    expect(r.netTrim).toBe(2);
     expect(r.settleType).toBe("refund");
   });
 
@@ -207,5 +210,112 @@ describe("computeTerminationSettlement — 무상 개월수", () => {
     });
     // 무상 달이라 실이용료 0, 총수납 0 → 예치금 1,000,000 − 환수 300,000
     expect(r.netAmount).toBe(700_000);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ★★★ 순정산금 절사 — **10원 미만을 버린다** (2026-09-26)
+   ══════════════════════════════════════════════════════════════════════════
+   실제로 계좌로 주고받는 금액이라 1원 잔돈을 남기지 않는다. 원장에 들어가는 값이
+   이 값이고, 정산서·정산 카드·정산 처리 기본값이 모두 원장을 읽는다 — 그래서 **여기서
+   한 번만** 버린다. 화면이 따로 버리면 원장과 화면이 갈린다.
+
+   ★★ `rentNet` 은 버리지 않는다. 그것은 청구서에 들어가는 몫이고, 정산 처리가
+      청구서마다 남은 금액의 합이 `-rentNet` 과 같은지 검사한다(다르면 409).
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("computeTerminationSettlement — 순정산금 절사", () => {
+  /** 환불 466,667 → 466,660. 지시서의 그 금액이다. */
+  it("★ 환불은 10원 미만을 버린다", () => {
+    const r = computeTerminationSettlement({
+      startDate: d(2026, 9, 1),
+      terminateDate: d(2026, 9, 10),
+      monthlyRent: 1_000_000,
+      taxFee: 100_000,
+      deposit: 0,
+      clawbackTotal: 0,
+      freeMonths: 0,
+      totalRentPaid: MONTHLY, // 9월 한 달 완납 후 10일에 해지
+    });
+    // 9월 30일 중 10일 사용 → round(1,100,000 × 10/30) = 366,667
+    expect(r.usageCharge).toBe(366_667);
+    expect(r.netAmountRaw).toBe(733_333);
+    expect(r.netAmount).toBe(733_330);
+    expect(r.netTrim).toBe(3);
+    expect(r.settleType).toBe("refund");
+  });
+
+  /**
+   * ★★★ 추가청구도 **버린다 — 고객이 덜 낸다.** 음수에 `Math.floor` 를 쓰면
+   *    −819,677 이 −819,680 이 되어 고객이 **더 내는** 쪽으로 버려진다.
+   */
+  it("★★★ 추가청구는 고객이 덜 내는 쪽으로 버린다", () => {
+    const r = computeTerminationSettlement({
+      startDate: d(2026, 1, 1),
+      terminateDate: d(2026, 1, 15),
+      monthlyRent: 1_000_000,
+      taxFee: 100_000,
+      deposit: 0,
+      // 실이용료만큼 받아 두었으니 rentNet 은 0 이다 — 환수가 그대로 추가청구가 된다
+      clawbackTotal: 819_677,
+      freeMonths: 0,
+      totalRentPaid: Math.round((MONTHLY * 15) / 31),
+    });
+    expect(r.netAmountRaw).toBe(-819_677);
+    expect(r.netAmount).toBe(-819_670); // −819,680 이 아니다
+    expect(r.netTrim).toBe(7);
+    expect(r.settleType).toBe("charge");
+  });
+
+  /** ★ 버려서 0 이 되면 방향도 「없음」이다 — 7원을 돌려주러 은행에 가지 않는다. */
+  it("★ 10원이 안 되는 정산은 주고받을 금액이 없다", () => {
+    const r = computeTerminationSettlement({
+      startDate: d(2026, 2, 1),
+      terminateDate: d(2026, 2, 28),
+      monthlyRent: 1_000_000,
+      taxFee: 100_000,
+      deposit: 0,
+      clawbackTotal: 0,
+      freeMonths: 0,
+      totalRentPaid: MONTHLY + 7, // 7원 더 받았다
+    });
+    expect(r.netAmountRaw).toBe(7);
+    expect(r.netAmount).toBe(0);
+    expect(r.settleType).toBe("none");
+  });
+
+  it("★ 10원 단위로 딱 맞으면 버릴 것이 없다", () => {
+    const r = computeTerminationSettlement({
+      startDate: d(2026, 2, 1),
+      terminateDate: d(2026, 2, 28),
+      monthlyRent: 1_000_000,
+      taxFee: 100_000,
+      deposit: 500_000,
+      clawbackTotal: 0,
+      freeMonths: 0,
+      totalRentPaid: MONTHLY,
+    });
+    expect(r.netAmount).toBe(500_000);
+    expect(r.netTrim).toBe(0);
+  });
+});
+
+describe("trimSettlementNet", () => {
+  it("절댓값을 10원 단위로 내린다 — 부호는 그대로", () => {
+    expect(trimSettlementNet(466_667)).toBe(466_660);
+    expect(trimSettlementNet(-466_667)).toBe(-466_660);
+    expect(trimSettlementNet(466_660)).toBe(466_660);
+    expect(trimSettlementNet(-9)).toBe(0);
+    expect(trimSettlementNet(9)).toBe(0);
+    expect(trimSettlementNet(0)).toBe(0);
+  });
+
+  it("단위는 바꿔 부를 수 있다 — 규칙은 하나지만 시험은 단위를 건다", () => {
+    expect(trimSettlementNet(466_667, 100)).toBe(466_600);
+    expect(trimSettlementNet(466_667, 1_000)).toBe(466_000);
+    expect(trimSettlementNet(466_667, 1)).toBe(466_667);
+  });
+
+  it("★ 절사 단위는 10원이다", () => {
+    expect(SETTLE_TRIM_UNIT).toBe(10);
   });
 });

@@ -22,6 +22,8 @@
  *  · 월납(M): 해지달만 일할 정산(과납 환불 / 미납 추가청구), 미래 청구 취소
  *  · 순정산금 = (총수납 + 예치금) − 실이용료 − 할인총액  (양수=환불 / 음수=추가청구)
  *  · 예치금·할인은 임대료 청구가 아니므로 정산 원장에만 기록한다
+ *  · ★ 순정산금은 **10원 미만을 버린다**(2026-09-26, `trimSettlementNet`). 실제로 주고받는
+ *    금액이고 원장에 그 값이 저장된다. 청구서에 들어가는 `rentNet` 은 버리지 않는다
  *
  * ★★ **지금 이 저장소에 「할인」이 없다.** 레거시의 `contracts.discount_amount` 는
  *    008 에서 드롭됐고 `tb_s080_contract_spaces` 에도 대응 칸이 없다. 그래서 부르는
@@ -74,11 +76,50 @@ export type TerminationSettlementResult = {
   rentNet: number;
   /** 예치금 반환액 (= deposit) */
   depositReturn: number;
-  /** 순정산금 = 예치금 + 임대료 순차액 − 환수 합계 (양수=환불 / 음수=추가청구) */
+  /**
+   * 순정산금 = 예치금 + 임대료 순차액 − 환수 합계 (양수=환불 / 음수=추가청구).
+   *
+   * ★★ **10원 미만은 버린 값**이다(`trimSettlementNet`). 실제로 주고받는 금액이고
+   *    정산 원장에 그대로 저장된다 — 정산서·정산 카드·정산 처리 기본값이 다 이 값이다.
+   *    버리기 전 값은 `netAmountRaw`, 버린 크기는 `netTrim` 이다.
+   */
   netAmount: number;
-  /** 정산 유형 */
+  /** 버리기 전 순정산금 = 예치금 + 임대료 순차액 − 환수 합계. */
+  netAmountRaw: number;
+  /** 버린 금액(0 이상). `|netAmountRaw| − |netAmount|` 다. */
+  netTrim: number;
+  /** 정산 유형. ★ **버린 뒤**의 부호로 정한다 — 7원이 0 이 되면 `none` 이다. */
   settleType: SettleType;
 };
+
+/**
+ * 정산 절사 단위 — **10원**. 「원 단위 버림」이다.
+ *
+ * ★ 실제로 계좌로 주고받는 금액이라 1원 잔돈을 남기지 않는다. 단위를 키우면(100·1,000)
+ *   버리는 금액이 그만큼 커진다 — 사용자 결정으로 10원이다(2026-09-26).
+ */
+export const SETTLE_TRIM_UNIT = 10;
+
+/**
+ * 순정산금 절사 — **절댓값을 내린다**(0 쪽으로 버린다).
+ *
+ * =============================================================================
+ * ★★★ 방향에 상관없이 **버린다** — 양쪽 다 고객에게 불리해지지 않는 쪽이다
+ * =============================================================================
+ *   · 환불(양수) 466,667 → 466,660   우리가 돌려주는 돈이 10원 단위가 된다
+ *   · 추가청구(음수) −466,667 → −466,660   **고객이 덜 낸다**
+ * 음수에 `Math.floor` 를 쓰면 −466,670 이 되어 고객이 **더 내는** 쪽으로 버려진다.
+ * 그래서 `trunc` 이다 — 부호를 떼고 내린 뒤 부호를 돌려준다.
+ *
+ * ★ 원장에 들어가는 값이 이것이다. 화면이 따로 버리면 원장과 화면이 갈린다.
+ */
+export function trimSettlementNet(net: number, unit = SETTLE_TRIM_UNIT): number {
+  if (unit <= 1) return net;
+  const abs = Math.floor(Math.abs(net) / unit) * unit;
+  // ★ `-0` 을 내보내지 않는다 — 부호 있는 0 은 비교에서 조용히 갈린다(`Object.is`).
+  if (abs === 0) return 0;
+  return net < 0 ? -abs : abs;
+}
 
 /** 해당 연·월(0-based month)의 일수 */
 function daysInMonth(year: number, month0: number): number {
@@ -168,7 +209,15 @@ export function computeTerminationSettlement(
   const usageCharge = paidFullMonths * monthlyTotal + terminationMonthCharge;
 
   const rentNet = totalRentPaid - usageCharge;
-  const netAmount = deposit + rentNet - clawbackTotal;
+
+  /*
+   * ★★ 주고받는 금액만 버린다 — `rentNet` 은 그대로다.
+   *    `rentNet` 은 **청구서에 들어가는 몫**이고, 정산 처리가 청구서마다 남은 금액을
+   *    옮겨 담아 합계가 맞는지 검사한다(`moved !== -rentNet` 이면 409). 여기서 버리면
+   *    그 검사가 10원 때문에 막히고, 청구서 수납 합계가 어긋난다.
+   */
+  const netAmountRaw = deposit + rentNet - clawbackTotal;
+  const netAmount = trimSettlementNet(netAmountRaw);
   const settleType: SettleType = netAmount > 0 ? "refund" : netAmount < 0 ? "charge" : "none";
 
   return {
@@ -178,6 +227,8 @@ export function computeTerminationSettlement(
     rentNet,
     depositReturn: deposit,
     netAmount,
+    netAmountRaw,
+    netTrim: Math.abs(netAmountRaw) - Math.abs(netAmount),
     settleType,
   };
 }

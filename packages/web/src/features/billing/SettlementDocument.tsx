@@ -14,6 +14,10 @@
  * ★★ 금액을 여기서 계산하지 않는다. 전부 정산 원장의 값이고, 나누어 보여 주는 것
  *    (실이용료의 「개월 + 일할」 · 방향 이름)은 shared 의 함수가 한다.
  *
+ * ★★ 주고받을 금액은 **10원 미만을 버린 값**이다(`trimSettlementNet`, shared). 버리는 것은
+ *    계산할 때 한 번이고 원장에 그 값이 들어 있다 — 여기서 다시 버리지 않는다. 버린 금액이
+ *    있으면 「절사」 줄로 찍어 식이 맞게 둔다.
+ *
  * ★ **할인** 환수의 근거는 **전대차계약서 제8조 3항**이다(「월회비 할인률이 적용된 경우 …
  *   할인 받은 총금액을 최종 정산시 일괄 반환한다」). 지시서에는 「제5조 3항」으로 적혀
  *   있었는데 우리 전대차계약서의 5조는 회비 지급(2항까지)이다 — 실제 문구가 있는 조항을
@@ -154,6 +158,13 @@ export function SettlementDocument({ s, onClose }: { s: Settlement; onClose: () 
                 td={`${wonText(-s.freeClawback)}  (근거: ${FREE_CLAWBACK_BASIS})`}
                 wide
               />
+              {/*
+                ★★ 절사 줄 — 있을 때만 찍는다. 이 줄이 없으면 위 세 칸의 합과 아래 금액이
+                   달라 보이고, 종이를 받은 입주사는 10원이 어디로 갔는지 알 수 없다.
+              */}
+              {s.netTrim > 0 ? (
+                <Row th="절사" td={`${wonText(-s.netTrim)}  (10원 미만 버림)`} wide />
+              ) : null}
               <Row th={dir.label} td={dir.kind === 'none' ? '0원' : wonText(dir.amount)} wide strong />
             </div>
 

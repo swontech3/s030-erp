@@ -717,8 +717,9 @@ const json = (res) => {
         String(st.rows[0]?.usage_charge),
       );
       check(
-        '★ 순정산금 = −실이용료 − 환수 합계 = −819,677 (추가청구)',
-        st.rows[0]?.net_amount === -819_677 && st.rows[0]?.settle_type === 'charge',
+        // ★ −819,677 에서 10원 미만을 버린다(2026-09-26). 고객이 더 내는 쪽(−819,680)으로 버리지 않는다.
+        '★ 순정산금 = −실이용료 − 환수 합계 = −819,677 → 절사 −819,670 (추가청구)',
+        st.rows[0]?.net_amount === -819_670 && st.rows[0]?.settle_type === 'charge',
         `${st.rows[0]?.net_amount} ${st.rows[0]?.settle_type}`,
       );
 
@@ -966,14 +967,25 @@ const json = (res) => {
 
       const q = await queue();
       const waiting = q.pending.find((p) => p.contractId === body.contractId);
-      check('정산 탭 — 중도해지 정산 대기 · 환불 466,667', waiting?.kind === 'settlement' && waiting.amount === 466_667, JSON.stringify(waiting));
+      /*
+       * ★★ 환불 466,667 → **466,660**. 10원 미만을 버린다(2026-09-26).
+       *    원장의 `net_amount` 가 이미 버린 값이고 정산 탭·정산서·정산 카드·정산 처리
+       *    기본값이 전부 그것을 읽는다 — 네 곳이 같은 값이어야 한다.
+       * ★ 시작일도 같이 내려온다(목록의 「시작일」 열).
+       */
+      check(
+        '정산 탭 — 중도해지 정산 대기 · 환불 466,660 (466,667 에서 10원 미만 버림)',
+        waiting?.kind === 'settlement' && waiting.amount === 466_660,
+        JSON.stringify(waiting),
+      );
+      check('정산 탭 — 목록에 계약 시작일이 있다', waiting?.startDate === '2026-09-01', String(waiting?.startDate));
 
       const url = `/contracts/${body.contractId}/settlement/process`;
-      const noAccount = await op.inject({ method: 'POST', url, payload: { paidOn: '2026-09-26', amount: 466_667, payMethod: 'B' } });
+      const noAccount = await op.inject({ method: 'POST', url, payload: { paidOn: '2026-09-26', amount: 466_660, payMethod: 'B' } });
       check('★ 환불인데 계좌가 없으면 400', noAccount.statusCode === 400 && json(noAccount).error === 'refund_account_required', noAccount.body);
       const ok = await op.inject({
         method: 'POST', url,
-        payload: { paidOn: '2026-09-26', amount: 466_667, payMethod: 'B', refundBank: '신한은행', refundAccount: '110-123-456789', refundHolder: '검증' },
+        payload: { paidOn: '2026-09-26', amount: 466_660, payMethod: 'B', refundBank: '신한은행', refundAccount: '110-123-456789', refundHolder: '검증' },
       });
       check('정산 처리 200', ok.statusCode === 200, ok.body);
       const after = (await invoicesOf(body.contractId)).find((i) => i.yearMonth === '2026-09');
@@ -989,6 +1001,42 @@ const json = (res) => {
       const company = json(await op.inject({ method: 'GET', url: `/companies/${COMPANY}/billing` }));
       const card = company.settlements.find((x) => x.contractId === body.contractId);
       check('정산 카드는 전체 계좌번호', card?.refund?.account === '110-123-456789', JSON.stringify(card?.refund));
+
+      /*
+       * ★★★ 절사는 **한 값**이어야 한다 — 원장(DB) · 정산 카드·정산서(API) · 정산 탭 ·
+       *    정산 처리 기록. 한 곳만 안 버리면 「정산서는 466,667 인데 보낸 돈은 466,660」이 된다.
+       */
+      const ledger = await asOperator((c) =>
+        c.query(
+          `SELECT net_amount, processed_amount, deposit_return, total_paid, usage_charge,
+                  discount_clawback, free_clawback
+             FROM public.tb_s080_settlements WHERE contract_id = $1`,
+          [body.contractId],
+        ),
+      );
+      const L = ledger.rows[0] ?? {};
+      check(
+        '★★ 원장 net_amount 이 절사된 값 466,660 이고, 절사 전은 466,667 이다',
+        L.net_amount === 466_660 &&
+          L.deposit_return + (L.total_paid - L.usage_charge) - L.discount_clawback - L.free_clawback === 466_667,
+        JSON.stringify(L),
+      );
+      check(
+        '★★ 정산 카드·정산서가 같은 값 — netAmount 466,660 · netTrim 7',
+        card?.netAmount === 466_660 && card?.netTrim === 7,
+        JSON.stringify({ net: card?.netAmount, trim: card?.netTrim }),
+      );
+      check(
+        '★★ 정산 탭 처리 완료 금액과 원장 처리 금액이 그 값이다',
+        done?.amount === 466_660 && L.processed_amount === 466_660,
+        JSON.stringify({ queue: done?.amount, ledger: L.processed_amount }),
+      );
+      /* ★ 이용료 차액은 **버리지 않는다** — 버리면 청구서 수납 합계가 어긋난다(mismatch 409). */
+      check(
+        '★★ 이용료 차액은 절사하지 않는다 — 366,667 그대로',
+        card?.rentNet === 366_667,
+        String(card?.rentNet),
+      );
     }
 
     /* ═══ 24. 추가청구 — 예치금은 차감 ════════════════════════════════════ */
@@ -1014,6 +1062,48 @@ const json = (res) => {
       });
       check('추가청구 정산은 계좌 없이 처리된다', ok.statusCode === 200, ok.body);
       check('★ 예치금 — 받음 뒤 차감 100,000 · 반환 없음', kinds(await depositsOf(b.contractId)) === 'receive:100000,deduct:100000');
+    }
+
+    /* ═══ 25. 월별 청구 목록의 계약 값 셋 — 예치금 · 이용 시작일 · 이용 종료일 ═══
+       ★ 청구서가 아니라 **그 계약의 값**이다. 한 입주사가 계약을 여러 건 들고 있으면
+         줄마다 다르다 — 그래서 청구서 줄에 붙여 내려보낸다.
+       ★ 예치금은 **장부 잔액**이다(사용자 결정) — 반환하면 0 이 된다. */
+    console.log('\n25. 월별 청구 목록 — 예치금 · 이용 시작일 · 이용 종료일');
+    {
+      const { body: b } = await createContract({
+        paymentMethod: 'M', periodMonths: 3, freeMonths: 0,
+        contractDate: '2026-09-25', startDate: '2026-10-01',
+        spaces: [spaceOf(nextSpace(), { deposit: 500_000, monthlyFee: 400_000 })],
+      });
+
+      const listOf = async (ym) => {
+        const res = json(await op.inject({ method: 'GET', url: `/billing/invoices?yearMonth=${ym}` }));
+        return (res.invoices ?? []).find((i) => i.contractId === b.contractId);
+      };
+
+      const oct = await listOf('2026-10');
+      check(
+        '★ 예치금은 장부 잔액 500,000 · 이용 2026-10-01 ~ 2026-12-31 · 해지 아님',
+        oct?.deposit === 500_000 && oct?.usageStart === '2026-10-01' && oct?.usageEnd === '2026-12-31' &&
+          oct?.terminated === false,
+        JSON.stringify(oct && { d: oct.deposit, s: oct.usageStart, e: oct.usageEnd, t: oct.terminated }),
+      );
+
+      await op.inject({
+        method: 'POST', url: `/contracts/${b.contractId}/status`,
+        payload: { to: 'terminated', terminatedDate: '2026-11-15', terminationReason: '검증 중도해지' },
+      });
+      const oct2 = await listOf('2026-10');
+      check(
+        '★★ 중도해지하면 이용 종료일이 **종료일자**가 된다 — 2026-11-15 · 해지 표시',
+        oct2?.usageEnd === '2026-11-15' && oct2?.terminated === true,
+        JSON.stringify(oct2 && { e: oct2.usageEnd, t: oct2.terminated }),
+      );
+      check(
+        '★ 정산 처리 전이라 예치금은 아직 500,000 이다',
+        oct2?.deposit === 500_000,
+        String(oct2?.deposit),
+      );
     }
   } finally {
     await op.close();

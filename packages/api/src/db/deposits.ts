@@ -16,8 +16,13 @@ interface Rows<T> {
 const q = <T>(client: ScopedClient, sql: string, params?: unknown[]): Promise<Rows<T>> =>
   client.query(sql, params) as Promise<Rows<T>>;
 
-/** 보유액 = 받음 + 이월(받음) − 이월(넘김) − 반환 − 차감. `deposit-ledger.ts` 와 같은 식. */
-const BALANCE_SQL = `
+/**
+ * 보유액 = 받음 + 이월(받음) − 이월(넘김) − 반환 − 차감. `deposit-ledger.ts` 와 같은 식.
+ *
+ * ★ 별칭 `d` 의 장부 테이블을 전제한다. 청구 목록도 이 식을 쓴다(`invoices.ts`) —
+ *   **두 벌로 쓰지 않는다.** 한쪽만 고치면 화면 두 곳이 다른 보유액을 말한다.
+ */
+export const BALANCE_SQL = `
   coalesce(sum(CASE WHEN d.entry_kind IN ('receive', 'carry_in') THEN d.amount ELSE -d.amount END), 0)::int`;
 
 export interface DepositRow {
@@ -110,6 +115,8 @@ export interface SettlementQueueRow {
   status: string;
   /** 종료일자 `YYYY-MM-DD`. */
   terminated_day: string | null;
+  /** 계약 시작일 `YYYY-MM-DD` — 정산 탭 목록의 「시작일」. */
+  start_day: string;
   end_day: string;
   room_names: string | null;
   deposit_balance: number;
@@ -130,6 +137,7 @@ export async function listSettlementQueue(client: ScopedClient): Promise<Settlem
     client,
     `SELECT k.contract_id, k.company_id, c.company_name, k.status,
             to_char(k.terminated_date, 'YYYY-MM-DD') AS terminated_day,
+            to_char(k.start_date, 'YYYY-MM-DD')      AS start_day,
             to_char(k.end_date, 'YYYY-MM-DD')        AS end_day,
             (SELECT string_agg(s.room_name, ' / ' ORDER BY cs.seq)
                FROM public.tb_s080_contract_spaces cs

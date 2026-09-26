@@ -149,6 +149,11 @@ function toBillingItem(row: BillingListRow) {
     roomNames: row.room_names ?? '',
     isFree: row.has_free,
     freeSupply: row.free_supply,
+    /* ★ 아래 셋은 **그 계약의 값**이다 — 청구서의 값이 아니다(`BillingListRow` 머리말). */
+    deposit: row.deposit_balance,
+    usageStart: row.start_day,
+    usageEnd: row.usage_end_day,
+    terminated: row.terminated,
   };
 }
 
@@ -166,8 +171,24 @@ function toSettlement(row: SettlementRow) {
     depositReturn: row.deposit_return,
     discountClawback: row.discount_clawback,
     freeClawback: row.free_clawback,
-    /** 양수 = 환불 / 음수 = 추가청구. */
+    /**
+     * 양수 = 환불 / 음수 = 추가청구. **10원 미만을 버린 값**이다(`trimSettlementNet`).
+     *
+     * ★★ 원장에 저장된 이 값이 정본이다 — 정산서·정산 카드·정산 처리 기본값이 다 이것을
+     *    읽는다. 화면이 따로 버리지 않는다.
+     */
     netAmount: row.net_amount,
+    /**
+     * 버린 금액(0 이상) — 원장 칸이 아니라 **파생값**이다.
+     *
+     * ★ 칸을 새로 만들지 않았다. 구성 요소가 전부 원장에 있어 뺄셈으로 나온다.
+     *   절사 전 = 예치금 반환 + (총수납 − 실이용료) − 할인 환수 − 무상 환수.
+     *   절사를 넣기 전에 만들어진 정산은 이 값이 0 이다 — 그 원장은 그대로 둔다.
+     */
+    netTrim:
+      Math.abs(
+        row.deposit_return + (row.total_paid - row.usage_charge) - row.discount_clawback - row.free_clawback,
+      ) - Math.abs(row.net_amount),
     settleType: row.settle_type,
     /** ★ 청구서에 들어가는 몫 = 총수납 − 실이용료. 나머지(예치금·환수)는 원장에만 남는다. */
     rentNet: row.total_paid - row.usage_charge,
@@ -287,6 +308,8 @@ export function registerBillingRoutes(app: FastifyInstance): void {
         companyId: r.company_id,
         companyName: r.company_name,
         roomNames: r.room_names ?? '',
+        /** ★ 계약 시작일 — 목록의 「시작일」 열. 종료일 앞에 온다. */
+        startDate: r.start_day,
         terminatedDate: r.terminated_day ?? r.end_day,
       };
       if (kind === 'settlement') {

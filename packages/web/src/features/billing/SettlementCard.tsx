@@ -86,7 +86,19 @@ export function SettlementCard({ s, onProcessed }: { s: Settlement; onProcessed:
 
       <div className={styles.settleNet}>
         <div>
-          <div className={styles.factKey}>= 예치금 반환 + 이용료 차액 − 할인 환수 − 무상 환수</div>
+          <div className={styles.factKey}>
+            = 예치금 반환 + 이용료 차액 − 할인 환수 − 무상 환수
+            {/*
+              ★★ 절사를 적어야 식이 맞는다. 순정산금만 10원 단위로 버리면 위 네 칸의 합과
+                 아래 금액이 달라 보이고, 운영자는 어느 쪽이 틀렸는지 모른다.
+              ★ 원장에 저장된 값이 이미 버린 값이다 — 화면이 버리는 것이 아니다.
+            */}
+            {s.netTrim > 0 ? (
+              <span className={styles.muted} data-settle-trim={s.netTrim}>
+                {' '}− 절사 {won(s.netTrim)} (10원 미만)
+              </span>
+            ) : null}
+          </div>
           <div className={styles.settleNetValue} data-settle-net="1">
             {dir.label} {dir.kind === 'none' ? '' : won(dir.amount)}
           </div>
