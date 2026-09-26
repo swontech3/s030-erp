@@ -50,7 +50,10 @@ import {
   rejectSpacePick,
   type SpaceHolder,
 } from '@swonbiz/shared/domain/space-occupancy';
-import { billOnConfirm, settleOnTerminate } from '../billing/contractBilling.ts';
+import { billOnConfirm, depositOnConfirm, settleOnTerminate } from '../billing/contractBilling.ts';
+import { findContractSettlement } from '../db/invoices.ts';
+import { contractDepositState } from '../db/deposits.ts';
+import { pendingKind } from '@swonbiz/shared/domain/settlement-view';
 import { requireSession } from '../session/hook.ts';
 import { findCompany } from '../db/companies.ts';
 import { listSpaces } from '../db/lookups.ts';
@@ -369,10 +372,25 @@ export function registerContractRoutes(app: FastifyInstance): void {
     const found = await withCompanyScope(scopeOf(session), async (client) => {
       const contract = await findContract(client, req.params.id);
       if (!contract) return null;
-      return { contract, spaces: await findSpaces(client, req.params.id) };
+      /*
+       * ★ 종료된 계약이면 정산 상태도 같이 준다 — 계약 폼 머리의 「정산 결과 보기」가
+       *   처리 대기면 눈에 띄게 그린다. 판정은 정산 탭과 같은 `pendingKind` 다.
+       */
+      let settlementState: 'pending' | 'done' | null = null;
+      if (contract.status === 'terminated') {
+        const settlement = await findContractSettlement(client, contract.contract_id);
+        const deposit = await contractDepositState(client, contract.contract_id);
+        const kind = pendingKind({
+          contractStatus: contract.status,
+          settlement: settlement ? { processed: settlement.processed_day !== null } : null,
+          depositBalance: deposit.balance,
+        });
+        settlementState = kind ? 'pending' : settlement || deposit.hasRecords ? 'done' : null;
+      }
+      return { contract, spaces: await findSpaces(client, req.params.id), settlementState };
     });
     if (!found) return notFound(reply);
-    return reply.send(toResponse(found.contract, found.spaces));
+    return reply.send({ ...toResponse(found.contract, found.spaces), settlementState: found.settlementState });
   });
 
   /**
@@ -529,9 +547,13 @@ export function registerContractRoutes(app: FastifyInstance): void {
          만들어진다.** 청구서 없이 확정된 계약은 아무도 청구하지 않는 계약이 되고,
          그 사실은 한 달 뒤 돈이 안 들어와야 드러난다 — 차라리 여기서 막는다. */
       let invoiceCount = 0;
+      let deposit: string = 'none';
       if (status === 'confirmed') {
         const billed = await billOnConfirm(client, { contractId, actor, newId: randomUUID });
         if (billed.kind === 'created') invoiceCount = billed.invoiceCount;
+        // ★ 예치금 「받음」/「이월」도 같은 트랜잭션이다. 재계약 이월은 이전 계약을 닫기 **전에**
+        //   본다 — 보유액은 상태와 무관하게 장부의 합이라 순서가 결과를 바꾸지는 않는다.
+        deposit = (await depositOnConfirm(client, { contractId, actor, newId: randomUUID })).kind;
       }
 
       /* ══════════════════════════════════════════════════════════════════════
@@ -565,10 +587,10 @@ export function registerContractRoutes(app: FastifyInstance): void {
           toStatus: 'terminated',
           actor,
         });
-        return { kind: 'ok' as const, closedPrevious: previous.contract_id, invoiceCount };
+        return { kind: 'ok' as const, closedPrevious: previous.contract_id, invoiceCount, deposit };
       }
 
-      return { kind: 'ok' as const, closedPrevious: null, invoiceCount };
+      return { kind: 'ok' as const, closedPrevious: null, invoiceCount, deposit };
     });
 
     /*
@@ -603,6 +625,8 @@ export function registerContractRoutes(app: FastifyInstance): void {
       closedPrevious: created.closedPrevious,
       // ★ 만든 청구서 장수. 화면은 아직 안 쓰지만 검증 스크립트가 이 값을 본다.
       invoiceCount: created.invoiceCount,
+      // ★ 예치금 장부에 무엇이 남았는지 — recorded / none / previous_unrecorded(재계약인데 이전 장부 없음).
+      deposit: created.deposit,
     });
   });
 
@@ -759,12 +783,16 @@ export function registerContractRoutes(app: FastifyInstance): void {
                           아무것도 건드리지 않는다(기간 만료·재계약이 그 길이다). */
       let invoiceCount = 0;
       let billing: string = 'none';
+      let deposit: string = 'none';
       if (to === 'confirmed') {
         const billed = await billOnConfirm(client, {
           contractId: contract.contract_id, actor, newId: randomUUID,
         });
         billing = billed.kind;
         if (billed.kind === 'created') invoiceCount = billed.invoiceCount;
+        deposit = (await depositOnConfirm(client, {
+          contractId: contract.contract_id, actor, newId: randomUUID,
+        })).kind;
       } else if (to === 'terminated') {
         const settled = await settleOnTerminate(client, {
           contractId: contract.contract_id,
@@ -776,7 +804,7 @@ export function registerContractRoutes(app: FastifyInstance): void {
         billing = settled.kind;
       }
 
-      return { kind: 'ok' as const, invoiceCount, billing };
+      return { kind: 'ok' as const, invoiceCount, billing, deposit };
     });
 
     /*
@@ -802,6 +830,7 @@ export function registerContractRoutes(app: FastifyInstance): void {
       status: to,
       invoiceCount: result.invoiceCount,
       billing: result.billing,
+      deposit: result.deposit,
     });
   });
 }

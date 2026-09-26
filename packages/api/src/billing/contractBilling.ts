@@ -24,6 +24,8 @@ import {
   type TerminationChanges,
 } from '@swonbiz/shared/domain/invoice-plan';
 import { parseDay } from '@swonbiz/shared/domain/day';
+import { planDepositOnConfirm } from '@swonbiz/shared/domain/deposit-ledger';
+import { contractDepositState, insertDepositEntry } from '../db/deposits.ts';
 import type { ScopedClient } from '../db/withCompanyScope.ts';
 import {
   applyProrate,
@@ -121,6 +123,80 @@ export async function billOnConfirm(
   });
 
   return { kind: 'created', invoiceCount: plans.length };
+}
+
+export type DepositOnConfirmResult =
+  | { kind: 'recorded'; entries: number }
+  /** 이미 장부가 있는 계약이다 — 확정 경로가 여럿이라 두 번 도는 길이 있다. */
+  | { kind: 'already' }
+  /** 예치금 0원 — 남길 것이 없다. */
+  | { kind: 'none' }
+  /** ★ 재계약인데 이전 계약에 장부가 없다. 아무것도 남기지 않았다 — 화면이 알린다. */
+  | { kind: 'previous_unrecorded' }
+  | { kind: 'no_contract' };
+
+/**
+ * 계약 확정 — 예치금 장부에 「받음」 또는 「이월」을 남긴다. **확정과 같은 트랜잭션이다.**
+ *
+ * 무엇을 남길지는 `planDepositOnConfirm`(shared)가 정한다. 날짜는 **계약일자**(없으면
+ * 시작일)다 — 예치금은 계약서에 서명하며 내는 돈이다(전대차계약서 제4조 1항).
+ *
+ * ★ 재계약이면 이전 계약의 보유액을 넘겨받는다(이전 계약에는 「이월」 넘김이 남는다).
+ *   이전 계약이 기간 만료로 끝나 「예치금 반환 대기」였어도 이월되면 대기에서 빠진다.
+ */
+export async function depositOnConfirm(
+  client: ScopedClient,
+  args: { contractId: string; actor: string; newId: () => string },
+): Promise<DepositOnConfirmResult> {
+  const { contractId, actor, newId } = args;
+
+  const contract = await findBillingContract(client, contractId);
+  if (!contract) return { kind: 'no_contract' };
+  if ((await contractDepositState(client, contractId)).hasRecords) return { kind: 'already' };
+
+  const spaces = await findBillingSpaces(client, contractId);
+  const depositTotal = spaces.reduce((sum, row) => sum + row.deposit, 0);
+
+  const previousId = contract.renewed_from_contract_id;
+  const previousRow = previousId ? await findBillingContract(client, previousId) : null;
+  const plan = planDepositOnConfirm({
+    depositTotal,
+    previous: previousRow ? await contractDepositState(client, previousRow.contract_id) : null,
+  });
+  if (plan.previousUnrecorded) return { kind: 'previous_unrecorded' };
+  if (plan.current.length === 0) return { kind: 'none' };
+
+  const entryOn = contract.contract_day ?? contract.start_day;
+  for (const entry of plan.current) {
+    await insertDepositEntry(client, {
+      depositEntryId: newId(),
+      buildId: contract.build_id,
+      companyId: contract.company_id,
+      contractId,
+      kind: entry.kind,
+      amount: entry.amount,
+      entryOn,
+      relatedContractId: entry.kind === 'carry_in' ? previousRow?.contract_id : null,
+      memo: entry.kind === 'return' ? '재계약 — 예치금 차액 반환' : null,
+      actor,
+    });
+  }
+  if (previousRow) {
+    for (const entry of plan.previous) {
+      await insertDepositEntry(client, {
+        depositEntryId: newId(),
+        buildId: previousRow.build_id,
+        companyId: previousRow.company_id,
+        contractId: previousRow.contract_id,
+        kind: entry.kind,
+        amount: entry.amount,
+        entryOn,
+        relatedContractId: contractId,
+        actor,
+      });
+    }
+  }
+  return { kind: 'recorded', entries: plan.current.length + plan.previous.length };
 }
 
 export type SettleOnTerminateResult =

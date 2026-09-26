@@ -104,14 +104,14 @@ const json = (res) => {
             SELECT 1 FROM public.tb_s080_contract_spaces cs
               JOIN public.tb_s080_contracts k ON k.contract_id = cs.contract_id
              WHERE cs.space_id = s.space_id AND k.status IN ('confirmed', 'draft'))
-        ORDER BY s.room_name LIMIT 26`,
+        ORDER BY s.room_name LIMIT 40`,
       [BUILD_ID],
     ),
   );
 
-  if (!BUILD_ID || !COMPANY || spaceRows.length < 24) {
+  if (!BUILD_ID || !COMPANY || spaceRows.length < 34) {
     console.error(
-      `✘ 준비 부족 — build=${BUILD_ID} company=${COMPANY} 빈비상주=${spaceRows.length}(24 필요)`,
+      `✘ 준비 부족 — build=${BUILD_ID} company=${COMPANY} 빈비상주=${spaceRows.length}(34 필요)`,
     );
     process.exit(1);
   }
@@ -840,6 +840,181 @@ const json = (res) => {
       );
       check('계약이 안 만들어졌다', left.rows[0].n === 0, `${left.rows[0].n}건`);
     }
+
+    /* ═══ 20. 예치금 — 신규 확정은 「받음」 1건 (024) ═══════════════════════ */
+    console.log('\n20. 예치금 — 신규 확정 → 받음');
+    const depositsOf = (contractId) =>
+      asOperator((c) =>
+        c.query(
+          `SELECT entry_kind, amount, to_char(entry_on, 'YYYY-MM-DD') AS day, related_contract_id
+             FROM public.tb_s080_deposit_ledger WHERE contract_id = $1 ORDER BY entry_on, created_at`,
+          [contractId],
+        ),
+      ).then((r) => r.rows);
+    const kinds = (rows) => rows.map((r) => `${r.entry_kind}:${r.amount}`).join(',');
+    {
+      const { body } = await createContract({ periodMonths: 3 });
+      check('확정 응답이 예치금 recorded', body.deposit === 'recorded', String(body.deposit));
+      const rows = await depositsOf(body.contractId);
+      check(
+        '★ 받음 1건 · 100,000 · 날짜 = 계약일자(2026-02-25)',
+        kinds(rows) === 'receive:100000' && rows[0].day === '2026-02-25',
+        JSON.stringify(rows),
+      );
+    }
+
+    /* ═══ 21. 예치금 — 재계약 확정은 「이월」, 받음 없음 ══════════════════ */
+    console.log('\n21. 예치금 — 재계약 확정 → 이월');
+    const renewOf = async (prevId, deposit) => {
+      const res = await op.inject({
+        method: 'POST',
+        url: '/contracts',
+        payload: {
+          companyId: COMPANY, buildId: BUILD_ID, contractRoom: nextRoom(), paymentMethod: 'M',
+          periodMonths: 3, contractDate: '2026-12-20', startDate: '2027-01-01', status: 'confirmed', memo: TAG,
+          spaces: [spaceOf(nextSpace(), { deposit })], renewedFromContractId: prevId,
+        },
+      });
+      const b = json(res);
+      if (b.contractId) created.push(b.contractId);
+      return { res, body: b };
+    };
+    {
+      const prev = await createContract({ startDate: '2026-10-01', periodMonths: 3 });
+      const renew = await renewOf(prev.body.contractId, 100_000);
+      check('재계약 확정 201', renew.res.statusCode === 201, renew.res.body);
+      const mine = await depositsOf(renew.body.contractId);
+      check(
+        '★ 새 계약 — 이월 100,000 한 건 · 받음 없음',
+        kinds(mine) === 'carry_in:100000' && mine[0].related_contract_id === prev.body.contractId,
+        JSON.stringify(mine),
+      );
+      const theirs = await depositsOf(prev.body.contractId);
+      check('이전 계약 — 받음 뒤에 이월(넘김) → 보유 0', kinds(theirs) === 'receive:100000,carry_out:100000', JSON.stringify(theirs));
+
+      const prev2 = await createContract({ startDate: '2026-10-01', periodMonths: 3 });
+      const bigger = await renewOf(prev2.body.contractId, 150_000);
+      const rows = await depositsOf(bigger.body.contractId);
+      check('예치금이 늘면 차액만 받음 — 이월 100,000 + 받음 50,000', kinds(rows) === 'carry_in:100000,receive:50000', JSON.stringify(rows));
+
+      // 장부가 생기기 전에 확정된 계약을 흉내 낸다 — 이전 계약의 기록을 지운다
+      const prev3 = await createContract({ startDate: '2026-10-01', periodMonths: 3 });
+      await asOperator((c) =>
+        c.query('DELETE FROM public.tb_s080_deposit_ledger WHERE contract_id = $1', [prev3.body.contractId]),
+      );
+      const blind = await renewOf(prev3.body.contractId, 100_000);
+      check(
+        '★ 이전 계약에 장부가 없으면 아무것도 안 남기고 알린다',
+        blind.body.deposit === 'previous_unrecorded' && (await depositsOf(blind.body.contractId)).length === 0,
+        String(blind.body.deposit),
+      );
+    }
+
+    /* ═══ 22. 기간 만료 종료 → 「예치금 반환 대기」 → 반환 ═══════════════ */
+    console.log('\n22. 기간 만료 — 예치금 반환 대기');
+    const queue = async () => json(await op.inject({ method: 'GET', url: '/billing/settlements' }));
+    {
+      const { body } = await createContract({ startDate: '2026-03-01', periodMonths: 3 });
+      await op.inject({
+        method: 'POST', url: `/contracts/${body.contractId}/status`,
+        payload: { to: 'terminated', terminatedDate: '2026-05-31', terminationReason: '기간 만료' },
+      });
+      let q = await queue();
+      const waiting = q.pending.find((p) => p.contractId === body.contractId);
+      check('★ 정산 탭에 「예치금 반환 대기」 100,000', waiting?.kind === 'deposit' && waiting.amount === 100_000, JSON.stringify(waiting));
+
+      const noAccount = await op.inject({
+        method: 'POST', url: `/contracts/${body.contractId}/deposit/return`,
+        payload: { paidOn: '2026-06-03', payMethod: 'B' },
+      });
+      check('반환 계좌 없이는 400', noAccount.statusCode === 400, noAccount.body);
+
+      const ok = await op.inject({
+        method: 'POST', url: `/contracts/${body.contractId}/deposit/return`,
+        payload: { paidOn: '2026-06-03', payMethod: 'B', refundBank: '국민은행', refundAccount: '123-45-678901', refundHolder: '검증' },
+      });
+      check('반환 200', ok.statusCode === 200 && json(ok).amount === 100_000, ok.body);
+      check('장부 — 받음 뒤 반환 100,000', kinds(await depositsOf(body.contractId)) === 'receive:100000,return:100000');
+      q = await queue();
+      const done = q.done.find((p) => p.contractId === body.contractId);
+      check(
+        '정산 탭 — 대기에서 빠지고 처리 완료',
+        !q.pending.some((p) => p.contractId === body.contractId) && done?.kind === 'deposit',
+        JSON.stringify(done),
+      );
+      check('★ 목록의 계좌번호는 가린다', done?.account === '***-**-**8901', String(done?.account));
+    }
+
+    /* ═══ 23. 첫 달 중간 해지 — 미수금 0 · 과납 · 정산 처리 ═══════════════ */
+    console.log('\n23. 첫 달 중간 해지 — 과납 · 정산 대기');
+    {
+      const { summarizeInvoices } = await import('../packages/shared/src/domain/invoice-summary.ts');
+      const { displayInvoiceStatus } = await import('../packages/shared/src/domain/invoice-status.ts');
+      const { body } = await createContract({ startDate: '2026-09-01', periodMonths: 3 });
+      await op.inject({
+        method: 'POST', url: `/contracts/${body.contractId}/status`,
+        payload: { to: 'terminated', terminatedDate: '2026-09-10', terminationReason: '중도 해지' },
+      });
+      const sep = (await invoicesOf(body.contractId)).find((i) => i.yearMonth === '2026-09');
+      const asOf = new Date(2026, 8, 26);
+      const st = displayInvoiceStatus({
+        status: sep.status, paidAmount: sep.paidAmount, totalAmount: sep.totalAmount, dueDate: null, asOf,
+      });
+      check(`★ 해지 달 — 청구 ${sep.totalAmount} · 수납 ${sep.paidAmount} → 과납(overpaid)`, st === 'overpaid', st);
+      const s = summarizeInvoices([sep], asOf);
+      check('★ 미수금 0 · 과납 366,667', s.outstanding === 0 && s.overpaid === 366_667, JSON.stringify(s));
+
+      const q = await queue();
+      const waiting = q.pending.find((p) => p.contractId === body.contractId);
+      check('정산 탭 — 중도해지 정산 대기 · 환불 466,667', waiting?.kind === 'settlement' && waiting.amount === 466_667, JSON.stringify(waiting));
+
+      const url = `/contracts/${body.contractId}/settlement/process`;
+      const noAccount = await op.inject({ method: 'POST', url, payload: { paidOn: '2026-09-26', amount: 466_667, payMethod: 'B' } });
+      check('★ 환불인데 계좌가 없으면 400', noAccount.statusCode === 400 && json(noAccount).error === 'refund_account_required', noAccount.body);
+      const ok = await op.inject({
+        method: 'POST', url,
+        payload: { paidOn: '2026-09-26', amount: 466_667, payMethod: 'B', refundBank: '신한은행', refundAccount: '110-123-456789', refundHolder: '검증' },
+      });
+      check('정산 처리 200', ok.statusCode === 200, ok.body);
+      const after = (await invoicesOf(body.contractId)).find((i) => i.yearMonth === '2026-09');
+      check('★ 과납 장이 납부완료 — 수납 = 청구', after.paidAmount === after.totalAmount && after.status === 'E', JSON.stringify(after));
+      check('★ 예치금 — 받음 뒤 반환 100,000 (차감 없음)', kinds(await depositsOf(body.contractId)) === 'receive:100000,return:100000');
+      const q2 = await queue();
+      const done = q2.done.find((p) => p.contractId === body.contractId);
+      check(
+        '정산 탭에서 빠지고 처리 완료',
+        !q2.pending.some((p) => p.contractId === body.contractId) && done?.kind === 'settlement',
+        JSON.stringify(done),
+      );
+      const company = json(await op.inject({ method: 'GET', url: `/companies/${COMPANY}/billing` }));
+      const card = company.settlements.find((x) => x.contractId === body.contractId);
+      check('정산 카드는 전체 계좌번호', card?.refund?.account === '110-123-456789', JSON.stringify(card?.refund));
+    }
+
+    /* ═══ 24. 추가청구 — 예치금은 차감 ════════════════════════════════════ */
+    console.log('\n24. 추가청구 — 예치금 차감');
+    {
+      const res = await op.inject({
+        method: 'POST', url: '/contracts',
+        payload: {
+          companyId: COMPANY, buildId: BUILD_ID, contractRoom: nextRoom(), paymentMethod: 'M', periodMonths: 3,
+          freeMonths: 1, contractDate: '2026-05-25', startDate: '2026-06-01', status: 'confirmed', memo: TAG,
+          spaces: [spaceOf(nextSpace(), { standardFee: 300_000, monthlyFee: 270_000 })],
+        },
+      });
+      const b = json(res);
+      if (b.contractId) created.push(b.contractId);
+      await op.inject({
+        method: 'POST', url: `/contracts/${b.contractId}/status`,
+        payload: { to: 'terminated', terminatedDate: '2026-08-15', terminationReason: '중도 해지' },
+      });
+      const ok = await op.inject({
+        method: 'POST', url: `/contracts/${b.contractId}/settlement/process`,
+        payload: { paidOn: '2026-09-26', amount: -719_677, payMethod: 'B' },
+      });
+      check('추가청구 정산은 계좌 없이 처리된다', ok.statusCode === 200, ok.body);
+      check('★ 예치금 — 받음 뒤 차감 100,000 · 반환 없음', kinds(await depositsOf(b.contractId)) === 'receive:100000,deduct:100000');
+    }
   } finally {
     await op.close();
 
@@ -853,7 +1028,7 @@ const json = (res) => {
         [TAG],
       );
       const list = ids.rows.map((r) => r.contract_id);
-      if (list.length === 0) return { payments: 0, invoices: 0, settlements: 0, contracts: 0 };
+      if (list.length === 0) return { payments: 0, invoices: 0, settlements: 0, deposits: 0, contracts: 0 };
 
       const payments = await c.query(
         `DELETE FROM public.tb_s080_payments p
@@ -870,6 +1045,11 @@ const json = (res) => {
         `DELETE FROM public.tb_s080_settlements WHERE contract_id = ANY($1::text[])`,
         [list],
       );
+      // ★ 예치금 장부(024)도 계약을 참조한다 — 계약보다 먼저 지운다.
+      const deposits = await c.query(
+        `DELETE FROM public.tb_s080_deposit_ledger WHERE contract_id = ANY($1::text[])`,
+        [list],
+      );
       // 계약 항목은 계약에서 CASCADE 된다.
       const contracts = await c.query(
         `DELETE FROM public.tb_s080_contracts WHERE memo = $1`,
@@ -880,25 +1060,33 @@ const json = (res) => {
         payments: payments.rowCount,
         invoices: invoices.rowCount,
         settlements: settlements.rowCount,
+        deposits: deposits.rowCount,
         contracts: contracts.rowCount,
       };
     });
     console.log(
-      `  수납 ${cleanup.payments} · 청구서 ${cleanup.invoices} · 정산 ${cleanup.settlements} · 계약 ${cleanup.contracts} 삭제`,
+      `  수납 ${cleanup.payments} · 청구서 ${cleanup.invoices} · 정산 ${cleanup.settlements} · 예치금 ${cleanup.deposits} · 계약 ${cleanup.contracts} 삭제`,
     );
 
+    /*
+     * ★ **이 검증이 만든 계약의 것만** 센다. 예전에는 표 전체를 셌는데, 개발계 DB 에
+     *   사람이 화면으로 만든 청구서가 생기자(2026-09-26) 남의 데이터 때문에 실패했다.
+     *   표 전체가 비어 있어야 한다는 가정은 공용 DB 에서 틀린다.
+     */
+    const mine = created;
     const left = await asOperator(async (c) => ({
       contracts: (await c.query(`SELECT count(*)::int n FROM public.tb_s080_contracts WHERE memo = $1`, [TAG])).rows[0].n,
-      invoices: (await c.query(`SELECT count(*)::int n FROM public.tb_s080_invoices`)).rows[0].n,
-      payments: (await c.query(`SELECT count(*)::int n FROM public.tb_s080_payments`)).rows[0].n,
-      settlements: (await c.query(`SELECT count(*)::int n FROM public.tb_s080_settlements`)).rows[0].n,
-      lines: (await c.query(`SELECT count(*)::int n FROM public.tb_s080_invoice_lines`)).rows[0].n,
+      invoices: (await c.query(`SELECT count(*)::int n FROM public.tb_s080_invoices WHERE contract_id = ANY($1::text[])`, [mine])).rows[0].n,
+      payments: (await c.query(`SELECT count(*)::int n FROM public.tb_s080_payments p JOIN public.tb_s080_invoices i ON i.invoice_id = p.invoice_id WHERE i.contract_id = ANY($1::text[])`, [mine])).rows[0].n,
+      settlements: (await c.query(`SELECT count(*)::int n FROM public.tb_s080_settlements WHERE contract_id = ANY($1::text[])`, [mine])).rows[0].n,
+      deposits: (await c.query(`SELECT count(*)::int n FROM public.tb_s080_deposit_ledger WHERE contract_id = ANY($1::text[])`, [mine])).rows[0].n,
+      lines: (await c.query(`SELECT count(*)::int n FROM public.tb_s080_invoice_lines l JOIN public.tb_s080_invoices i ON i.invoice_id = l.invoice_id WHERE i.contract_id = ANY($1::text[])`, [mine])).rows[0].n,
       company: (await c.query(`SELECT count(*)::int n FROM public.tb_s080_companies WHERE company_id = $1`, [TEMP_COMPANY])).rows[0].n,
     }));
     check(
       '★ 검증 데이터가 하나도 안 남았다',
       left.contracts === 0 && left.invoices === 0 && left.payments === 0 &&
-        left.settlements === 0 && left.lines === 0 && left.company === 0,
+        left.settlements === 0 && left.deposits === 0 && left.lines === 0 && left.company === 0,
       JSON.stringify(left),
     );
     await closePool();
@@ -924,6 +1112,7 @@ const json = (res) => {
             WHERE i.invoice_id = p.invoice_id AND i.contract_id = ANY($1::text[])`, [list]);
         await c.query(`DELETE FROM public.tb_s080_invoices WHERE contract_id = ANY($1::text[])`, [list]);
         await c.query(`DELETE FROM public.tb_s080_settlements WHERE contract_id = ANY($1::text[])`, [list]);
+        await c.query(`DELETE FROM public.tb_s080_deposit_ledger WHERE contract_id = ANY($1::text[])`, [list]);
       }
       await c.query(`DELETE FROM public.tb_s080_contracts WHERE memo = $1`, [TAG]);
       await c.query(`DELETE FROM public.tb_s080_companies WHERE company_id = $1`, [TEMP_COMPANY]);

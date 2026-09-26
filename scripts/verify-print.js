@@ -19,7 +19,11 @@
  *   ★ `127.0.0.1` 이 아니라 **localhost** 다 (Next 16 하이드레이션).
  *
  * 쓰는 법:  node scripts/verify-print.js [계약ID]
- *           계약ID 를 안 주면 DB 에서 확정 계약 하나를 고른다.
+ *           계약ID 를 안 주면 **검증용 계약을 새로 만들어** 쓰고 끝나면 지운다(2026-09-26).
+ *           예전에는 DB 에서 확정 계약을 골랐는데, 개발계에 확정 계약이 없으면 돌지 않았다.
+ *
+ * ★ 중도해지 정산서(s0300200070p3)도 뽑는다 — 검증용 계약을 중도 해지해 정산을 만들고,
+ *   입주사·계약 화면의 청구 탭에서 [정산서] 를 눌러 **진짜 인쇄 경로**를 탄다.
  */
 const fs = require('fs');
 const os = require('os');
@@ -204,6 +208,54 @@ async function printDoc(send, contractId, kind) {
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * 중도해지 정산서(s0300200070p3) — 입주사·계약 화면 청구 탭의 [정산서] 를 눌러 뽑는다.
+ *
+ * ★ 인쇄 규칙은 계약서와 같다(`print.css` 의 `data-printing='contract-doc'`). 그래서 같은
+ *   검사(가로선이 뒤에 칠해지는 배경에 맞닿는가)를 그대로 건다.
+ * ★ PDF 글자는 글꼴 부호라 읽기 어렵다 — 내용 확인은 **인쇄 직전의 문서 DOM** 에서 한다.
+ */
+async function printSettlement(send, companyId, contractId) {
+  const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
+  const S = (m, p) => send(m, p, sessionId);
+  await S('Page.enable');
+  await S('Runtime.enable');
+  const ev = async (expression, awaitPromise = false) => {
+    const r = await S('Runtime.evaluate', { expression, returnByValue: true, awaitPromise });
+    if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails));
+    return r.result.value;
+  };
+  const goto = async (url) => {
+    await S('Page.navigate', { url });
+    for (let i = 0; i < 80; i++) { await sleep(250); if (await ev('document.readyState') === 'complete') return; }
+  };
+
+  await goto(`${WEB}/login`);
+  const status = await ev(`fetch('/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:${JSON.stringify(JSON.stringify(LOGIN))}}).then(r=>r.status)`, true);
+  if (status !== 200) throw new Error(`로그인 실패 ${status}`);
+
+  await goto(`${WEB}/tenants/contracts?chips=all&companyId=${encodeURIComponent(companyId)}&tab=billing`);
+  let opened = 'NO';
+  for (let i = 0; i < 40 && opened !== 'OK'; i++) {
+    await sleep(250);
+    opened = await ev(`(() => { const card=document.querySelector('[data-settlement-card="${contractId}"]'); if(!card) return 'NO'; const b=[...card.querySelectorAll('button')].find(x=>x.textContent.includes('정산서')); if(!b) return 'NO'; b.click(); return 'OK'; })()`);
+  }
+  if (opened !== 'OK') throw new Error('청구 탭에 정산 카드의 [정산서] 가 없다');
+  await sleep(900);
+
+  const text = await ev(`(() => { const p=document.querySelector('[data-doc-page="settlement"]'); return p ? p.innerText : 'NONE'; })()`);
+  if (text === 'NONE') throw new Error('정산서 문서가 열리지 않았다');
+
+  const { data } = await S('Page.printToPDF', {
+    printBackground: true,
+    preferCSSPageSize: true,
+    marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0,
+  });
+  await send('Target.closeTarget', { targetId });
+  return { pdf: Buffer.from(data, 'base64'), text };
+}
+
 function readEnv(file) {
   return Object.fromEntries(
     fs.readFileSync(file, 'utf8').split(/\r?\n/)
@@ -212,17 +264,82 @@ function readEnv(file) {
   );
 }
 
-async function pickContract() {
+/**
+ * 검증용 계약 — 새로 만들어 쓰고 지운다. 개발계는 공용 DB 라 흔적을 남기지 않는다.
+ *
+ *   ① 확정(월납 3개월 · 2026-09-01 시작)   → 이용계약서 · 전대차계약서
+ *   ② 2026-09-10 중도 해지                  → 정산이 생긴다 → 정산서
+ *
+ * 만들고 끝내는 것은 **웹 API** 로 한다(화면이 쓰는 그 길). 지우는 것만 DB 로 한다 —
+ * 청구서·수납·정산·예치금 장부는 계약에서 CASCADE 되지 않는다(일부러 그렇다).
+ */
+async function createTempContract() {
   const env = readEnv('.env');
-  const c = new Client({ host: env.DB_HOST, port: +env.DB_PORT, user: env.DB_USER, password: env.DB_PASSWORD, database: env.DB_NAME });
-  await c.connect();
-  try {
-    const r = await c.query(`SELECT contract_id FROM public.tb_s080_contracts WHERE status = 'confirmed' ORDER BY created_at LIMIT 1`);
-    if (r.rows.length === 0) throw new Error('확정된 계약이 없다 — 계약 하나를 확정하고 다시 돌려라');
-    return r.rows[0].contract_id;
-  } finally {
-    await c.end();
-  }
+  const TAG = `verify-print-${Date.now()}`;
+  const db = new Client({ host: env.DB_HOST, port: +env.DB_PORT, user: env.DB_USER, password: env.DB_PASSWORD, database: env.DB_NAME });
+  await db.connect();
+
+  const login = await fetch(`${WEB}/api/auth/login`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(LOGIN),
+  });
+  if (login.status !== 200) { await db.end(); throw new Error(`로그인 실패 ${login.status}`); }
+  const cookie = (login.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ');
+  const api = async (method, url, body) => {
+    const res = await fetch(`${WEB}${url}`, {
+      method, headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    return { status: res.status, body: await res.json().catch(() => ({})) };
+  };
+
+  const build = (await db.query('SELECT build_id FROM public.tb_s080_buildings LIMIT 1')).rows[0]?.build_id;
+  const company = (await db.query(`SELECT c.company_id FROM public.tb_s080_companies c
+     WHERE (SELECT count(*) FROM public.tb_cm_file f WHERE f.target_id = c.company_id) >= 2 ORDER BY c.company_id LIMIT 1`)).rows[0]?.company_id;
+  const space = (await db.query(`SELECT s.space_id, s.room_type FROM public.tb_s080_spaces s
+     WHERE s.build_id = $1 AND s.room_type = 'VR' AND s.is_active AND NOT EXISTS (
+       SELECT 1 FROM public.tb_s080_contract_spaces cs JOIN public.tb_s080_contracts k ON k.contract_id = cs.contract_id
+        WHERE cs.space_id = s.space_id AND k.status IN ('confirmed','draft')) ORDER BY s.room_name LIMIT 1`, [build])).rows[0];
+  if (!build || !company || !space) { await db.end(); throw new Error('검증용 계약을 만들 준비가 안 됐다(건물·서류 있는 회사·빈 비상주)'); }
+
+  const created = await api('POST', '/api/contracts', {
+    companyId: company, buildId: build, contractRoom: `VP${String(Date.now()).slice(-6)}`, paymentMethod: 'M',
+    periodMonths: 3, contractDate: '2026-08-25', startDate: '2026-09-01', status: 'confirmed', memo: TAG,
+    spaces: [{ roomType: space.room_type, spaceId: space.space_id, standardFee: 500000, deposit: 100000, monthlyFee: 500000, vatYn: true }],
+  });
+  if (created.status !== 201) { await db.end(); throw new Error(`검증용 계약 생성 실패 ${created.status} ${JSON.stringify(created.body)}`); }
+  const contractId = created.body.contractId;
+
+  return {
+    contractId,
+    companyId: company,
+    terminate: async () => {
+      const r = await api('POST', `/api/contracts/${contractId}/status`, {
+        to: 'terminated', terminatedDate: '2026-09-10', terminationReason: '인쇄 검증',
+      });
+      if (r.status !== 200 || r.body.billing !== 'settled') throw new Error(`중도 해지 실패 ${r.status} ${JSON.stringify(r.body)}`);
+    },
+    /** 정산 처리 — 환불 계좌가 정산서에 찍히는지 보려고 처리까지 한다. */
+    process: async () => {
+      const r = await api('POST', `/api/contracts/${contractId}/settlement/process`, {
+        paidOn: '2026-09-26', amount: 466667, payMethod: 'B',
+        refundBank: '신한은행', refundAccount: '110-123-456789', refundHolder: '인쇄검증',
+      });
+      if (r.status !== 200) throw new Error(`정산 처리 실패 ${r.status} ${JSON.stringify(r.body)}`);
+    },
+    cleanup: async () => {
+      const ids = (await db.query('SELECT contract_id FROM public.tb_s080_contracts WHERE memo = $1', [TAG])).rows.map((r) => r.contract_id);
+      if (ids.length > 0) {
+        await db.query('DELETE FROM public.tb_s080_deposit_ledger WHERE contract_id = ANY($1::text[])', [ids]);
+        await db.query('DELETE FROM public.tb_s080_settlements WHERE contract_id = ANY($1::text[])', [ids]);
+        await db.query(`DELETE FROM public.tb_s080_payments p USING public.tb_s080_invoices i
+                         WHERE i.invoice_id = p.invoice_id AND i.contract_id = ANY($1::text[])`, [ids]);
+        await db.query('DELETE FROM public.tb_s080_invoices WHERE contract_id = ANY($1::text[])', [ids]);
+        await db.query('DELETE FROM public.tb_s080_contracts WHERE contract_id = ANY($1::text[])', [ids]);
+      }
+      const left = (await db.query('SELECT count(*)::int n FROM public.tb_s080_contracts WHERE memo = $1', [TAG])).rows[0].n;
+      check('검증용 계약을 지웠다', left === 0, `${ids.length}건 삭제`);
+      await db.end();
+    },
+  };
 }
 
 const DOCS = [
@@ -231,9 +348,11 @@ const DOCS = [
 ];
 
 (async () => {
-  const contractId = process.argv[2] || (await pickContract());
+  const temp = await createTempContract();
+  const contractId = process.argv[2] || temp.contractId;
   console.log(`계약 ${contractId.slice(0, 8)} 로 실제 PDF 를 뽑는다\n`);
 
+  try {
   await withChrome(async (send) => {
     for (const doc of DOCS) {
       console.log(`── ${doc.name}`);
@@ -261,7 +380,35 @@ const DOCS = [
         check(`${doc.name} 가로선이 충분히 있다`, total >= 40, `${total}개 — 칸마다 스스로 그린다`);
       }
     }
+
+    /* ── 중도해지 정산서 — 검증용 계약을 9/10 에 해지하고 정산 처리까지 한 뒤 뽑는다 ── */
+    console.log('── 중도해지 정산서');
+    await temp.terminate();
+    await temp.process();
+    const { pdf, text } = await printSettlement(send, temp.companyId, temp.contractId);
+    check('중도해지 정산서 1장', pageCount(pdf) === 1, `${pageCount(pdf)}장`);
+
+    let total = 0;
+    let risky = 0;
+    for (const content of contentStreams(pdf)) {
+      for (const line of riskyLines(content)) {
+        total++;
+        if (line.covered.length > 0) risky++;
+      }
+    }
+    check('중도해지 정산서 가로선이 뒤에 칠해지는 배경에 안 맞닿는다', risky === 0, `위태 ${risky} / 가로선 ${total}`);
+    check('중도해지 정산서 가로선이 충분히 있다', total >= 12, `${total}개`);
+
+    // 내용 — 인쇄 직전의 문서에서 읽는다(PDF 글자는 글꼴 부호라 읽기 어렵다)
+    check('실제 이용 기간 「2026.09.01 ~ 2026.09.10 (10일)」', text.includes('2026.09.01 ~ 2026.09.10 (10일)'));
+    check('환수 근거 조항 「전대차계약서 제8조 3항」', text.includes('전대차계약서 제8조 3항'));
+    check('환불할 금액 466,667원', text.includes('환불할 금액') && text.includes('466,667원'));
+    check('환불 계좌 — 전체 번호', text.includes('신한은행 110-123-456789'));
+    check('서명란이 없다', !text.includes('서명') && !text.includes('(인)'));
   });
+  } finally {
+    await temp.cleanup();
+  }
 
   const bad = results.filter((r) => !r.ok).length;
   console.log(`\n${'='.repeat(50)}`);

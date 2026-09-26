@@ -26,6 +26,7 @@ import { requireSession } from '../session/hook.ts';
 import { withCompanyScope, type CompanyScope } from '../db/withCompanyScope.ts';
 import {
   deletePayment,
+  findBillingContract,
   findContractSettlement,
   findInvoice,
   findPayment,
@@ -42,6 +43,15 @@ import {
   type BillingListRow,
   type SettlementRow,
 } from '../db/invoices.ts';
+import {
+  contractDepositState,
+  insertDepositEntry,
+  listCompanyDeposits,
+  listSettlementQueue,
+  type DepositRow,
+} from '../db/deposits.ts';
+import { depositBalance, splitDepositOnSettle } from '@swonbiz/shared/domain/deposit-ledger';
+import { maskAccount, pendingKind } from '@swonbiz/shared/domain/settlement-view';
 
 /** 수납을 쓸 수 있는 역할. 조회는 입주사도 한다. */
 const WRITE_ROLE = 'operator';
@@ -55,6 +65,23 @@ interface PaymentBody {
   amount?: number;
   payMethod?: string;
   memo?: string | null;
+  /** 정산 처리 · 예치금 반환 — 환불일 때만. */
+  refundBank?: string | null;
+  refundAccount?: string | null;
+  refundHolder?: string | null;
+}
+
+/**
+ * 환불 계좌 — 셋이 다 있어야 한다. 하나라도 비면 `null`.
+ *
+ * ★ 반쯤 적힌 계좌는 받지 않는다. 은행 없는 계좌번호로는 송금할 수 없고, 그 기록을 보고
+ *   누가 송금했다고 믿으면 돈이 안 간 채로 끝난다.
+ */
+function parseRefund(body: PaymentBody | undefined): { bank: string; account: string; holder: string } | null {
+  const bank = String(body?.refundBank ?? '').trim();
+  const account = String(body?.refundAccount ?? '').trim();
+  const holder = String(body?.refundHolder ?? '').trim();
+  return bank && account && holder ? { bank, account, holder } : null;
 }
 
 type ParsedPayment = { paidOn: string; amount: number; payMethod: string; memo: string | null };
@@ -144,6 +171,18 @@ function toSettlement(row: SettlementRow) {
     settleType: row.settle_type,
     /** ★ 청구서에 들어가는 몫 = 총수납 − 실이용료. 나머지(예치금·환수)는 원장에만 남는다. */
     rentNet: row.total_paid - row.usage_charge,
+    companyName: row.company_name,
+    bizNumber: row.biz_number ?? '',
+    contractRoom: row.contract_room ?? '',
+    freeMonths: row.free_months,
+    monthlyTotal: row.monthly_total,
+    /**
+     * 환불 계좌 — **전체 번호**다. 정산 카드와 정산서에서만 쓴다.
+     * ★ 목록(`GET /billing/settlements`)은 가린 번호만 준다.
+     */
+    refund: row.refund_account
+      ? { bank: row.refund_bank ?? '', account: row.refund_account, holder: row.refund_holder ?? '' }
+      : null,
     processed: row.processed_day
       ? {
           processedOn: row.processed_day,
@@ -154,6 +193,30 @@ function toSettlement(row: SettlementRow) {
         }
       : null,
   };
+}
+
+/**
+ * 입주사의 예치금 — 계약마다 보유액과 기록.
+ *
+ * ★ 보유액은 기록의 합이다(`depositBalance`, shared). 여기서 따로 세지 않는다.
+ */
+function toDeposits(rows: readonly DepositRow[]) {
+  const byContract = new Map<string, DepositRow[]>();
+  for (const row of rows) {
+    const list = byContract.get(row.contract_id) ?? [];
+    list.push(row);
+    byContract.set(row.contract_id, list);
+  }
+  return [...byContract.entries()].map(([contractId, list]) => ({
+    contractId,
+    balance: depositBalance(list.map((r) => ({ kind: r.entry_kind, amount: r.amount }))),
+    entries: list.map((r) => ({
+      kind: r.entry_kind,
+      amount: r.amount,
+      entryOn: r.entry_day,
+      memo: r.memo ?? '',
+    })),
+  }));
 }
 
 /** 두 번 처리하려 했다 — 트랜잭션을 되돌리려고 던진다. */
@@ -189,17 +252,127 @@ export function registerBillingRoutes(app: FastifyInstance): void {
     if (session.role !== WRITE_ROLE) return forbidden(reply);
 
     const found = await withCompanyScope(scopeOf(session), async (client) => {
-      const [invoices, settlements] = await Promise.all([
-        listBillingInvoices(client, { yearMonth: null, companyId: req.params.id }),
-        listCompanySettlements(client, req.params.id),
-      ]);
-      return { invoices, settlements };
+      // ★ 차례로 부른다 — 한 트랜잭션 커넥션에 동시에 쿼리를 걸면 pg 가 경고하고(pg@9 에서 막힌다)
+      //   어차피 한 줄로 서서 돈다.
+      const invoices = await listBillingInvoices(client, { yearMonth: null, companyId: req.params.id });
+      const settlements = await listCompanySettlements(client, req.params.id);
+      const deposits = await listCompanyDeposits(client, req.params.id);
+      return { invoices, settlements, deposits };
     });
     return reply.send({
       invoices: found.invoices.map(toBillingItem),
       settlements: found.settlements.map(toSettlement),
+      deposits: toDeposits(found.deposits),
     });
   });
+
+  /* ── 정산 탭 (s0300200070 「정산」) — 처리 대기 · 최근 처리 완료 ──────────
+     ★ 대기인지는 `pendingKind`(shared) 하나가 정한다. 정산서 한 장을 그릴 수 있게 정산
+       전체도 같이 준다(계좌는 가린다 — 전체 번호는 정산서를 열 때 입주사 청구 API 로 받는다). */
+  app.get('/billing/settlements', async (req, reply) => {
+    const session = requireSession(req);
+    if (session.role !== WRITE_ROLE) return forbidden(reply);
+
+    const rows = await withCompanyScope(scopeOf(session), (client) => listSettlementQueue(client));
+    const pending: unknown[] = [];
+    const done: unknown[] = [];
+    for (const r of rows) {
+      const kind = pendingKind({
+        contractStatus: r.status,
+        settlement: r.settlement_id ? { processed: r.processed_day !== null } : null,
+        depositBalance: r.deposit_balance,
+      });
+      const head = {
+        contractId: r.contract_id,
+        companyId: r.company_id,
+        companyName: r.company_name,
+        roomNames: r.room_names ?? '',
+        terminatedDate: r.terminated_day ?? r.end_day,
+      };
+      if (kind === 'settlement') {
+        pending.push({ ...head, kind, amount: r.net_amount ?? 0 });
+      } else if (kind === 'deposit') {
+        // ★ 예치금 반환은 언제나 돌려주는 돈이다 — 양수(환불 방향).
+        pending.push({ ...head, kind, amount: r.deposit_balance });
+      } else if (r.processed_day) {
+        done.push({
+          ...head, kind: 'settlement', processedOn: r.processed_day, amount: r.processed_amount ?? 0,
+          account: maskAccount(r.settlement_refund_account),
+        });
+      } else if (r.last_return_day) {
+        done.push({
+          ...head, kind: 'deposit', processedOn: r.last_return_day, amount: r.last_return_amount ?? 0,
+          account: maskAccount(r.last_return_account),
+        });
+      }
+    }
+    return reply.send({ pending, done });
+  });
+
+  /* ── 예치금 반환 — 정산서 없이 (기간 만료로 끝난 계약) ─────────────────────
+     ★ 중도해지 정산이 처리 전이면 막는다 — 그 예치금은 정산 처리가 반환·차감으로 나눈다.
+       여기서 먼저 돌려주면 정산이 받을 돈을 메울 예치금이 없어진다. */
+  app.post<{ Params: { id: string }; Body: PaymentBody }>(
+    '/contracts/:id/deposit/return',
+    async (req, reply) => {
+      const session = requireSession(req);
+      if (session.role !== WRITE_ROLE) {
+        return reply.code(403).send({ error: 'forbidden', message: '예치금 반환은 운영사만 할 수 있습니다' });
+      }
+      const returnedOn = String(req.body?.paidOn ?? '');
+      if (parseDay(returnedOn) === null) {
+        return reply.code(400).send({ error: 'invalid_request', message: `반환일이 올바르지 않습니다: ${returnedOn || '(없음)'}` });
+      }
+      const refund = parseRefund(req.body);
+      if (refund === null) {
+        return reply.code(400).send({
+          error: 'refund_account_required',
+          message: '반환 계좌(은행 · 계좌번호 · 예금주)를 입력해 주세요',
+        });
+      }
+      const memo = typeof req.body?.memo === 'string' && req.body.memo.trim() !== '' ? req.body.memo.trim() : null;
+      const actor = String(session.s020MemberId);
+
+      const result = await withCompanyScope(scopeOf(session), async (client) => {
+        const contract = await findBillingContract(client, req.params.id);
+        if (!contract) return { kind: 'not_found' as const };
+        const settlement = await findContractSettlement(client, contract.contract_id);
+        const deposit = await contractDepositState(client, contract.contract_id);
+        const kind = pendingKind({
+          contractStatus: contract.status,
+          settlement: settlement ? { processed: settlement.processed_day !== null } : null,
+          depositBalance: deposit.balance,
+        });
+        if (kind !== 'deposit') return { kind: 'not_pending' as const, why: kind };
+
+        await insertDepositEntry(client, {
+          depositEntryId: randomUUID(),
+          buildId: contract.build_id,
+          companyId: contract.company_id,
+          contractId: contract.contract_id,
+          kind: 'return',
+          amount: deposit.balance,
+          entryOn: returnedOn,
+          refund,
+          memo: memo ?? '계약 종료 — 예치금 반환',
+          actor,
+        });
+        return { kind: 'ok' as const, amount: deposit.balance };
+      });
+
+      if (result.kind === 'not_found') return notFound(reply, '계약');
+      if (result.kind === 'not_pending') {
+        return reply.code(409).send({
+          error: 'not_pending',
+          message:
+            result.why === 'settlement'
+              ? '중도해지 정산이 처리 전입니다 — 예치금은 [정산 처리]에서 함께 처리합니다'
+              : '돌려줄 예치금이 없습니다',
+        });
+      }
+      return reply.send({ amount: result.amount });
+    },
+  );
 
   /* ── 정산 처리 ────────────────────────────────────────────────────────────
      ★★★ 두 곳에 나누어 쓴다 — **한 트랜잭션이다**(023 머리말, 2026-09-26 결정).
@@ -237,11 +410,14 @@ export function registerBillingRoutes(app: FastifyInstance): void {
       const memo =
         typeof req.body?.memo === 'string' && req.body.memo.trim() !== '' ? req.body.memo.trim() : null;
       const actor = String(session.s020MemberId);
+      const refund = parseRefund(req.body);
 
       type Outcome =
         | { kind: 'not_found' }
         | { kind: 'already' }
         | { kind: 'mismatch'; moved: number; rentNet: number }
+        | { kind: 'deposit_mismatch'; held: number; depositReturn: number }
+        | { kind: 'refund_account_required' }
         | { kind: 'ok'; paymentId: string | null };
 
       let result: Outcome;
@@ -250,6 +426,20 @@ export function registerBillingRoutes(app: FastifyInstance): void {
           const settlement = await findContractSettlement(client, req.params.id);
           if (!settlement) return { kind: 'not_found' };
           if (settlement.processed_day) return { kind: 'already' };
+
+          // ★ 환불이면 계좌가 있어야 한다 — 돌려줄 곳을 모르는 환불은 처리된 것이 아니다.
+          if (settlement.net_amount > 0 && refund === null) return { kind: 'refund_account_required' };
+
+          /*
+           * ★★ 예치금 — 장부가 있으면 반환·차감으로 나누어 남긴다(`splitDepositOnSettle`).
+           *    장부의 보유액과 정산의 예치금 반환이 다르면 **막는다.** 정산은 계약 항목의 예치금
+           *    합으로 계산됐고, 장부는 실제로 받은 기록이다 — 둘이 다르면 어느 쪽이 맞는지
+           *    사람이 봐야 한다. 장부가 아예 없는 계약(024 이전 확정)은 기록 없이 넘어간다.
+           */
+          const deposit = await contractDepositState(client, settlement.contract_id);
+          if (deposit.hasRecords && deposit.balance !== settlement.deposit_return) {
+            return { kind: 'deposit_mismatch', held: deposit.balance, depositReturn: settlement.deposit_return };
+          }
 
           const rentNet = settlement.total_paid - settlement.usage_charge;
 
@@ -308,10 +498,35 @@ export function registerBillingRoutes(app: FastifyInstance): void {
             method,
             memo,
             paymentId,
+            refund: settlement.net_amount > 0 ? refund : null,
             actor,
           });
           // ★ 그 사이 다른 사람이 처리했다. 던져서 위의 수납까지 되돌린다.
           if (!marked) throw new AlreadyProcessed();
+
+          if (deposit.hasRecords && deposit.balance > 0) {
+            const split = splitDepositOnSettle({ held: deposit.balance, netAmount: settlement.net_amount });
+            const base = {
+              buildId: settlement.build_id,
+              companyId: settlement.company_id,
+              contractId: settlement.contract_id,
+              entryOn: processedOn,
+              settlementId: settlement.settlement_id,
+              actor,
+            };
+            if (split.deducted > 0) {
+              await insertDepositEntry(client, {
+                ...base, depositEntryId: randomUUID(), kind: 'deduct', amount: split.deducted,
+                memo: '중도해지 정산 — 받을 돈을 예치금으로 메움',
+              });
+            }
+            if (split.returned > 0) {
+              await insertDepositEntry(client, {
+                ...base, depositEntryId: randomUUID(), kind: 'return', amount: split.returned,
+                refund, memo: '중도해지 정산 — 예치금 반환',
+              });
+            }
+          }
           return { kind: 'ok', paymentId };
         });
       } catch (err) {
@@ -322,6 +537,21 @@ export function registerBillingRoutes(app: FastifyInstance): void {
       if (result.kind === 'not_found') return notFound(reply, '정산 원장');
       if (result.kind === 'already') {
         return reply.code(409).send({ error: 'already_processed', message: '이미 처리된 정산입니다' });
+      }
+      if (result.kind === 'refund_account_required') {
+        return reply.code(400).send({
+          error: 'refund_account_required',
+          message: '환불할 정산입니다 — 환불 계좌(은행 · 계좌번호 · 예금주)를 입력해 주세요',
+        });
+      }
+      if (result.kind === 'deposit_mismatch') {
+        const fmt = (n: number) => n.toLocaleString('ko-KR');
+        return reply.code(409).send({
+          error: 'deposit_mismatch',
+          message:
+            `예치금 장부의 보유액(${fmt(result.held)}원)이 정산의 예치금 반환(${fmt(result.depositReturn)}원)과 ` +
+            '맞지 않아 처리하지 않았습니다. 예치금 기록을 확인해 주세요',
+        });
       }
       if (result.kind === 'mismatch') {
         const fmt = (n: number) => n.toLocaleString('ko-KR');
@@ -365,10 +595,8 @@ export function registerBillingRoutes(app: FastifyInstance): void {
     const found = await withCompanyScope(scopeOf(session), async (client) => {
       const invoice = await findInvoice(client, req.params.id);
       if (!invoice) return null;
-      const [lines, payments] = await Promise.all([
-        listInvoiceLines(client, invoice.invoice_id),
-        listInvoicePayments(client, invoice.invoice_id),
-      ]);
+      const lines = await listInvoiceLines(client, invoice.invoice_id);
+      const payments = await listInvoicePayments(client, invoice.invoice_id);
       return { invoice, lines, payments };
     });
     if (!found) return notFound(reply, '청구서');

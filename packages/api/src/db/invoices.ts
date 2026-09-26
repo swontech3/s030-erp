@@ -55,6 +55,8 @@ export interface BillingContract {
   end_day: string;
   /** `YYYY-MM-DD`. 계약일자는 선택이라 NULL 일 수 있다. */
   contract_day: string | null;
+  /** 재계약이면 이전 계약 — 예치금 이월이 본다. */
+  renewed_from_contract_id: string | null;
 }
 
 export async function findBillingContract(
@@ -66,7 +68,8 @@ export async function findBillingContract(
     `SELECT contract_id, company_id, build_id, status, payment_method, period_months, free_months,
             to_char(start_date,    'YYYY-MM-DD') AS start_day,
             to_char(end_date,      'YYYY-MM-DD') AS end_day,
-            to_char(contract_date, 'YYYY-MM-DD') AS contract_day
+            to_char(contract_date, 'YYYY-MM-DD') AS contract_day,
+            renewed_from_contract_id
        FROM public.tb_s080_contracts
       WHERE contract_id = $1`,
     [contractId],
@@ -575,6 +578,7 @@ export async function listBillingInvoices(
 /** 정산 원장 한 줄 — 화면이 보는 칸 전부. 날짜는 문자열이다(머리말 참조). */
 export interface SettlementRow {
   settlement_id: string;
+  build_id: string;
   company_id: string;
   contract_id: string;
   /** `YYYY-MM-DD`. */
@@ -597,10 +601,22 @@ export interface SettlementRow {
   start_day: string;
   end_day: string;
   room_names: string | null;
+  /** 정산서 머리 — 입주사 · 계약호실 · 사업자번호. */
+  company_name: string;
+  biz_number: string | null;
+  contract_room: string | null;
+  /** 실이용료를 「개월 + 일할」로 나누어 보여 줄 때 쓴다. */
+  free_months: number;
+  /** 부가세 포함 월액(호실 납부액 합). */
+  monthly_total: number;
+  /** 환불 계좌 — 024. ★ 목록에서는 가린다. */
+  refund_bank: string | null;
+  refund_account: string | null;
+  refund_holder: string | null;
 }
 
 const SETTLEMENT_SELECT = `
-  SELECT st.settlement_id, st.company_id, st.contract_id,
+  SELECT st.settlement_id, st.build_id, st.company_id, st.contract_id,
          to_char(st.terminate_date, 'YYYY-MM-DD') AS terminate_day,
          st.payment_method, st.total_paid, st.usage_charge, st.deposit_return,
          st.discount_clawback, st.free_clawback, st.net_amount, st.settle_type,
@@ -611,9 +627,14 @@ const SETTLEMENT_SELECT = `
          (SELECT string_agg(s.room_name, ' / ' ORDER BY cs.seq)
             FROM public.tb_s080_contract_spaces cs
             LEFT JOIN public.tb_s080_spaces s ON s.space_id = cs.space_id
-           WHERE cs.contract_id = st.contract_id) AS room_names
+           WHERE cs.contract_id = st.contract_id) AS room_names,
+         c.company_name, c.biz_number, k.contract_room, k.free_months,
+         (SELECT coalesce(sum(cs.payment_amount), 0)::int
+            FROM public.tb_s080_contract_spaces cs WHERE cs.contract_id = st.contract_id) AS monthly_total,
+         st.refund_bank, st.refund_account, st.refund_holder
     FROM public.tb_s080_settlements st
-    JOIN public.tb_s080_contracts k ON k.contract_id = st.contract_id`;
+    JOIN public.tb_s080_contracts k ON k.contract_id = st.contract_id
+    JOIN public.tb_s080_companies c ON c.company_id = st.company_id`;
 
 export async function listCompanySettlements(
   client: ScopedClient,
@@ -673,6 +694,8 @@ export async function markSettlementProcessed(
     method: string;
     memo: string | null;
     paymentId: string | null;
+    /** 환불일 때만 — 돌려준 계좌(024). */
+    refund: { bank: string; account: string; holder: string } | null;
     actor: string;
   },
 ): Promise<boolean> {
@@ -681,11 +704,13 @@ export async function markSettlementProcessed(
     `UPDATE public.tb_s080_settlements
         SET processed_on = $2::date, processed_amount = $3, processed_method = $4,
             processed_memo = $5, processed_payment_id = $6,
-            processed_at = now(), processed_by = $7
+            processed_at = now(), processed_by = $7,
+            refund_bank = $8, refund_account = $9, refund_holder = $10
       WHERE settlement_id = $1 AND processed_on IS NULL`,
     [
       args.settlementId, args.processedOn, args.amount, args.method, args.memo,
       args.paymentId, args.actor,
+      args.refund?.bank ?? null, args.refund?.account ?? null, args.refund?.holder ?? null,
     ],
   );
   return (res.rowCount ?? 0) === 1;

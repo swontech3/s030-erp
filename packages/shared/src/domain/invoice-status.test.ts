@@ -105,3 +105,41 @@ describe('displayInvoiceStatus — 납부일 당일은 아직 미납이 아니�
     ).toBe('unpaid');
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ★★ 과납 — 받은 것이 청구보다 많다 (2026-09-26 재현)
+   ══════════════════════════════════════════════════════════════════════════
+   월납 첫 달을 확정 때 받고 그 달 중간에 해지하면, 해지 달이 일할로 낮아져
+   청구 183,333 · 수납 550,000 이 된다. 저장상태는 E 라 「납부완료」로 보였다 —
+   돌려줄 돈이 366,667 남아 있는데 끝난 장처럼 읽혔다. */
+describe('displayInvoiceStatus — 과납', () => {
+  it('★ 수납이 청구보다 많으면 overpaid — 저장상태 E 여도', () => {
+    expect(
+      displayInvoiceStatus({ status: 'E', paidAmount: 550_000, totalAmount: 183_333, dueDate: null, asOf }),
+    ).toBe('overpaid');
+  });
+
+  it('저장상태 P 여도 수납이 많으면 overpaid', () => {
+    expect(
+      displayInvoiceStatus({ status: 'P', paidAmount: 600, totalAmount: 500, dueDate: day(2026, 6, 1), asOf }),
+    ).toBe('overpaid');
+  });
+
+  it('수납 = 청구면 여전히 paid (과납 아님)', () => {
+    expect(
+      displayInvoiceStatus({ status: 'E', paidAmount: 183_333, totalAmount: 183_333, dueDate: null, asOf }),
+    ).toBe('paid');
+  });
+
+  it('취소된 장은 수납이 남아 있어도 canceled', () => {
+    expect(
+      displayInvoiceStatus({ status: 'C', paidAmount: 550_000, totalAmount: 550_000, dueDate: null, asOf }),
+    ).toBe('canceled');
+  });
+
+  it('무상 장(청구 0 · 수납 0)은 paid', () => {
+    expect(
+      displayInvoiceStatus({ status: 'E', paidAmount: 0, totalAmount: 0, dueDate: null, asOf }),
+    ).toBe('paid');
+  });
+});

@@ -36,7 +36,13 @@
  */
 import { daysBetweenLocal } from './day.ts';
 
-export type DisplayStatus = 'paid' | 'partial' | 'unpaid' | 'pending' | 'canceled';
+/**
+ * ★ `overpaid` — 받은 것이 청구보다 많다. 화면 이름은 「과납 · 정산 대기」.
+ *   월납 첫 달을 확정 때 받고 그 달 중간에 해지하면 해지 달이 일할로 낮아져 생긴다.
+ *   저장상태는 E 라서 예전에는 「납부완료」로 보였다 — 돌려줄 돈이 남은 장이 끝난 장처럼
+ *   읽혔다(2026-09-26 재현). 정산 처리가 그 차액을 음수 수납으로 넣으면 paid 가 된다.
+ */
+export type DisplayStatus = 'paid' | 'partial' | 'unpaid' | 'pending' | 'canceled' | 'overpaid';
 
 /**
  * 지금 이 청구서를 화면에 뭐라고 쓸 것인가.
@@ -55,6 +61,8 @@ export function displayInvoiceStatus(args: {
   const { status, paidAmount, totalAmount, dueDate, asOf } = args;
 
   if (status === 'C') return 'canceled';
+  // ★ E 보다 먼저 본다 — 과납 장은 저장상태가 E 다.
+  if (paidAmount > totalAmount) return 'overpaid';
   if (status === 'E' || paidAmount >= totalAmount) return 'paid';
   if (paidAmount > 0) return 'partial';
 
