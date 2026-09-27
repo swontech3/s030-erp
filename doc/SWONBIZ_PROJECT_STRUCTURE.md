@@ -55,7 +55,7 @@ SwonBiz-erp/                             ← 모노레포 루트 · npm workspac
 │  │  │  │  │  ├─ applications/page.tsx     # s0300200060 신청 대기
 │  │  │  │  │  ├─ billing/page.tsx          # s0300200070 월별 청구 (3차)
 │  │  │  │  │  └─ booking/
-│  │  │  │  │     ├─ page.tsx               # s0300600010 예약 현황
+│  │  │  │  │     ├─ page.tsx               # s0300600010 회의실 예약
 │  │  │  │  │     └─ approvals/page.tsx     # s0300600020 승인 큐
 │  │  │  │  └─ layout.tsx                # 루트 · 폰트(next/font/local) · 전역 토큰
 │  │  │  ├─ components/
@@ -126,7 +126,7 @@ export const SCREENS = {
   s0300200040: { route: '/contracts/[id]',     name: '계약 폼',         group: '020' },
   s0300500010: { route: '/',                   name: '랜딩',           group: '050', public: true },
   s0300500060: { route: '/kiosk',              name: '회의실 현황판',    group: '050', public: true },
-  s0300600010: { route: '/booking',            name: '예약 현황',       group: '060' },
+  s0300600010: { route: '/booking',            name: '회의실 예약',     group: '060' },
   // ... 전체 목록은 doc/SWONBIZ_SCREEN_LIST.md 참조
 } as const;
 ```
@@ -213,7 +213,7 @@ return routeOf(screens[0])
 
 기본은 고정 1440px 기준. 단 아래 두 화면만 3단 대응한다.
 
-- `s0300600010` 예약 현황 — 1280+ 주간 / 768~1279 축약 / ~767 일간
+- `s0300600010` 회의실 예약 — 1280+ 주간 / 768~1279 축약 / ~767 일간
 - `s0300500060` 현황판 — `100dvh` 고정, 스크롤 없음
 
 브레이크포인트 토큰: `--bp-tablet: 768px` / `--bp-desktop: 1280px`

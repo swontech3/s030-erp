@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>s0300600010 회의실 예약 — SwonBiz ERP 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<script src="https://unpkg.com/lucide@0.414.0/dist/umd/lucide.js"></script>
+<style>
+/* ── 디자인 토큰 ── handoff/tokens/*.css 와 동일한 값 ── */
+:root{
+  --indigo-600:#4F46E5; --indigo-700:#4338CA; --indigo-400:#818CF8;
+  --cyan-400:#22D3EE; --indigo-50:#EEF2FF;
+  --slate-950:#0B1120; --slate-600:#475569; --slate-500:#64748B;
+  --slate-400:#94A3B8; --white:#FFFFFF; --slate-50:#F8FAFC; --slate-200:#E2E8F0;
+  --amber-600:#D97706; --amber-100:#FEF3C7; --amber-800:#92400E;
+  --red-600:#DC2626; --red-100:#FEE2E2; --red-800:#991B1B;
+  --color-primary:var(--indigo-600); --color-primary-hover:var(--indigo-700);
+  --color-secondary:var(--indigo-400); --color-accent:var(--cyan-400);
+  --color-accent-bg:var(--indigo-50);
+  --color-warning:var(--amber-600); --color-warning-bg:var(--amber-100); --color-warning-text:var(--amber-800);
+  --color-danger:var(--red-600); --color-danger-bg:var(--red-100); --color-danger-text:var(--red-800);
+  --surface:var(--white); --surface-alt:var(--slate-50); --surface-inverse:var(--slate-950);
+  --border:var(--slate-200); --border-strong:#CBD5E1;
+  --text-heading:var(--slate-950); --text-body:var(--slate-600);
+  --text-muted:var(--slate-500); --text-caption:var(--slate-400);
+  --text-on-primary:var(--white);
+  --focus-ring:rgba(79,70,229,.32);
+  --font-core:"Pretendard Variable",Pretendard,Inter,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --radius-xs:4px; --radius-sm:6px; --radius-md:8px; --radius-lg:12px; --radius-pill:999px;
+  --shadow-primary:0 4px 16px rgba(79,70,229,.22);
+  --shadow-float:0 8px 24px rgba(11,17,32,.10);
+  --shadow-overlay:0 20px 48px rgba(11,17,32,.18);
+  --ease-out:cubic-bezier(.22,.61,.36,1);
+  --dur-fast:120ms; --dur:180ms; --dur-slow:280ms;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;display:flex;flex-direction:column;background:#E9EDF3;color:var(--text-body);
+     font-family:var(--font-core);font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased}
+h1,h2,h3{margin:0;color:var(--text-heading);letter-spacing:-.02em}
+button,input,select,textarea{font-family:inherit}
+a{color:var(--color-primary)}a:hover{color:var(--color-primary-hover)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ── 확인 컨트롤 바 ── ★ 개발 확인용. 실서비스에는 포함되지 않습니다 ── */
+.devbar{flex:0 0 auto;z-index:90;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+        padding:10px 20px;background:var(--surface-inverse);color:#fff;font-size:13px}
+.devbar strong{font-size:12px;letter-spacing:.06em;opacity:.6}
+.devbar label{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.devbar select{height:30px;padding:0 10px;border:1px solid rgba(255,255,255,.22);
+        border-radius:var(--radius-sm);background:rgba(255,255,255,.08);color:#fff;font-size:13px}
+.devbar select option{color:#0B1120}
+.devbar .spacer{flex:1}
+
+/* ── 폭 확인용 프레임 ──
+   시안은 프레임 폭으로 is-xl / is-md / is-sm 을 붙입니다.
+   실제 구현은 같은 경계의 미디어 쿼리입니다 (08-responsive.md). */
+.stage{flex:1;min-height:0;overflow:auto;display:flex;justify-content:center}
+.frame{position:relative;width:100%;height:100%;min-height:560px;overflow:hidden;background:var(--surface-alt);flex:0 0 auto}
+.frame.is-fixed{box-shadow:0 0 0 1px var(--border-strong)}
+
+/* ── ERP 셸 ── */
+.shell{display:flex;height:100%}
+.sidebar{width:248px;flex:0 0 auto;background:var(--surface);border-right:1px solid var(--border);
+         display:flex;flex-direction:column;padding:20px 16px;transition:transform 240ms var(--ease-out)}
+.brand{display:flex;align-items:center;gap:10px;height:40px;padding:0 8px;margin-bottom:24px;
+       border:0;background:transparent;border-radius:var(--radius-md);width:100%}
+.brand img{height:24px;width:auto;flex:0 0 auto}
+.wordmark{font-size:17px;font-weight:800;letter-spacing:-.03em;color:var(--text-heading);white-space:nowrap}
+.wordmark .dot{opacity:.55}.wordmark .suffix{color:var(--color-primary)}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:var(--radius-md);
+          background:transparent;color:var(--text-muted);font-size:15px;text-align:left;cursor:pointer;white-space:nowrap}
+.nav-item:hover{background:var(--surface-alt)}
+.nav-item.is-active{background:var(--color-accent-bg);color:var(--color-primary-hover);font-weight:700}
+.frame.is-md .sidebar{width:64px;padding:20px 12px}
+.frame.is-md .side-label{display:none}
+.frame.is-md .brand,.frame.is-md .nav-item{justify-content:center;padding:0;gap:0}
+.frame.is-sm .sidebar{position:absolute;left:0;top:0;bottom:0;z-index:70;transform:translateX(-100%);box-shadow:var(--shadow-overlay)}
+.frame.is-sm.drawer-open .sidebar{transform:none}
+.scrim{display:none;position:absolute;inset:0;z-index:65;background:rgba(11,17,32,.45)}
+.frame.is-sm.drawer-open .scrim{display:block}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{flex:0 0 auto;height:64px;border-bottom:1px solid var(--border);background:var(--surface);
+        display:flex;align-items:center;gap:16px;padding:0 28px}
+.frame.is-sm .topbar{height:56px;padding:0 12px 0 8px;gap:8px}
+.topbar .hamburger{display:none}
+.frame.is-sm .topbar .hamburger{display:grid}
+.topbar .crumb{font-size:12px;color:var(--text-caption);line-height:1.3}
+.topbar .title{font-size:17px;font-weight:700;letter-spacing:-.015em;color:var(--text-heading);line-height:1.4}
+.topbar .spacer{flex:1}
+.role-note{font-size:12px;color:var(--text-muted);white-space:nowrap}
+.frame.is-sm .role-note,.frame.is-md .role-note{display:none}
+.account{display:flex;align-items:center;gap:10px;padding-left:16px;border-left:1px solid var(--border)}
+.frame.is-sm .account{padding-left:0;border-left:0}
+.frame.is-sm .account .who{display:none}
+.avatar{width:32px;height:32px;border-radius:var(--radius-sm);background:var(--color-accent-bg);
+        color:var(--color-primary-hover);display:grid;place-items:center;font-size:13px;font-weight:700;flex:0 0 auto}
+.who{line-height:1.3}.who b{display:block;font-size:14px;color:var(--text-heading);white-space:nowrap}
+.who span{font-size:12px;color:var(--text-muted);white-space:nowrap}
+
+/* ── 버튼 ── */
+.btn{height:40px;padding:0 16px;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+     border-radius:var(--radius-md);font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;
+     border:1px solid transparent;transition:background var(--dur) var(--ease-out)}
+.btn--primary{background:var(--color-primary);color:var(--text-on-primary);box-shadow:var(--shadow-primary)}
+.btn--primary:hover{background:var(--color-primary-hover)}
+.btn--ghost{background:var(--surface);color:var(--text-heading);border-color:var(--border)}
+.btn--ghost:hover{background:var(--surface-alt)}
+.btn--danger-ghost{background:var(--surface);color:var(--color-danger);border-color:var(--border)}
+.btn--danger-ghost:hover{background:var(--color-danger-bg)}
+.btn--danger{background:var(--color-danger);color:#fff}
+.btn--danger:hover{background:var(--red-800)}
+.btn--sm{height:36px;padding:0 14px}
+.btn--lg{height:44px}
+.btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+.icon-btn{width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--border);border-radius:var(--radius-md);
+          background:var(--surface);color:var(--text-muted);cursor:pointer;padding:0;transition:background var(--dur) var(--ease-out)}
+.icon-btn:hover{background:var(--surface-alt)}
+.icon-btn:disabled{opacity:.4;cursor:not-allowed}
+.icon-btn--bare{border:0;background:transparent}
+
+/* ── 툴바 ── */
+.toolbar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px 16px;flex-wrap:wrap;padding:20px 28px 14px}
+.frame.is-md .toolbar{padding:16px 20px 12px}
+.frame.is-sm .toolbar{padding:12px 12px 8px}
+.tb-left,.tb-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.step{display:flex;gap:4px}
+.range{font-size:17px;font-weight:700;letter-spacing:-.015em;color:var(--text-heading);white-space:nowrap;font-variant-numeric:tabular-nums}
+.room-pick{position:relative;display:flex}
+.room-pick select{appearance:none;height:36px;padding:0 34px 0 36px;border:1px solid var(--border);border-radius:var(--radius-md);
+                  background:var(--surface);font-size:14px;color:var(--text-heading);cursor:pointer;outline:none}
+.room-pick select:focus{border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)}
+.room-pick .lead{position:absolute;left:12px;top:50%;transform:translateY(-50%);display:flex;color:var(--text-muted);pointer-events:none}
+.room-pick .caret{position:absolute;right:12px;top:50%;transform:translateY(-50%);display:flex;color:var(--text-muted);pointer-events:none}
+.seg{display:inline-flex;gap:4px;padding:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-md)}
+.seg button{height:28px;padding:0 14px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-size:13px;cursor:pointer;white-space:nowrap}
+.seg button.is-on{background:var(--surface);color:var(--text-heading);font-weight:700;box-shadow:0 1px 2px rgba(11,17,32,.06)}
+.frame.is-sm .tb-left{width:100%;justify-content:space-between}
+.frame.is-sm .tb-right{width:100%}
+.frame.is-sm .room-pick,.frame.is-sm .room-pick select{width:100%}
+.frame.is-sm #add-btn{display:none}
+
+/* ── 날짜 스트립 (767 이하) ── */
+.datestrip{display:none;flex:0 0 auto;gap:4px;padding:0 12px 10px}
+.frame.is-sm .datestrip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.ds-day{height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;border:1px solid transparent;
+        border-radius:var(--radius-md);background:transparent;cursor:pointer;padding:0;line-height:1.3}
+.ds-day .d{font-size:12px;color:var(--text-muted)}
+.ds-day .n{font-size:16px;font-weight:700;color:var(--text-heading);font-variant-numeric:tabular-nums}
+.ds-day.is-today .n{color:var(--color-primary)}
+.ds-day.is-on{background:var(--surface);border-color:var(--color-primary)}
+.ds-day.is-off{opacity:.4}
+
+/* ── 주간 그리드 ── */
+.panel{flex:1;min-height:0;margin:0 28px 24px;display:flex;flex-direction:column;background:var(--surface);
+       border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.frame.is-md .panel{margin:0 20px 20px}
+.frame.is-sm .panel{margin:0 12px 84px}
+.scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.g-head{position:sticky;top:0;z-index:5;display:grid;border-bottom:1px solid var(--border);background:var(--surface)}
+.frame.is-sm .g-head{display:none}
+.g-body{position:relative;display:grid;user-select:none;-webkit-user-select:none}
+.h-cell{position:relative;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+        border-right:1px solid var(--border);line-height:1.35}
+.h-cell:last-child{border-right:0}
+.h-cell .d{font-size:12px;font-weight:700;color:var(--text-muted)}
+.h-cell .n{font-size:16px;font-weight:700;color:var(--text-heading);font-variant-numeric:tabular-nums}
+.h-cell.is-today{background:rgba(79,70,229,.03)}
+.h-cell.is-today .d,.h-cell.is-today .n{color:var(--color-primary)}
+.h-cell.is-today::after{content:"";position:absolute;left:20%;right:20%;bottom:0;height:2px;background:var(--color-primary)}
+.t-col{border-right:1px solid var(--border)}
+.t-row{height:28px;display:flex;align-items:flex-start;justify-content:flex-end;padding:2px 8px 0 0;border-top:1px solid var(--border);
+       font-size:12px;color:var(--text-caption);font-variant-numeric:tabular-nums;line-height:1.4}
+.t-row.half{border-top-style:dashed}
+.d-col{position:relative;border-right:1px solid var(--border)}
+.d-col:last-child{border-right:0}
+.d-col.is-today{background:rgba(79,70,229,.03)}
+.cell{height:28px;border-top:1px solid var(--border);cursor:pointer}
+.cell.half{border-top-style:dashed}
+.cell:hover{background:rgba(79,70,229,.05)}
+.cell.is-past{background:var(--surface-alt)}
+.cell.is-blocked{cursor:not-allowed}
+.cell.is-blocked:hover{background:var(--surface-alt)}
+.cell.is-limit{background:repeating-linear-gradient(135deg,var(--surface-alt) 0 6px,#fff 6px 12px)}
+.bk{position:absolute;left:3px;right:3px;padding:4px 6px 4px 9px;border-radius:4px;overflow:hidden;z-index:2;
+    border-left:3px solid var(--color-primary);background:rgba(79,70,229,.08);line-height:1.35}
+.bk.is-full{cursor:pointer}
+.bk.is-full:hover{background:rgba(79,70,229,.14)}
+.bk .t{font-size:11px;font-weight:700;color:var(--color-primary-hover);white-space:nowrap;font-variant-numeric:tabular-nums}
+.bk .n{margin-top:1px;font-size:12px;font-weight:700;color:var(--text-heading);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk .m{margin-top:1px;font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk .own{position:absolute;right:4px;top:4px;height:16px;padding:0 5px;border-radius:999px;background:var(--color-accent-bg);
+         color:var(--color-primary-hover);font-size:10px;font-weight:700;display:flex;align-items:center;white-space:nowrap}
+.bk.is-done{background:var(--surface-alt);border-left-color:var(--text-caption)}
+.bk.is-done:hover{background:#F1F4F8}
+.bk.is-done .t,.bk.is-done .n{color:var(--text-muted)}
+.frame.is-md .bk .own{display:none}
+.frame.is-sm .bk .n{font-size:14px}
+.frame.is-sm .bk .t{font-size:12px}
+.now-line{position:absolute;left:0;right:0;height:0;border-top:1px solid var(--color-accent);pointer-events:none;z-index:3}
+.now-line::before{content:"";position:absolute;left:-4px;top:-4.5px;width:8px;height:8px;border-radius:999px;background:var(--color-accent)}
+.ghost{position:absolute;left:3px;right:3px;display:none;flex-direction:column;align-items:center;justify-content:center;gap:0;
+       border:1px dashed var(--color-primary);border-radius:4px;background:rgba(79,70,229,.10);pointer-events:none;z-index:4;overflow:hidden;line-height:1.35}
+.ghost .t{font-size:12px;font-weight:700;color:var(--color-primary-hover);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ghost .c{font-size:11px;color:var(--color-primary-hover);white-space:nowrap}
+.legend{flex:0 0 auto;display:flex;align-items:center;gap:8px 20px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--border);background:var(--surface-alt);font-size:12px;color:var(--text-muted);line-height:1.5}
+.legend .sw{display:flex;align-items:center;gap:6px}
+.legend .sp{flex:1}
+.legend .rule{color:var(--text-caption)}
+.frame.is-sm .legend{padding:10px 14px}
+.frame.is-sm .legend .sw{display:none}
+
+/* ── 월간 (운영자, 768 이상) ── */
+.m-head{position:sticky;top:0;z-index:5;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;height:40px;padding:0 8px;background:var(--surface);border-bottom:1px solid var(--border)}
+.m-head span{display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text-muted)}
+.m-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;padding:8px}
+.m-cell{min-height:112px;display:flex;flex-direction:column;gap:8px;padding:10px;text-align:left;border:1px solid var(--border);
+        border-radius:var(--radius-md);background:var(--surface);cursor:pointer;transition:background var(--dur) var(--ease-out);line-height:1.3}
+.m-cell:hover{background:var(--surface-alt)}
+.m-cell:disabled{opacity:.4;cursor:default}
+.m-cell.is-past{opacity:.6}
+.m-cell .num{font-size:16px;font-weight:700;color:var(--text-heading);font-variant-numeric:tabular-nums}
+.m-cell.is-today .num{width:30px;height:30px;display:grid;place-items:center;border-radius:999px;background:var(--color-primary);color:#fff}
+.m-cell .track{display:block;height:8px;border-radius:4px;background:#EEF0F4;overflow:hidden}
+.m-cell .fill{display:block;height:8px;border-radius:4px;background:var(--color-secondary)}
+.m-cell .sum{font-size:18px;font-weight:600;color:var(--text-heading);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.m-cell .sum span{font-weight:400;color:var(--text-muted)}
+.frame.is-md .m-cell .sum{font-size:15px}
+
+/* ── 모바일 하단 CTA ── */
+.m-cta{display:none;position:absolute;left:0;right:0;bottom:0;z-index:20;padding:12px;background:var(--surface);border-top:1px solid var(--border)}
+.frame.is-sm .m-cta{display:block}
+.m-cta .btn{width:100%;height:48px;font-size:15px}
+
+/* ── 모달 ── 프레임 안에서 열립니다 ── */
+.overlay{position:absolute;inset:0;z-index:80;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(11,17,32,.45)}
+.overlay.is-open{display:flex}
+.modal{width:640px;max-width:100%;max-height:100%;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);
+       border-radius:var(--radius-lg);box-shadow:var(--shadow-overlay);overflow:hidden}
+.modal--sm{width:480px}
+.frame.is-sm #form-overlay{padding:0;align-items:stretch}
+.frame.is-sm #form-overlay .modal{width:100%;height:100%;max-height:none;border-radius:0;border:0}
+.frame.is-sm #cancel-overlay{padding:16px}
+.modal-head{flex:0 0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:24px;border-bottom:1px solid var(--border)}
+.frame.is-sm .modal-head{padding:16px}
+.modal-head h3{font-size:22px;font-weight:600;line-height:1.4}
+.modal-head .sub{margin:4px 0 0;font-size:14px;color:var(--text-muted)}
+.modal-body{flex:1;min-height:0;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:24px}
+.frame.is-sm .modal-body{padding:16px}
+.modal-foot{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:20px 24px;border-top:1px solid var(--border)}
+.modal-foot .sp{flex:1}
+.frame.is-sm .modal-foot{padding:12px 16px}
+.frame.is-sm .modal-foot .btn{flex:1}
+.frame.is-sm .modal-foot .sp{display:none}
+.badge{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:var(--radius-pill);font-size:12px;font-weight:700;white-space:nowrap}
+.badge--indigo{background:var(--color-accent-bg);color:var(--color-primary-hover)}
+.badge--neutral{background:var(--surface-alt);color:var(--text-muted);border:1px solid var(--border)}
+.badge--cancel{background:var(--surface-alt);color:var(--text-caption);border:1px solid var(--border)}
+.sec-title{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:var(--text-heading)}
+.sec-title::before{content:"";width:3px;height:16px;background:var(--color-primary)}
+.sec-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sec-row .note{font-size:12px;color:var(--text-muted);white-space:nowrap}
+.fgrid{margin-top:12px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));column-gap:12px;row-gap:14px}
+.fgrid .span-6{grid-column:span 6}.fgrid .span-3{grid-column:span 3}.fgrid .span-2{grid-column:span 2}
+.frame.is-sm .fgrid .span-2.f-date{grid-column:span 6}
+.frame.is-sm .fgrid .span-2{grid-column:span 3}
+.frame.is-sm .fgrid .span-3{grid-column:span 6}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field > .label{font-size:12px;color:var(--text-muted);line-height:1.4}
+.field > .label .req{color:var(--color-danger)}
+.input,.select,.textarea{width:100%;height:44px;padding:0 14px;font-size:14px;color:var(--text-heading);background:var(--surface);
+     border:1px solid var(--border);border-radius:var(--radius-md);outline:none;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)}
+.input:focus,.select:focus,.textarea:focus{border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)}
+.input.is-error,.select.is-error{border-color:var(--color-danger)}
+.input:disabled,.select:disabled,.textarea:disabled{background:var(--surface-alt);color:var(--text-body);cursor:default;opacity:1}
+.textarea{height:auto;padding:12px 14px;line-height:1.6;resize:vertical}
+.select-wrap{position:relative;display:flex}
+.select{appearance:none;padding-right:34px;cursor:pointer}
+.select-wrap .caret{position:absolute;right:12px;top:50%;transform:translateY(-50%);display:flex;color:var(--text-muted);pointer-events:none}
+.select:disabled + .caret{display:none}
+.frame.is-sm .input,.frame.is-sm .select,.frame.is-sm .textarea{font-size:16px}
+.err{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--color-danger);line-height:1.5}
+.err[hidden]{display:none}
+.hint{font-size:12px;color:var(--text-muted);line-height:1.5}
+.stepper{display:inline-flex;align-items:center;width:fit-content;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
+.stepper button{width:44px;height:44px;display:grid;place-items:center;border:0;background:var(--surface);color:var(--text-muted);cursor:pointer;padding:0}
+.stepper button:hover{background:var(--surface-alt)}
+.stepper button:disabled{opacity:.35;cursor:not-allowed}
+.stepper button:first-child{border-right:1px solid var(--border)}
+.stepper button:last-child{border-left:1px solid var(--border)}
+.stepper .v{width:56px;text-align:center;font-size:16px;font-weight:700;color:var(--text-heading);font-variant-numeric:tabular-nums}
+.people-row{display:flex;align-items:center;gap:12px}
+.booker{margin-top:12px;position:relative;padding:16px 16px 16px 20px;background:var(--surface-alt);border-radius:var(--radius-md);overflow:hidden}
+.booker::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--color-primary)}
+.booker .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));row-gap:14px;column-gap:20px}
+.booker .k{font-size:12px;color:var(--text-muted);line-height:1.4}
+.booker .v{margin-top:2px;font-size:16px;color:var(--text-heading);line-height:1.4}
+.booker .v.b{font-weight:700}
+.meta-line{font-size:12px;color:var(--text-caption)}
+
+/* 확인 모달 */
+.confirm{padding:32px 28px 24px;text-align:center}
+.confirm .ic{width:56px;height:56px;margin:0 auto;border-radius:999px;display:grid;place-items:center;background:var(--color-danger-bg);color:var(--color-danger)}
+.confirm h3{margin-top:16px;font-size:22px;font-weight:600}
+.confirm p{margin:8px 0 0;font-size:14px;color:var(--text-body);text-wrap:pretty}
+.confirm .sum{margin-top:16px;padding:12px 14px;border-radius:var(--radius-md);background:var(--surface-alt);font-size:14px;color:var(--text-heading);font-variant-numeric:tabular-nums}
+.confirm-foot{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 28px 28px}
+.confirm-foot .btn{height:44px}
+
+/* 토스트 */
+.toast{position:absolute;left:50%;bottom:28px;z-index:95;transform:translate(-50%,12px);opacity:0;pointer-events:none;display:flex;align-items:center;gap:8px;
+       height:44px;padding:0 18px;border-radius:var(--radius-md);background:var(--surface-inverse);color:#fff;font-size:14px;font-weight:700;white-space:nowrap;
+       box-shadow:var(--shadow-float);transition:opacity var(--dur) var(--ease-out),transform var(--dur) var(--ease-out)}
+.toast.is-on{opacity:1;transform:translate(-50%,0)}
+.frame.is-sm .toast{bottom:88px}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════
+     확인 컨트롤 바
+     ★ 개발 확인용입니다. 실서비스 화면에는 포함되지 않습니다.
+     ══════════════════════════════════════════════════════════════ -->
+<div class="devbar">
+  <strong>확인용</strong>
+  <label>viewer
+    <select id="c-viewer"><option value="operator" selected>operator</option><option value="tenant">tenant</option></select>
+  </label>
+  <label>room
+    <select id="c-room"><option value="A" selected>A · 09–22 · 30분~4시간</option><option value="B">B · 08–20 · 1~3시간</option><option value="C">C · 09–18 · 30분~2시간</option></select>
+  </label>
+  <label>폭
+    <select id="c-width"><option value="auto" selected>창 폭</option><option value="1440">1440</option><option value="1024">1024</option><option value="820">820</option><option value="390">390</option></select>
+  </label>
+  <label>modal
+    <select id="c-modal"><option value="none" selected>none</option><option value="create">create</option><option value="edit">edit</option><option value="view">view (종료)</option><option value="cancel">cancel 확인</option></select>
+  </label>
+  <span class="spacer"></span>
+  <span style="opacity:.6">s0300600010 · 회의실 예약 · 오늘 = 2026.09.30(수) 13:40</span>
+</div>
+
+<div class="stage" id="stage">
+<div class="frame" id="frame">
+
+<div class="shell">
+  <!-- ── ERP 셸 · 사이드바 ── 기준: erp-tenants / common/04-shell.md ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <img src="../assets/swonbiz-logo.png" alt="" onerror="this.style.visibility='hidden'">
+      <span class="wordmark side-label">S<span class="dot">·</span>won<span class="suffix">Biz</span></span>
+    </div>
+    <nav class="nav" id="nav"></nav>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn icon-btn--bare hamburger" id="hamburger" type="button" aria-label="메뉴 열기"><i data-lucide="menu" style="width:20px;height:20px"></i></button>
+      <div>
+        <div class="crumb">운영 · 강남 삼성점</div>
+        <div class="title">회의실 예약</div>
+      </div>
+      <div class="spacer"></div>
+      <span class="role-note" id="role-note"></span>
+      <div class="account">
+        <span class="avatar" id="avatar">최</span>
+        <span class="who"><b id="who-name">최현수</b><span id="who-org">운영 관리자</span></span>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div class="tb-left">
+        <span class="step">
+          <button class="icon-btn" type="button" id="prev" aria-label="이전"><i data-lucide="chevron-left" style="width:16px;height:16px"></i></button>
+          <button class="btn btn--ghost btn--sm" type="button" id="today">오늘</button>
+          <button class="icon-btn" type="button" id="next" aria-label="다음"><i data-lucide="chevron-right" style="width:16px;height:16px"></i></button>
+        </span>
+        <span class="range" id="range"></span>
+      </div>
+      <div class="tb-right">
+        <span class="room-pick">
+          <span class="lead"><i data-lucide="door-open" style="width:16px;height:16px"></i></span>
+          <select id="room-select" aria-label="회의실"></select>
+          <span class="caret"><i data-lucide="chevron-down" style="width:16px;height:16px"></i></span>
+        </span>
+        <span class="seg" id="view-seg">
+          <button type="button" data-view="month">월간</button>
+          <button type="button" data-view="week">주간</button>
+        </span>
+        <button class="btn btn--primary btn--sm" type="button" id="add-btn"><i data-lucide="plus" style="width:16px;height:16px"></i>예약 추가</button>
+      </div>
+    </div>
+
+    <div class="datestrip" id="datestrip"></div>
+
+    <section class="panel" id="week-panel">
+      <div class="scroll" id="week-scroll">
+        <div class="g-head" id="g-head"></div>
+        <div class="g-body" id="g-body"></div>
+      </div>
+      <div class="legend" id="legend">
+        <span class="sw"><span style="width:12px;height:12px;border-radius:3px;background:rgba(79,70,229,.08);border-left:3px solid var(--color-primary)"></span>확정</span>
+        <span class="sw"><span style="width:12px;height:12px;border-radius:3px;background:var(--surface-alt);border-left:3px solid var(--text-caption)"></span>종료</span>
+        <span class="sw" id="legend-limit"><span style="width:12px;height:12px;border-radius:3px;border:1px solid var(--border);background:repeating-linear-gradient(135deg,var(--surface-alt) 0 3px,#fff 3px 6px)"></span>예약 가능 기간 밖</span>
+        <span class="sw"><span style="width:12px;height:2px;background:var(--color-accent)"></span>현재 시각</span>
+        <span class="sp"></span>
+        <span class="rule" id="rule-text"></span>
+      </div>
+    </section>
+
+    <section class="panel" id="month-panel" style="display:none">
+      <div class="scroll">
+        <div class="m-head"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
+        <div class="m-grid" id="m-grid"></div>
+      </div>
+      <div class="legend">
+        <span>막대 = 운영시간 대비 예약된 시간</span>
+        <span class="sp"></span>
+        <span class="rule">날짜를 누르면 그 주의 주간 보기로 이동합니다</span>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="m-cta"><button class="btn btn--primary" type="button" id="m-add"><i data-lucide="plus" style="width:18px;height:18px"></i>예약 추가</button></div>
+
+<!-- ══════════ 등록·수정·상세 모달 — 한 모달, mode 3종 ══════════ -->
+<div class="overlay" id="form-overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="f-heading">
+    <div class="modal-head">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <h3 id="f-heading">회의실 예약</h3>
+          <span class="badge" id="f-badge" hidden></span>
+        </div>
+        <p class="sub" id="f-sub"></p>
+      </div>
+      <button class="icon-btn icon-btn--bare" type="button" data-close aria-label="닫기"><i data-lucide="x" style="width:20px;height:20px"></i></button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <div class="sec-title">예약 정보</div>
+        <div class="fgrid">
+          <label class="field span-6"><span class="label">회의실</span>
+            <span class="select-wrap"><select class="select" id="f-room"></select><span class="caret"><i data-lucide="chevron-down" style="width:16px;height:16px"></i></span></span>
+          </label>
+          <label class="field span-2 f-date"><span class="label">날짜</span><input class="input" type="date" id="f-date"></label>
+          <label class="field span-2"><span class="label">시작</span>
+            <span class="select-wrap"><select class="select" id="f-start"></select><span class="caret"><i data-lucide="chevron-down" style="width:16px;height:16px"></i></span></span>
+          </label>
+          <label class="field span-2"><span class="label">종료</span>
+            <span class="select-wrap"><select class="select" id="f-end"></select><span class="caret"><i data-lucide="chevron-down" style="width:16px;height:16px"></i></span></span>
+          </label>
+          <div class="span-6" style="display:flex;flex-direction:column;gap:4px;margin-top:-6px">
+            <span class="err" id="f-time-err" hidden><i data-lucide="circle-alert" style="width:12px;height:12px;flex:0 0 auto"></i><span></span></span>
+            <span class="hint" id="f-room-rule"></span>
+            <span class="hint" id="f-usage" hidden></span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="sec-title">예약 내용</div>
+        <div class="fgrid">
+          <label class="field span-6"><span class="label">회의 제목 <span class="req">*</span></span>
+            <input class="input" id="f-title" maxlength="40" placeholder="주간 회의" autocomplete="off">
+            <span class="err" id="f-title-err" hidden><i data-lucide="circle-alert" style="width:12px;height:12px;flex:0 0 auto"></i>회의 제목을 입력해 주세요</span>
+          </label>
+          <div class="field span-6"><span class="label">참석 인원</span>
+            <span class="people-row">
+              <span class="stepper">
+                <button type="button" id="f-minus" aria-label="인원 감소"><i data-lucide="minus" style="width:16px;height:16px"></i></button>
+                <span class="v" id="f-people">4</span>
+                <button type="button" id="f-plus" aria-label="인원 증가"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
+              </span>
+              <span class="hint" id="f-cap"></span>
+            </span>
+          </div>
+          <label class="field span-6"><span class="label">메모</span>
+            <textarea class="textarea" id="f-memo" maxlength="200" rows="2" placeholder="준비물, 참석자 안내 등"></textarea>
+          </label>
+        </div>
+      </div>
+      <div>
+        <div class="sec-row">
+          <div class="sec-title">예약자 정보</div>
+          <span class="note" id="f-booker-note">로그인 정보로 자동 입력됩니다</span>
+        </div>
+        <label class="field" id="f-org-wrap" style="margin-top:12px"><span class="label">예약 조직</span>
+          <span class="select-wrap"><select class="select" id="f-org"></select><span class="caret"><i data-lucide="chevron-down" style="width:16px;height:16px"></i></span></span>
+        </label>
+        <div class="booker">
+          <div class="grid" id="f-booker"></div>
+        </div>
+      </div>
+      <div class="meta-line" id="f-meta" hidden></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn--danger-ghost btn--lg" type="button" id="f-cancel-booking">예약 취소</button>
+      <span class="sp"></span>
+      <button class="btn btn--ghost btn--lg" type="button" data-close id="f-dismiss">닫기</button>
+      <button class="btn btn--primary btn--lg" type="button" id="f-submit">예약하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 예약 취소 확인 모달 (480px) ══════════ -->
+<div class="overlay" id="cancel-overlay">
+  <div class="modal modal--sm" role="alertdialog" aria-modal="true">
+    <div class="confirm">
+      <div class="ic"><i data-lucide="circle-x" style="width:24px;height:24px"></i></div>
+      <h3>예약을 취소하시겠습니까?</h3>
+      <p>취소한 시간은 바로 다른 조직이 예약할 수 있습니다.<br>이 작업은 되돌릴 수 없습니다.</p>
+      <div class="sum" id="c-sum"></div>
+    </div>
+    <div class="confirm-foot">
+      <button class="btn btn--ghost" type="button" id="c-back">돌아가기</button>
+      <button class="btn btn--danger" type="button" id="c-ok">예약 취소</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><i data-lucide="check" style="width:16px;height:16px"></i><span></span></div>
+
+</div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   정책 상수 — 05-logic.md#1
+   ══════════════════════════════════════════════════════════════ */
+const SLOT = 30;                 // 모든 회의실 공통 30분 단위
+const TENANT_ADVANCE_DAYS = 28;  // 입주사: 오늘 포함 4주 앞까지
+const TENANT_DAILY_MIN = 120;    // 입주사: 조직당 하루 2시간 (모든 회의실 합산, 취소 제외)
+const SLOT_H = 28;
+
+/* 시안 기준 현재 시각 — 실제로는 서버 시각 */
+const TODAY = "2026-09-30";
+const NOW_MIN = 13 * 60 + 40;
+
+/* ══════════════════════════════════════════════════════════════
+   시안 데이터 — 값만 바꿔 확인하실 수 있습니다
+   ══════════════════════════════════════════════════════════════ */
+
+/** 회의실 설정값 — 07-data-model.md#1. open/close/min/max 는 분 단위, 30의 배수.
+ *  fee30 은 이번 화면에 표시하지 않습니다 (청구 연결 단계에서 사용). */
+const ROOMS = [
+  { id: "A", name: "회의실 A", capLabel: "4~5인", cap: 5, open: 540, close: 1320, min: 30, max: 240, fee30: 5000 },
+  { id: "B", name: "회의실 B", capLabel: "6~8인", cap: 8, open: 480, close: 1200, min: 60, max: 180, fee30: 8000 },
+  { id: "C", name: "미팅룸 C", capLabel: "2인",   cap: 2, open: 540, close: 1080, min: 30, max: 120, fee30: 3000 },
+];
+
+const ORGS = {
+  sone:      { name: "에스원테크", operator: true },
+  bridgelab: { name: "브릿지랩 주식회사" },
+  orca:      { name: "오르카 스튜디오" },
+  hangyeol:  { name: "한결세무법인" },
+  nautilus:  { name: "노틸러스" },
+  seum:      { name: "세움컴퍼니" },
+};
+
+const USERS = {
+  operator: { name: "최현수", sub: "운영 관리자", initial: "최", orgId: "sone", phone: "070-4355-2312" },
+  tenant:   { name: "김도현", sub: "브릿지랩 주식회사", initial: "김", orgId: "bridgelab", phone: "010-2345-6789" },
+};
+
+/** status 는 저장값입니다. confirmed 이면서 종료 시각이 지난 예약은 화면에서 종료로 봅니다 (05-logic.md#3). */
+let BOOKINGS = [
+  { id: 1,  room: "A", date: "2026-09-28", start: 600,  end: 660,  title: "주간 스프린트 회의", orgId: "bridgelab", people: 4, status: "completed", by: "김도현", phone: "010-2345-6789", at: "9월 21일 10:12" },
+  { id: 2,  room: "A", date: "2026-09-28", start: 840,  end: 960,  title: "투자사 미팅", orgId: "orca", people: 5, status: "completed", by: "박지훈", phone: "010-5678-1234", at: "9월 22일 09:40" },
+  { id: 3,  room: "A", date: "2026-09-29", start: 720,  end: 810,  title: "신규 입주 상담", orgId: "sone", people: 3, status: "completed", by: "최현수", phone: "070-4355-2312", at: "9월 25일 16:20" },
+  { id: 4,  room: "A", date: "2026-09-30", start: 570,  end: 630,  title: "파트너 킥오프", orgId: "orca", people: 4, status: "cancelled", by: "박지훈", phone: "010-5678-1234", at: "9월 26일 11:05" },
+  { id: 5,  room: "A", date: "2026-09-30", start: 660,  end: 780,  title: "세무 검토 회의", orgId: "hangyeol", people: 2, status: "confirmed", by: "최민서", phone: "010-7890-2345", at: "9월 27일 08:55" },
+  { id: 6,  room: "A", date: "2026-09-30", start: 780,  end: 840,  title: "채용 면접", orgId: "nautilus", people: 2, status: "confirmed", by: "이수진", phone: "010-3456-7890", at: "9월 28일 17:30" },
+  { id: 7,  room: "A", date: "2026-09-30", start: 960,  end: 1020, title: "제품 리뷰", orgId: "bridgelab", people: 4, status: "confirmed", by: "김도현", phone: "010-2345-6789", at: "9월 29일 14:02", memo: "빔프로젝터 사용" },
+  { id: 8,  room: "A", date: "2026-09-30", start: 1020, end: 1080, title: "파트너 콜", orgId: "orca", people: 3, status: "confirmed", by: "박지훈", phone: "010-5678-1234", at: "9월 29일 15:48" },
+  { id: 9,  room: "A", date: "2026-09-30", start: 1200, end: 1260, title: "저녁 스터디", orgId: "seum", people: 3, status: "confirmed", by: "정하늘", phone: "010-4567-8901", at: "9월 29일 19:10" },
+  { id: 10, room: "A", date: "2026-10-01", start: 600,  end: 630,  title: "데일리 싱크", orgId: "nautilus", people: 2, status: "confirmed", by: "이수진", phone: "010-3456-7890", at: "9월 29일 09:00" },
+  { id: 11, room: "A", date: "2026-10-01", start: 900,  end: 1020, title: "파트너사 미팅", orgId: "bridgelab", people: 5, status: "confirmed", by: "김도현", phone: "010-2345-6789", at: "9월 29일 14:10" },
+  { id: 12, room: "A", date: "2026-10-02", start: 840,  end: 960,  title: "입주사 설명회", orgId: "sone", people: 5, status: "confirmed", by: "최현수", phone: "070-4355-2312", at: "9월 27일 10:30" },
+  { id: 13, room: "B", date: "2026-09-30", start: 600,  end: 720,  title: "전체 회의", orgId: "orca", people: 7, status: "confirmed", by: "박지훈", phone: "010-5678-1234", at: "9월 25일 13:00" },
+  { id: 14, room: "B", date: "2026-10-01", start: 840,  end: 900,  title: "고객사 워크숍", orgId: "seum", people: 6, status: "confirmed", by: "정하늘", phone: "010-4567-8901", at: "9월 28일 10:00" },
+  { id: 15, room: "C", date: "2026-09-30", start: 810,  end: 840,  title: "고객 통화", orgId: "hangyeol", people: 1, status: "confirmed", by: "최민서", phone: "010-7890-2345", at: "9월 30일 09:12" },
+];
+
+/* ══════════════════════════════════════════════════════════════
+   상태
+   ══════════════════════════════════════════════════════════════ */
+const state = {
+  viewer: "operator",
+  room: "A",
+  view: "week",        // week | month — month 는 운영자 · 768 이상에서만
+  anchor: TODAY,       // 기준 날짜. 월↔주 전환, 모바일 하루 보기가 모두 이 날짜를 공유
+  width: "auto",
+  drawer: false,
+  drag: null,
+  form: null,          // { mode: create|edit|view, id, draft }
+};
+
+/* ══════════════════════════════════════════════════════════════
+   유틸
+   ══════════════════════════════════════════════════════════════ */
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const DOW = ["월", "화", "수", "목", "금", "토", "일"];
+const pd = (k) => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+const key = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const addDays = (k, n) => { const d = pd(k); d.setDate(d.getDate() + n); return key(d); };
+const dayNo = (k) => { const [y, m, d] = k.split("-").map(Number); return Math.round(Date.UTC(y, m - 1, d) / 86400000); };
+const abs = (k, min) => dayNo(k) * 1440 + min;
+const NOW_ABS = abs(TODAY, NOW_MIN);
+const dowOf = (k) => (pd(k).getDay() + 6) % 7;
+const mondayOf = (k) => addDays(k, -dowOf(k));
+const md = (k) => { const d = pd(k); return (d.getMonth() + 1) + "월 " + d.getDate() + "일"; };
+const fmt = (min) => String(Math.floor(min / 60)).padStart(2, "0") + ":" + String(min % 60).padStart(2, "0");
+const dur = (min) => { const h = Math.floor(min / 60), m = min % 60; return (h ? h + "시간" : "") + (h && m ? " " : "") + (m ? m + "분" : "") || "0분"; };
+const LIMIT = addDays(TODAY, TENANT_ADVANCE_DAYS - 1);   // 2026-10-27
+const room = (id) => ROOMS.find((r) => r.id === (id || state.room));
+const me = () => USERS[state.viewer];
+const isTenant = () => state.viewer === "tenant";
+
+/** 767 이하 sm · 768~1279 md · 1280 이상 xl */
+function mode() {
+  const w = $("#frame").clientWidth;
+  return w >= 1280 ? "xl" : w >= 768 ? "md" : "sm";
+}
+
+/* ══════════════════════════════════════════════════════════════
+   규칙 — 05-logic.md, 04-rules.md 와 1:1
+   ══════════════════════════════════════════════════════════════ */
+
+/** 표시 상태. 저장값이 confirmed 여도 종료 시각이 지나면 종료로 봅니다. */
+function statusOf(b) {
+  if (b.status === "cancelled") return "cancelled";
+  if (b.status === "completed" || abs(b.date, b.end) <= NOW_ABS) return "completed";
+  return "confirmed";
+}
+/** 남의 조직 예약은 「예약됨」만 — 운영자는 전부 봅니다. */
+const access = (b) => (state.viewer === "operator" || b.orgId === me().orgId ? "full" : "masked");
+/** 수정 가능: 확정 상태 + (운영자 | 우리 조직이면서 시작 전) */
+function canEdit(b) {
+  if (statusOf(b) !== "confirmed") return false;
+  if (state.viewer === "operator") return true;
+  return b.orgId === me().orgId && abs(b.date, b.start) > NOW_ABS;
+}
+const live = (b) => b.status !== "cancelled";
+
+/** 슬롯 차단 사유. 운영자는 제한이 없습니다. */
+function blockedReason(date, startMin) {
+  if (!isTenant()) return null;
+  if (date > LIMIT) return "limit";
+  if (abs(date, startMin) < NOW_ABS) return "past";
+  return null;
+}
+const isPastSlot = (date, startMin) => abs(date, startMin + SLOT) <= NOW_ABS;
+
+function usedMin(orgId, date, exceptId) {
+  return BOOKINGS.filter((b) => live(b) && b.orgId === orgId && b.date === date && b.id !== exceptId)
+    .reduce((n, b) => n + (b.end - b.start), 0);
+}
+
+/** 시간 검증 — 첫 번째 위반 하나만 돌려줍니다. 순서가 곧 우선순위입니다. */
+function checkTime(d, exceptId) {
+  const r = room(d.room);
+  const len = d.end - d.start;
+  if (len <= 0) return "종료 시각은 시작 시각보다 늦어야 합니다";
+  if (BOOKINGS.some((b) => live(b) && b.id !== exceptId && b.room === d.room && b.date === d.date && d.start < b.end && d.end > b.start))
+    return "이미 예약된 시간과 겹칩니다";
+  if (len < r.min) return r.name + "은 최소 " + dur(r.min) + " 이상 예약할 수 있습니다";
+  if (len > r.max) return r.name + "은 한 번에 최대 " + dur(r.max) + "까지 예약할 수 있습니다";
+  if (isTenant()) {
+    if (abs(d.date, d.start) < NOW_ABS) return "지난 시각은 예약할 수 없습니다";
+    if (d.date > LIMIT) return md(LIMIT) + "까지 예약할 수 있습니다 (오늘부터 4주)";
+    const used = usedMin(me().orgId, d.date, exceptId);
+    if (used + len > TENANT_DAILY_MIN)
+      return "하루 2시간까지 예약할 수 있습니다 · 이 날 " + dur(used) + " 예약되어 있습니다";
+  }
+  return null;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   렌더
+   ══════════════════════════════════════════════════════════════ */
+const icon = (n, s) => '<i data-lucide="' + n + '" style="width:' + s + 'px;height:' + s + 'px"></i>';
+
+/* ★ 예시입니다. 실제 ERP는 권한 응답으로 동적 렌더링합니다 (common/04-shell.md) */
+const NAV_ITEMS = [
+  ["tenants", "building-2", "입주사"], ["billing", "receipt", "청구"], ["tax", "calculator", "세무"],
+  ["rooms", "calendar-check", "회의실"], ["spaces", "door-open", "호실"], ["settings", "settings", "설정"],
+];
+function renderNav() {
+  const items = isTenant() ? NAV_ITEMS.filter(([k]) => k === "rooms" || k === "billing") : NAV_ITEMS;
+  $("#nav").innerHTML = items.map(([k, ic, label]) =>
+    '<button class="nav-item' + (k === "rooms" ? " is-active" : "") + '" type="button" title="' + label + '">' +
+    icon(ic, 18) + '<span class="side-label">' + label + "</span></button>").join("");
+}
+
+function renderShell() {
+  const f = $("#frame");
+  const m = mode();
+  f.classList.toggle("is-xl", m === "xl");
+  f.classList.toggle("is-md", m === "md");
+  f.classList.toggle("is-sm", m === "sm");
+  f.classList.toggle("drawer-open", m === "sm" && state.drawer);
+  const u = me();
+  $("#avatar").textContent = u.initial;
+  $("#who-name").textContent = u.name;
+  $("#who-org").textContent = u.sub;
+  $("#role-note").textContent = isTenant() ? "입주사 · 타사 예약은 「예약됨」으로만 표시됩니다" : "운영 관리자 · 전체 예약 내용 표시";
+}
+
+function effectiveView() {
+  return state.viewer === "operator" && mode() !== "sm" ? state.view : "week";
+}
+
+function renderToolbar() {
+  const m = mode(), v = effectiveView();
+  const sel = $("#room-select");
+  sel.innerHTML = ROOMS.map((r) => '<option value="' + r.id + '">' + r.name + " (" + r.capLabel + ")</option>").join("");
+  sel.value = state.room;
+  $("#view-seg").style.display = state.viewer === "operator" && m !== "sm" ? "inline-flex" : "none";
+  $$("#view-seg button").forEach((b) => b.classList.toggle("is-on", b.dataset.view === v));
+
+  const a = state.anchor;
+  let text;
+  if (v === "month") text = pd(a).getFullYear() + "년 " + (pd(a).getMonth() + 1) + "월";
+  else if (m === "sm") text = md(a) + " (" + DOW[dowOf(a)] + ")";
+  else {
+    const mon = mondayOf(a), sun = addDays(mon, 6);
+    text = md(mon) + " – " + (pd(sun).getMonth() === pd(mon).getMonth() ? pd(sun).getDate() + "일" : md(sun));
+  }
+  $("#range").textContent = text;
+  $("#next").disabled = isTenant() && nextAnchor(1) > LIMIT && (m === "sm" ? true : mondayOf(nextAnchor(1)) > LIMIT);
+}
+
+/** 이전·다음 단위 — 월간 한 달, 주간 한 주, 767 이하 하루 */
+function nextAnchor(dir) {
+  const v = effectiveView(), a = state.anchor;
+  if (v === "month") { const d = pd(a); d.setDate(1); d.setMonth(d.getMonth() + dir); return key(d); }
+  return addDays(a, mode() === "sm" ? dir : dir * 7);
+}
+
+function renderDateStrip() {
+  const host = $("#datestrip");
+  if (mode() !== "sm") { host.innerHTML = ""; return; }
+  const mon = mondayOf(state.anchor);
+  host.innerHTML = "";
+  for (let i = 0; i < 7; i++) {
+    const k = addDays(mon, i);
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ds-day" + (k === state.anchor ? " is-on" : "") + (k === TODAY ? " is-today" : "") + (isTenant() && k > LIMIT ? " is-off" : "");
+    b.innerHTML = '<span class="d">' + DOW[i] + '</span><span class="n">' + pd(k).getDate() + "</span>";
+    b.addEventListener("click", () => { state.anchor = k; render(); });
+    host.appendChild(b);
+  }
+}
+
+function renderWeek() {
+  const r = room(), m = mode();
+  const days = m === "sm" ? [state.anchor] : Array.from({ length: 7 }, (_, i) => addDays(mondayOf(state.anchor), i));
+  const cols = (m === "xl" ? 72 : 56) + "px repeat(" + days.length + ",minmax(0,1fr))";
+  const n = (r.close - r.open) / SLOT;
+  const head = $("#g-head"), body = $("#g-body");
+  head.style.gridTemplateColumns = cols;
+  body.style.gridTemplateColumns = cols;
+
+  head.innerHTML = '<div class="h-cell"></div>' + days.map((k) =>
+    '<div class="h-cell' + (k === TODAY ? " is-today" : "") + '"><span class="d">' + DOW[dowOf(k)] + '</span><span class="n">' + pd(k).getDate() + "</span></div>").join("");
+
+  body.innerHTML = "";
+  const times = document.createElement("div");
+  times.className = "t-col";
+  for (let s = 0; s < n; s++) {
+    const t = r.open + s * SLOT;
+    const row = document.createElement("div");
+    row.className = "t-row" + (t % 60 ? " half" : "");
+    if (!(t % 60)) row.textContent = fmt(t);
+    times.appendChild(row);
+  }
+  body.appendChild(times);
+
+  days.forEach((k) => {
+    const col = document.createElement("div");
+    col.className = "d-col" + (k === TODAY ? " is-today" : "");
+    col.dataset.date = k;
+    for (let s = 0; s < n; s++) {
+      const t = r.open + s * SLOT;
+      const why = blockedReason(k, t);
+      const c = document.createElement("div");
+      c.className = "cell" + (t % 60 ? " half" : "") + (isPastSlot(k, t) || why === "past" ? " is-past" : "") +
+        (why ? " is-blocked" : "") + (why === "limit" ? " is-limit" : "");
+      c.dataset.date = k;
+      c.dataset.slot = s;
+      if (why) c.title = why === "limit" ? md(LIMIT) + "까지 예약할 수 있습니다" : "지난 시각은 예약할 수 없습니다";
+      col.appendChild(c);
+    }
+    BOOKINGS.filter((b) => live(b) && b.room === r.id && b.date === k).forEach((b) => col.appendChild(bookingEl(b, r)));
+    if (k === TODAY && NOW_MIN >= r.open && NOW_MIN < r.close) {
+      const line = document.createElement("div");
+      line.className = "now-line";
+      line.style.top = ((NOW_MIN - r.open) / SLOT * SLOT_H) + "px";
+      col.appendChild(line);
+    }
+    const g = document.createElement("div");
+    g.className = "ghost";
+    col.appendChild(g);
+    body.appendChild(col);
+  });
+
+  const rt = "운영 " + fmt(r.open) + " – " + fmt(r.close) + " · 30분 단위 · 1회 " + dur(r.min) + " ~ " + dur(r.max);
+  $("#rule-text").textContent = isTenant() ? rt + " · 입주사 " + md(LIMIT) + "까지 · 하루 2시간" : rt;
+  $("#legend-limit").style.display = isTenant() ? "flex" : "none";
+}
+
+function bookingEl(b, r) {
+  const vis = access(b), st = statusOf(b);
+  const slots = (b.end - b.start) / SLOT;
+  const el = document.createElement("div");
+  el.className = "bk" + (vis === "full" ? " is-full" : "") + (st === "completed" ? " is-done" : "");
+  el.style.top = ((b.start - r.open) / SLOT * SLOT_H + 1) + "px";
+  el.style.height = (slots * SLOT_H - 2) + "px";
+  let html = '<div class="t">' + fmt(b.start) + "–" + fmt(b.end) + "</div>";
+  const showName = slots >= 2 || mode() === "sm";
+  if (showName) html += '<div class="n">' + (vis === "masked" ? "예약됨" : esc(b.title)) + "</div>";
+  if (slots >= 3 && vis === "full") html += '<div class="m">' + ORGS[b.orgId].name + " · " + b.people + "명</div>";
+  if (vis === "full" && state.viewer === "operator" && ORGS[b.orgId].operator) html += '<span class="own">운영사</span>';
+  el.innerHTML = html;
+  if (vis === "full") el.addEventListener("click", (e) => { e.stopPropagation(); openBooking(b); });
+  el.addEventListener("pointerdown", (e) => e.stopPropagation());
+  return el;
+}
+
+function renderMonth() {
+  const r = room();
+  const a = pd(state.anchor);
+  const y = a.getFullYear(), mo = a.getMonth();
+  const first = key(new Date(y, mo, 1));
+  const lead = dowOf(first);
+  const last = new Date(y, mo + 1, 0).getDate();
+  const total = Math.ceil((lead + last) / 7) * 7;
+  const span = r.close - r.open;
+  const demoMon = mondayOf(TODAY);
+  const host = $("#m-grid");
+  host.innerHTML = "";
+  for (let i = 0; i < total; i++) {
+    const k = addDays(first, i - lead);
+    const outside = pd(k).getMonth() !== mo;
+    /* 시안: 시연 주 밖의 날짜는 같은 요일 패턴을 반복해 밀도를 만듭니다 */
+    const src = k >= demoMon && k <= addDays(demoMon, 6) ? k : addDays(demoMon, dowOf(k));
+    const list = BOOKINGS.filter((b) => live(b) && b.room === r.id && b.date === src);
+    const busy = list.reduce((s, b) => s + b.end - b.start, 0);
+    const c = document.createElement("button");
+    c.type = "button";
+    c.disabled = outside;
+    c.className = "m-cell" + (k === TODAY ? " is-today" : "") + (k < TODAY ? " is-past" : "");
+    let html = '<span class="num">' + pd(k).getDate() + '</span><span class="track">' +
+      (busy ? '<span class="fill" style="width:' + (busy / span * 100) + '%"></span>' : "") + "</span>";
+    if (list.length && !outside) html += '<span class="sum">' + list.length + "건 <span>· " + (busy / 60 % 1 ? (busy / 60).toFixed(1) : busy / 60) + "h</span></span>";
+    c.innerHTML = html;
+    if (list.length) c.title = list.map((b) => fmt(b.start) + "–" + fmt(b.end) + " " + ORGS[b.orgId].name).join("\n");
+    c.addEventListener("click", () => { state.view = "week"; state.anchor = k; render(); });
+    host.appendChild(c);
+  }
+}
+
+function render() {
+  renderShell();
+  renderNav();
+  renderToolbar();
+  renderDateStrip();
+  const v = effectiveView();
+  $("#week-panel").style.display = v === "week" ? "flex" : "none";
+  $("#month-panel").style.display = v === "month" ? "flex" : "none";
+  if (v === "week") renderWeek(); else renderMonth();
+  lucide.createIcons();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   드래그 · 탭 선택 — 03-booking-form.md#1, 08-responsive.md#3
+   마우스: 누른 채 끌어 범위 선택
+   터치:   탭 = 그 칸부터 최소 이용시간. 끌면 스크롤 (선택하지 않음)
+   ══════════════════════════════════════════════════════════════ */
+function occupied(date) {
+  const r = room(), set = new Set();
+  BOOKINGS.filter((b) => live(b) && b.room === r.id && b.date === date).forEach((b) => {
+    for (let t = b.start; t < b.end; t += SLOT) set.add((t - r.open) / SLOT);
+  });
+  return set;
+}
+function slotFree(date, s, occ) {
+  const r = room();
+  return s >= 0 && s < (r.close - r.open) / SLOT && !occ.has(s) && !blockedReason(date, r.open + s * SLOT);
+}
+
+$("#g-body").addEventListener("pointerdown", (e) => {
+  const c = e.target.closest(".cell");
+  if (!c || c.classList.contains("is-blocked") || e.button > 0) return;
+  const s = +c.dataset.slot;
+  if (occupied(c.dataset.date).has(s)) return;
+  state.drag = { date: c.dataset.date, from: s, lo: s, hi: s, mouse: e.pointerType === "mouse", capped: false };
+  if (state.drag.mouse) { e.preventDefault(); paintGhost(); }
+});
+$("#g-body").addEventListener("pointerover", (e) => {
+  const d = state.drag;
+  if (!d || !d.mouse) return;
+  const c = e.target.closest(".cell");
+  if (!c || c.dataset.date !== d.date) return;
+  const s = +c.dataset.slot, occ = occupied(d.date), maxS = room().max / SLOT;
+  let lo = d.from, hi = d.from;
+  while (lo - 1 >= Math.min(s, d.from) && slotFree(d.date, lo - 1, occ)) lo--;
+  while (hi + 1 <= Math.max(s, d.from) && slotFree(d.date, hi + 1, occ)) hi++;
+  d.capped = hi - lo + 1 > maxS;
+  if (d.capped) { if (s < d.from) lo = hi - maxS + 1; else hi = lo + maxS - 1; }
+  d.lo = lo; d.hi = hi;
+  paintGhost();
+});
+document.addEventListener("pointercancel", () => { state.drag = null; hideGhost(); });
+document.addEventListener("pointerup", (e) => {
+  const d = state.drag;
+  if (!d) return;
+  state.drag = null;
+  hideGhost();
+  if (!d.mouse) {
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const c = hit && hit.closest(".cell");
+    if (!c || c.dataset.date !== d.date || +c.dataset.slot !== d.from) return;
+  }
+  openCreate(d.date, d.lo, d.hi);
+});
+
+function paintGhost() {
+  hideGhost();
+  const d = state.drag;
+  const col = $('.d-col[data-date="' + d.date + '"]');
+  if (!col) return;
+  const g = col.querySelector(".ghost");
+  const r = room(), len = (d.hi - d.lo + 1) * SLOT;
+  g.style.display = "flex";
+  g.style.top = (d.lo * SLOT_H + 1) + "px";
+  g.style.height = ((d.hi - d.lo + 1) * SLOT_H - 2) + "px";
+  g.innerHTML = '<span class="t">' + fmt(r.open + d.lo * SLOT) + "–" + fmt(r.open + (d.hi + 1) * SLOT) + " (" + dur(len) + ")</span>" +
+    (d.capped ? '<span class="c">최대 ' + dur(r.max) + "</span>" : "");
+}
+function hideGhost() { $$(".ghost").forEach((g) => { g.style.display = "none"; }); }
+
+/* ══════════════════════════════════════════════════════════════
+   등록 · 수정 · 상세 — 한 모달, mode 3종
+   ══════════════════════════════════════════════════════════════ */
+function openCreate(date, lo, hi) {
+  const r = room(), n = (r.close - r.open) / SLOT, minS = r.min / SLOT;
+  if (hi - lo + 1 < minS) hi = Math.min(lo + minS - 1, n - 1);
+  state.form = { mode: "create", id: null, draft: {
+    room: r.id, date, start: r.open + lo * SLOT, end: r.open + (hi + 1) * SLOT,
+    title: "", people: Math.min(4, r.cap), memo: "", orgId: me().orgId,
+  } };
+  seedForm();
+}
+
+/** 예약 추가 버튼 — 보고 있는 날(주간이면 오늘 또는 그 주 월요일)의 다음 빈 30분 */
+function openCreateDefault() {
+  const r = room();
+  const mon = mondayOf(state.anchor);
+  let date = mode() === "sm" ? state.anchor : (TODAY >= mon && TODAY <= addDays(mon, 6) ? TODAY : mon);
+  if (isTenant() && date < TODAY) date = TODAY;
+  const occ = occupied(date), n = (r.close - r.open) / SLOT;
+  let s = 0;
+  while (s < n && !slotFree(date, s, occ)) s++;
+  if (s >= n) s = 0;
+  openCreate(date, s, s);
+}
+
+function openBooking(b) {
+  state.form = { mode: canEdit(b) ? "edit" : "view", id: b.id, draft: { ...b } };
+  seedForm();
+}
+
+/** 필드 값은 모달이 열릴 때 한 번만 채웁니다. 입력 중 다시 채우지 않습니다. */
+function seedForm() {
+  const f = state.form, d = f.draft, ro = f.mode === "view";
+  const r = room(d.room);
+  const b = f.id ? BOOKINGS.find((x) => x.id === f.id) : null;
+
+  $("#f-heading").textContent = f.mode === "create" ? "회의실 예약" : f.mode === "edit" ? "예약 수정" : "예약 상세";
+  const badge = $("#f-badge");
+  if (b) {
+    const st = statusOf(b);
+    badge.hidden = false;
+    badge.className = "badge " + (st === "confirmed" ? "badge--indigo" : st === "completed" ? "badge--neutral" : "badge--cancel");
+    badge.textContent = st === "confirmed" ? "확정" : st === "completed" ? "종료" : "취소";
+  } else badge.hidden = true;
+
+  $("#f-room").innerHTML = ROOMS.map((x) => '<option value="' + x.id + '">' + x.name + " (" + x.capLabel + ")</option>").join("");
+  $("#f-room").value = d.room;
+  $("#f-date").value = d.date;
+  $("#f-date").min = isTenant() ? TODAY : "";
+  $("#f-date").max = isTenant() ? LIMIT : "";
+  fillTimes();
+  $("#f-title").value = d.title;
+  $("#f-memo").value = d.memo || "";
+  $("#f-title-err").hidden = true;
+  $("#f-title").classList.remove("is-error");
+
+  ["#f-room", "#f-date", "#f-start", "#f-end", "#f-title", "#f-memo", "#f-org"].forEach((s) => { $(s).disabled = ro; });
+
+  /* 예약 조직 — 운영자가 새로 만들 때만 고릅니다. 저장 후에는 바꿀 수 없습니다. */
+  const pickOrg = state.viewer === "operator" && f.mode === "create";
+  $("#f-org-wrap").style.display = pickOrg ? "flex" : "none";
+  if (pickOrg) {
+    $("#f-org").innerHTML = Object.entries(ORGS).map(([id, o]) => '<option value="' + id + '">' + o.name + (o.operator ? " (운영사)" : "") + "</option>").join("");
+    $("#f-org").value = d.orgId;
+  }
+  $("#f-booker-note").textContent = f.mode === "create"
+    ? (pickOrg ? "등록자는 로그인한 운영자로 기록됩니다" : "로그인 정보로 자동 입력됩니다")
+    : "등록 후에는 바꿀 수 없습니다";
+  const who = b ? { org: ORGS[b.orgId].name, name: b.by, phone: b.phone } : { org: ORGS[d.orgId].name, name: me().name, phone: me().phone };
+  $("#f-booker").innerHTML =
+    '<div><div class="k">조직명</div><div class="v b" id="f-booker-org">' + who.org + "</div></div>" +
+    '<div><div class="k">' + (b ? "예약자" : "등록자") + '</div><div class="v">' + who.name + "</div></div>" +
+    '<div><div class="k">연락처</div><div class="v" style="font-variant-numeric:tabular-nums">' + who.phone + "</div></div>";
+
+  $("#f-meta").hidden = !b;
+  if (b) $("#f-meta").textContent = "등록 " + b.at + " · " + b.by + (b.status === "cancelled" ? " · 취소됨" : "");
+
+  $("#f-cancel-booking").style.display = f.mode === "edit" ? "inline-flex" : "none";
+  $("#f-submit").style.display = ro ? "none" : "inline-flex";
+  $("#f-submit").textContent = f.mode === "edit" ? "저장" : "예약하기";
+  $("#f-dismiss").textContent = ro ? "닫기" : "취소";
+
+  paintPeople();
+  validate();
+  $("#form-overlay").classList.add("is-open");
+  lucide.createIcons();
+  if (!ro && f.mode === "create" && mode() !== "sm") setTimeout(() => $("#f-title").focus(), 30);
+}
+
+function fillTimes() {
+  const d = state.form.draft, r = room(d.room);
+  const opt = (t) => '<option value="' + t + '">' + fmt(t) + "</option>";
+  let s = "", e = "";
+  for (let t = r.open; t < r.close; t += SLOT) s += opt(t);
+  for (let t = r.open + SLOT; t <= r.close; t += SLOT) e += opt(t);
+  $("#f-start").innerHTML = s;
+  $("#f-end").innerHTML = e;
+  $("#f-start").value = d.start;
+  $("#f-end").value = d.end;
+  $("#f-room-rule").textContent = r.name + " · 운영 " + fmt(r.open) + " – " + fmt(r.close) + " · 1회 " + dur(r.min) + " ~ " + dur(r.max);
+  $("#f-sub").textContent = r.name + " · " + r.capLabel + " · 30분 단위";
+  $("#f-cap").textContent = "최대 " + r.cap + "명";
+}
+
+function paintPeople() {
+  const d = state.form.draft, r = room(d.room), ro = state.form.mode === "view";
+  $("#f-people").textContent = d.people;
+  $("#f-minus").disabled = ro || d.people <= 1;
+  $("#f-plus").disabled = ro || d.people >= r.cap;
+}
+
+function validate() {
+  const f = state.form;
+  if (!f) return true;
+  const d = f.draft;
+  const msg = f.mode === "view" ? null : checkTime(d, f.id);
+  const err = $("#f-time-err");
+  err.hidden = !msg;
+  err.querySelector("span").textContent = msg || "";
+  $("#f-end").classList.toggle("is-error", !!msg);
+  $("#f-start").classList.toggle("is-error", !!msg);
+  $("#f-submit").disabled = !!msg;
+
+  const usage = $("#f-usage");
+  usage.hidden = !(isTenant() && f.mode !== "view");
+  if (!usage.hidden) {
+    const used = usedMin(me().orgId, d.date, f.id);
+    const left = Math.max(0, TENANT_DAILY_MIN - used);
+    usage.textContent = md(d.date) + " 우리 조직 예약 " + dur(used) + " · " + (left ? dur(left) + " 더 예약할 수 있습니다" : "더 예약할 수 없습니다");
+  }
+  return !msg;
+}
+
+function closeForm() {
+  state.form = null;
+  $("#form-overlay").classList.remove("is-open");
+}
+
+/* 입력 바인딩 — 파생 표시만 갱신하고 폼 전체를 다시 그리지 않습니다 */
+$("#f-room").addEventListener("change", (e) => {
+  const d = state.form.draft, r = room(e.target.value), len = d.end - d.start;
+  d.room = r.id;
+  d.start = Math.min(Math.max(d.start, r.open), r.close - SLOT);   // 운영시간 안으로 맞춤
+  d.end = Math.min(d.start + len, r.close);
+  d.people = Math.min(d.people, r.cap);
+  fillTimes(); paintPeople(); validate();
+});
+$("#f-date").addEventListener("change", (e) => { if (e.target.value) state.form.draft.date = e.target.value; validate(); });
+$("#f-start").addEventListener("change", (e) => {
+  const d = state.form.draft, len = d.end - d.start, r = room(d.room);
+  d.start = +e.target.value;
+  d.end = Math.min(d.start + Math.max(len, r.min), r.close);          // 길이 유지하며 종료 이동
+  $("#f-end").value = d.end;
+  validate();
+});
+$("#f-end").addEventListener("change", (e) => { state.form.draft.end = +e.target.value; validate(); });
+$("#f-title").addEventListener("input", (e) => {
+  state.form.draft.title = e.target.value;
+  if (e.target.value.trim()) { $("#f-title-err").hidden = true; e.target.classList.remove("is-error"); }
+});
+$("#f-memo").addEventListener("input", (e) => { state.form.draft.memo = e.target.value; });
+$("#f-org").addEventListener("change", (e) => { state.form.draft.orgId = e.target.value; $("#f-booker-org").textContent = ORGS[e.target.value].name; });
+$("#f-minus").addEventListener("click", () => { state.form.draft.people--; paintPeople(); });
+$("#f-plus").addEventListener("click", () => { state.form.draft.people++; paintPeople(); });
+$$("[data-close]").forEach((b) => b.addEventListener("click", closeForm));
+$("#form-overlay").addEventListener("click", (e) => { if (e.target.id === "form-overlay") closeForm(); });
+
+$("#f-submit").addEventListener("click", () => {
+  const f = state.form, d = f.draft;
+  if (!validate()) return;
+  if (!d.title.trim()) {
+    $("#f-title-err").hidden = false;
+    $("#f-title").classList.add("is-error");
+    $("#f-title").focus();
+    return;
+  }
+  if (f.mode === "create") {
+    BOOKINGS.push({ ...d, title: d.title.trim(), id: Date.now(), status: "confirmed", by: me().name, phone: me().phone, at: "9월 30일 13:40" });
+    toast("예약했습니다");
+  } else {
+    Object.assign(BOOKINGS.find((b) => b.id === f.id), { ...d, title: d.title.trim() });
+    toast("예약을 변경했습니다");
+  }
+  state.room = d.room;
+  state.anchor = d.date;
+  closeForm();
+  render();
+});
+
+/* 예약 취소 — 확인 모달 */
+function openCancel() {
+  const d = state.form.draft;
+  $("#c-sum").textContent = room(d.room).name + " · " + md(d.date) + " " + fmt(d.start) + "–" + fmt(d.end);
+  $("#cancel-overlay").classList.add("is-open");
+}
+$("#f-cancel-booking").addEventListener("click", openCancel);
+$("#c-back").addEventListener("click", () => $("#cancel-overlay").classList.remove("is-open"));
+$("#c-ok").addEventListener("click", () => {
+  const b = BOOKINGS.find((x) => x.id === state.form.id);
+  if (b) b.status = "cancelled";
+  $("#cancel-overlay").classList.remove("is-open");
+  closeForm();
+  render();
+  toast("예약을 취소했습니다");
+});
+
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast");
+  t.querySelector("span").textContent = msg;
+  t.classList.add("is-on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("is-on"), 2400);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   툴바 바인딩
+   ══════════════════════════════════════════════════════════════ */
+$("#prev").addEventListener("click", () => { state.anchor = nextAnchor(-1); render(); });
+$("#next").addEventListener("click", () => { state.anchor = nextAnchor(1); render(); });
+$("#today").addEventListener("click", () => { state.anchor = TODAY; render(); scrollToNow(); });
+$("#room-select").addEventListener("change", (e) => { state.room = e.target.value; $("#c-room").value = state.room; render(); scrollToNow(); });
+$$("#view-seg button").forEach((b) => b.addEventListener("click", () => { state.view = b.dataset.view; render(); }));
+$("#add-btn").addEventListener("click", openCreateDefault);
+$("#m-add").addEventListener("click", openCreateDefault);
+$("#hamburger").addEventListener("click", () => { state.drawer = true; renderShell(); });
+$("#scrim").addEventListener("click", () => { state.drawer = false; renderShell(); });
+
+/** 진입 시 현재 시각 1시간 전이 맨 위에 오게 */
+function scrollToNow() {
+  const r = room(), sc = $("#week-scroll");
+  sc.scrollTop = Math.max(0, ((NOW_MIN - 60 - r.open) / SLOT) * SLOT_H);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   확인 컨트롤 바
+   ══════════════════════════════════════════════════════════════ */
+$("#c-viewer").addEventListener("change", (e) => { state.viewer = e.target.value; closeForm(); render(); });
+$("#c-room").addEventListener("change", (e) => { state.room = e.target.value; render(); scrollToNow(); });
+$("#c-width").addEventListener("change", (e) => {
+  state.width = e.target.value;
+  const f = $("#frame");
+  f.style.width = state.width === "auto" ? "100%" : state.width + "px";
+  f.classList.toggle("is-fixed", state.width !== "auto");
+  state.drawer = false;
+  render();
+});
+$("#c-modal").addEventListener("change", (e) => {
+  const v = e.target.value;
+  closeForm();
+  $("#cancel-overlay").classList.remove("is-open");
+  if (v === "create") { state.room = "A"; openCreate(TODAY, 10, 11); }
+  if (v === "edit" || v === "cancel") { state.room = "A"; openBooking(BOOKINGS.find((b) => b.id === 7)); if (v === "cancel") openCancel(); }
+  if (v === "view") { state.room = "A"; openBooking(BOOKINGS.find((b) => b.id === 1)); }
+  e.target.value = "none";
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if ($("#cancel-overlay").classList.contains("is-open")) $("#cancel-overlay").classList.remove("is-open");
+  else if (state.form) closeForm();
+});
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+
+let lastMode = null;
+new ResizeObserver(() => { const m = mode(); if (m !== lastMode) { lastMode = m; render(); } }).observe($("#frame"));
+render();
+scrollToNow();
+</script>
+</body>
+</html>

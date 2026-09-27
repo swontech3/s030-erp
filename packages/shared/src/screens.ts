@@ -56,7 +56,9 @@ export const SCREENS = {
   s0300500060: { route: '/kiosk',          name: '회의실 현황판',   group: '050', public: true },
 
   // --- 060 공간운영 ---
-  s0300600010: { route: '/booking',        name: '예약 현황',       group: '060' },
+  // ★ 이름이 곧 사이드바 문구다 — 화면이 하는 일이 「회의실 예약」이다(2026-09-26 개칭).
+  //   화면 목록·삐용 시드의 「회의실 예약 현황」도 같이 고쳤다.
+  s0300600010: { route: '/booking',        name: '회의실 예약',     group: '060' },
 } as const satisfies Record<string, ScreenMeta>;
 
 export type ScreenId = keyof typeof SCREENS;

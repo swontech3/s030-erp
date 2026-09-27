@@ -63,5 +63,5 @@
   animation: swonSpin 700ms linear infinite;
 }
 
-/* 원본은 min-width:1440px 고정이다. 반응형은 예약 현황·현황판 두 화면만 한다
+/* 원본은 min-width:1440px 고정이다. 반응형은 회의실 예약·현황판 두 화면만 한다
    (SWONBIZ_PROJECT_STRUCTURE.md §5). 여기서는 원본을 그대로 따른다. */

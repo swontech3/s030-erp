@@ -1,0 +1,1302 @@
+/*
+ * s0300600010 회의실 예약 — 주간 그리드 · 월간 · 등록/수정 모달.
+ *
+ * 원본: design/handoff/prototypes/s0300600010.html (2차 인계 시안, 2026-09-27)
+ * 치수·색·간격을 그 파일에서 그대로 옮겼다 — 값을 바꾸면 시안과 갈라진다.
+ * ★ 녹색은 쓰지 않는다(`lint-no-green`). 시안도 인디고·앰버·레드만 쓴다.
+ *
+ * ★★ 폭 단계는 `08-responsive.md` 와 같다 — xl 1280↑ / md 768~1279 / sm 767↓.
+ *    다만 이 파일은 **미디어 쿼리가 아니라 `data-w` 속성**으로 갈린다. 시안은 프레임
+ *    폭(= 셸 포함)으로 갈리는데, 우리 화면은 ERP 셸 안에 들어 있어 창 폭과 내용 폭이
+ *    다르다. 창 폭을 재서 속성으로 내려 주면 두 곳(셸·내용)이 같은 기준으로 갈린다.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ── 툴바 ── */
+.toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+  padding: 20px 28px 14px;
+}
+
+.page[data-w='md'] .toolbar {
+  padding: 16px 20px 12px;
+}
+
+.page[data-w='sm'] .toolbar {
+  padding: 12px 12px 8px;
+}
+
+.tbLeft,
+.tbRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page[data-w='sm'] .tbLeft {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.page[data-w='sm'] .tbRight {
+  width: 100%;
+}
+
+.step {
+  display: flex;
+  gap: 4px;
+}
+
+.range {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text-heading);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.btn {
+  height: 40px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.btnSm {
+  height: 36px;
+  padding: 0 14px;
+}
+
+.btnLg {
+  height: 44px;
+}
+
+.btnPrimary {
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.22);
+}
+
+.btnPrimary:hover {
+  background: var(--color-primary-hover);
+}
+
+.btnGhost {
+  background: var(--surface);
+  color: var(--text-heading);
+  border-color: var(--border);
+}
+
+.btnGhost:hover {
+  background: var(--surface-alt);
+}
+
+.btnDangerGhost {
+  background: var(--surface);
+  color: var(--color-danger);
+  border-color: var(--border);
+}
+
+.btnDangerGhost:hover {
+  background: var(--color-danger-bg);
+}
+
+.btnDanger {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.iconBtn {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  background: var(--surface-alt);
+}
+
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.iconBtnBare {
+  border: 0;
+  background: transparent;
+}
+
+/* 회의실 고르기 — 좌측 door-open · 우측 caret */
+.roomPick {
+  position: relative;
+  display: flex;
+}
+
+.roomPick select {
+  appearance: none;
+  height: 36px;
+  padding: 0 34px 0 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-heading);
+  cursor: pointer;
+  outline: none;
+}
+
+.roomPick select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.32);
+}
+
+.page[data-w='sm'] .roomPick,
+.page[data-w='sm'] .roomPick select {
+  width: 100%;
+}
+
+.lead,
+.caret {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.lead {
+  left: 12px;
+}
+
+.caret {
+  right: 12px;
+}
+
+/* 월간 | 주간 */
+.seg {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.seg button {
+  height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.segOn {
+  background: var(--surface);
+  color: var(--text-heading);
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(11, 17, 32, 0.06);
+}
+
+/* ── 날짜 스트립 (767 이하) ── */
+.datestrip {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  padding: 0 12px 10px;
+}
+
+.dsDay {
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  line-height: 1.3;
+}
+
+.dsDow {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.dsNum {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.dsToday .dsNum {
+  color: var(--color-primary);
+}
+
+.dsOn {
+  background: var(--surface);
+  border-color: var(--color-primary);
+}
+
+.dsOff {
+  opacity: 0.4;
+}
+
+/* ── 패널 ── */
+.panel {
+  flex: 1;
+  min-height: 0;
+  margin: 0 28px 24px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.page[data-w='md'] .panel {
+  margin: 0 20px 20px;
+}
+
+.page[data-w='sm'] .panel {
+  margin: 0 12px 84px;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ── 주간 그리드 ── */
+.gHead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* ★ 767 이하에서는 날짜 스트립이 요일 머리를 대신한다 — 두 줄이 겹치지 않게 숨긴다 */
+.page[data-w='sm'] .gHead {
+  display: none;
+}
+
+.gBody {
+  position: relative;
+  display: grid;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hCell {
+  position: relative;
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--border);
+  line-height: 1.35;
+}
+
+.hCell:last-child {
+  border-right: 0;
+}
+
+.hDow {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.hNum {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.hToday {
+  background: rgba(79, 70, 229, 0.03);
+}
+
+.hToday .hDow,
+.hToday .hNum {
+  color: var(--color-primary);
+}
+
+.hToday::after {
+  content: '';
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  bottom: 0;
+  height: 2px;
+  background: var(--color-primary);
+}
+
+.tCol {
+  border-right: 1px solid var(--border);
+}
+
+.tRow {
+  height: 28px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 2px 8px 0 0;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.half {
+  border-top-style: dashed;
+}
+
+.dCol {
+  position: relative;
+  border-right: 1px solid var(--border);
+}
+
+.dCol:last-child {
+  border-right: 0;
+}
+
+.dToday {
+  background: rgba(79, 70, 229, 0.03);
+}
+
+.cell {
+  height: 28px;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.cell:hover {
+  background: rgba(79, 70, 229, 0.05);
+}
+
+.cellPast {
+  background: var(--surface-alt);
+}
+
+.cellBlocked {
+  cursor: not-allowed;
+}
+
+.cellBlocked:hover {
+  background: var(--surface-alt);
+}
+
+/* 예약 가능 기간 밖 — 지난 칸과 막힌 이유가 달라 사선으로 구분한다 */
+.cellLimit {
+  background: repeating-linear-gradient(135deg, var(--surface-alt) 0 6px, #fff 6px 12px);
+}
+
+/* ── 예약 블록 — 절대배치 한 덩어리 ── */
+.bk {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  z-index: 2;
+  padding: 4px 6px 4px 9px;
+  border: 0;
+  border-left: 3px solid var(--color-primary);
+  border-radius: 4px;
+  background: rgba(79, 70, 229, 0.08);
+  overflow: hidden;
+  text-align: left;
+  line-height: 1.35;
+  font-family: inherit;
+  cursor: default;
+}
+
+.bkFull {
+  cursor: pointer;
+}
+
+.bkFull:hover {
+  background: rgba(79, 70, 229, 0.14);
+}
+
+.bkTime {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-primary-hover);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.bkName {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bkMeta {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 「입주사」「운영사」「외부」 뱃지 — 블록 우상단. 768~1279 이하에서는 자리가 없어 숨긴다 */
+.bkOwn {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  height: 16px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--color-accent-bg);
+  color: var(--color-primary-hover);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.page[data-w='md'] .bkOwn,
+.page[data-w='sm'] .bkOwn {
+  display: none;
+}
+
+.bkDone {
+  background: var(--surface-alt);
+  border-left-color: var(--text-caption);
+}
+
+.bkDone:hover {
+  background: #f1f4f8;
+}
+
+.bkDone .bkTime,
+.bkDone .bkName {
+  color: var(--text-muted);
+}
+
+.page[data-w='sm'] .bkName {
+  font-size: 14px;
+}
+
+.page[data-w='sm'] .bkTime {
+  font-size: 12px;
+}
+
+/* 현재 시각 */
+.nowLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid var(--color-accent);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.nowLine::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -4.5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-accent);
+}
+
+/* 드래그 고스트 */
+.ghost {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--color-primary);
+  border-radius: 4px;
+  background: rgba(79, 70, 229, 0.1);
+  pointer-events: none;
+  overflow: hidden;
+  line-height: 1.35;
+}
+
+.ghostTime {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary-hover);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.ghostCap {
+  font-size: 11px;
+  color: var(--color-primary-hover);
+  white-space: nowrap;
+}
+
+/* ── 범례 ── */
+.legend {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px 20px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-alt);
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.page[data-w='sm'] .legend {
+  padding: 10px 14px;
+}
+
+.sw {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 767 이하에서는 범례 조각을 숨기고 규칙 문구만 남긴다 */
+.page[data-w='sm'] .sw {
+  display: none;
+}
+
+.swConfirmed {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: rgba(79, 70, 229, 0.08);
+  border-left: 3px solid var(--color-primary);
+}
+
+.swDone {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--surface-alt);
+  border-left: 3px solid var(--text-caption);
+}
+
+.swLimit {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: repeating-linear-gradient(135deg, var(--surface-alt) 0 3px, #fff 3px 6px);
+}
+
+.swNow {
+  width: 12px;
+  height: 2px;
+  background: var(--color-accent);
+}
+
+.sp {
+  flex: 1;
+}
+
+.rule {
+  color: var(--text-caption);
+}
+
+/* ── 월간 (운영자 · 768 이상) ── */
+.mHead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.mHead span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.mGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+
+.mCell {
+  min-height: 112px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-family: inherit;
+  cursor: pointer;
+  line-height: 1.3;
+}
+
+.mCell:hover {
+  background: var(--surface-alt);
+}
+
+.mCell:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.mPast {
+  opacity: 0.6;
+}
+
+.mNum {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.mToday .mNum {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.track {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: #eef0f4;
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--color-secondary);
+}
+
+.mSum {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.mSum span {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.page[data-w='md'] .mSum {
+  font-size: 15px;
+}
+
+/* ── 모바일 하단 CTA ── */
+.mCta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  padding: 12px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.mCta .btn {
+  width: 100%;
+  height: 48px;
+  font-size: 15px;
+}
+
+/* ── 빈 상태 ── */
+.empty {
+  padding: 56px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.emptyIcon {
+  color: var(--text-caption);
+}
+
+.emptyLead {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.emptySub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ── 모달 ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(11, 17, 32, 0.45);
+}
+
+.modal {
+  width: 640px;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 48px rgba(11, 17, 32, 0.18);
+  overflow: hidden;
+}
+
+.modalSm {
+  width: 480px;
+}
+
+/* 767 이하 — 등록·수정 모달은 전체 화면 */
+.overlayFull {
+  padding: 0;
+  align-items: stretch;
+}
+
+.overlayFull .modal {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+}
+
+.overlayNarrow {
+  padding: 16px;
+}
+
+.modalHead {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.page[data-w='sm'] .modalHead,
+.overlayFull .modalHead {
+  padding: 16px;
+}
+
+.modalTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+}
+
+.modalSub {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.modalBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.overlayFull .modalBody {
+  padding: 16px;
+}
+
+.modalFoot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border);
+}
+
+.overlayFull .modalFoot {
+  padding: 12px 16px;
+}
+
+.overlayFull .modalFoot .btn {
+  flex: 1;
+}
+
+.overlayFull .modalFoot .sp {
+  display: none;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badgeIndigo {
+  background: var(--color-accent-bg);
+  color: var(--color-primary-hover);
+}
+
+.badgeNeutral {
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.badgeCancel {
+  background: var(--surface-alt);
+  color: var(--text-caption);
+  border: 1px solid var(--border);
+}
+
+/*
+ * ★ 시간이 지났는데 **저장값은 아직 확정**인 예약 — 운영자에게만 보인다.
+ *   화면은 종료로 그리지만(시안 04-rules.md §1), 닫는 것은 운영자의 일이라
+ *   「아직 안 닫힌 것」이 구분돼야 한다.
+ */
+.badgeWaiting {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.secTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.secTitle::before {
+  content: '';
+  width: 3px;
+  height: 16px;
+  background: var(--color-primary);
+}
+
+.secRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.secNote {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.fgrid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  column-gap: 12px;
+  row-gap: 14px;
+}
+
+.span6 {
+  grid-column: span 6;
+}
+
+.span2 {
+  grid-column: span 2;
+}
+
+/* 767 이하 — 날짜는 한 줄, 시작·종료는 반씩 */
+.overlayFull .span2 {
+  grid-column: span 3;
+}
+
+.overlayFull .fdate {
+  grid-column: span 6;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.req {
+  color: var(--color-danger);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-heading);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.32);
+}
+
+.isError {
+  border-color: var(--color-danger);
+}
+
+.input:disabled,
+.select:disabled,
+.textarea:disabled {
+  background: var(--surface-alt);
+  color: var(--text-body);
+  cursor: default;
+  opacity: 1;
+}
+
+.textarea {
+  height: auto;
+  padding: 12px 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.selectWrap {
+  position: relative;
+  display: flex;
+}
+
+.selectWrap .select {
+  appearance: none;
+  padding-right: 34px;
+  cursor: pointer;
+}
+
+.err {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--color-danger);
+  line-height: 1.5;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.stepper button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.stepper button:hover {
+  background: var(--surface-alt);
+}
+
+.stepper button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.stepper button:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.stepper button:last-child {
+  border-left: 1px solid var(--border);
+}
+
+.stepValue {
+  width: 56px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.peopleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 예약자 정보 */
+.booker {
+  margin-top: 12px;
+  position: relative;
+  padding: 16px 16px 16px 20px;
+  background: var(--surface-alt);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.booker::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-primary);
+}
+
+.bookerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  row-gap: 14px;
+  column-gap: 20px;
+}
+
+.bookerKey {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.bookerValue {
+  margin-top: 2px;
+  font-size: 16px;
+  color: var(--text-heading);
+  line-height: 1.4;
+}
+
+.bookerValueBold {
+  font-weight: 700;
+}
+
+.metaLine {
+  font-size: 12px;
+  color: var(--text-caption);
+}
+
+/* ── 취소 확인 ── */
+.confirm {
+  padding: 32px 28px 24px;
+  text-align: center;
+}
+
+.confirmIcon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.confirmTitle {
+  margin: 16px 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.confirmText {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text-body);
+}
+
+.confirmSum {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+  font-size: 14px;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.confirmReason {
+  margin-top: 16px;
+  text-align: left;
+}
+
+.confirmFoot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 28px 28px;
+}
+
+.confirmFoot .btn {
+  height: 44px;
+}
+
+/* ── 토스트 ── */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 95;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius-md);
+  background: var(--surface-inverse);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(11, 17, 32, 0.1);
+}
+
+.page[data-w='sm'] .toast {
+  bottom: 88px;
+}

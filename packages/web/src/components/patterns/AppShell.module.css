@@ -395,3 +395,142 @@
   overflow: auto;
   padding: 32px;
 }
+
+
+/* =============================================================================
+ * 반응형 — **`.responsive` 가 붙은 화면에서만**(지금은 /booking 하나)
+ * =============================================================================
+ * ERP 는 1440px 고정이 기본이다(맨 위 `.shell`). 회의실 예약은 입주사가 휴대폰으로도
+ * 쓰는 화면이라 셸까지 같이 줄어야 한다(`room-booking/08-responsive.md` §1):
+ *
+ *   1280 이상   사이드바 248 펼침 · 헤더 64
+ *   768~1279    사이드바 64 레일(라벨 숨김) · 헤더 64
+ *   767 이하    사이드바 숨김 → 햄버거로 여는 덮개 · 헤더 56 · 계정은 아바타만
+ *
+ * ★ 이 규칙은 전부 `.responsive` 안에 있다. 다른 화면은 한 줄도 달라지지 않는다.
+ * ============================================================================= */
+
+.responsive {
+  min-width: 0;
+}
+
+.hamburger {
+  display: none;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.hamburger:hover {
+  background: var(--surface-alt);
+}
+
+.scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  background: rgba(11, 17, 32, 0.45);
+}
+
+/* ── 768~1279 — 사이드바는 아이콘 레일 ── */
+@media (max-width: 1279px) {
+  .responsive .aside {
+    width: 64px;
+    padding: 20px 12px;
+  }
+
+  .responsive .aside .label {
+    display: none;
+  }
+
+  .responsive .logo,
+  .responsive .item {
+    justify-content: center;
+    padding: 0;
+    gap: 0;
+  }
+
+  /* 접기 토글은 레일에서 의미가 없다 — 폭이 이미 고정이다 */
+  .responsive .toggle {
+    display: none;
+  }
+}
+
+/* ── 767 이하 — 덮개 사이드바 · 56px 헤더 ── */
+@media (max-width: 767px) {
+  .responsive .aside {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 70;
+    width: 248px;
+    padding: 20px 16px;
+    transform: translateX(-100%);
+    box-shadow: 0 20px 48px rgba(11, 17, 32, 0.18);
+  }
+
+  .responsive.drawerOpen .aside {
+    transform: none;
+  }
+
+  .responsive.drawerOpen .scrim {
+    display: block;
+  }
+
+  /* 덮개 안에서는 라벨이 다시 보인다 */
+  .responsive .aside .label {
+    display: inline;
+  }
+
+  .responsive .logo,
+  .responsive .item {
+    justify-content: flex-start;
+    padding: 0 12px;
+    gap: 12px;
+  }
+
+  .responsive .header {
+    height: 56px;
+    padding: 0 12px 0 8px;
+    gap: 8px;
+  }
+
+  .responsive .hamburger {
+    display: grid;
+  }
+
+  /* 이름·조직은 접고 아바타만 남긴다 */
+  .responsive .userText {
+    display: none;
+  }
+
+  .responsive .user {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  /* 도움말·알림은 좁은 화면에서 자리를 먹는다 */
+  .responsive .header .iconBtn {
+    display: none;
+  }
+}
+
+.roleNote {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 1279px) {
+  .responsive .roleNote {
+    display: none;
+  }
+}

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>s0300500060 회의실 현황판 — SwonBiz ERP 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<script src="https://unpkg.com/lucide@0.414.0/dist/umd/lucide.js"></script>
+<style>
+/* ── 디자인 토큰 ── handoff/tokens/*.css 와 동일한 값 ── */
+:root{
+  --indigo-600:#4F46E5; --indigo-700:#4338CA; --indigo-400:#818CF8; --cyan-400:#22D3EE; --indigo-50:#EEF2FF;
+  --slate-950:#0B1120; --slate-600:#475569; --slate-500:#64748B; --slate-400:#94A3B8; --white:#FFFFFF; --slate-50:#F8FAFC; --slate-200:#E2E8F0;
+  --red-600:#DC2626; --red-100:#FEE2E2;
+  --color-primary:var(--indigo-600); --color-primary-hover:var(--indigo-700); --color-accent:var(--cyan-400); --color-accent-bg:var(--indigo-50);
+  --color-danger:var(--red-600); --color-danger-bg:var(--red-100);
+  --surface:var(--white); --surface-alt:var(--slate-50); --surface-inverse:var(--slate-950); --border:var(--slate-200);
+  --text-heading:var(--slate-950); --text-body:var(--slate-600); --text-muted:var(--slate-500); --text-caption:var(--slate-400);
+  --font-core:"Pretendard Variable",Pretendard,Inter,-apple-system,"Segoe UI",sans-serif;
+  --radius-md:8px; --radius-pill:999px; --ease-out:cubic-bezier(.22,.61,.36,1);
+  /* 현황판 로컬 변수 — README 이관 주의 2번: tokens/colors.css 로 올릴지 판단 필요 */
+  --k-booked:#818CF8; --k-booked-bar:#4F46E5; --k-empty:#EEF0F4; --k-now:#22D3EE;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;display:flex;flex-direction:column;background:#1E2433;font-family:var(--font-core);-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@keyframes kFade{from{opacity:.55}to{opacity:1}}
+
+/* ── 확인 컨트롤 바 ── ★ 개발 확인용. 실서비스에는 포함되지 않습니다 ── */
+.devbar{flex:0 0 auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 20px;background:var(--surface-inverse);color:#fff;font-size:13px}
+.devbar strong{font-size:12px;letter-spacing:.06em;opacity:.6}
+.devbar label{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.devbar select{height:30px;padding:0 10px;border:1px solid rgba(255,255,255,.22);border-radius:6px;background:rgba(255,255,255,.08);color:#fff;font-size:13px}
+.devbar select option{color:#0B1120}
+.devbar .spacer{flex:1}
+.devbar code{font-family:ui-monospace,Menlo,monospace;font-size:12px;opacity:.7}
+
+/* ── 1280×800 고정 캔버스를 창에 맞춰 축소 ── */
+.stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:20px}
+.device{width:1280px;height:800px;flex:0 0 auto;transform-origin:center;border-radius:14px;box-shadow:0 0 0 10px #0B1120,0 30px 80px rgba(0,0,0,.45);overflow:hidden}
+
+/* ── 현황판 ── 원본: erp-booking-kiosk ── */
+.k{position:relative;width:1280px;height:800px;overflow:hidden;background:var(--surface);user-select:none;color:var(--text-body)}
+.k-screen{width:100%;height:100%;display:flex;flex-direction:column;gap:20px;padding:28px 32px}
+.k-screen.is-fade{animation:kFade 420ms var(--ease-out)}
+.k-offline{flex:0 0 auto;display:none;align-items:center;gap:12px;height:56px;padding:0 24px;border-radius:var(--radius-md);background:var(--color-danger-bg);border:1px solid rgba(220,38,38,.3)}
+.k-offline.is-on{display:flex}
+.k-offline .t{font-size:22px;font-weight:700;color:var(--color-danger);white-space:nowrap}
+.k-offline .at{margin-left:auto;font-size:18px;color:var(--text-body);white-space:nowrap;font-variant-numeric:tabular-nums}
+.k-head{flex:0 0 auto;min-height:88px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.k-head .l{display:flex;align-items:center;gap:16px;min-width:0}
+.k-head img{height:32px;width:auto}
+.k-room{font-size:34px;font-weight:800;letter-spacing:-.02em;color:var(--text-heading);white-space:nowrap;line-height:1.2}
+.k-date{margin-top:2px;font-size:20px;color:var(--text-muted);white-space:nowrap}
+.k-clock{font-size:76px;font-weight:800;line-height:1;letter-spacing:-.02em;color:var(--text-heading);font-variant-numeric:tabular-nums}
+.k-banner{flex:0 0 auto;height:72px;display:flex;align-items:center;gap:14px;padding:0 24px;border-radius:var(--radius-md);background:var(--surface-alt);border:1px solid var(--border)}
+.k-banner .dot{width:16px;height:16px;flex:0 0 auto;border-radius:999px;background:var(--text-caption)}
+.k-banner .main{font-size:36px;font-weight:800;letter-spacing:-.02em;color:var(--text-heading);white-space:nowrap}
+.k-banner .sub{margin-left:auto;font-size:24px;color:var(--text-muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.k-banner.is-live{background:var(--color-primary);border-color:var(--color-primary)}
+.k-banner.is-live .dot{background:#fff}
+.k-banner.is-live .main{color:#fff}
+.k-banner.is-live .sub{color:rgba(255,255,255,.8)}
+.k-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:20px;transition:opacity 280ms var(--ease-out)}
+.k-body.is-stale{opacity:.35}
+.k-rows{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:20px}
+.k-row{flex:1 1 0;min-height:0;max-height:210px;display:flex}
+.k-row .lab{flex:0 0 72px;display:flex;align-items:center;font-size:18px;color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.k-row .tl{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+.k-ticks{position:relative;flex:0 0 26px}
+.k-ticks span{position:absolute;bottom:2px;font-size:20px;color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1}
+.k-track{position:relative;flex:1 1 auto;min-height:0;border-radius:var(--radius-md);background:var(--k-empty);overflow:hidden}
+.k-track .g{position:absolute;top:0;bottom:0;width:1px;background:var(--border)}
+.k-track .g.half{background:none;border-left:1px dashed var(--border)}
+.k-track .bar{position:absolute;top:0;bottom:0;border-radius:8px;background:var(--k-booked);border-left:3px solid var(--k-booked-bar)}
+.k-track .now{position:absolute;top:0;bottom:0;width:3px;background:var(--k-now);z-index:3}
+.k-tri{position:absolute;bottom:-2px;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid var(--k-now)}
+.k-foot{flex:0 0 auto;height:176px;display:flex;gap:32px}
+.k-next{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:10px}
+.k-next h2{margin:0;font-size:20px;font-weight:700;color:var(--text-heading)}
+.k-cards{flex:1 1 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.k-card{height:100%;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:0 22px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface)}
+.k-card .t{font-size:30px;font-weight:700;color:var(--text-heading);white-space:nowrap;font-variant-numeric:tabular-nums;line-height:1.2}
+.k-card .s{font-size:20px;color:var(--text-muted)}
+.k-empty{grid-column:1 / -1;display:flex;align-items:center;font-size:24px;color:var(--text-muted)}
+.k-qr{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px}
+.k-qr .code{width:136px;height:136px;padding:8px;border-radius:var(--radius-md);background:#fff;border:1px solid var(--border);display:grid;grid-template-columns:repeat(21,1fr);grid-template-rows:repeat(21,1fr)}
+.k-qr .a{font-size:20px;font-weight:700;color:var(--text-heading);white-space:nowrap;text-align:center;line-height:1.3}
+.k-qr .b{font-size:16px;color:var(--text-muted);white-space:nowrap;text-align:center}
+.k-dim{position:absolute;inset:0;z-index:40;display:none;background:rgba(11,17,32,.6);pointer-events:none}
+.k-dim.is-on{display:block}
+.k-dim span{position:absolute;left:50%;top:28px;transform:translateX(-50%);height:44px;padding:0 20px;display:inline-flex;align-items:center;border-radius:var(--radius-pill);background:rgba(255,255,255,.14);color:#fff;font-size:20px;font-weight:700;white-space:nowrap}
+.k-dev{position:absolute;right:12px;bottom:12px;z-index:60;display:none;padding:8px 12px;border-radius:6px;background:var(--surface-inverse);color:#fff;font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums;text-align:right;pointer-events:none}
+.k-dev.is-on{display:block}
+.k-hit{position:absolute;right:0;bottom:0;z-index:59;width:72px;height:72px;border:0;background:transparent;padding:0;cursor:default}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════
+     확인 컨트롤 바
+     ★ 개발 확인용입니다. 실서비스 화면에는 포함되지 않습니다.
+     ══════════════════════════════════════════════════════════════ -->
+<div class="devbar">
+  <strong>확인용</strong>
+  <label>room
+    <select id="c-room"><option value="A" selected>A · 09–22</option><option value="B">B · 08–20</option><option value="C">C · 09–18</option></select>
+  </label>
+  <label>시각
+    <select id="c-time">
+      <option value="480">08:00 운영 전</option>
+      <option value="820" selected>13:40</option>
+      <option value="910">15:10</option>
+      <option value="990">16:30</option>
+      <option value="1240">20:40</option>
+      <option value="1350">22:30 운영 종료</option>
+    </select>
+  </label>
+  <label>network
+    <select id="c-net"><option value="online" selected>online</option><option value="off5">끊김 5분</option><option value="off40">끊김 40분</option></select>
+  </label>
+  <label>data
+    <select id="c-data"><option value="has" selected>has</option><option value="empty">empty</option></select>
+  </label>
+  <span class="spacer"></span>
+  <span>QR → <code id="c-qr"></code></span>
+</div>
+
+<div class="stage" id="stage">
+<div class="device" id="device">
+<div class="k" id="k">
+
+  <div class="k-dim" id="k-dim"><span>운영 시간 외</span></div>
+  <div class="k-dev" id="k-dev"></div>
+  <button class="k-hit" id="k-hit" type="button" aria-label="개발 정보"></button>
+
+  <div class="k-screen" id="k-screen">
+    <div class="k-offline" id="k-offline">
+      <i data-lucide="wifi-off" style="width:22px;height:22px;color:var(--color-danger)"></i>
+      <span class="t">연결이 끊어졌습니다</span>
+      <span class="at" id="k-offline-at"></span>
+    </div>
+
+    <div class="k-head">
+      <div class="l">
+        <img src="../assets/swonbiz-logo.png" alt="" onerror="this.style.visibility='hidden'">
+        <div>
+          <div class="k-room" id="k-room">회의실 A</div>
+          <div class="k-date" id="k-date">9월 30일 수요일</div>
+        </div>
+      </div>
+      <div class="k-clock" id="k-clock">13:40</div>
+    </div>
+
+    <div class="k-banner" id="k-banner">
+      <span class="dot"></span>
+      <span class="main" id="k-main"></span>
+      <span class="sub" id="k-sub"></span>
+    </div>
+
+    <div class="k-body" id="k-body">
+      <div class="k-rows" id="k-rows"></div>
+      <div class="k-foot">
+        <div class="k-next">
+          <h2>다음 예약</h2>
+          <div class="k-cards" id="k-cards"></div>
+        </div>
+        <div class="k-qr">
+          <div class="code" id="k-qr"></div>
+          <div><div class="a">지금 예약하기</div><div class="b">휴대폰으로 스캔</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   상수 — 06-kiosk.md
+   ══════════════════════════════════════════════════════════════ */
+const QR_BASE = "https://erp.swonbiz.com/booking";   // → s0300600010 ?room={id}&src=kiosk
+const POLL_MS = 30000;          // 데이터 30초
+const TICK_MS = 1000;           // 시계·마커 1초 (로컬)
+const STALE_MIN = 30;           // 이 이상 끊기면 현황을 보여주지 않음
+const ROW_MAX_SLOTS = 18;       // 한 행 최대 9시간
+const SLOT = 30;
+
+/* ══════════════════════════════════════════════════════════════
+   시안 데이터 — s0300600010 시안과 같은 날(9/30) 같은 예약
+   현황판 응답에는 시간만 들어옵니다 (제목·조직 없음)
+   ══════════════════════════════════════════════════════════════ */
+const ROOMS = {
+  A: { name: "회의실 A", open: 540, close: 1320, nextOpenLabel: "내일 09:00" },
+  B: { name: "회의실 B", open: 480, close: 1200, nextOpenLabel: "내일 08:00" },
+  C: { name: "미팅룸 C", open: 540, close: 1080, nextOpenLabel: "내일 09:00" },
+};
+const TODAY = {
+  A: [{ s: 660, e: 780 }, { s: 780, e: 840 }, { s: 960, e: 1020 }, { s: 1020, e: 1080 }, { s: 1200, e: 1260 }],
+  B: [{ s: 600, e: 720 }],
+  C: [{ s: 810, e: 840 }],
+};
+
+const state = { room: "A", now: 820, net: "online", data: "has" };
+
+const $ = (s) => document.querySelector(s);
+const fmt = (m) => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+const room = () => ROOMS[state.room];
+const list = () => (state.data === "empty" ? [] : TODAY[state.room]);
+const offlineMin = () => (state.net === "off5" ? 5 : state.net === "off40" ? 40 : 0);
+
+/* ══════════════════════════════════════════════════════════════
+   렌더
+   ══════════════════════════════════════════════════════════════ */
+function paint() {
+  const r = room(), now = state.now;
+  $("#k-room").textContent = r.name;
+  $("#k-clock").textContent = fmt(now);
+  $("#c-qr").textContent = QR_BASE + "?room=" + state.room + "&src=kiosk";
+
+  const off = offlineMin();
+  const stale = off >= STALE_MIN;
+  $("#k-offline").classList.toggle("is-on", off > 0);
+  $("#k-offline-at").textContent = "마지막 갱신 " + fmt(now - off);
+  $("#k-body").classList.toggle("is-stale", stale);
+
+  const outside = now < r.open || now >= r.close;
+  $("#k-dim").classList.toggle("is-on", outside);
+
+  paintBanner(r, now, stale);
+  paintRows(r, now);
+  paintCards(now, r);
+}
+
+/** 한 줄 상태 — 원거리에서 배경색만으로 판단되게 */
+function paintBanner(r, now, stale) {
+  const b = $("#k-banner"), main = $("#k-main"), sub = $("#k-sub");
+  const L = list();
+  const liveB = L.find((x) => now >= x.s && now < x.e);
+  const next = L.filter((x) => x.s > now).sort((a, z) => a.s - z.s)[0];
+  b.classList.remove("is-live");
+
+  if (stale) { main.textContent = "현황을 확인할 수 없습니다"; sub.textContent = "연결되면 자동으로 갱신됩니다"; return; }
+  if (now < r.open) {
+    main.textContent = "운영 시작 전";
+    sub.textContent = fmt(r.open) + "부터" + (next ? " · 첫 예약 " + fmt(next.s) : "");
+    return;
+  }
+  if (now >= r.close) { main.textContent = "운영 종료"; sub.textContent = r.nextOpenLabel + "부터"; return; }
+  if (liveB) {
+    b.classList.add("is-live");
+    main.textContent = "사용 중 · " + fmt(liveB.e) + "까지";
+    /* 바로 이어지는 예약이 있으면 비는 시각이 아니라 연속 사용임을 알린다 */
+    const cont = L.find((x) => x.s === liveB.e);
+    sub.textContent = cont ? "이어서 예약 " + fmt(cont.s) + "–" + fmt(cont.e) : next ? "다음 예약 " + fmt(next.s) : "이후 예약 없음";
+    return;
+  }
+  main.textContent = next ? "비어 있음 · " + fmt(next.s) + "까지" : "비어 있음";
+  sub.textContent = next ? "다음 예약 " + fmt(next.s) + "–" + fmt(next.e) : "오늘 남은 예약 없음";
+}
+
+/**
+ * 타임라인 행 — 운영시간을 18슬롯(9시간) 단위로 나눕니다.
+ * 모든 행의 슬롯 폭이 같도록 짧은 행은 폭을 비율로 줄입니다.
+ */
+function paintRows(r, now) {
+  const host = $("#k-rows");
+  host.innerHTML = "";
+  const total = (r.close - r.open) / SLOT;
+  const rows = [];
+  for (let from = 0; from < total; from += ROW_MAX_SLOTS) rows.push([from, Math.min(from + ROW_MAX_SLOTS, total)]);
+  const unit = Math.min(ROW_MAX_SLOTS, total);
+
+  rows.forEach(([a, z]) => {
+    const span = z - a;
+    const t0 = r.open + a * SLOT, t1 = r.open + z * SLOT;
+    const pct = (slots) => (slots / span) * 100;
+    const row = document.createElement("div");
+    row.className = "k-row";
+    row.innerHTML = '<div class="lab">' + fmt(t0).slice(0, 2) + "–" + fmt(t1).slice(0, 2) + '</div><div class="tl" style="width:' + (span / unit * 100) + '%;flex:0 0 auto;max-width:calc(100% - 72px)"><div class="k-ticks"></div><div class="k-track"></div></div>';
+    const ticks = row.querySelector(".k-ticks"), track = row.querySelector(".k-track");
+    row.querySelector(".tl").style.width = "calc((100% - 72px) * " + (span / unit) + ")";
+
+    for (let i = 1; i < span; i++) {
+      const g = document.createElement("span");
+      g.className = "g" + ((t0 + i * SLOT) % 60 ? " half" : "");
+      g.style.left = pct(i) + "%";
+      track.appendChild(g);
+    }
+    list().forEach((b) => {
+      const s = Math.max(b.s, t0), e = Math.min(b.e, t1);
+      if (e <= s) return;
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      bar.style.left = pct((s - t0) / SLOT) + "%";
+      bar.style.width = pct((e - s) / SLOT) + "%";
+      track.appendChild(bar);
+    });
+    for (let m = Math.ceil(t0 / 60) * 60; m <= t1; m += 60) {
+      const x = pct((m - t0) / SLOT);
+      const t = document.createElement("span");
+      t.textContent = String(m / 60).padStart(2, "0");
+      t.style.left = x + "%";
+      t.style.transform = m === t0 ? "none" : m === t1 ? "translateX(-100%)" : "translateX(-50%)";
+      t.style.opacity = m < now ? ".3" : "1";
+      ticks.appendChild(t);
+    }
+    if (now >= t0 && now < t1) {
+      const x = pct((now - t0) / SLOT);
+      const line = document.createElement("div");
+      line.className = "now";
+      line.style.left = x + "%";
+      track.appendChild(line);
+      const tri = document.createElement("span");
+      tri.className = "k-tri";
+      tri.style.left = x + "%";
+      ticks.appendChild(tri);
+    }
+    host.appendChild(row);
+  });
+}
+
+/** 다음 예약 3장 — 진행 중인 예약은 배너가 말하므로 빼고, 시작 전인 것만 */
+function paintCards(now, r) {
+  const host = $("#k-cards");
+  const up = list().filter((b) => b.s > now).sort((a, z) => a.s - z.s).slice(0, 3);
+  host.innerHTML = "";
+  if (!up.length) {
+    host.innerHTML = '<div class="k-empty">' + (now >= r.close ? "오늘 예약이 모두 끝났습니다" : "오늘 남은 예약이 없습니다") + "</div>";
+    return;
+  }
+  up.forEach((b) => {
+    const c = document.createElement("div");
+    c.className = "k-card";
+    c.innerHTML = '<div class="t">' + fmt(b.s) + " – " + fmt(b.e) + '</div><div class="s">예약됨</div>';
+    host.appendChild(c);
+  });
+}
+
+/** QR — 시안은 결정적 패턴. 실제는 QR_BASE?room=…&src=kiosk 로 생성 */
+function paintQr() {
+  const host = $("#k-qr");
+  for (let i = 0; i < 441; i++) {
+    const rr = Math.floor(i / 21), c = i % 21;
+    const finder = (rr < 7 && c < 7) || (rr < 7 && c > 13) || (rr > 13 && c < 7);
+    const ring = finder && (rr % 6 === 0 || c % 6 === 0 || (rr % 14 > 1 && rr % 14 < 5 && c % 14 > 1 && c % 14 < 5));
+    const on = finder ? ring : (rr * 7 + c * 13 + (rr % 3) * (c % 5)) % 3 === 0;
+    const s = document.createElement("span");
+    if (on) s.style.background = "#0B1120";
+    host.appendChild(s);
+  }
+}
+
+/** 우하단 3회 탭 → 개발 정보 5초 */
+let taps = 0, tapReset, devTimer;
+$("#k-hit").addEventListener("click", () => {
+  taps++; clearTimeout(tapReset); tapReset = setTimeout(() => { taps = 0; }, 600);
+  if (taps < 3) return;
+  taps = 0;
+  const d = $("#k-dev");
+  d.innerHTML = "1280 × 800<br>room " + state.room + " · 갱신 " + fmt(state.now - offlineMin());
+  d.classList.add("is-on");
+  clearTimeout(devTimer); devTimer = setTimeout(() => d.classList.remove("is-on"), 5000);
+});
+
+/* 데이터 갱신 연출 — 페이드만, 레이아웃 이동 없음 */
+function fade() { const s = $("#k-screen"); s.classList.remove("is-fade"); void s.offsetWidth; s.classList.add("is-fade"); }
+
+/* 확인 컨트롤 바 */
+[["#c-room", "room"], ["#c-time", "now", Number], ["#c-net", "net"], ["#c-data", "data"]].forEach(([sel, k, cast]) =>
+  $(sel).addEventListener("change", (e) => { state[k] = cast ? cast(e.target.value) : e.target.value; paint(); fade(); }));
+
+function fit() {
+  const st = $("#stage"), dv = $("#device");
+  const s = Math.min((st.clientWidth - 40) / 1280, (st.clientHeight - 40) / 800, 1);
+  dv.style.transform = "scale(" + s + ")";
+  dv.style.margin = (-(800 * (1 - s)) / 2) + "px " + (-(1280 * (1 - s)) / 2) + "px";
+}
+window.addEventListener("resize", fit);
+
+paintQr();
+paint();
+fit();
+lucide.createIcons();
+</script>
+</body>
+</html>

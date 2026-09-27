@@ -47,10 +47,22 @@ export interface AppShellProps {
   homeRoute: string;
   /** 헤더 표시값. **표시 전용** — 이 값으로 메뉴를 열고 닫지 않는다(지시문 1-6). */
   display: AppShellDisplay | null;
+  /**
+   * 권한 안내 — 「운영 관리자 · 전체 예약 내용 표시」/「입주사 · 타사 예약은 …」.
+   *
+   * ★ 시안은 이 문구를 **셸 헤더**에 둔다(`room-booking/02-booking.md` §1). 셸은 모든
+   *   화면이 함께 쓰므로 **반응형 화면(/booking)에서만** 그린다 — 다른 화면에는 이런
+   *   문구가 없다. 1280 미만에서는 자리가 없어 CSS 가 감춘다.
+   * ★ 표시 전용이다. 이 문구로 무엇을 열고 닫지 않는다(지시문 1-6).
+   */
+  roleNote?: string | null;
   children: React.ReactNode;
 }
 
-export function AppShell({ initialCollapsed, items, homeRoute, display, children }: AppShellProps) {
+/** 반응형으로 그리는 화면 — 여기 없는 경로는 1440px 고정 그대로다. */
+const RESPONSIVE_ROUTES = new Set(['/booking']);
+
+export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote, children }: AppShellProps) {
   /*
    * ★★ 초기값이 서버가 준 prop 그대로다 — 이것이 깜빡임 없음의 전부다.
    *    useEffect 로 마운트 후에 고치거나, 여기서 document.cookie 를 다시 읽으면
@@ -58,6 +70,19 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, children
    */
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const pathname = usePathname();
+
+  /*
+   * ★★★ **반응형은 정해진 화면에서만** 한다 — 회의실 예약·현황판 둘뿐이다
+   *    (`doc/SWONBIZ_PROJECT_STRUCTURE.md` §5 · `room-booking/08-responsive.md` §1).
+   *
+   *    ERP 는 데스크톱 업무 도구라 셸이 `min-width:1440px` 로 고정돼 있다. 그 고정을
+   *    전 화면에서 풀면 계약 폼·청구 표가 좁은 창에서 무너진다 — 그래서 **이 경로일 때만**
+   *    고정을 풀고 사이드바를 레일(768~1279)·드로어(767 이하)로 바꾼다.
+   *    판정은 경로 하나로 한다. 페이지가 클래스를 올려 주는 방식은 첫 페인트가 한 번
+   *    틀렸다가 고쳐져 깜빡인다.
+   */
+  const responsive = RESPONSIVE_ROUTES.has(pathname);
+  const [drawer, setDrawer] = useState(false);
 
   /*
    * 헤더 제목은 경로에서 끌어온다. 서버 컴포넌트인 layout 은 현재 경로를 알 수 없고
@@ -87,7 +112,14 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, children
   const toggleLabel = collapsed ? '사이드바 펼치기' : '사이드바 접기';
 
   return (
-    <div className={`${styles.shell}${collapsed ? ` ${styles.collapsed}` : ''}`}>
+    <div
+      className={
+        `${styles.shell}` +
+        (collapsed ? ` ${styles.collapsed}` : '') +
+        (responsive ? ` ${styles.responsive}` : '') +
+        (drawer ? ` ${styles.drawerOpen}` : '')
+      }
+    >
       <aside className={styles.aside}>
         <div className={styles.logoWrap}>
           {/* 원본에서도 로고가 곧 홈 진입점이다(data-nav="dashboard"). */}
@@ -131,6 +163,16 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, children
         </nav>
       </aside>
 
+      {/* ★ 767 이하에서 사이드바가 덮개로 뜬다 — 바깥을 누르면 닫힌다 */}
+      {responsive ? (
+        <div
+          className={styles.scrim}
+          role="presentation"
+          data-scrim="1"
+          onClick={() => setDrawer(false)}
+        />
+      ) : null}
+
       <button type="button" className={styles.toggle} onClick={onToggle} aria-label={toggleLabel}>
         <Icon name={collapsed ? 'chevron-right' : 'chevron-left'} size={14} />
         <span className={styles.toggleTip}>{toggleLabel}</span>
@@ -138,12 +180,28 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, children
 
       <div className={styles.column}>
         <header className={styles.header}>
+          {responsive ? (
+            <button
+              type="button"
+              className={styles.hamburger}
+              aria-label="메뉴 열기"
+              data-hamburger="1"
+              onClick={() => setDrawer((open) => !open)}
+            >
+              <Icon name="menu" size={20} />
+            </button>
+          ) : null}
           <div>
             {/* TODO(페이즈 3): 지점명은 기준설정(s0300100010)이 생기면 실제 값으로 바꾼다. */}
             <div className={styles.crumb}>{display ? display.orgName : ''}</div>
             <div className={styles.title}>{title}</div>
           </div>
           <div className={styles.spacer} />
+          {responsive && roleNote ? (
+            <span className={styles.roleNote} data-role-note="1">
+              {roleNote}
+            </span>
+          ) : null}
           {/* TODO(페이즈 3·6): 도움말·알림은 자리만 있다. 동작은 해당 페이즈에서. */}
           <button type="button" className={styles.iconBtn} aria-label="도움">
             <Icon name="circle-help" size={18} />

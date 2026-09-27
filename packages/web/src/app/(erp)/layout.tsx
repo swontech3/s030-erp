@@ -36,6 +36,15 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       items={buildNavItems(me.screens)}
       homeRoute={me.home}
       display={me.display}
+      /*
+       * ★ 권한 안내 문구 — **회의실 예약 화면에서만** 헤더에 뜬다(시안 02-booking.md §1).
+       *   역할은 서버가 안다. 셸은 이 문구를 그리기만 하고 판정에 쓰지 않는다.
+       */
+      roleNote={
+        me.role === 'operator'
+          ? '운영 관리자 · 전체 예약 내용 표시'
+          : '입주사 · 타사 예약은 「예약됨」으로만 표시됩니다'
+      }
     >
       {children}
     </AppShell>

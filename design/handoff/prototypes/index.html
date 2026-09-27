@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SwonBiz ERP 프로토타입 — 1차 인계</title>
+<title>SwonBiz ERP 프로토타입 — 1·2차 인계</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
 <style>
 :root{
@@ -91,17 +91,34 @@ h1{margin-top:28px;font-size:36px;font-weight:700;line-height:1.25}
 <span class="wordmark">S<span class="dot">·</span>won<span class="suffix">Biz</span></span>
 </div>
 
-<h1>ERP 프로토타입 — 1차 인계</h1>
-<p class="lede">입주사·계약 관리 업무의 동작 확인용 시안입니다. 각 파일은 단독으로 열립니다 — 폰트 CDN 외에는 외부 의존이 없습니다.</p>
+<h1>ERP 프로토타입 — 1·2차 인계</h1>
+<p class="lede">업무별 동작 확인용 시안입니다. 각 파일은 단독으로 열립니다 — 폰트·아이콘 CDN 외에는 외부 의존이 없습니다.</p>
 
 <div class="facts">
-<span><b>기준 폭</b> 1440px 고정</span>
-<span><b>명세</b> ../tenant-contract/</span>
-<span><b>최종 갱신</b> 2026-09-13</span>
+<span><b>기준 폭</b> 1440px (현황판 1280×800)</span>
+<span><b>명세</b> ../tenant-contract/ · ../room-booking/</span>
+<span><b>최종 갱신</b> 2026-09-27</span>
 </div>
 
 <div class="rule"></div>
 
+<h2 style="font-size:15px;font-weight:700;margin-bottom:12px">2차 · 회의실 예약</h2>
+<div class="grid">
+<a class="card" href="s0300600010.html">
+<div class="card-head"><span class="code">s0300600010</span><h2>회의실 예약</h2></div>
+<p class="body">주간 그리드(운영자는 월간 전환) + 등록·수정·상세 모달 1개와 예약 취소 확인 모달. 회의실별 운영시간·최소·최대 이용시간, 입주사 제한 3종, 767px 이하 하루 보기가 들어 있습니다.</p>
+<div class="meta"><span class="meta-label">확인 컨트롤</span><span class="chips"><span class="chip">viewer (operator·tenant)</span><span class="chip">room A·B·C</span><span class="chip">폭 1440·1024·820·390</span><span class="chip">modal (create·edit·view·cancel)</span></span></div>
+<div class="meta"><span class="meta-label">명세</span><span class="doc">room-booking/02-booking.md · 03-booking-form.md · 04-rules.md · 05-logic.md · 08-responsive.md</span></div>
+</a>
+<a class="card" href="s0300500060.html">
+<div class="card-head"><span class="code">s0300500060</span><h2>회의실 현황판</h2></div>
+<p class="body">벽면 태블릿용 표시 전용 화면. 로그인 없음. 당일 타임라인, 사용 중·비어 있음 배너, 다음 예약 3건, 휴대폰 예약 QR.</p>
+<div class="meta"><span class="meta-label">확인 컨트롤</span><span class="chips"><span class="chip">room A·B·C</span><span class="chip">시각 (운영 전·사용 중·비어 있음·운영 종료)</span><span class="chip">network (끊김 5분·40분)</span><span class="chip">data empty</span></span></div>
+<div class="meta"><span class="meta-label">명세</span><span class="doc">room-booking/06-kiosk.md</span></div>
+</a>
+</div>
+
+<h2 style="font-size:15px;font-weight:700;margin:40px 0 12px">1차 · 입주사·계약</h2>
 <div class="grid">
 <a class="card" href="s0300200030.html">
 <div class="card-head"><span class="code">s0300200030</span><h2>입주사·계약 마스터-디테일</h2></div>
@@ -127,7 +144,8 @@ h1{margin-top:28px;font-size:36px;font-weight:700;line-height:1.25}
 <h2>읽는 방법</h2>
 <ul>
 <li>각 화면 상단의 <b>검정 확인 컨트롤 바</b>는 개발 확인용입니다. 실서비스에는 포함되지 않습니다.</li>
-<li>모달은 별도 파일이 아니라 부모 화면 안에서 열립니다 — 계약 상세(p1)는 s0300200030, 확인 모달 3종은 s0300200040 안에 있습니다.</li>
+<li>모달은 별도 파일이 아니라 부모 화면 안에서 열립니다 — 계약 상세(p1)는 s0300200030, 확인 모달 3종은 s0300200040, 예약 모달·취소 확인은 s0300600010 안에 있습니다.</li>
+<li>회의실 예약 시안의 「오늘」은 2026.09.30(수) 13:40 으로 고정되어 있습니다. 현황판 시안도 같은 날 같은 예약입니다.</li>
 <li>브릿지랩 주식회사 · Room-1 등은 예시값입니다. ㈜에스원테크의 사업자 정보와 인감은 실제 값입니다.</li>
 <li>시안과 명세가 어긋나면 <b>명세가 기준</b>입니다. 시안은 동작을 보이기 위한 것입니다.</li>
 </ul>

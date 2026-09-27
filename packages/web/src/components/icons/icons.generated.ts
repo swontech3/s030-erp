@@ -11,6 +11,7 @@ export type IconName =
   | 'building-2'
   | 'calendar-check'
   | 'check'
+  | 'chevron-down'
   | 'chevron-left'
   | 'chevron-right'
   | 'circle'
@@ -27,6 +28,8 @@ export type IconName =
   | 'layout-dashboard'
   | 'lock'
   | 'mail-check'
+  | 'menu'
+  | 'minus'
   | 'mouse-pointer-click'
   | 'package-open'
   | 'plus'
@@ -49,6 +52,7 @@ export const ICON_MARKUP: Record<IconName, string> = {
   'building-2': "<path d=\"M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z\" /><path d=\"M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2\" /><path d=\"M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2\" /><path d=\"M10 6h4\" /><path d=\"M10 10h4\" /><path d=\"M10 14h4\" /><path d=\"M10 18h4\" />",
   'calendar-check': "<path d=\"M8 2v4\" /><path d=\"M16 2v4\" /><rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\" /><path d=\"M3 10h18\" /><path d=\"m9 16 2 2 4-4\" />",
   'check': "<path d=\"M20 6 9 17l-5-5\" />",
+  'chevron-down': "<path d=\"m6 9 6 6 6-6\" />",
   'chevron-left': "<path d=\"m15 18-6-6 6-6\" />",
   'chevron-right': "<path d=\"m9 18 6-6-6-6\" />",
   'circle': "<circle cx=\"12\" cy=\"12\" r=\"10\" />",
@@ -65,6 +69,8 @@ export const ICON_MARKUP: Record<IconName, string> = {
   'layout-dashboard': "<rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\" />",
   'lock': "<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\" /><path d=\"M7 11V7a5 5 0 0 1 10 0v4\" />",
   'mail-check': "<path d=\"M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h8\" /><path d=\"m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7\" /><path d=\"m16 19 2 2 4-4\" />",
+  'menu': "<line x1=\"4\" x2=\"20\" y1=\"12\" y2=\"12\" /><line x1=\"4\" x2=\"20\" y1=\"6\" y2=\"6\" /><line x1=\"4\" x2=\"20\" y1=\"18\" y2=\"18\" />",
+  'minus': "<path d=\"M5 12h14\" />",
   'mouse-pointer-click': "<path d=\"m9 9 5 12 1.8-5.2L21 14Z\" /><path d=\"M7.2 2.2 8 5.1\" /><path d=\"m5.1 8-2.9-.8\" /><path d=\"M14 4.1 12 6\" /><path d=\"m6 12-1.9 2\" />",
   'package-open': "<path d=\"M12 22v-9\" /><path d=\"M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 0 3.36L8.82 14.79a1.655 1.655 0 0 1-1.64 0L3 12.43a1.93 1.93 0 0 1 0-3.36z\" /><path d=\"M20 13v3.87a2.06 2.06 0 0 1-1.11 1.83l-6 3.08a1.93 1.93 0 0 1-1.78 0l-6-3.08A2.06 2.06 0 0 1 4 16.87V13\" /><path d=\"M21 12.43a1.93 1.93 0 0 0 0-3.36L8.83 2.2a1.64 1.64 0 0 0-1.63 0L3 4.57a1.93 1.93 0 0 0 0 3.36l12.18 6.86a1.636 1.636 0 0 0 1.63 0z\" />",
   'plus': "<path d=\"M5 12h14\" /><path d=\"M12 5v14\" />",
