@@ -26,15 +26,27 @@ import { redirect } from 'next/navigation';
 import { getMe, verifyScreen } from '@/lib/session';
 import { BookingView } from '@/features/booking/BookingView';
 
-export default async function BookingPage() {
+export default async function BookingPage({
+  searchParams,
+}: {
+  /**
+   * ★ 현황판 QR 이 달고 들어온다 — `?room={회의실}&src=kiosk`(06-kiosk §6).
+   *   `src` 는 유입 집계용이라 화면 동작에 쓰지 않는다. 지금은 집계할 곳이 없어
+   *   **읽지 않는다** — 파라미터는 유지하라는 명세를 QR 쪽에서 지킨다.
+   */
+  searchParams: Promise<{ room?: string; src?: string }>;
+}) {
   await verifyScreen('s0300600010', '/booking');
   const me = await getMe();
   if (!me) redirect('/login');
+  const { room } = await searchParams;
 
   return (
     <BookingView
       operator={me.role === 'operator'}
       companyId={me.companyId}
+      /* ★ 스캔해 들어오면 그 회의실이 열린다. 목록에 없는 값이면 무시하고 첫 회의실이다. */
+      initialRoomId={(room ?? '').trim() || null}
       // ★ 예약자 정보 블록의 기본값 — 표시 전용이다(판정에 쓰지 않는다).
       me={{ memberName: me.display?.memberName ?? '', orgName: me.display?.orgName ?? '' }}
     />

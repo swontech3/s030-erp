@@ -27,6 +27,30 @@ import { readSid } from './session';
  * ★ 그래도 세션은 반드시 넘긴다. 빼면 Fastify 가 401 을 내고, 그게 «데이터 없음»으로
  *   보이는 화면이 된다.
  */
+/**
+ * **인증 없는** 조회를 넘긴다 — 공개 화면(050)만 쓴다.
+ *
+ * ★★★ 지금 쓰는 곳은 회의실 현황판(s0300500060) 하나다. 이 함수를 새로 쓰기 전에
+ *    묻는다: **로그인하지 않은 사람에게 보여도 되는 응답인가?** Fastify 쪽 라우트도
+ *    `config: { public: true }` 를 직접 달아야 하므로 양쪽이 모두 «공개»라고 적은
+ *    경로만 열린다 — 한쪽만 고쳐서는 열리지 않는다.
+ * ★ 세션 쿠키를 **일부러 넘기지 않는다.** 넘기면 로그인한 사람과 아닌 사람에게
+ *   다른 응답이 갈 수 있고, 그러면 공개 화면이 조용히 권한 화면이 된다.
+ */
+export async function forwardPublicGetJson(path: string): Promise<NextResponse> {
+  let res;
+  try {
+    res = await callApi<{ message?: string }>(path);
+  } catch (err) {
+    console.error(`[forward] 공개 GET ${path} 실패:`, (err as Error).message);
+    return NextResponse.json({ message: '서버에 연결할 수 없습니다' }, { status: 503 });
+  }
+  if (!res.ok && res.status >= 500) {
+    return NextResponse.json({ message: '서버 오류가 났습니다' }, { status: res.status });
+  }
+  return NextResponse.json(res.body ?? {}, { status: res.status });
+}
+
 export async function forwardGetJson(path: string): Promise<NextResponse> {
   const sid = await readSid();
   if (!sid) {

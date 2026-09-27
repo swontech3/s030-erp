@@ -82,6 +82,23 @@ export async function lockRoom(client: ScopedClient, facilityId: string): Promis
   return rows[0] ?? null;
 }
 
+/**
+ * 회의실 한 칸 — 잠그지 않고 읽는다. 현황판(s0300500060)이 쓴다.
+ *
+ * ★ `is_reservable` 을 보지 않는다 — 지금 예약을 못 받는 방이어도 **벽에 걸린 화면은
+ *   오늘 일정을 보여 줘야 한다**. 예약을 만드는 길은 이 화면에 없다.
+ */
+export async function findRoom(client: ScopedClient, facilityId: string): Promise<RoomRow | null> {
+  const { rows } = await q<RoomRow>(
+    client,
+    `SELECT ${ROOM_COLUMNS}
+       FROM public.tb_s080_facilities f
+      WHERE f.facility_id = $1 AND f.facility_type = 'MEETING' AND f.status = 'active'`,
+    [facilityId],
+  );
+  return rows[0] ?? null;
+}
+
 /** 예약 한 줄 — 화면이 보는 칸. 시각은 벽시계 문자열이다(머리말). */
 export interface ReservationRow {
   reservation_id: string;

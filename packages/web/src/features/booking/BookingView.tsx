@@ -86,6 +86,12 @@ interface Props {
   companyId: string | null;
   /** 로그인한 사람 — 예약자 정보 블록의 기본값. */
   me: { memberName: string; orgName: string };
+  /**
+   * 처음 열 회의실 — 현황판 QR(`/booking?room=…&src=kiosk`)로 들어온 경우다.
+   * ★ 목록에 없으면 무시한다. 남의 건물 식별자를 붙여도 그 방이 열리지는 않는다 —
+   *   목록 자체가 서버가 준 것이다.
+   */
+  initialRoomId?: string | null;
 }
 
 interface DragState {
@@ -97,7 +103,7 @@ interface DragState {
   capped: boolean;
 }
 
-export function BookingView({ operator, companyId, me }: Props) {
+export function BookingView({ operator, companyId, me, initialRoomId = null }: Props) {
   const [rooms, setRooms] = useState<Room[] | null>(null);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [roomId, setRoomId] = useState('');
@@ -158,10 +164,12 @@ export function BookingView({ operator, companyId, me }: Props) {
         const all = b?.facilities ?? [];
         setRooms(all);
         setCompanies(b?.companies ?? []);
-        setRoomId((prev) => prev || all[0]?.facilityId || '');
+        // ★ QR 로 들어온 회의실이 **목록에 있을 때만** 고른다 — 없으면 첫 회의실이다.
+        const asked = all.some((r) => r.facilityId === initialRoomId) ? initialRoomId! : '';
+        setRoomId((prev) => prev || asked || all[0]?.facilityId || '');
       })
       .catch(() => setRooms([]));
-  }, []);
+  }, [initialRoomId]);
 
   const room = rooms?.find((r) => r.facilityId === roomId) ?? null;
   const rules = room ? roomRules(room) : null;
