@@ -32,6 +32,9 @@ const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
   s0300200070: 'receipt',
   s0300500010: null, // 랜딩 — 공개 화면
   s0300500060: null, // 회의실 현황판 — 공개 화면(키오스크)
+  s0300500070: null, // 문의상담 목록 — 공개 화면
+  s0300500070p1: null, // 문의하기 — 공개 화면
+  s0300500070p2: null, // 문의 보기 — 공개 화면
   s0300600010: 'calendar-check',
 };
 

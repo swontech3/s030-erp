@@ -1,0 +1,1087 @@
+/*
+ * s0300500070 문의상담 게시판 — 목록 · 문의하기(p1) · 글 보기(p2).
+ *
+ * 원본: design/handoff/prototypes/s0300500070.html (3차 인계 시안, 2026-09-27)
+ * 명세: design/handoff/inquiry-board/02-screens.md
+ * 치수·색·간격을 시안에서 **그대로** 옮겼다 — 값을 바꾸면 시안과 갈라진다.
+ *
+ * ★★ ERP 셸을 쓰지 않는다. 로그인 없이 누구나 여는 공개 영역이라 사이드바·헤더가
+ *    없고, 본문 최대 800px 가운데 정렬 한 가지다(모바일 우선 — 폭 분기가 거의 없다).
+ * ★ 시안의 「확인 컨트롤 바」와 390px 프레임은 옮기지 않는다 — 실서비스 화면이 아니다.
+ * ★ 녹색은 쓰지 않는다(`lint-no-green`). 시안도 인디고·레드뿐이다.
+ */
+
+/* ── 틀 ── */
+.page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-alt);
+  color: var(--text-body);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+/* 헤더 64px sticky — 반투명 + blur(02-screens §1) */
+.head {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.headIn,
+.footIn,
+.main {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 20px;
+  width: 100%;
+}
+
+.headIn {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.logo img {
+  height: 28px;
+  width: auto;
+}
+
+.wordmark {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.wordmarkDot {
+  opacity: 0.55;
+}
+
+.wordmarkSuffix {
+  color: var(--color-primary);
+}
+
+/* 전화 — 44px 터치 영역 */
+.tel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  color: var(--color-primary);
+}
+
+.tel:hover {
+  color: var(--color-primary-hover);
+}
+
+.main {
+  flex: 1;
+  padding: 32px 20px 64px;
+}
+
+.foot {
+  background: var(--surface-inverse);
+  padding: 32px 0;
+}
+
+.footIn {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.footMark {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+/* 사업자 정보 — **실제 값**이다(02-screens §1) */
+.biz {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.footTel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.footTelNo {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.footHours {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ── 공통 ── */
+.h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+}
+
+.lede {
+  margin: 6px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.back {
+  min-height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--color-primary);
+}
+
+.btn {
+  height: 44px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 180ms var(--ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
+}
+
+.btnPrimary {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.22);
+}
+
+.btnPrimary:hover {
+  background: var(--color-primary-hover);
+  color: #fff;
+}
+
+.btnGhost {
+  background: var(--surface);
+  color: var(--text-heading);
+  border-color: var(--border);
+}
+
+.btnGhost:hover {
+  background: var(--surface-alt);
+  color: var(--text-heading);
+}
+
+.btnXl {
+  height: 52px;
+  font-size: 16px;
+}
+
+.btnBlock {
+  width: 100%;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.badge {
+  height: 26px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* 접수 — 조용한 회색. 답변완료 — 인디고 */
+.badgeWait {
+  background: var(--surface-alt);
+  color: var(--text-muted);
+}
+
+.badgeDone {
+  background: var(--color-accent-bg);
+  color: var(--color-primary-hover);
+}
+
+.sec {
+  margin-top: 16px;
+  padding: 24px 20px;
+}
+
+.secTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+}
+
+.secTitle::before {
+  content: '';
+  width: 3px;
+  height: 16px;
+  flex: 0 0 auto;
+  background: var(--color-primary);
+}
+
+.secRule {
+  margin: 16px 0;
+  height: 1px;
+  background: var(--border);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  column-gap: 20px;
+  row-gap: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.labOpt {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* 필수 표시 — 라벨 앞 5px 원 */
+.reqDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--color-danger);
+}
+
+.input,
+.select,
+.textarea {
+  margin-top: 6px;
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  /* 16px — iOS 가 입력할 때 화면을 확대하지 않는 최소값이다 */
+  font-size: 16px;
+  color: var(--text-heading);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition:
+    border-color 180ms var(--ease-out, cubic-bezier(0.22, 0.61, 0.36, 1)),
+    box-shadow 180ms var(--ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
+}
+
+.textarea {
+  height: auto;
+  padding: 12px 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring, rgba(79, 70, 229, 0.32));
+}
+
+/*
+ * ★ 오류 테두리는 이 한 줄로 끝낸다(02-screens §3). 포커스 링은 box-shadow 라
+ *   겹치지 않는다 — 오류 상태에서도 지금 어디에 있는지 보인다.
+ */
+.isErr {
+  border-color: var(--color-danger) !important;
+}
+
+.err {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-danger);
+}
+
+.hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.countRow {
+  margin-top: 4px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.countErr {
+  color: var(--color-danger);
+}
+
+/* ── 목록 ── */
+.listTop {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filters {
+  margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+}
+
+.filters > .field {
+  flex: 1 1 160px;
+}
+
+.filters .lab {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  line-height: 20px;
+}
+
+.filters .input,
+.filters .select {
+  padding: 0 12px;
+}
+
+.fRange {
+  flex: 2 1 300px !important;
+}
+
+.pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pair .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.tilde {
+  flex: 0 0 auto;
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* 라벨과 [검색조건 초기화] 를 한 줄에 — 카드 높이를 늘리지 않는다 */
+.labRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  line-height: 20px;
+}
+
+.fReset {
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--color-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fReset:hover {
+  color: var(--color-primary-hover);
+}
+
+.countLine {
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.countLine b {
+  color: var(--text-heading);
+}
+
+.rowsCard {
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+/*
+ * 2열 목록 — 셀마다 위·왼쪽 1px 선을 두고, 바깥으로 나가는 선은 카드 테두리 밑에
+ * 숨긴다(`margin:-1px 0 0 -1px`). 680px 미만에서 자동 1열(auto-fill).
+ */
+.rowsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  margin: -1px 0 0 -1px;
+}
+
+.row {
+  min-width: 0;
+  width: 100%;
+  min-height: 72px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 180ms var(--ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
+}
+
+.row:hover {
+  background: var(--surface-alt);
+}
+
+.lock {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text-caption);
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.4;
+}
+
+/* 제목은 **문의 유형 그대로**다 — 제목 칸이 없다(01-flow 「확정된 결정」) */
+.rowTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.rowMeta {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pager {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.pager button {
+  min-width: 44px;
+  height: 44px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.pagerOn {
+  border-color: var(--border) !important;
+  background: var(--surface) !important;
+  color: var(--text-heading) !important;
+  font-weight: 700;
+}
+
+.few {
+  margin-top: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.fewLead {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.fewSub {
+  margin-top: 2px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.empty {
+  margin-top: 24px;
+  padding: 56px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.emptySm {
+  padding: 48px 24px;
+}
+
+.icCircle {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-accent-bg);
+  color: var(--color-primary);
+}
+
+.icMuted {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+}
+
+.emptyTitle {
+  margin: 18px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.emptyTitleSm {
+  margin: 16px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.emptyText {
+  margin: 8px 0 0;
+  max-width: 34ch;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.emptyBtns {
+  margin-top: 24px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ── 문의하기 ── */
+.types {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-alt);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+}
+
+.types button {
+  height: 40px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.typeOn {
+  background: var(--surface) !important;
+  color: var(--text-heading) !important;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(11, 17, 32, 0.08);
+}
+
+.privacy {
+  padding: 14px 16px;
+  background: var(--surface-alt);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.privacy b {
+  color: var(--text-heading);
+}
+
+.privacyShow {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--text-heading);
+  font-weight: 700;
+}
+
+.privacyShow span {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.agree {
+  margin-top: 14px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--text-heading);
+}
+
+.agree input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+.agreeReq {
+  color: var(--color-danger);
+}
+
+.errBanner {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--color-danger-bg);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: var(--radius-lg);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+/* 등록 제한(스팸) 배너 — 같은 자리, 두 줄 */
+.errBannerLimit {
+  align-items: flex-start;
+  gap: 10px;
+  font-weight: 400;
+}
+
+.errBannerLimit > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.errBannerLimit b {
+  font-size: 14px;
+  color: var(--color-danger);
+}
+
+.errBannerLimit > span > span {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-body);
+}
+
+.errBannerLimit svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+.formFoot {
+  margin-top: 24px;
+  display: flex;
+  gap: 8px;
+}
+
+/* 등록이 남은 폭을 가져간다 — 좁아도 한 줄을 유지한다(02-screens §5) */
+.formFoot .grow {
+  flex: 1;
+}
+
+/* ── 비밀번호 · 완료 ── */
+.gate {
+  margin: 12px auto 0;
+  max-width: 420px;
+  padding: 36px 24px;
+}
+
+.gateHead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.gateTitle {
+  margin: 16px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.gateText {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.done {
+  margin: 24px auto 0;
+  max-width: 480px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.doneTitle {
+  margin: 18px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.donePreview {
+  margin-top: 20px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface-alt);
+  border-radius: var(--radius-md);
+  text-align: left;
+}
+
+.donePreview .k {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.donePreview .v {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+/* ── 글 보기 ── */
+.viewHead {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.viewTitle {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+}
+
+.viewDate {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px 20px;
+}
+
+.info > div {
+  min-width: 0;
+}
+
+.infoKey {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.infoVal {
+  margin-top: 2px;
+  font-size: 15px;
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ★ 고객이 쓴 글은 HTML 이 아니다 — 줄바꿈만 살린다(04-data-model §4) */
+.bodyText {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.75;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.msg {
+  margin-top: 12px;
+  padding: 20px;
+}
+
+/* 고객 글은 배경색으로만 구분한다 — 좌우 정렬(채팅형)은 쓰지 않았다 */
+.msgCustomer {
+  background: var(--surface-alt);
+}
+
+.msgHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.av {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.avOp {
+  background: var(--color-accent-bg);
+  padding: 6px;
+}
+
+.avOp img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.avCu {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.who {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+  line-height: 1.4;
+}
+
+.when {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.msg .bodyText {
+  margin-top: 14px;
+}
+
+.msgPhone,
+.msgWait {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.msgPhone .avBig {
+  background: var(--color-accent-bg);
+  color: var(--color-primary);
+}
+
+.msgWait {
+  background: var(--surface-alt);
+  border-style: dashed;
+}
+
+.msgWait .avBig {
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.avBig {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.msgLead {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+  line-height: 1.5;
+}
+
+.msgSub {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.msgWaitText {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.composeFoot {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.composeNote {
+  flex: 1 1 240px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.usedNote {
+  margin-top: 24px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.usedNote svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: var(--text-muted);
+}
+
+.inlineTel {
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}

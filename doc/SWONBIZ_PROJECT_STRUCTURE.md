@@ -36,6 +36,10 @@ SwonBiz-erp/                             ← 모노레포 루트 · npm workspac
 │  │  │  ├─ app/
 │  │  │  │  ├─ page.tsx                  # s0300500010 랜딩 (050 공개)
 │  │  │  │  ├─ kiosk/page.tsx            # s0300500060 회의실 현황판 (050 공개 · 셸 없음)
+│  │  │  │  ├─ inquiry/                  # 050 공개 · 문의상담 (로그인 대신 글 비밀번호)
+│  │  │  │  │  ├─ page.tsx                  # s0300500070 목록
+│  │  │  │  │  ├─ new/page.tsx              # s0300500070p1 문의하기 (모달 아님)
+│  │  │  │  │  └─ [id]/page.tsx             # s0300500070p2 글 보기
 │  │  │  │  │                            #   ★ (public) 라우트 그룹은 만들지 않았다 —
 │  │  │  │  │                            #     공개 화면이 둘뿐이고 그룹이 공유할 레이아웃이
 │  │  │  │  │                            #     없다. 보호는 proxy.ts matcher 가 한다
@@ -127,6 +131,7 @@ export const SCREENS = {
   s0300200040: { route: '/contracts/[id]',     name: '계약 폼',         group: '020' },
   s0300500010: { route: '/',                   name: '랜딩',           group: '050', public: true },
   s0300500060: { route: '/kiosk',              name: '회의실 현황판',    group: '050', public: true },
+  s0300500070: { route: '/inquiry',            name: '문의상담',         group: '050', public: true },
   s0300600010: { route: '/booking',            name: '회의실 예약',     group: '060' },
   // ... 전체 목록은 doc/SWONBIZ_SCREEN_LIST.md 참조
 } as const;

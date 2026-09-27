@@ -30,9 +30,10 @@ export interface ApiResult<T> {
 
 export async function callApi<T>(
   path: string,
-  init: { method?: string; body?: unknown; erpSid?: string | null } = {},
+  init: { method?: string; body?: unknown; erpSid?: string | null; headers?: Record<string, string> } = {},
 ): Promise<ApiResult<T>> {
-  const headers: Record<string, string> = {};
+  // ★ 공개 라우트(문의상담)가 클라이언트 IP·열람 토큰을 넘길 때 쓴다. 세션과 섞이지 않는다.
+  const headers: Record<string, string> = { ...init.headers };
   // ★ 본문이 있을 때만 content-type 을 붙인다. 본문 없이 이 헤더만 보내면 Fastify 가
   //   FST_ERR_CTP_EMPTY_JSON_BODY 로 400 을 낸다 — 실제로 로그아웃이 그렇게 조용히
   //   실패했다(쿠키는 지워지고 서버 세션은 살아 있는 상태). 2026-09-07 확인.

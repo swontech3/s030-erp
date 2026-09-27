@@ -51,6 +51,55 @@ export async function forwardPublicGetJson(path: string): Promise<NextResponse> 
   return NextResponse.json(res.body ?? {}, { status: res.status });
 }
 
+/**
+ * **인증 없는** 쓰기를 넘긴다 — 공개 화면(050)만 쓴다. 지금은 문의상담뿐이다.
+ *
+ * ★ 출처 검사(CSRF)는 그대로 한다 — 로그인이 없다고 다른 사이트의 자동 제출 폼까지
+ *   받아 줄 이유는 없다.
+ * ★★ **클라이언트 IP 를 붙여 넘긴다.** Fastify 는 우리 Next 만 보므로 그대로 두면
+ *    모든 사람이 127.0.0.1 로 보이고, 비밀번호 시도 제한이 전 세계 공용 카운터가 된다.
+ *    이 헤더를 넣을 수 있는 것은 loopback 에 붙는 우리 프록시뿐이다.
+ * ★ `pass` 로 넘길 헤더를 고른다 — 열람 토큰(`x-inquiry-token`)이 그것이다. 고르지
+ *   않은 헤더는 넘어가지 않는다(브라우저가 보낸 것을 통째로 전달하지 않는다).
+ */
+export async function forwardPublicJson(
+  request: Request,
+  path: string,
+  method: 'POST' | 'PATCH',
+  pass: readonly string[] = [],
+): Promise<NextResponse> {
+  const blocked = rejectCrossSite(request, { requireJson: true });
+  if (blocked) return blocked;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ message: '요청 형식이 올바르지 않습니다' }, { status: 400 });
+  }
+
+  const headers: Record<string, string> = {};
+  const forwarded = request.headers.get('x-forwarded-for');
+  const ip = (forwarded ?? '').split(',')[0]?.trim();
+  if (ip) headers['x-erp-client-ip'] = ip;
+  for (const name of pass) {
+    const value = request.headers.get(name);
+    if (value) headers[name] = value;
+  }
+
+  let res;
+  try {
+    res = await callApi<{ message?: string }>(path, { method, body, headers });
+  } catch (err) {
+    console.error(`[forward] 공개 ${method} ${path} 실패:`, (err as Error).message);
+    return NextResponse.json({ message: '서버에 연결할 수 없습니다' }, { status: 503 });
+  }
+  if (!res.ok && res.status >= 500) {
+    return NextResponse.json({ message: '서버 오류가 났습니다' }, { status: res.status });
+  }
+  return NextResponse.json(res.body ?? {}, { status: res.status });
+}
+
 export async function forwardGetJson(path: string): Promise<NextResponse> {
   const sid = await readSid();
   if (!sid) {
