@@ -70,6 +70,15 @@ import {
 /** 칸 하나의 높이(px) — 시안 `SLOT_H`. 블록·현재 시각 선·진입 스크롤이 이 값을 쓴다. */
 const SLOT_H = 28;
 
+/**
+ * 하루 한도를 다 쓴 날에 알리는 말.
+ *
+ * ★★ **창을 열기 전에 막는다.** 모달을 다 그려 놓고 안에서 안 된다고 하면, 제목까지
+ *    적은 사람이 그제서야 헛일이었음을 안다. 남은 시간이 없으면 창을 열지 않는다.
+ * ★ 남은 시간이 있으면 지금 그대로다 — 창이 열리고, 넘기는 순간 안에서 막는다.
+ */
+const DAY_FULL_TEXT = '하루에 예약할 수 있는 시간(2시간)을 모두 사용하셨습니다';
+
 interface Props {
   /** 운영사인가 — 지난 시각·4주·하루 한도 예외, 월간 보기, 예약 조직 선택, 종료 처리. */
   operator: boolean;
@@ -99,7 +108,7 @@ export function BookingView({ operator, companyId, me }: Props) {
   const [busy, setBusy] = useState<Busy[]>([]);
   const [usedByDate, setUsedByDate] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; block: boolean } | null>(null);
   const [form, setForm] = useState<FormSeed | null>(null);
   const [confirming, setConfirming] = useState<Reservation | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -125,10 +134,14 @@ export function BookingView({ operator, companyId, me }: Props) {
     return () => clearInterval(timer);
   }, []);
 
-  const notify = useCallback((message: string) => {
-    setToast(message);
+  /**
+   * 아래쪽 알림. `kind='block'` 은 **막았다는 말**이다 — 체크 표시를 붙이면 처리된 것처럼
+   * 보이므로 느낌표로 바꾸고 조금 더 오래 둔다(읽을 글이 더 길다).
+   */
+  const notify = useCallback((message: string, kind: 'done' | 'block' = 'done') => {
+    setToast({ text: message, block: kind === 'block' });
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 2400);
+    toastTimer.current = setTimeout(() => setToast(null), kind === 'block' ? 3200 : 2400);
   }, []);
 
   useEffect(
@@ -250,15 +263,43 @@ export function BookingView({ operator, companyId, me }: Props) {
     [operator, usedByDate],
   );
 
-  /** 칸이 막힌 이유 — 운영자는 제한이 없다(시안 `blockedReason`). */
+  /**
+   * 그 날 더 잡을 수 있는 시간이 남았는가 — **하루 한도를 다 쓴 날**은 칸 자체를 잠근다.
+   *
+   * ★ 남은 시간이 그 회의실 최소 이용 시간보다 짧으면 어떤 예약도 만들 수 없다.
+   *   최소 30분인 방에서는 곧 「남은 시간 0」과 같은 말이다.
+   * ★ 운영자는 한도가 없다(`validateReservation` 의 운영자 예외).
+   */
+  const dayFull = useCallback(
+    (day: string) => {
+      if (operator || !rules) return false;
+      return DAILY_LIMIT_MINUTES - usedOn(day) < (rules.minMinutes ?? SLOT_MINUTES);
+    },
+    [operator, rules, usedOn],
+  );
+
+  /** 다 쓴 날에 할 말 — 최소 이용 시간이 30분보다 긴 방에서는 남은 시간을 말해 준다. */
+  const dayFullText = useCallback(
+    (day: string) => {
+      const left = DAILY_LIMIT_MINUTES - usedOn(day);
+      return left <= 0
+        ? DAY_FULL_TEXT
+        : `남은 시간 ${dur(left)}은 이 회의실 최소 이용 시간(${dur(rules?.minMinutes ?? SLOT_MINUTES)})보다 짧습니다`;
+    },
+    [usedOn, rules],
+  );
+
+  /** 칸이 막힌 이유 — 운영자는 제한이 없다(시안 `blockedReason` + 하루 한도). */
   const blockedReason = useCallback(
-    (day: string, startMinutes: number): 'limit' | 'past' | null => {
+    (day: string, startMinutes: number): 'limit' | 'past' | 'full' | null => {
       if (operator) return null;
       if (lastBookable && day > lastBookable) return 'limit';
       if (day < now.day || (day === now.day && startMinutes < now.minutes)) return 'past';
+      // ★ 지난 칸보다 뒤에 본다 — 다 쓴 날의 지난 칸은 「지난 시각」이 먼저 맞는 말이다.
+      if (dayFull(day)) return 'full';
       return null;
     },
-    [operator, lastBookable, now],
+    [operator, lastBookable, now, dayFull],
   );
 
   /** 이미 지난 칸인가 — 색만 다르다(운영자도 흐리게 본다). */
@@ -341,7 +382,12 @@ export function BookingView({ operator, companyId, me }: Props) {
 
   const onCellDown = (day: string, slot: number, e: React.PointerEvent) => {
     if (e.button > 0 || !rules) return;
-    if (blockedReason(day, rules.openMinutes + slot * SLOT_MINUTES)) return;
+    const why = blockedReason(day, rules.openMinutes + slot * SLOT_MINUTES);
+    if (why) {
+      // ★ 한도만 말해 준다 — 지난 시각·기간 밖은 사선과 말풍선으로 이미 보인다.
+      if (why === 'full') notify(dayFullText(day), 'block');
+      return; // 드래그를 시작하지 않는다 → 고스트도 모달도 없다
+    }
     if (occupiedOn(day).has(slot)) return;
     const mouse = e.pointerType === 'mouse';
     if (mouse) e.preventDefault();
@@ -370,6 +416,11 @@ export function BookingView({ operator, companyId, me }: Props) {
   /* ── 모달 열기 ───────────────────────────────────────────────────────── */
   const openCreate = (day: string, lo: number, hi: number) => {
     if (!room || !rules) return;
+    // ★★ 마지막 문지기 — 빈 칸·드래그·[+ 예약 추가] 가 모두 여기로 모인다.
+    if (dayFull(day)) {
+      notify(dayFullText(day), 'block');
+      return;
+    }
     const count = (rules.closeMinutes - rules.openMinutes) / SLOT_MINUTES;
     const minSlots = (rules.minMinutes ?? SLOT_MINUTES) / SLOT_MINUTES;
     // ★ 최소 이용 시간까지 늘린다. 늘리다 다음 예약과 겹치면 그대로 열고 오류를 보여 준다.
@@ -710,13 +761,16 @@ export function BookingView({ operator, companyId, me }: Props) {
                             (t % 60 ? ` ${styles.half}` : '') +
                             (isPastSlot(day, t) || why === 'past' ? ` ${styles.cellPast}` : '') +
                             (why ? ` ${styles.cellBlocked}` : '') +
-                            (why === 'limit' ? ` ${styles.cellLimit}` : '')
+                            // ★ 다 쓴 날도 사선으로 잠긴다 — 눌리는 것처럼 보이면 안 된다
+                            (why === 'limit' || why === 'full' ? ` ${styles.cellLimit}` : '')
                           }
                           title={
                             why === 'limit'
                               ? `${md(lastBookable!)}까지 예약할 수 있습니다`
                               : why === 'past'
                               ? '지난 시각은 예약할 수 없습니다'
+                              : why === 'full'
+                              ? dayFullText(day)
                               : undefined
                           }
                           onPointerDown={(e) => onCellDown(day, i, e)}
@@ -886,9 +940,9 @@ export function BookingView({ operator, companyId, me }: Props) {
       ) : null}
 
       {toast ? (
-        <div className={styles.toast}>
-          <Icon name="check" size={16} />
-          <span>{toast}</span>
+        <div className={`${styles.toast}${toast.block ? ` ${styles.toastBlock}` : ''}`} data-toast="1">
+          <Icon name={toast.block ? 'circle-alert' : 'check'} size={16} />
+          <span>{toast.text}</span>
         </div>
       ) : null}
     </div>
