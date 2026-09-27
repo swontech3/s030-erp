@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>s0300500070 문의상담 게시판 — SwonBiz 공개 영역 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<script src="https://unpkg.com/lucide@0.414.0/dist/umd/lucide.js"></script>
+<style>
+/* ── 디자인 토큰 ── handoff/tokens/*.css 와 동일한 값 ── */
+:root{
+  --indigo-600:#4F46E5; --indigo-700:#4338CA; --indigo-50:#EEF2FF;
+  --slate-950:#0B1120; --slate-600:#475569; --slate-500:#64748B; --slate-400:#94A3B8; --white:#FFFFFF; --slate-50:#F8FAFC; --slate-200:#E2E8F0;
+  --red-600:#DC2626; --red-100:#FEE2E2;
+  --color-primary:var(--indigo-600); --color-primary-hover:var(--indigo-700); --color-accent-bg:var(--indigo-50);
+  --color-danger:var(--red-600); --color-danger-bg:var(--red-100);
+  --surface:var(--white); --surface-alt:var(--slate-50); --surface-inverse:var(--slate-950); --border:var(--slate-200);
+  --text-heading:var(--slate-950); --text-body:var(--slate-600); --text-muted:var(--slate-500); --text-caption:var(--slate-400);
+  --text-on-primary:var(--white); --text-on-inverse-muted:rgba(255,255,255,.55);
+  --focus-ring:rgba(79,70,229,.32);
+  --font-core:"Pretendard Variable",Pretendard,Inter,-apple-system,"Segoe UI",sans-serif;
+  --radius-sm:6px; --radius-md:8px; --radius-lg:12px; --radius-pill:999px;
+  --shadow-primary:0 4px 16px rgba(79,70,229,.22);
+  --ease-out:cubic-bezier(.22,.61,.36,1); --dur:180ms;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#E9EDF3;color:var(--text-body);font-family:var(--font-core);font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased}
+h1,h2{margin:0;color:var(--text-heading);letter-spacing:-.02em}
+button,input,select,textarea{font-family:inherit}
+a{color:var(--color-primary)}a:hover{color:var(--color-primary-hover)}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ── 확인 컨트롤 바 ── ★ 개발 확인용. 실서비스에는 포함되지 않습니다 ── */
+.devbar{position:sticky;top:0;z-index:90;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 20px;background:var(--surface-inverse);color:#fff;font-size:13px}
+.devbar strong{font-size:12px;letter-spacing:.06em;opacity:.6}
+.devbar label{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.devbar select{height:30px;padding:0 10px;border:1px solid rgba(255,255,255,.22);border-radius:var(--radius-sm);background:rgba(255,255,255,.08);color:#fff;font-size:13px}
+.devbar select option{color:#0B1120}
+.devbar .spacer{flex:1}
+
+.frame{margin:0 auto;min-height:calc(100vh - 50px);display:flex;flex-direction:column;background:var(--surface-alt)}
+.frame.is-mobile{width:390px;box-shadow:0 0 0 1px var(--border),0 20px 48px rgba(11,17,32,.12)}
+
+/* ── 공개 헤더·푸터 — ERP 셸을 쓰지 않습니다 ── */
+.site-head{position:sticky;top:50px;z-index:30;height:64px;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.site-head .in{max-width:800px;margin:0 auto;padding:0 20px;height:64px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.logo{display:flex;align-items:center;gap:8px;text-decoration:none}
+.logo img{height:28px;width:auto}
+.wordmark{font-size:18px;font-weight:800;letter-spacing:-.03em;color:var(--text-heading);white-space:nowrap}
+.wordmark .dot{opacity:.55}.wordmark .suffix{color:var(--color-primary)}
+.tel{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap}
+main{flex:1;width:100%;max-width:800px;margin:0 auto;padding:32px 20px 64px}
+.site-foot{background:var(--surface-inverse);padding:32px 0}
+.site-foot .in{max-width:800px;margin:0 auto;padding:0 20px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:20px}
+.site-foot .biz{margin-top:10px;font-size:12px;line-height:1.7;color:var(--text-on-inverse-muted)}
+
+/* ── 공통 ── */
+.h1{font-size:28px;font-weight:700;line-height:1.3}
+.lede{margin:6px 0 0;font-size:15px;line-height:1.6}
+.back{min-height:44px;padding:0;display:inline-flex;align-items:center;gap:4px;border:0;background:transparent;font-size:14px;color:var(--text-muted);cursor:pointer}
+.back:hover{color:var(--color-primary)}
+.btn{height:44px;padding:0 18px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid transparent;border-radius:var(--radius-md);font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;text-decoration:none;transition:background var(--dur) var(--ease-out)}
+.btn--primary{background:var(--color-primary);color:var(--text-on-primary);box-shadow:var(--shadow-primary)}
+.btn--primary:hover{background:var(--color-primary-hover);color:var(--text-on-primary)}
+.btn--ghost{background:var(--surface);color:var(--text-heading);border-color:var(--border)}
+.btn--ghost:hover{background:var(--surface-alt);color:var(--text-heading)}
+.btn--xl{height:52px;font-size:16px}
+.btn--block{width:100%}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.badge{height:26px;padding:0 10px;display:inline-flex;align-items:center;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;flex:0 0 auto}
+.badge--wait{background:var(--surface-alt);color:var(--text-muted)}
+.badge--done{background:var(--color-accent-bg);color:var(--color-primary-hover)}
+.sec{margin-top:16px;padding:24px 20px}
+.sec-title{display:flex;align-items:center;gap:8px;font-size:22px;font-weight:600;line-height:1.4;color:var(--text-heading)}
+.sec-title::before{content:"";width:3px;height:16px;flex:0 0 auto;background:var(--color-primary)}
+.sec-rule{margin:16px 0;height:1px;background:var(--border)}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));column-gap:20px;row-gap:18px}
+.field{display:flex;flex-direction:column;min-width:0}
+.field .lab{display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-heading)}
+.field .lab .opt{font-weight:400;color:var(--text-muted)}
+.req-dot{width:5px;height:5px;border-radius:999px;background:var(--color-danger)}
+.input,.select,.textarea{margin-top:6px;width:100%;height:44px;padding:0 14px;font-size:16px;color:var(--text-heading);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);outline:none;transition:border-color var(--dur) var(--ease-out),box-shadow var(--dur) var(--ease-out)}
+.textarea{height:auto;padding:12px 14px;line-height:1.6;resize:vertical}
+.input:focus,.select:focus,.textarea:focus{border-color:var(--color-primary);box-shadow:0 0 0 3px var(--focus-ring)}
+.is-err{border-color:var(--color-danger)!important}
+.err{margin-top:4px;font-size:12px;color:var(--color-danger)}
+.hint{margin-top:4px;font-size:12px;color:var(--text-muted)}
+.count-row{margin-top:4px;display:flex;justify-content:space-between;gap:8px;font-size:12px}
+.count-row .c{color:var(--text-muted);font-variant-numeric:tabular-nums}
+.count-row .e{color:var(--color-danger)}
+
+/* 목록 */
+.notice{margin-top:20px;display:flex;align-items:flex-start;gap:8px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);font-size:13px;line-height:1.6}
+.filters{margin-top:20px;display:flex;flex-wrap:wrap;gap:12px;padding:16px}
+.filters > .field{flex:1 1 160px}
+.lab-row{display:flex;align-items:center;justify-content:space-between;gap:8px;line-height:20px}
+.f-reset{padding:0;display:inline-flex;align-items:center;gap:3px;border:0;background:transparent;font-size:12px;line-height:20px;font-weight:700;color:var(--color-primary);cursor:pointer;white-space:nowrap}
+.f-reset:hover{color:var(--color-primary-hover)}
+.filters > .f-range{flex:2 1 300px}
+.f-range .pair{display:flex;align-items:center;gap:8px}
+.f-range .pair .input{flex:1;min-width:0}
+.f-range .pair .tilde{flex:0 0 auto;margin-top:6px;font-size:14px;color:var(--text-muted)}
+.filters .field .lab{font-size:12px;font-weight:400;color:var(--text-muted);line-height:20px}
+.filters .input,.filters .select{padding:0 12px}
+.link{min-height:44px;padding:0;border:0;background:transparent;font-size:14px;font-weight:700;color:var(--color-primary);cursor:pointer}
+.link:hover{color:var(--color-primary-hover)}
+/* 2열 목록 — 셀마다 위·왼쪽 선, 바깥쪽 선은 -1px 로 카드 테두리 밑에 숨김 */
+.rows-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));margin:-1px 0 0 -1px}
+.row{min-width:0;width:100%;min-height:72px;padding:14px 18px;display:flex;align-items:center;gap:14px;border:0;border-top:1px solid var(--border);border-left:1px solid var(--border);background:var(--surface);text-align:left;cursor:pointer;transition:background var(--dur) var(--ease-out)}
+.row:hover{background:var(--surface-alt)}
+.row .lk{width:36px;height:36px;flex:0 0 auto;display:grid;place-items:center;border-radius:999px;background:var(--surface-alt);color:var(--text-caption)}
+.row .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.4}
+.row .t{font-size:16px;font-weight:700;color:var(--text-heading)}
+.row .m{font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.pager{margin-top:20px;display:flex;justify-content:center;gap:4px}
+.pager button{min-width:44px;height:44px;padding:0 8px;border:1px solid transparent;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-size:15px;cursor:pointer;font-variant-numeric:tabular-nums}
+.pager button.on{border-color:var(--border);background:var(--surface);color:var(--text-heading);font-weight:700}
+.few{margin-top:16px;padding:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:var(--surface);border:1px dashed var(--border);border-radius:var(--radius-lg)}
+.empty{margin-top:24px;padding:56px 24px;display:flex;flex-direction:column;align-items:center;text-align:center}
+.ic-circle{width:56px;height:56px;display:grid;place-items:center;border-radius:999px;background:var(--color-accent-bg);color:var(--color-primary)}
+
+/* 유형 세그먼트 */
+.types{margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:4px;padding:4px;background:var(--surface-alt);border-radius:var(--radius-md);border:1px solid transparent}
+.types button{height:40px;padding:0 4px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font-size:14px;cursor:pointer;white-space:nowrap}
+.types button.on{background:var(--surface);color:var(--text-heading);font-weight:700;box-shadow:0 1px 3px rgba(11,17,32,.08)}
+.privacy{padding:14px 16px;background:var(--surface-alt);border-radius:var(--radius-md);display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:1.6}
+.privacy b{color:var(--text-heading)}
+.privacy .show{margin-top:4px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:flex-start;gap:6px;color:var(--text-heading);font-weight:700}
+.agree{margin-top:14px;min-height:44px;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:15px;color:var(--text-heading)}
+.agree input{width:20px;height:20px;flex:0 0 auto;margin:0;accent-color:var(--color-primary)}
+.err-banner.limit{align-items:flex-start;gap:10px;font-weight:400}
+.err-banner.limit > span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.err-banner.limit b{font-size:14px;color:var(--color-danger)}
+.err-banner.limit > span > span{font-size:14px;line-height:1.6;color:var(--text-body)}
+.err-banner{margin-top:20px;display:flex;align-items:center;gap:8px;padding:14px 16px;background:var(--color-danger-bg);border:1px solid rgba(220,38,38,.3);border-radius:var(--radius-lg);font-size:14px;font-weight:700;color:var(--color-danger)}
+
+/* 비밀번호·완료 */
+.gate{margin:12px auto 0;max-width:420px;padding:36px 24px}
+.done{margin:24px auto 0;max-width:480px;padding:40px 24px;text-align:center}
+
+/* 글 보기 */
+.info{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 20px}
+.info > div{min-width:0}
+.info .k{font-size:12px;color:var(--text-muted)}
+.info .v{margin-top:2px;font-size:15px;color:var(--text-heading);overflow-wrap:anywhere}
+.body-text{margin:0;font-size:15px;line-height:1.75;white-space:pre-line;text-wrap:pretty}
+.msg{margin-top:12px;padding:20px}
+.msg--customer{background:var(--surface-alt)}
+.msg-head{display:flex;align-items:center;gap:10px}
+.msg-head .av{width:32px;height:32px;flex:0 0 auto;display:grid;place-items:center;border-radius:999px}
+.msg-head .av--op{background:var(--color-accent-bg);padding:6px}
+.msg-head .av--op img{width:100%;height:100%;object-fit:contain}
+.msg-head .av--cu{background:var(--surface);border:1px solid var(--border);color:var(--text-muted)}
+.msg-head .who{font-size:14px;font-weight:700;color:var(--text-heading);line-height:1.4}
+.msg-head .when{display:flex;flex-wrap:wrap;gap:0 6px;font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums;line-height:1.5}
+.msg .body-text{margin-top:14px}
+.msg--phone{display:flex;align-items:flex-start;gap:14px}
+.msg--phone .av{width:40px;height:40px;flex:0 0 auto;display:grid;place-items:center;border-radius:999px;background:var(--color-accent-bg);color:var(--color-primary)}
+.msg--wait{background:var(--surface-alt);border-style:dashed;display:flex;align-items:flex-start;gap:14px}
+.msg--wait .av{width:40px;height:40px;flex:0 0 auto;display:grid;place-items:center;border-radius:999px;background:var(--surface);color:var(--text-muted)}
+.compose-foot{margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.compose-foot .n{flex:1 1 240px;font-size:13px;line-height:1.6;color:var(--text-muted)}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════
+     확인 컨트롤 바
+     ★ 개발 확인용입니다. 실서비스 화면에는 포함되지 않습니다.
+     ══════════════════════════════════════════════════════════════ -->
+<div class="devbar">
+  <strong>확인용</strong>
+  <label>screen
+    <select id="c-screen"><option value="list" selected>s0300500070 목록</option><option value="write">p1 문의하기</option><option value="done">p1 등록 완료</option><option value="password">p2 비밀번호</option><option value="view">p2 글 보기</option></select>
+  </label>
+  <label>listState
+    <select id="c-list"><option value="many" selected>many (23)</option><option value="few">few (2)</option><option value="empty">empty</option></select>
+  </label>
+  <label>thread
+    <select id="c-thread"><option value="text" selected>text</option><option value="phone">phone</option><option value="pending">pending</option><option value="thread">thread (추가 질문·수정됨)</option></select>
+  </label>
+  <label>submitResult
+    <select id="c-submit"><option value="ok" selected>ok</option><option value="daily">하루 3건 초과</option><option value="cooldown">1분 이내</option></select>
+  </label>
+  <label>frame
+    <select id="c-frame"><option value="desktop" selected>desktop</option><option value="mobile">390</option></select>
+  </label>
+  <span class="spacer"></span>
+  <span style="opacity:.6">swonbiz.com/inquiry · 비밀번호 0000 = 불일치</span>
+</div>
+
+<div class="frame" id="frame">
+<header class="site-head"><div class="in">
+  <a class="logo" href="#"><img src="../assets/swonbiz-logo.png" alt="SwonBiz" onerror="this.style.visibility='hidden'"><span class="wordmark">S<span class="dot">·</span>won<span class="suffix">Biz</span></span></a>
+  <a class="tel" href="tel:07043552312"><i data-lucide="phone" style="width:16px;height:16px"></i>070-4355-2312</a>
+</div></header>
+
+<main id="main">
+
+<!-- ══════════ 목록 ══════════ -->
+<section data-screen="list">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div><h1 class="h1">문의상담</h1><p class="lede">로그인 없이 남기실 수 있습니다. 영업일 1일 내 답변드립니다.</p></div>
+    <button class="btn btn--primary" type="button" data-go="write"><i data-lucide="pencil-line" style="width:16px;height:16px"></i>문의하기</button>
+  </div>
+  <div class="card filters" id="filters">
+    <div class="field f-range"><span class="lab">문의일자</span><span class="pair"><input class="input" type="date" id="f-from" aria-label="문의일자 시작"><span class="tilde">~</span><input class="input" type="date" id="f-to" aria-label="문의일자 종료"></span></div>
+    <label class="field"><span class="lab">상태</span><select class="select" id="f-status"><option value="">전체</option><option value="접수">접수</option><option value="답변완료">답변완료</option></select></label>
+    <div class="field"><span class="lab-row"><label class="lab" for="f-type">문의유형</label><button class="f-reset" type="button" id="f-reset"><i data-lucide="rotate-ccw" style="width:12px;height:12px"></i>검색조건 초기화</button></span><select class="select" id="f-type"><option value="">전체</option><option value="입주문의">입주문의</option><option value="법무설립문의">법무설립문의</option><option value="세무문의">세무문의</option><option value="연구소설립문의">연구소설립문의</option><option value="기타">기타</option></select></div>
+  </div>
+  <div id="list-has">
+    <div style="margin-top:24px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;color:var(--text-muted)"><span><span id="count-label">전체</span> <b style="color:var(--text-heading)" id="total">0</b>건</span></div>
+    <div class="card" style="margin-top:10px;overflow:hidden" id="rows"></div>
+    <div class="pager" id="pager"></div>
+    <div class="few" id="few">
+      <div><div style="font-size:15px;font-weight:700;color:var(--text-heading)">궁금한 점이 있으신가요?</div><div style="margin-top:2px;font-size:14px;color:var(--text-muted)">입주 · 법무 · 세무 · 연구소 설립 무엇이든 남겨 주세요</div></div>
+      <button class="btn btn--ghost" type="button" data-go="write" style="font-size:14px">문의 남기기</button>
+    </div>
+  </div>
+  <div class="card empty" id="list-nomatch" style="padding:48px 24px">
+    <span style="width:48px;height:48px;display:grid;place-items:center;border-radius:999px;background:var(--surface-alt);color:var(--text-muted)"><i data-lucide="search-x" style="width:22px;height:22px"></i></span>
+    <h2 style="margin-top:16px;font-size:18px;font-weight:700">조건에 맞는 문의가 없습니다</h2>
+    <button class="btn btn--ghost" type="button" id="f-reset2" style="margin-top:16px;font-size:14px">검색조건 초기화</button>
+  </div>
+  <div class="card empty" id="list-empty">
+    <span class="ic-circle"><i data-lucide="message-square-text" style="width:26px;height:26px"></i></span>
+    <h2 style="margin-top:18px;font-size:20px;font-weight:700">아직 등록된 문의가 없습니다</h2>
+    <p style="margin:8px 0 0;max-width:34ch;font-size:15px;line-height:1.6;text-wrap:pretty">첫 문의를 남겨 주세요. 영업일 1일 내 담당자가 답변드립니다.</p>
+    <div style="margin-top:24px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+      <button class="btn btn--primary" type="button" data-go="write" style="height:48px">문의하기</button>
+      <a class="btn btn--ghost" href="tel:07043552312" style="height:48px"><i data-lucide="phone" style="width:16px;height:16px"></i>전화 상담</a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 글쓰기 ══════════ -->
+<section data-screen="write">
+  <button class="back" type="button" data-go="list"><i data-lucide="chevron-left" style="width:16px;height:16px"></i>목록</button>
+  <h1 class="h1" style="margin-top:4px">문의하기</h1>
+  <p class="lede">비밀글로 등록됩니다. 답변은 이메일 또는 전화로 드립니다.</p>
+  <div class="err-banner" id="err-banner" hidden><i data-lucide="circle-alert" style="width:16px;height:16px"></i><span id="err-count"></span></div>
+  <!-- 서버 등록 제한 — 04-data-model.md#4 -->
+  <div class="err-banner limit" id="limit-daily" hidden><i data-lucide="circle-alert" style="width:16px;height:16px;flex:0 0 auto;margin-top:3px"></i><span><b>오늘은 더 등록할 수 없습니다</b><span>같은 연락처로 하루 3건까지 남기실 수 있습니다. 이미 남기신 글에 추가 질문으로 이어 쓰시거나 <a href="tel:07043552312" style="font-weight:700;text-decoration:none;white-space:nowrap">070-4355-2312</a> 로 연락 주세요.</span></span></div>
+  <div class="err-banner limit" id="limit-cool" hidden><i data-lucide="clock" style="width:16px;height:16px;flex:0 0 auto;margin-top:3px"></i><span><b>잠시 후 다시 등록해 주세요</b><span>방금 문의를 등록하셨습니다. 1분 뒤에 다시 등록할 수 있습니다. 입력하신 내용은 그대로 남아 있습니다.</span></span></div>
+
+  <div class="card sec">
+    <h2 class="sec-title">연락처</h2><div class="sec-rule"></div>
+    <div class="fields">
+      <label class="field"><span class="lab"><span class="req-dot"></span>이름</span><input class="input" data-f="name" autocomplete="name" placeholder="김도현"><span class="err" data-e="name" hidden>이름을 입력해 주세요</span></label>
+      <label class="field"><span class="lab"><span class="req-dot"></span>연락처</span><input class="input" data-f="phone" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" style="font-variant-numeric:tabular-nums"><span class="err" data-e="phone" hidden>연락처를 확인해 주세요</span></label>
+      <label class="field"><span class="lab"><span class="req-dot"></span>이메일</span><input class="input" data-f="email" type="email" autocomplete="email" placeholder="name@company.com"><span class="err" data-e="email" hidden>이메일 형식을 확인해 주세요</span></label>
+      <label class="field"><span class="lab">회사명 <span class="opt">(선택)</span></span><input class="input" data-f="company" autocomplete="organization" placeholder="브릿지랩 주식회사"></label>
+    </div>
+  </div>
+
+  <div class="card sec">
+    <h2 class="sec-title">문의 내용</h2><div class="sec-rule"></div>
+    <div class="field"><span class="lab"><span class="req-dot"></span>문의 유형</span>
+      <div class="types" id="types" data-b="type"></div>
+      <span class="err" data-e="type" hidden>문의 유형을 골라 주세요</span>
+    </div>
+    <div class="fields" style="margin-top:18px">
+            <label class="field" style="grid-column:1/-1"><span class="lab"><span class="req-dot"></span>문의 내용</span><textarea class="textarea" data-f="body" maxlength="1000" rows="6" placeholder="궁금한 점을 자유롭게 적어 주세요"></textarea>
+        <span class="count-row"><span class="e" data-e="body" hidden>문의 내용을 입력해 주세요</span><span></span><span class="c" id="body-count">0 / 1000</span></span></label>
+    </div>
+  </div>
+
+  <div class="card sec">
+    <h2 class="sec-title">비밀번호</h2><div class="sec-rule"></div>
+    <label class="field" style="max-width:360px"><span class="lab"><span class="req-dot"></span>비밀번호</span><input class="input" data-f="pw" type="password" autocomplete="new-password" placeholder="4자 이상">
+      <span class="err" data-e="pw" hidden>4자 이상 입력해 주세요</span><span class="hint" id="pw-hint">내 글과 답변을 확인하고 추가 질문을 남길 때 필요합니다</span></label>
+  </div>
+
+  <div class="card sec" data-b="agree">
+    <div class="privacy">
+      <span><b>수집 항목</b> 이름, 연락처, 이메일, 회사명, 문의 내용</span>
+      <span><b>이용 목적</b> 문의 답변 및 입주 상담</span>
+      <span><b>보유 기간</b> 등록일로부터 6개월 보관 후 파기</span>
+      <span class="show"><i data-lucide="eye" style="width:14px;height:14px;flex:0 0 auto;margin-top:4px;color:var(--color-primary)"></i>이름 일부와 문의 유형이 목록에 표시됩니다 <span style="font-weight:400;color:var(--text-muted)">(예: 김** · 입주문의)</span></span>
+    </div>
+    <label class="agree"><input type="checkbox" data-f="agree"><span>개인정보 수집·이용에 동의합니다 <b style="color:var(--color-danger)">(필수)</b></span></label>
+    <span class="err" data-e="agree" hidden style="display:block">동의해 주셔야 문의를 등록할 수 있습니다</span>
+  </div>
+
+  <div style="margin-top:24px;display:flex;gap:8px">
+    <button class="btn btn--ghost btn--xl" type="button" data-go="list">취소</button>
+    <button class="btn btn--primary btn--xl" type="button" id="submit" style="flex:1">문의 등록</button>
+  </div>
+</section>
+
+<!-- ══════════ 등록 완료 ══════════ -->
+<section data-screen="done">
+  <div class="card done">
+    <span class="ic-circle" style="margin:0 auto"><i data-lucide="circle-check" style="width:28px;height:28px"></i></span>
+    <h2 style="margin-top:18px;font-size:22px;font-weight:700;line-height:1.4">문의를 등록했습니다</h2>
+    <p style="margin:8px 0 0;font-size:15px;line-height:1.6">영업일 1일 내 이메일 또는 전화로 답변드립니다.</p>
+    <div style="margin-top:20px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface-alt);border-radius:var(--radius-md);text-align:left">
+      <span style="font-size:13px;color:var(--text-muted)">목록 표시</span><span style="font-size:15px;font-weight:700;color:var(--text-heading)" id="done-label">김** · 입주문의</span>
+    </div>
+    <p style="margin:12px 0 0;font-size:13px;line-height:1.6;color:var(--text-muted)">답변은 목록에서 글을 누르고 비밀번호를 입력하면 확인할 수 있습니다.</p>
+    <button class="btn btn--ghost btn--xl btn--block" type="button" data-go="list" style="margin-top:24px">목록으로</button>
+  </div>
+</section>
+
+<!-- ══════════ 비밀번호 확인 ══════════ -->
+<section data-screen="password">
+  <button class="back" type="button" data-go="list"><i data-lucide="chevron-left" style="width:16px;height:16px"></i>목록</button>
+  <div class="card gate">
+    <div style="display:flex;flex-direction:column;align-items:center;text-align:center">
+      <span style="width:48px;height:48px;display:grid;place-items:center;border-radius:999px;background:var(--surface-alt);color:var(--text-muted)"><i data-lucide="lock" style="width:22px;height:22px"></i></span>
+      <h2 style="margin-top:16px;font-size:20px;font-weight:700;line-height:1.4">비밀글입니다</h2>
+      <p style="margin:6px 0 0;font-size:14px;line-height:1.6"><span id="gate-label">김** · 입주문의</span> · 작성 시 입력한 비밀번호를 입력해 주세요</p>
+    </div>
+    <label class="field" style="margin-top:24px"><span class="lab">비밀번호</span><input class="input" id="pw-check" type="password" autocomplete="current-password" placeholder="비밀번호" style="height:48px"><span class="err" id="pw-wrong" hidden>비밀번호가 맞지 않습니다</span></label>
+    <button class="btn btn--primary btn--xl btn--block" type="button" id="pw-ok" style="margin-top:16px">확인</button>
+      </div>
+</section>
+
+<!-- ══════════ 글 보기 — 원글 + 스레드 + 추가 질문 ══════════ -->
+<section data-screen="view">
+  <button class="back" type="button" data-go="list"><i data-lucide="chevron-left" style="width:16px;height:16px"></i>목록</button>
+  <div style="margin-top:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <h1 style="font-size:26px;font-weight:700;line-height:1.3" id="v-title">입주문의</h1>
+    <span class="badge" id="v-badge"></span>
+    <span style="font-size:14px;color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap" id="v-date">2026.09.24 등록</span>
+  </div>
+
+  <div class="card" style="margin-top:20px;padding:20px">
+    <div class="info">
+      <div><div class="k">이름</div><div class="v">김도현</div></div>
+      <div><div class="k">연락처</div><div class="v" style="font-variant-numeric:tabular-nums">010-2345-6789</div></div>
+      <div><div class="k">이메일</div><div class="v">kim@bridgelab.co.kr</div></div>
+      <div><div class="k">회사명</div><div class="v">브릿지랩 주식회사</div></div>
+          </div>
+    <div style="margin:18px 0;height:1px;background:var(--border)"></div>
+    <p class="body-text">3명이 함께 쓸 사무실을 찾고 있습니다. 12개월 계약 기준 월 이용료가 어느 정도인지, 회의실은 따로 예약해서 쓰는 방식인지 궁금합니다. 다음 주 중 방문도 가능할까요?</p>
+  </div>
+
+  <h2 class="sec-title" style="margin-top:24px">답변</h2>
+  <div id="thread"></div>
+
+  <div class="card" id="compose" style="margin-top:24px;padding:20px">
+    <label class="field"><span class="lab">추가 질문 남기기</span>
+      <textarea class="textarea" id="follow" maxlength="1000" rows="4" placeholder="이어서 궁금한 점을 적어 주세요" style="margin-top:8px"></textarea>
+      <span class="count-row"><span class="e" id="follow-err" hidden>내용을 입력해 주세요</span><span></span><span class="c" id="follow-count">0 / 1000</span></span>
+    </label>
+    <div class="compose-foot">
+      <span class="n">추가 질문은 한 번만 남길 수 있고, 등록 후 수정·삭제할 수 없습니다.</span>
+      <button class="btn btn--primary" type="button" id="follow-add" style="height:48px">추가 질문 등록</button>
+    </div>
+  </div>
+
+  <div class="card" id="compose-used" style="margin-top:24px;padding:14px 16px;display:flex;align-items:flex-start;gap:8px;font-size:14px;line-height:1.6" hidden><i data-lucide="info" style="width:16px;height:16px;flex:0 0 auto;margin-top:3px;color:var(--text-muted)"></i><span>추가 질문은 한 번만 남길 수 있습니다. 더 궁금한 점은 <a href="tel:07043552312" style="font-weight:700;text-decoration:none;white-space:nowrap">070-4355-2312</a> 로 연락 주시거나 새 문의를 남겨 주세요.</span></div>
+
+  <button class="btn btn--ghost btn--xl btn--block" type="button" data-go="list" style="margin-top:24px">목록으로</button>
+</section>
+
+</main>
+
+<footer class="site-foot"><div class="in">
+  <div><span style="font-size:17px;font-weight:800;letter-spacing:-.03em;color:#fff">S<span style="opacity:.55">·</span>wonBiz</span>
+    <div class="biz">주식회사 에스원테크 · 대표 최현수 · 사업자등록번호 105-87-68698<br>서울특별시 강남구 봉은사로55길 19, 3층 (삼성동, 우리빌딩)</div></div>
+  <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:14px;font-weight:700;color:#fff">070-4355-2312</span><span style="font-size:12px;color:var(--text-on-inverse-muted)">평일 09:00 - 18:00</span></div>
+</div></footer>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   시안 데이터 — 값만 바꿔 확인하실 수 있습니다
+   ══════════════════════════════════════════════════════════════ */
+const TYPES = ["입주문의", "법무설립문의", "세무문의", "연구소설립문의", "기타"];
+const SURNAMES = ["김", "이", "박", "최", "정", "강", "조", "윤", "장", "임"];
+const PER_PAGE = 20;   // 2열 × 10행
+const TODAY = new Date(2026, 8, 26);
+
+const ANSWER = "안녕하세요, SwonBiz 입니다. 3명이시면 4인실을 권해 드립니다. 12개월 계약 기준 월 1,180,000원부터이며 회의실은 월 12시간이 포함되고, ERP 에서 예약해 쓰시는 방식입니다.\n방문은 평일 10:00–18:00 중 편하신 시간에 가능합니다. 이 글에 적어 주신 연락처로 일정 확인 전화를 드리겠습니다.";
+
+/** 스레드 — 원글 아래에 시간순으로 쌓입니다. kind: text · phone · customer
+ *  editedAt 은 운영자 text 만 가질 수 있습니다 (03-thread.md#3). */
+const THREADS = {
+  text: [{ kind: "text", at: "2026.09.25 10:12", by: "이정희", body: ANSWER }],
+  phone: [{ kind: "phone", at: "2026.09.25 14:20", by: "이정희" }],
+  pending: [],
+  thread: [
+    { kind: "text", at: "2026.09.25 10:12", by: "이정희", body: ANSWER, editedAt: "2026.09.26" },
+    { kind: "customer", at: "2026.09.26 09:40", body: "4인실로 진행하고 싶습니다. 입주 전에 한 번 보고 결정하고 싶은데 이번 주 목요일 오후 3시 방문 가능할까요?" },
+    { kind: "phone", at: "2026.09.26 11:05", by: "이정희" },
+  ],
+};
+
+const pad = (n) => String(n).padStart(2, "0");
+const fmt = (d) => d.getFullYear() + "." + pad(d.getMonth() + 1) + "." + pad(d.getDate());
+/** 목록 마스킹 — 성만 남기고 ** 고정 (글자 수를 드러내지 않음) */
+const maskName = (n) => (n ? n.trim().charAt(0) + "**" : "");
+
+function seed(kind) {
+  if (kind === "empty") return [];
+  const n = kind === "few" ? 2 : 23;
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(TODAY); d.setDate(TODAY.getDate() - Math.floor(i * 1.4));
+    return { id: 1000 - i, type: TYPES[(i * 3 + 1) % 5], author: SURNAMES[(i * 7) % 10] + "**", date: fmt(d),
+             thread: i < 2 ? "pending" : i % 4 === 2 ? "thread" : i % 3 === 1 ? "phone" : "text", extra: [] };
+  });
+}
+
+/** 상태는 저장값이 아니라 마지막 글로 정합니다 — 03-thread.md#2 */
+const statusOf = (msgs) => (!msgs.length || msgs[msgs.length - 1].kind === "customer" ? "접수" : "답변완료");
+const msgsOf = (it) => (THREADS[it.thread] || []).concat(it.extra);
+
+/* ══════════════════════════════════════════════════════════════
+   상태
+   ══════════════════════════════════════════════════════════════ */
+const state = { filter: { from: "", to: "", status: "", type: "" }, submitResult: "ok", screen: "list", items: seed("many"), page: 1, sel: null, type: "", tried: false, frame: "desktop" };
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const icon = (n, s) => '<i data-lucide="' + n + '" style="width:' + s + 'px;height:' + s + 'px"></i>';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+function go(screen, sel) {
+  state.screen = screen;
+  if (sel !== undefined) state.sel = sel;
+  if (screen === "write") resetForm();
+  if (screen === "password") { $("#pw-check").value = ""; $("#pw-wrong").hidden = true; $("#pw-check").classList.remove("is-err"); }
+  if (screen === "view") { $("#follow").value = ""; $("#follow-count").textContent = "0 / 1000"; $("#follow-err").hidden = true; $("#follow").classList.remove("is-err"); }
+  render();
+  window.scrollTo(0, 0);
+}
+
+function render() {
+  $$("[data-screen]").forEach((s) => { s.hidden = s.dataset.screen !== state.screen; });
+  $("#frame").classList.toggle("is-mobile", state.frame === "mobile");
+  if (state.screen === "list") renderList();
+  if (state.screen === "write") renderTypes();
+  if (state.screen === "password" || state.screen === "view") renderSel();
+  lucide.createIcons();
+}
+
+/* ── 목록 ── */
+/** 검색 — 문의일자 from~to (양 끝 포함, 한쪽만 넣어도 됨) · 상태 · 유형. 상태는 스레드 기준(03-thread.md#2) */
+function filtered() {
+  const f = state.filter, from = f.from.replace(/-/g, "."), to = f.to.replace(/-/g, ".");
+  return state.items.filter((it) => (!from || it.date >= from) && (!to || it.date <= to) &&
+    (!f.status || statusOf(msgsOf(it)) === f.status) && (!f.type || it.type === f.type));
+}
+function renderList() {
+  const items = state.items, list = filtered(), f = state.filter;
+  const on = !!(f.from || f.to || f.status || f.type);
+  $("#filters").hidden = !items.length;
+  $("#f-from").value = f.from; $("#f-to").value = f.to;
+  $("#f-from").max = f.to; $("#f-to").min = f.from;     // 시작 > 종료 선택 방지 $("#f-status").value = f.status; $("#f-type").value = f.type;
+  $("#list-has").hidden = !list.length;
+  $("#list-nomatch").hidden = !(items.length && !list.length);
+  $("#list-empty").hidden = !!items.length;
+  $("#few").hidden = !(!on && items.length && items.length < 4);
+  $("#count-label").textContent = on ? "검색 결과" : "전체";
+  $("#total").textContent = list.length;
+  const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
+  state.page = Math.min(state.page, pages);
+  $("#rows").innerHTML = '<div class="rows-grid">' + list.slice((state.page - 1) * PER_PAGE, state.page * PER_PAGE).map((it) => {
+    const st = statusOf(msgsOf(it));
+    return '<button class="row" type="button" data-id="' + it.id + '"><span class="lk">' + icon("lock", 16) + '</span>' +
+      '<span class="tx"><span class="t">' + it.type + '</span><span class="m">' + it.author + " · " + it.date + "</span></span>" +
+      '<span class="badge ' + (st === "접수" ? "badge--wait" : "badge--done") + '">' + st + "</span></button>";
+  }).join("") + "</div>";
+  $$("#rows .row").forEach((r) => r.addEventListener("click", () => go("password", state.items.find((x) => x.id === +r.dataset.id))));
+  $("#pager").innerHTML = pages > 1 ? Array.from({ length: pages }, (_, i) =>
+    '<button type="button" class="' + (i + 1 === state.page ? "on" : "") + '"' + (i + 1 === state.page ? ' aria-current="page"' : "") + ' data-p="' + (i + 1) + '">' + (i + 1) + "</button>").join("") : "";
+  $$("#pager button").forEach((b) => b.addEventListener("click", () => { state.page = +b.dataset.p; renderList(); window.scrollTo(0, 0); }));
+}
+
+/* ── 글쓰기 ── */
+const form = {};
+function resetForm() {
+  Object.keys(form).forEach((k) => delete form[k]);
+  state.type = ""; state.tried = false;
+  $$("[data-f]").forEach((el) => { if (el.type === "checkbox") el.checked = false; else el.value = ""; });
+  $("#body-count").textContent = "0 / 1000";
+  showErrors({});
+  showLimit(null);
+}
+function showLimit(kind) { $("#limit-daily").hidden = kind !== "daily"; $("#limit-cool").hidden = kind !== "cooldown"; }
+function renderTypes() {
+  $("#types").innerHTML = TYPES.map((t) => '<button type="button" aria-pressed="' + (state.type === t) + '" class="' + (state.type === t ? "on" : "") + '" data-t="' + t + '">' + t + "</button>").join("");
+  $$("#types button").forEach((b) => b.addEventListener("click", () => { state.type = b.dataset.t; renderTypes(); if (state.tried) showErrors(validate()); }));
+}
+function validate() {
+  const e = {};
+  if (!(form.name || "").trim()) e.name = 1;
+  if ((form.phone || "").replace(/\D/g, "").length < 10) e.phone = 1;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email || "")) e.email = 1;
+  if (!state.type) e.type = 1;
+  if (!(form.body || "").trim()) e.body = 1;
+  if ((form.pw || "").length < 4) e.pw = 1;
+  if (!form.agree) e.agree = 1;
+  return e;
+}
+/** 빨간 테두리는 미입력일 때만. 고치면 즉시 회색으로, 포커스 링은 항상 보입니다. */
+function showErrors(e) {
+  ["name", "phone", "email", "body", "pw"].forEach((k) => $('[data-f="' + k + '"]').classList.toggle("is-err", !!e[k]));
+  $("#types").classList.toggle("is-err", !!e.type);
+  $('[data-b="agree"]').classList.toggle("is-err", !!e.agree);
+  $$("[data-e]").forEach((el) => { el.hidden = !e[el.dataset.e]; });
+  $("#pw-hint").hidden = !!e.pw;
+  const n = Object.keys(e).length;
+  $("#err-banner").hidden = !n;
+  $("#err-count").textContent = "입력하지 않은 필수 항목이 " + n + "곳 있습니다";
+}
+$$("[data-f]").forEach((el) => el.addEventListener(el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "input", () => {
+  const k = el.dataset.f;
+  if (k === "phone") {
+    const d = el.value.replace(/\D/g, "").slice(0, 11);
+    const mid = d.length > 10 || d.startsWith("010") ? 7 : 6;
+    el.value = d.length > mid ? d.slice(0, 3) + "-" + d.slice(3, mid) + "-" + d.slice(mid) : d.length > 3 ? d.slice(0, 3) + "-" + d.slice(3) : d;
+  }
+  form[k] = el.type === "checkbox" ? el.checked : el.value;
+  if (k === "body") $("#body-count").textContent = el.value.length + " / 1000";
+  if (state.tried) showErrors(validate());
+}));
+$("#submit").addEventListener("click", () => {
+  const e = validate();
+  state.tried = true;
+  showErrors(e);
+  showLimit(null);
+  if (Object.keys(e).length) { window.scrollTo(0, 0); return; }
+  /* 서버 등록 제한 — 입력값은 지우지 않습니다 */
+  if (state.submitResult !== "ok") { showLimit(state.submitResult); window.scrollTo(0, 0); return; }
+  const row = { id: Date.now(), type: state.type, author: maskName(form.name), date: fmt(TODAY), thread: "pending", extra: [] };
+  state.items = [row].concat(state.items);
+  state.page = 1;
+  $("#done-label").textContent = row.author + " · " + row.type;
+  go("done");
+});
+
+/* ── 비밀번호 · 글 보기 ── */
+function renderSel() {
+  const it = state.sel || state.items[0] || { type: "입주문의", author: "김**", date: fmt(TODAY), thread: "text", extra: [] };
+  state.sel = it;
+  $("#gate-label").textContent = it.author + " · " + it.type;
+  $("#v-title").textContent = it.type;
+  $("#v-date").textContent = it.date + " 등록";
+  renderThread();
+}
+function renderThread() {
+  const msgs = msgsOf(state.sel);
+  const st = statusOf(msgs);
+  const b = $("#v-badge");
+  b.className = "badge " + (st === "접수" ? "badge--wait" : "badge--done");
+  b.textContent = st;
+  let html = msgs.map((m) => {
+    if (m.kind === "phone") return '<div class="card msg msg--phone"><span class="av">' + icon("phone", 18) + '</span><div style="min-width:0">' +
+      '<div style="font-size:16px;font-weight:700;color:var(--text-heading);line-height:1.5">전화로 답변드렸습니다</div>' +
+      '<div style="margin-top:2px;font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">' + m.at + " · 담당 " + m.by + "</div></div></div>";
+    const cu = m.kind === "customer";
+    return '<div class="card msg' + (cu ? " msg--customer" : "") + '"><div class="msg-head">' +
+      (cu ? '<span class="av av--cu">' + icon("user", 16) + "</span>" : '<span class="av av--op"><img src="../assets/swonbiz-logo.png" alt=""></span>') +
+      '<div style="min-width:0"><div class="who">' + (cu ? "추가 질문" : "SwonBiz " + m.by) + '</div><div class="when"><span>' + m.at + "</span>" +
+      (m.editedAt ? "<span>· " + m.editedAt + " 수정됨</span>" : "") + "</div></div></div>" +
+      '<p class="body-text">' + esc(m.body) + "</p></div>";
+  }).join("");
+  if (st === "접수") html += '<div class="card msg msg--wait"><span class="av">' + icon("clock", 18) + '</span><div style="min-width:0">' +
+    '<div style="font-size:16px;font-weight:700;color:var(--text-heading);line-height:1.5">답변을 준비하고 있습니다</div>' +
+    '<div style="margin-top:4px;font-size:14px;line-height:1.6">영업일 1일 내 담당자가 이곳에 답변하거나 전화드립니다. 별도 알림은 보내지 않으니 이 글에서 확인해 주세요.</div></div></div>';
+  $("#thread").innerHTML = html;
+  /* 추가 질문은 1회 — 고객 글이 하나라도 있으면 입력란 대신 안내 */
+  const used = msgs.some((m) => m.kind === "customer");
+  $("#compose").hidden = used;
+  $("#compose-used").hidden = !used;
+  lucide.createIcons();
+}
+function checkPw() {
+  const v = $("#pw-check").value;
+  const wrong = v.length < 4 || v === "0000";   // 시안: 4자 이상이면 통과, 0000 은 불일치
+  $("#pw-wrong").hidden = !wrong;
+  $("#pw-check").classList.toggle("is-err", wrong);
+  if (!wrong) go("view");
+}
+$("#pw-ok").addEventListener("click", checkPw);
+$("#pw-check").addEventListener("keydown", (e) => { if (e.key === "Enter") checkPw(); });
+$("#pw-check").addEventListener("input", () => { $("#pw-wrong").hidden = true; $("#pw-check").classList.remove("is-err"); });
+
+$("#follow").addEventListener("input", (e) => {
+  $("#follow-count").textContent = e.target.value.length + " / 1000";
+  $("#follow-err").hidden = true; e.target.classList.remove("is-err");
+});
+$("#follow-add").addEventListener("click", () => {
+  const el = $("#follow"), body = el.value.trim();
+  if (!body) { $("#follow-err").hidden = false; el.classList.add("is-err"); el.focus(); return; }
+  const d = new Date();
+  state.sel.extra.push({ kind: "customer", at: fmt(TODAY) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes()), body });
+  el.value = ""; $("#follow-count").textContent = "0 / 1000";
+  renderThread();
+});
+
+/* ── 공통 바인딩 · 확인 컨트롤 바 ── */
+$$("[data-go]").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
+$("#c-screen").addEventListener("change", (e) => {
+  if (e.target.value === "password" || e.target.value === "view") state.sel = state.items[0] ? { ...state.items[0], thread: $("#c-thread").value, extra: [] } : null;
+  go(e.target.value);
+});
+$("#c-list").addEventListener("change", (e) => { state.items = seed(e.target.value); state.page = 1; go("list"); $("#c-screen").value = "list"; });
+$("#c-thread").addEventListener("change", (e) => {
+  const base = state.items[0] || { id: 0, type: "입주문의", author: "김**", date: fmt(TODAY) };
+  state.sel = { ...base, thread: e.target.value, extra: [] };
+  $("#c-screen").value = "view";
+  go("view");
+});
+[["#f-from", "from"], ["#f-to", "to"], ["#f-status", "status"], ["#f-type", "type"]].forEach(([sel, k]) =>
+  $(sel).addEventListener("change", (e) => { state.filter[k] = e.target.value; state.page = 1; renderList(); lucide.createIcons(); }));
+["#f-reset", "#f-reset2"].forEach((sel) => $(sel).addEventListener("click", () => { state.filter = { from: "", to: "", status: "", type: "" }; state.page = 1; renderList(); lucide.createIcons(); }));
+$("#c-submit").addEventListener("change", (e) => { state.submitResult = e.target.value; });
+$("#c-frame").addEventListener("change", (e) => { state.frame = e.target.value; render(); });
+
+render();
+</script>
+</body>
+</html>
