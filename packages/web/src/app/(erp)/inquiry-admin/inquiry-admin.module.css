@@ -1,0 +1,888 @@
+/*
+ * s0300200080 문의 관리 — 운영자가 답하는 화면.
+ *
+ * ★ **시안이 없다.** 기존 ERP 목록 화면의 모양을 그대로 따랐다 —
+ *   2단 레이아웃·검색·칩·카드·빈 상태·토스트는 `s0300200030`(입주사·계약)의 것이고,
+ *   스레드 카드(아바타 원 · 고객 글은 `--surface-alt`)는 고객 화면 `s0300500070p2` 의
+ *   것이다(`features/inquiry/inquiry.module.css`). 새로 만든 값은 없다.
+ *
+ * ★ 바깥 패딩을 주지 않는다 — 셸(`AppShell .main`)이 이미 padding:32px 를 준다.
+ */
+
+/*
+ * ★★ `height:100%` — 두 패널이 **각자 스크롤하라고** 준다. s0300200030 과 같은 이유다:
+ *    이 화면이 스크롤 상자 높이를 채우지 않으면 왼쪽 목록을 내릴 때 오른쪽 스레드까지
+ *    같이 사라진다. 고르는 자리와 답하는 자리가 한 화면에 있어야 하는 구조다.
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 520px;
+}
+
+/* ── 페이지 헤더 ── */
+.head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.title {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.018em;
+  color: var(--text-heading);
+}
+
+.sub {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* ── 버튼 ── s0300200030 의 규격 ── */
+.btn {
+  height: 40px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: background var(--dur) var(--ease-out);
+}
+
+.btnPrimary {
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  box-shadow: var(--shadow-primary);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btnGhost {
+  background: var(--surface);
+  color: var(--text-heading);
+  border-color: var(--border);
+}
+
+.btnGhost:hover:not(:disabled) {
+  background: var(--surface-alt);
+}
+
+/* 되돌릴 수 없는 처리 — 삭제. 계약취소 버튼과 같은 규칙이다(테두리·글씨만 붉다) */
+.btnDanger {
+  background: var(--surface);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: var(--color-danger-bg);
+}
+
+.btnSm {
+  height: 36px;
+  padding: 0 14px;
+}
+
+.btnXs {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── 2단 레이아웃 ── */
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 20px;
+  padding-top: 20px;
+}
+
+/* ── 좌측 · 문의 목록 ── */
+.list {
+  width: 420px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.listHead {
+  flex: 0 0 auto;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.searchWrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  display: flex;
+  color: var(--text-caption);
+  pointer-events: none;
+}
+
+.search {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px 0 40px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-heading);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition:
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+
+.search:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.count {
+  flex: 0 0 auto;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.filterRow {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chipRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  height: 28px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out);
+}
+
+.chipOn {
+  background: var(--color-accent-bg);
+  border-color: var(--color-primary);
+  color: var(--color-primary-hover);
+  font-weight: 700;
+}
+
+.typeSelect {
+  margin-left: auto;
+  height: 28px;
+  padding: 0 8px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-heading);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+  cursor: pointer;
+}
+
+.typeSelect:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* 목록 — 독립 스크롤 */
+.cards {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cards::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cards::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.cards:hover::-webkit-scrollbar-thumb {
+  background: var(--text-caption);
+}
+
+.card {
+  position: relative;
+  width: 100%;
+  display: block;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease-out);
+}
+
+.card:hover {
+  background: var(--surface-alt);
+}
+
+.cardSelected {
+  background: var(--color-accent-bg);
+}
+
+.cardSelected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-primary);
+}
+
+.cardRow1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cardType {
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardSelected .cardType {
+  color: var(--color-primary);
+}
+
+.cardMeta {
+  margin-top: 6px;
+  display: block;
+  font-size: 14px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardLast {
+  margin-top: 3px;
+  display: block;
+  font-size: 12px;
+  color: var(--text-caption);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 뱃지 ── */
+.badge {
+  height: 24px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* 접수 = 답해야 할 글. 시안의 「대기」 색(amber)과 같다 */
+.badgeWait {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+/* 답변완료 — 완료는 인디고다(녹색 금지 · PLAT-05) */
+.badgeDone {
+  background: var(--color-accent-bg);
+  color: var(--color-primary-hover);
+}
+
+/* 「보관 기간 지남」 — ★ 운영자 화면에만 있는 표시다 */
+.badgeOld {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+/* ── 우측 · 상세 ── */
+.detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.detailHead {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.who {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.who h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.012em;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.whoDivider {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 4px;
+  flex: 0 0 auto;
+}
+
+.whoSub {
+  font-size: 14px;
+  color: var(--text-body);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.detailBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* ── 원글 카드 ── 고객 글 보기(s0300500070p2)의 정보 그리드와 같은 모양 ── */
+.card2 {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  row-gap: 16px;
+  column-gap: 24px;
+}
+
+.infoKey {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.infoVal {
+  margin-top: 4px;
+  font-size: 16px;
+  color: var(--text-heading);
+  word-break: break-all;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.hr {
+  margin: 18px 0;
+  height: 1px;
+  background: var(--border);
+}
+
+.bodyText {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--text-heading);
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+/* 원글 위의 「보관 기간 지남」 안내 — 지우라는 뜻이 아니라 지날 수 있다는 표시다 */
+.retention {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.retention svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.secTitle {
+  margin: 24px 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+/* ── 스레드 ── 고객 화면과 **같은 모양**이다(03-thread.md §1) ──
+   ★ 좌우 정렬(채팅형)을 쓰지 않는다. 고객 글과 운영자 글은 배경색으로만 구분한다 —
+     긴 답변이 좁아져 읽기 어려워진다. */
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.msg + .msg,
+.msg + .compose {
+  margin-top: 12px;
+}
+
+/* 고객 글 — 배경색으로만 구분한다 */
+.msgCustomer {
+  background: var(--surface-alt);
+}
+
+/* 전화 답변 기록 — 본문이 없다 */
+.msgPhone {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.msgHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.av {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.avOp {
+  background: var(--color-accent-bg);
+  color: var(--color-primary-hover);
+}
+
+.avCu {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.avBig {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-accent-bg);
+  color: var(--color-primary-hover);
+}
+
+.who2 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.when {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.msgLead {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.msgSub {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.msgFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.msgHeadRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ── 답변 등록 · 수정 ── */
+.compose {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.lab {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.textarea {
+  width: 100%;
+  margin-top: 8px;
+  padding: 14px;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-heading);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+  resize: vertical;
+  transition:
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+
+.textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.isErr {
+  border-color: var(--color-danger);
+}
+
+.countRow {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.countErr {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.count2 {
+  color: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.composeFoot {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.composeNote {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.composeActions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── 잠긴 입력칸 ── 답변 2회를 다 썼거나, 답할 새 질문이 없을 때 ──
+   ★ 고객 화면의 「추가 질문은 한 번만」 안내 카드와 같은 결이다(점선 · 회색 바탕) */
+.locked {
+  background: var(--surface-alt);
+  border-style: dashed;
+}
+
+.lockedHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.lockedIcon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.lockedText {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-body);
+}
+
+/* ── 더 보기 ── */
+.more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.moreText {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── 빈 상태 ── */
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  text-align: center;
+}
+
+.emptyIcon {
+  color: var(--text-caption);
+}
+
+.emptyLead {
+  margin: 14px 0 0;
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.emptySub {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-caption);
+}
+
+.emptyAct {
+  margin-top: 20px;
+}
+
+/* ── 확인 창 (삭제) ── 상태 전이 확인 창(s0300200040p2)과 같은 모양 ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(11, 17, 32, 0.45);
+}
+
+.modal {
+  width: 460px;
+  max-width: 100%;
+  padding: 32px 28px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  text-align: center;
+}
+
+.modalIcon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.modalTitle {
+  margin: 16px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.modalDesc {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-body);
+  text-align: left;
+}
+
+.modalList {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-body);
+  text-align: left;
+}
+
+.modalFoot {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.modalFoot .btn {
+  width: 100%;
+  height: 48px;
+}
+
+.modalErr {
+  margin: 12px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+/* ── 토스트 ── s0300200030 과 같은 규격 ── */
+.toast {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 380px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+.toastDot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--color-primary);
+}
+
+.toastMsg {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}

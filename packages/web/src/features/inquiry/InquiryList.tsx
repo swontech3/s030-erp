@@ -132,16 +132,26 @@ export function InquiryList() {
 
   return (
     <>
-      <div className={styles.listTop}>
-        <div>
-          <h1 className={styles.h1}>문의상담</h1>
-          <p className={styles.lede}>로그인 없이 남기실 수 있습니다. 영업일 1일 내 답변드립니다.</p>
+      {/*
+        ★★ 제목과 검색 조건은 **고정**이다(2026-09-28) — 목록이 길어 스크롤해도 계속 보인다.
+           찾는 조건을 바꾸려고 맨 위로 되돌아가지 않게 하고, [문의하기] 도 항상 손에 있다.
+        ★ 셸 헤더(64px sticky)가 위에 있으므로 그 아래에 붙인다(`.listStick { top: 64px }`).
+      */}
+      <div className={styles.listStick} data-stick="1">
+        <div className={styles.listTop}>
+          <div>
+            <h1 className={styles.h1}>문의상담</h1>
+            <p className={styles.lede}>
+              궁금한 점이 있으신가요? 입주 · 법무 · 세무 · 연구소 설립 무엇이든 남겨 주세요.
+              <br />
+              영업일 1일 내 답변드립니다.
+            </p>
+          </div>
+          <Link className={`${styles.btn} ${styles.btnPrimary}`} href="/inquiry/new" data-go="write">
+            <Icon name="pencil-line" size={16} />
+            문의하기
+          </Link>
         </div>
-        <Link className={`${styles.btn} ${styles.btnPrimary}`} href="/inquiry/new" data-go="write">
-          <Icon name="pencil-line" size={16} />
-          문의하기
-        </Link>
-      </div>
 
       {/* 글이 하나도 없으면 검색 카드를 숨긴다 */}
       {empty ? null : (
@@ -215,6 +225,7 @@ export function InquiryList() {
           </div>
         </div>
       )}
+      </div>
 
       {empty ? (
         <div className={`${styles.card} ${styles.empty}`} data-empty="1">
@@ -297,22 +308,11 @@ export function InquiryList() {
             </div>
           ) : null}
 
-          {/* 조건 없이 1~3건일 때만 — 비어 보이는 목록을 그냥 두지 않는다 */}
-          {!searching && totalAll > 0 && totalAll < 4 ? (
-            <div className={styles.few} data-few="1">
-              <div>
-                <div className={styles.fewLead}>궁금한 점이 있으신가요?</div>
-                <div className={styles.fewSub}>입주 · 법무 · 세무 · 연구소 설립 무엇이든 남겨 주세요</div>
-              </div>
-              <Link
-                className={`${styles.btn} ${styles.btnGhost}`}
-                href="/inquiry/new"
-                style={{ fontSize: 14 }}
-              >
-                문의 남기기
-              </Link>
-            </div>
-          ) : null}
+          {/*
+            ★ 목록 아래 「궁금한 점이 있으신가요?」 안내는 **지웠다**(2026-09-28) — 같은 문구가
+              제목 아래로 올라갔고, [문의하기] 버튼도 이제 고정돼 항상 보인다. 한 화면에 같은
+              말과 같은 버튼이 두 번 있을 이유가 없다.
+          */}
         </div>
       )}
     </>

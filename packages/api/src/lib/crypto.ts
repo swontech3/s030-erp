@@ -12,7 +12,7 @@
  * 형식: `v1.<iv>.<tag>.<ciphertext>` (각 base64). 버전 접두어는 나중에 키를 회전하거나
  * 알고리즘을 바꿀 때 기존 값을 구분하기 위한 것이다.
  */
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
 import { env } from '../env.ts';
 
 const VERSION = 'v1';
@@ -56,4 +56,29 @@ export function newSessionId(): string {
  */
 export function hashSessionId(raw: string): string {
   return createHash('sha256').update(raw).digest('hex');
+}
+
+/**
+ * 지운 문의에 남기는 **연락처 해시** — 문의 관리(s0300200080)의 글 전체 삭제가 쓴다.
+ *
+ * =============================================================================
+ * ★★★ 지우면서 「같은 사람인지」만 남긴다 — 번호는 남기지 않는다
+ * =============================================================================
+ * 글을 지우면 이름·연락처·이메일·회사명·본문·스레드가 사라진다(04-data-model.md §5
+ * 「파기」). 그런데 `phone_digits` 를 **함께 지우면 스팸 판정이 죽는다** — 하루 3건을
+ * 넘긴 사람이 글을 지우고 다시 쓰는 길이 열린다(같은 문서 §4).
+ *
+ * 그래서 숫자 대신 이 해시를 넣는다. 같은 번호는 같은 값이 되므로 집계는 그대로 돌고,
+ * 값에서 번호를 되돌릴 수는 없다.
+ *
+ * ★★ `sha256(번호)` 로는 부족하다 — 휴대전화 번호는 후보가 1억 개뿐이라 전수 대입으로
+ *    바로 되돌려진다. 그래서 **키를 섞는다**(HMAC, `ERP_ENCRYPTION_KEY`). 키가 없으면
+ *    후보를 만들 수 없다.
+ * ★ `h:` 접두어를 붙인다 — 「숫자만」인 살아 있는 행과 눈으로도 구분되고, 집계 SQL 이
+ *   둘을 같이 찾을 때(`= ANY`) 무엇을 찾는지 읽힌다.
+ * ★ 키를 회전하면 옛 해시는 새 해시와 매칭되지 않는다. 그때 잃는 것은 **이미 지운
+ *   글의 하루 집계**뿐이라 그대로 둔다 — 세션·토큰과 달리 되살릴 필요가 없다.
+ */
+export function phoneDigitsToken(digits: string): string {
+  return `h:${createHmac('sha256', env.encryptionKey).update(digits).digest('hex')}`;
 }

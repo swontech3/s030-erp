@@ -22,7 +22,8 @@
     "icons:check": "node scripts/build-icons.js",
     "ds:compare": "tsx scripts/compare-ds.tsx",
     "verify:print": "node scripts/verify-print.js",
-    "verify:billing": "tsx scripts/verify-billing.js"
+    "verify:billing": "tsx scripts/verify-billing.js",
+    "verify:inquiry": "tsx scripts/verify-inquiry.js"
   },
   "devDependencies": {
     "tsx": "^4.23.13",

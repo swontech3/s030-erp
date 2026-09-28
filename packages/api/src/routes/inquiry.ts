@@ -24,8 +24,10 @@
  * 마지막 글로 판정한다(`inquiryStatus`). 검색도 같은 함수로 「어떤 kind 가 답변인가」를
  * 만들어 SQL 에 넘긴다 — 규칙이 SQL 과 코드 두 곳에 적히지 않게.
  *
- * ★ 운영자 답변 등록·수정은 **여기 없다.** 문의 관리 화면(s0300200080)과 함께 만든다
- *   (2026-09-27 결정). 이 파일에 쓰기는 「원글 등록」과 「고객 추가 질문」 둘뿐이다.
+ * ★ 운영자 답변 등록·수정·글 삭제는 **여기 없다** — `routes/inquiryAdmin.ts` 다
+ *   (s0300200080, 2026-09-28). 이 파일에 쓰기는 「원글 등록」과 「고객 추가 질문」
+ *   둘뿐이고, 둘 다 공개다. 운영자 라우트를 이 파일에 붙이지 않는다 — 여기는 라우트마다
+ *   `public: true` 가 달려 있어 한 줄 잘못 붙으면 개인정보가 로그인 없이 열린다.
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -33,6 +35,7 @@ import { parseDay } from '@swonbiz/shared/domain/day';
 import {
   COOLDOWN_SECONDS,
   DAILY_LIMIT,
+  OPERATOR_DISPLAY_NAME,
   PAGE_SIZE,
   TOKEN_TTL_MINUTES,
   UNLOCK_MAX_ATTEMPTS,
@@ -65,6 +68,7 @@ import {
   type MessageRow,
 } from '../db/inquiries.ts';
 import { hashPassword, verifyPassword } from '../lib/password.ts';
+import { phoneDigitsToken } from '../lib/crypto.ts';
 
 /** 세션이 없는 요청이 쓰는 스코프 — RLS 가 0건으로 보는 자리(`routes/kiosk.ts` 와 같다). */
 const NO_SCOPE = { role: 'tenant' as const, companyId: null };
@@ -99,7 +103,12 @@ function toMessage(row: MessageRow) {
     kind: row.kind,
     /** ★ `phone` 은 본문이 없다 — 「전화로 답변드렸습니다」만 보여 준다. */
     body: row.body,
-    operatorName: row.operator_name,
+    /**
+     * ★★★ 표시 이름은 **고정 문구**다(`OPERATOR_DISPLAY_NAME`, 2026-09-28).
+     *    `operator_name`(실제 처리자)을 내려보내지 않는다 — 공개 응답에 직원 실명이
+     *    나갈 이유가 없고, 담당자가 바뀌어도 옛 답변의 서명이 흔들리지 않는다.
+     */
+    operatorName: row.kind === 'customer' ? null : OPERATOR_DISPLAY_NAME,
     createdAt: row.created_at,
     editedAt: row.edited_at,
   };
@@ -201,7 +210,11 @@ export function registerInquiryRoutes(app: FastifyInstance): void {
     }
 
     const digits = phoneDigits(input.phone);
-    const usage = await withCompanyScope(NO_SCOPE, (client) => phoneUsage(client, digits));
+    /* ★ 집계 후보가 둘이다 — 살아 있는 글의 숫자와, 운영자가 지운 글에 남은 **해시**.
+       지운 글을 못 세면 「지우고 다시 쓰기」로 하루 3건을 넘길 수 있다(`purgeInquiry`). */
+    const usage = await withCompanyScope(NO_SCOPE, (client) =>
+      phoneUsage(client, [digits, phoneDigitsToken(digits)]),
+    );
     // ★ 하루 3건을 먼저 본다 — 둘 다 걸리면 「오늘은 더 등록할 수 없습니다」가 맞는 말이다.
     if (usage.today >= DAILY_LIMIT) {
       return reply.code(429).send({ error: 'too_many', reason: 'daily', message: '오늘은 더 등록할 수 없습니다' });

@@ -18,6 +18,7 @@ import { registerLookupRoutes } from './routes/lookups.ts';
 import { registerBookingRoutes } from './routes/booking.ts';
 import { registerKioskRoutes } from './routes/kiosk.ts';
 import { registerInquiryRoutes } from './routes/inquiry.ts';
+import { registerInquiryAdminRoutes } from './routes/inquiryAdmin.ts';
 import { registerCompanyRoutes } from './routes/companies.ts';
 import { registerFileRoutes } from './routes/files.ts';
 import { registerOcrRoutes } from './routes/ocr.ts';
@@ -78,6 +79,9 @@ registerKioskRoutes(app);
 // ★ 문의상담 게시판(s0300500070). **인증 없는 라우트**라 현황판과 같은 이유로 따로 둔다 —
 //   쓰기가 둘(원글·추가 질문) 있고, 추가 질문은 열람 토큰을 따로 본다.
 registerInquiryRoutes(app);
+// ★ 문의 관리(s0300200080). **운영사 전용**이고 공개 라우트와 **파일이 다르다** —
+//   같은 파일에 두면 `config.public` 을 잘못 붙여 개인정보가 로그인 없이 열릴 수 있다.
+registerInquiryAdminRoutes(app);
 registerCompanyRoutes(app);
 // ★ 첨부 서류(CONT-17). 회사 하위 경로라 입주사 라우트 **뒤에** 둔다 — 같은 접두사를
 //   쓰는 라우트는 등록 순서와 무관하지만, 읽는 사람이 묶어서 보게 한다.

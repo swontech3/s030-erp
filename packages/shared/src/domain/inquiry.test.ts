@@ -4,8 +4,15 @@ import {
   DAILY_LIMIT,
   PAGE_SIZE,
   UNLOCK_MAX_ATTEMPTS,
+  MAX_OPERATOR_ANSWERS,
+  OPERATOR_DISPLAY_NAME,
+  REPLY_BLOCK_MESSAGE,
+  RETENTION_MONTHS,
   inquiryStatus,
   maskName,
+  operatorReplyBlock,
+  parseOperatorReply,
+  type MessageKind,
   phoneDigits,
   validateFollowUp,
   validateInquiry,
@@ -150,10 +157,107 @@ describe('validateFollowUp', () => {
   });
 });
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   운영자 답변 — 문의 관리(s0300200080)가 쓴다
+   ★ 화면과 서버가 이 함수 하나를 부른다. API 를 직접 찌르면 화면을 지나가지 않는다.
+   ═══════════════════════════════════════════════════════════════════════════ */
+describe('parseOperatorReply', () => {
+  it('글답변은 앞뒤 공백을 떼고 담는다', () => {
+    expect(parseOperatorReply('text', '  10시에 방문 가능합니다 ')).toEqual({
+      kind: 'text',
+      body: '10시에 방문 가능합니다',
+    });
+  });
+
+  it('★ 공백만인 글답변은 답변이 아니다', () => {
+    expect(parseOperatorReply('text', '   ')).toBeNull();
+  });
+
+  it('1000자까지', () => {
+    expect(parseOperatorReply('text', 'ㄱ'.repeat(BODY_MAX))).not.toBeNull();
+    expect(parseOperatorReply('text', 'ㄱ'.repeat(BODY_MAX + 1))).toBeNull();
+  });
+
+  it('★★ 전화 답변은 **본문이 없다** — 보내와도 버린다', () => {
+    expect(parseOperatorReply('phone', '통화로 안내함')).toEqual({ kind: 'phone', body: null });
+  });
+
+  it('★★★ 운영자가 고객 글(customer)을 붙일 길은 없다', () => {
+    expect(parseOperatorReply('customer', '고객인 척')).toBeNull();
+  });
+
+  it('모르는 kind 는 거절한다', () => {
+    expect(parseOperatorReply('', '내용')).toBeNull();
+    expect(parseOperatorReply('TEXT', '내용')).toBeNull();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   답변 횟수 — 질문 하나에 답변 하나 · 최대 2회 (2026-09-28)
+   ★ 화면의 잠금과 서버의 409 가 이 함수 하나를 본다.
+   ═══════════════════════════════════════════════════════════════════════════ */
+describe('operatorReplyBlock', () => {
+  it('★ 원글만 있으면 답할 수 있다 — 원글이 답 안 한 질문이다', () => {
+    expect(operatorReplyBlock([])).toBeNull();
+  });
+
+  it('★★★ 답변1 뒤에는 막힌다 — 연달아 두 번 답하지 않는다', () => {
+    expect(operatorReplyBlock(['text'])).toBe('nothing_to_answer');
+    expect(operatorReplyBlock(['phone'])).toBe('nothing_to_answer');
+  });
+
+  it('★★★ 고객이 추가 질문을 남기면 다시 열린다', () => {
+    expect(operatorReplyBlock(['text', 'customer'])).toBeNull();
+  });
+
+  it('★★★ 답변2 뒤에는 2회를 다 썼다', () => {
+    expect(operatorReplyBlock(['text', 'customer', 'text'])).toBe('used_up');
+    expect(operatorReplyBlock(['text', 'customer', 'phone'])).toBe('used_up');
+    expect(operatorReplyBlock(['phone', 'customer', 'text'])).toBe('used_up');
+  });
+
+  it('★ 전화 답변도 한 번으로 센다 — 글답변과 같다', () => {
+    expect(operatorReplyBlock(['phone'])).toBe('nothing_to_answer');
+    expect(operatorReplyBlock(['phone', 'customer', 'phone'])).toBe('used_up');
+  });
+
+  it('★ 고객 글이 먼저 와도(추가 질문 먼저) 답할 수 있다', () => {
+    expect(operatorReplyBlock(['customer'])).toBeNull();
+  });
+
+  it('★★ 흐름 전체 — 문의 → 답변1 → 추가 질문 → 답변2 → 끝', () => {
+    const thread: MessageKind[] = [];
+    expect(operatorReplyBlock(thread)).toBeNull(); // 답변1 가능
+    thread.push('text');
+    expect(operatorReplyBlock(thread)).toBe('nothing_to_answer');
+    thread.push('customer');
+    expect(operatorReplyBlock(thread)).toBeNull(); // 답변2 가능
+    thread.push('text');
+    expect(operatorReplyBlock(thread)).toBe('used_up');
+  });
+
+  it('이유마다 사람 말이 있다 — 화면과 서버가 같은 문장을 쓴다', () => {
+    expect(REPLY_BLOCK_MESSAGE.used_up).toContain('두 번까지');
+    expect(REPLY_BLOCK_MESSAGE.nothing_to_answer).toContain('추가 질문');
+    // 둘 다 「수정」으로 안내한다 — 막고 끝내지 않는다
+    expect(REPLY_BLOCK_MESSAGE.used_up).toContain('수정');
+    expect(REPLY_BLOCK_MESSAGE.nothing_to_answer).toContain('수정');
+  });
+});
+
 describe('상수 — 명세와 같은 값인가', () => {
   it('목록 20건 · 하루 3건 · 시도 5회', () => {
     expect(PAGE_SIZE).toBe(20);
     expect(DAILY_LIMIT).toBe(3);
     expect(UNLOCK_MAX_ATTEMPTS).toBe(5);
+  });
+
+  it('보유 기간 6개월 — 「보관 기간 지남」 표시의 기준(04-data-model §5)', () => {
+    expect(RETENTION_MONTHS).toBe(6);
+  });
+
+  it('답변은 최대 2회 · 답변자 이름은 고정 문구다', () => {
+    expect(MAX_OPERATOR_ANSWERS).toBe(2);
+    expect(OPERATOR_DISPLAY_NAME).toBe('에스원비즈 운영담당자');
   });
 });

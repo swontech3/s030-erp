@@ -392,6 +392,28 @@
 }
 
 /* ── 목록 ── */
+/*
+ * ── 제목 + 검색 조건 고정 ── (2026-09-28)
+ *
+ * ★★ 목록이 스크롤돼도 제목과 검색 조건이 계속 보인다. 조건을 바꾸려고 맨 위로 올라가지
+ *    않아도 되고, [문의하기] 가 늘 손에 있다.
+ * ★ `top: 64px` 은 셸 헤더(`.head`, 64px sticky) 아래라는 뜻이다. 둘 다 sticky 라
+ *   겹치지 않게 헤더 높이만큼 내려 붙인다.
+ * ★★ 음수 마진 + 같은 크기 패딩은 **`.main` 의 패딩(32px 20px)을 그대로 흡수**하려는
+ *    것이다. 그러지 않으면 붙어 있는 동안 좌우 20px 틈으로 지나가는 목록이 비쳐 보인다.
+ *    `.main` 의 패딩을 고치면 여기도 함께 고친다.
+ * ★ 배경은 페이지 배경(`--surface-alt`)과 같은 색이다 — 카드가 아니라 «바닥»이어야
+ *   스크롤이 그 아래로 지나가는 것으로 읽힌다.
+ */
+.listStick {
+  position: sticky;
+  top: 64px;
+  z-index: 20;
+  margin: -32px -20px 0;
+  padding: 32px 20px 16px;
+  background: var(--surface-alt);
+}
+
 .listTop {
   display: flex;
   align-items: flex-end;
@@ -585,30 +607,8 @@
   font-weight: 700;
 }
 
-.few {
-  margin-top: 16px;
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  background: var(--surface);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-lg);
-}
-
-.fewLead {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-heading);
-}
-
-.fewSub {
-  margin-top: 2px;
-  font-size: 14px;
-  color: var(--text-muted);
-}
+/* .few · .fewLead · .fewSub 는 지웠다 — 목록 아래 「궁금한 점이…」 안내를 없앴다(2026-09-28).
+   같은 문구가 제목 아래에 있고 [문의하기] 버튼도 고정돼 늘 보인다. */
 
 .empty {
   margin-top: 24px;

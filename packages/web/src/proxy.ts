@@ -34,5 +34,5 @@ export function proxy(request: NextRequest) {
  *   `@swonbiz/shared` 의 screens.ts 를 함께 고친다.
  */
 export const config = {
-  matcher: ['/dashboard/:path*', '/booking/:path*', '/tenants/:path*', '/contracts/:path*', '/billing/:path*', '/settings/:path*', '/facility/:path*'],
+  matcher: ['/dashboard/:path*', '/booking/:path*', '/tenants/:path*', '/contracts/:path*', '/billing/:path*', '/settings/:path*', '/facility/:path*', '/inquiry-admin/:path*'],
 };

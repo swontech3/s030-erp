@@ -19,7 +19,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { BODY_MAX, validateFollowUp } from '@swonbiz/shared/domain/inquiry';
+import { BODY_MAX, OPERATOR_DISPLAY_NAME, validateFollowUp } from '@swonbiz/shared/domain/inquiry';
 import { Icon } from '@/components/ds';
 import styles from './inquiry.module.css';
 import {
@@ -264,8 +264,9 @@ export function InquiryView({ inquiryId }: Props) {
               </span>
               <div style={{ minWidth: 0 }}>
                 <div className={styles.msgLead}>전화로 답변드렸습니다</div>
+                {/* ★ 이름은 고정 문구다(2026-09-28) — 「담당 {사람}」이 아니라 문구 자체가 담당자다 */}
                 <div className={styles.msgSub}>
-                  {dotDateTime(m.createdAt)} · 담당 {m.operatorName ?? ''}
+                  {dotDateTime(m.createdAt)} · {OPERATOR_DISPLAY_NAME}
                 </div>
               </div>
             </div>
@@ -287,8 +288,9 @@ export function InquiryView({ inquiryId }: Props) {
                   </span>
                 )}
                 <div style={{ minWidth: 0 }}>
+                  {/* ★ 답변자 이름은 **고정 문구**다 — 담당자가 바뀌어도 옛 답변의 서명이 그대로다 */}
                   <div className={styles.who}>
-                    {m.kind === 'customer' ? '추가 질문' : `SwonBiz ${m.operatorName ?? ''}`}
+                    {m.kind === 'customer' ? '추가 질문' : OPERATOR_DISPLAY_NAME}
                   </div>
                   <div className={styles.when}>
                     <span>{dotDateTime(m.createdAt)}</span>
