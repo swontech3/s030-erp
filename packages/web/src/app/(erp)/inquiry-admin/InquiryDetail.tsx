@@ -25,7 +25,6 @@ import {
   BODY_MAX,
   MAX_OPERATOR_ANSWERS,
   OPERATOR_DISPLAY_NAME,
-  REPLY_BLOCK_MESSAGE,
   operatorReplyBlock,
   type MessageKind,
 } from '@swonbiz/shared/domain/inquiry';
@@ -63,8 +62,9 @@ export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit,
   /**
    * 답변을 쓸 수 있는가 — **판정은 shared 하나다**(서버도 같은 함수로 409 를 낸다).
    *
-   * ★ 화면이 잠그는 것은 **친절**이다. 여기서 막지 않아도 서버가 막지만, 잠긴 이유를
-   *   눌러 보고서야 알게 두지 않는다 — 안내 문구도 서버와 같은 문장을 쓴다.
+   * ★ 쓸 수 없으면 입력칸을 **아예 그리지 않는다.** 잠긴 칸을 눌러 보게 하지 않는다.
+   * ★ 안내도 두지 않는다(2026-09-28 결정) — 이 상태에서 할 수 있는 일은 [수정] 뿐이고
+   *   그 버튼은 스레드의 답변 옆에 이미 있다.
    */
   const block = operatorReplyBlock(messages.map((m) => m.kind as MessageKind));
   const answerCount = messages.filter((m) => m.kind !== 'customer').length;
@@ -281,25 +281,12 @@ export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit,
         </div>
 
         {/* ══ 답변 등록 ══ ★ 답변은 이 화면에서만 한다(한 업무는 한 화면에서 · CLAUDE.md)
-            ★★ 쓸 수 없는 상태면 **입력칸 자리에 이유를 둔다.** 잠긴 칸을 보여 주고 눌러
-               보게 하거나, 아무 말 없이 감추지 않는다 — 어느 쪽이든 「고장인가」로 읽힌다. */}
-        {block ? (
-          <div className={`${styles.compose} ${styles.locked}`} data-compose-locked={block}>
-            <div className={styles.lockedHead}>
-              <span className={styles.lockedIcon}>
-                <Icon name="lock" size={18} />
-              </span>
-              <div style={{ minWidth: 0 }}>
-                <div className={styles.msgLead}>지금은 답변을 쓸 수 없습니다</div>
-                {/* ★ 서버가 409 로 내는 문장과 **같은 문장**이다(`REPLY_BLOCK_MESSAGE`) */}
-                <div className={styles.lockedText}>{REPLY_BLOCK_MESSAGE[block]}</div>
-              </div>
-            </div>
-            <p className={styles.composeNote} style={{ marginTop: 12 }}>
-              답변 {answerCount}회 / 최대 {MAX_OPERATOR_ANSWERS}회 · 수정은 횟수와 상관없이 계속 할 수 있습니다.
-            </p>
-          </div>
-        ) : (
+            ★★ 쓸 수 없는 상태면 **아무것도 두지 않는다**(2026-09-28 결정). 잠긴 칸도,
+               왜 잠겼는지도 두지 않는다 — 할 수 있는 일이 [수정] 하나뿐이라 그 버튼이
+               스레드에 이미 있고, 안내 석 줄이 그 아래를 채우면 화면이 시끄러워진다.
+            ★ **서버의 409 는 그대로다**(`REPLY_BLOCK_MESSAGE`). 화면에 없다고 규칙이
+               없어진 것이 아니다 — API 를 직접 찌르면 문구와 함께 막힌다. */}
+        {block ? null : (
         <div className={styles.compose} data-compose="1">
           <label className={styles.lab} htmlFor="reply-body">
             답변 등록 · {answerCount + 1}번째 / 최대 {MAX_OPERATOR_ANSWERS}회

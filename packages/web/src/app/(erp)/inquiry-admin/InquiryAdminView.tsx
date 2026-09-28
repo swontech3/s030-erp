@@ -167,6 +167,29 @@ export function InquiryAdminView({ codes }: Props) {
     void loadDetail(selectedId);
   }, [selectedId, loadDetail]);
 
+  /**
+   * ★★★ **검색 조건이 바뀌면 고른 문의를 놓는다** — 오른쪽이 닫힌다.
+   *
+   * 오른쪽을 비우는 일은 위 effect 에 있는데 그것은 `selectedId` 가 바뀔 때만 돈다.
+   * 조건(검색어·상태·유형)을 바꾸면 목록만 다시 받고 선택은 그대로라, **검색 결과에
+   * 없는 문의가 오른쪽에 열린 채로 남았다.** 왼쪽에 눌린 줄이 없는데 오른쪽에는 글이
+   * 있는 화면이 되고, 거기서 [답변 등록]·[글 삭제] 를 누르게 된다.
+   *
+   * ★ 고른 문의가 결과에 **남아 있어도** 놓는다. 조건을 바꿨다는 것은 다른 것을 찾는
+   *   중이라는 뜻이고, 그러면 다시 고르는 것이 맞다(2026-09-28 결정).
+   * ★ 첫 렌더에서는 놓지 않는다 — 주소의 `?id=` 로 들어온 선택을 스스로 지우면
+   *   링크를 열자마자 빈 화면이 된다.
+   * ★ 검색어는 **친 그대로**(`keyword`) 본다. 서버로 나가는 것은 250ms 뒤(`query`)지만,
+   *   오른쪽이 닫히는 것은 조건을 손댄 **그 순간**이어야 손이 따라온다.
+   */
+  const filterKey = `${status ?? ''}|${type ?? ''}|${keyword.trim()}`;
+  const lastFilter = useRef(filterKey);
+  useEffect(() => {
+    if (lastFilter.current === filterKey) return;
+    lastFilter.current = filterKey;
+    setSelectedId(null);
+  }, [filterKey]);
+
   // 주소에 적는다 — [이전]·새로고침에 살아남는다. 기록은 쌓지 않는다.
   useEffect(() => {
     const qs = new URLSearchParams();

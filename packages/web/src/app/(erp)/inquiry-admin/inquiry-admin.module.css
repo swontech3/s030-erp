@@ -699,37 +699,8 @@
   gap: 8px;
 }
 
-/* ── 잠긴 입력칸 ── 답변 2회를 다 썼거나, 답할 새 질문이 없을 때 ──
-   ★ 고객 화면의 「추가 질문은 한 번만」 안내 카드와 같은 결이다(점선 · 회색 바탕) */
-.locked {
-  background: var(--surface-alt);
-  border-style: dashed;
-}
-
-.lockedHead {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.lockedIcon {
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-}
-
-.lockedText {
-  margin-top: 4px;
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--text-body);
-}
+/* .locked · .lockedHead · .lockedIcon · .lockedText 는 지웠다(2026-09-28) —
+   답변을 쓸 수 없는 상태에서는 **입력칸도 안내도 두지 않는다**(InquiryDetail 머리말). */
 
 /* ── 더 보기 ── */
 .more {
