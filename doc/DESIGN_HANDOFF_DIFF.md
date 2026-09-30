@@ -1695,3 +1695,67 @@ CSS 로 되는 유일한 방법이다.
   같은 문구가 위로 올라갔고 [문의하기] 도 고정돼 늘 보인다. 한 화면에 두 번 둘 이유가 없다
 - **제목과 검색 조건을 고정**했다(`.listStick`, `top: 64px` — 셸 헤더 아래). 시안에는 없다.
   목록이 길어질 때 조건을 바꾸려고 맨 위로 돌아가지 않게 한 것이다
+
+---
+
+## O. 셸 헤더 — 계정 메뉴를 넣고 도움말·알림을 뺐다 (2026-09-30)
+
+### O-1. 넣은 것 — 계정 메뉴 (시안에 **없다**)
+
+시안 `common/04-shell.md` 의 헤더 우측은 이렇게만 적혀 있다.
+
+```
+우측: 아이콘 버튼(도움·알림 36px) + 구분선 + 계정 블록
+계정 블록 — 32px 아바타(이니셜, --color-accent-bg 배경) + 이름 14px/700 + 소속 12px --text-muted
+```
+
+즉 **계정 블록은 표시 전용이고 드롭다운이 없다.** 그런데 그 상태로는 **로그인한 사람이
+화면에서 나갈 길이 없다** — 주소를 직접 치거나 브라우저에서 쿠키를 지워야 했다. 그래서
+계정 블록을 `button` 으로 바꾸고 드롭다운 안에 [로그아웃] 을 뒀다(대표 지시 2026-09-30).
+
+- 생김새는 시안 그대로다. 바뀐 것은 **누른다**는 것과 오른쪽 화살표(`chevron-down`)뿐이다
+- 드롭다운 안에 이름·소속을 한 번 더 적는다 — 좁은 화면(`.responsive`)에서는 헤더의
+  이름·소속이 감춰져 아바타만 남으므로, 거기가 **누구로 로그인했는지 확인할 유일한 자리**다
+- 로그아웃은 **`<form method="post">`** 다. 링크로 두면 프리페치만으로 로그아웃된다
+  (`/no-access` 의 로그아웃과 같은 방식·같은 이유)
+- 파일: `components/patterns/UserMenu.tsx` · 스타일은 `AppShell.module.css` 의 `.userWrap`~`.userMenuItem`
+
+> **★ 로그아웃이 두 화면에 있다** — 여기와 `/no-access`. `CLAUDE.md` 의 「같은 처리 버튼을
+> 두 화면에 두지 않는다」에 걸려 보이지만 **대표 결정으로 둘 다 둔다**(2026-09-30):
+> `/no-access` 는 **셸이 없는** 화면이라(AuthShell) 이 메뉴가 아예 존재하지 않고,
+> 화면 0건인 계정은 셸을 열지 못한다. 둘은 서로 닿지 않는 출구다.
+
+### O-2. 뺀 것 — 도움말(`circle-help`)·알림(`bell`) 아이콘 버튼 2개
+
+**아무 일도 하지 않는 버튼이었다.** 누르면 아무 반응이 없는 것을 사용자는 「아직 안 만든
+것」인지 「고장난 것」인지 구분할 수 없다. 만들 때 되돌린다.
+
+**되돌릴 때 필요한 것 — 시안 값 그대로라 다시 계산할 것이 없다.**
+
+| | |
+|---|---|
+| 자리 | 헤더 우측, `roleNote` 와 계정 블록 **사이**. 도움말 → 알림 순서 |
+| 마크업 | `<button type="button" className={styles.iconBtn} aria-label="도움"><Icon name="circle-help" size={18} /></button>` · 알림은 `aria-label="알림"` + `<Icon name="bell" size={18} />` |
+| 스타일 | `.iconBtn` — `36×36`, `display:grid; place-items:center`, `border:1px solid transparent`, `border-radius:8px`, `background:transparent`, `color:var(--text-muted)`, `cursor:pointer`, `transition: background 180ms cubic-bezier(.22,.61,.36,1)`. hover 는 `background:var(--surface-alt)` |
+| 좁은 화면 | `.responsive .header .iconBtn { display:none }` — 768~1279 에서 자리를 먹는다 |
+| 아이콘 | `circle-help` · `bell` 은 **아이콘 세트에 그대로 있다**(`icons.generated.ts`). 다시 받을 필요가 없다 |
+| 알림 배지 | 시안 `04-shell.md` 67행 — 「하단 알림: 카드 → bell 아이콘 + 숫자 배지로 축약」 |
+
+★ `.iconBtn` 클래스는 `AppShell.module.css` 에서 **지웠다**(위 값이 전부다). 다른 파일의
+`.iconBtn`(청구·예약·모달)은 각자의 CSS 모듈에 있는 **다른 클래스**이므로 영향이 없다.
+
+### O-3. 로그아웃한 뒤 [뒤로] — 캐시에서 되살아나던 것을 막았다
+
+계정 메뉴를 붙이고 나서 확인하다 나온 것이다. **로그아웃해서 세션이 죽은 뒤 [뒤로] 를
+누르면 대시보드가 이름·회사와 함께 그대로 다시 떴다.** 네트워크 요청이 한 번도 나가지
+않아 미들웨어도 서버 컴포넌트도 끼어들 자리가 없었다(`navigation.type = back_forward`,
+문서는 새로 만들어졌는데 요청은 없음 — 2026-09-30 실측).
+
+- Next 가 업무 화면에 붙이는 `no-cache, must-revalidate` 로는 **[뒤로] 의 재사용을 막지 못한다.**
+  막는 것은 `no-store` 다 → `next.config.ts` 의 `headers()` 에 넣었다
+  (★ **개발 서버를 다시 띄워야 반영된다**)
+- 미들웨어(`proxy.ts`)에서 같은 헤더를 붙여 봤지만 **Next 가 페이지 응답에서 덮어쓴다**(실측).
+  같은 시도를 반복하지 않도록 그 파일 머리말에 적어 뒀다
+- 그와 별개로 `AppShell` 이 브라우저 쪽에서 한 번 더 막는다 — 문서가 `back_forward` 로
+  만들어졌거나 bfcache 에서 되살아났으면(`pageshow.persisted`) 다시 불러온다.
+  **화면 안에서 [뒤로] 를 누르는 것은 걸리지 않는다** — 그건 같은 문서 안의 클라이언트 이동이다

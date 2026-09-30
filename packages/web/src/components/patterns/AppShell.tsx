@@ -25,11 +25,12 @@
  *    ERP 가 역할을 보고 거르지 않는다.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon } from '@/components/ds';
+import { UserMenu } from './UserMenu';
 import { SIDEBAR_COOKIE, SIDEBAR_COOKIE_MAX_AGE, screenNameForPath, type NavItem } from '@/lib/sidebar';
 import styles from './AppShell.module.css';
 
@@ -83,6 +84,51 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
    */
   const responsive = RESPONSIVE_ROUTES.has(pathname);
   const [drawer, setDrawer] = useState(false);
+
+  /*
+   * ══════════════════════════════════════════════════════════════════════════
+   * ★★★ 로그아웃한 뒤 [뒤로] 로 업무 화면이 되살아나지 않게 한다
+   * ══════════════════════════════════════════════════════════════════════════
+   * 2026-09-30 에 실제로 재현했다: 로그아웃해서 세션이 죽은 뒤 [뒤로] 를 누르면
+   * 대시보드가 이름·회사와 함께 그대로 다시 떴다. **네트워크 요청이 한 번도 나가지
+   * 않아** 미들웨어(`proxy.ts`)도 서버 컴포넌트도 끼어들 자리가 없었다.
+   *
+   * 되살아나는 길이 둘이고, 둘 다 막는다.
+   *   ① 캐시에서 문서를 새로 만든다 — `navigation.type === 'back_forward'`.
+   *      Next 가 붙이는 `no-cache` 는 **[뒤로] 의 재사용을 막지 못한다**(막는 것은
+   *      `no-store` 다). 이쪽이 실제로 재현된 경로다
+   *   ② bfcache 에서 문서를 통째로 되살린다 — `pageshow` 의 `persisted === true`
+   *
+   * 어느 쪽이든 **다시 불러온다.** `no-cache` 라 재검증 요청이 나가고, 쿠키가 없으니
+   * `/login` 으로 간다. 되돌아온 문서의 `navigation.type` 은 `reload` 라 반복되지 않는다.
+   *
+   * ★ **화면 안에서 [뒤로] 를 누르는 것은 여기 걸리지 않는다.** 그건 같은 문서 안의
+   *   클라이언트 이동이라 이 효과가 다시 돌지 않는다(셸은 레이아웃이라 계속 떠 있다).
+   *   걸리는 것은 **문서가 새로 만들어질 때**뿐이고, 로그아웃 → [뒤로] 가 그 경우다.
+   *
+   * ★ 셸 안(로그인이 필요한 화면)에서만 돈다. 공개 화면(현황판·문의 게시판)은 이
+   *   컴포넌트를 쓰지 않는다 — 거기엔 지킬 것이 없다.
+   *
+   * ★★ `next.config.ts` 의 `no-store` 가 **제대로 된 해법**이고 그것도 같이 넣어 뒀다.
+   *    다만 그 설정은 개발 서버를 다시 띄워야 반영된다 — 이 코드는 그와 무관하게
+   *    브라우저 쪽에서 한 번 더 막는 안전장치다. 둘 다 있어도 부딪히지 않는다.
+   *
+   * ★★★ 이것은 편의가 아니라 **안전장치**다. 공용 PC 에서 로그아웃하고 자리를 뜬 뒤
+   *      다음 사람이 [뒤로] 를 누르는 것이 이 코드가 막는 상황이다.
+   */
+  useEffect(() => {
+    const [nav] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+    if (nav?.type === 'back_forward') {
+      window.location.reload();
+      return;
+    }
+
+    function onPageShow(event: PageTransitionEvent) {
+      if (event.persisted) window.location.reload();
+    }
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
 
   /*
    * 헤더 제목은 경로에서 끌어온다. 서버 컴포넌트인 layout 은 현재 경로를 알 수 없고
@@ -202,22 +248,26 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
               {roleNote}
             </span>
           ) : null}
-          {/* TODO(페이즈 3·6): 도움말·알림은 자리만 있다. 동작은 해당 페이즈에서. */}
-          <button type="button" className={styles.iconBtn} aria-label="도움">
-            <Icon name="circle-help" size={18} />
-          </button>
-          <button type="button" className={styles.iconBtn} aria-label="알림">
-            <Icon name="bell" size={18} />
-          </button>
-          <div className={styles.user}>
-            <span className={styles.avatar} aria-hidden="true">
-              {display?.memberName.slice(0, 1) ?? ''}
-            </span>
-            <div className={styles.userText}>
-              <div className={styles.userName}>{display?.memberName ?? ''}</div>
-              <div className={styles.userOrg}>{display?.orgName ?? ''}</div>
-            </div>
-          </div>
+          {/*
+            ★ 도움말(circle-help)·알림(bell) 아이콘 버튼 2개를 **뺐다**(2026-09-30).
+              시안 `common/04-shell.md` 「우측: 아이콘 버튼(도움·알림 36px)」에는 있지만
+              **아무 일도 하지 않는 버튼**이었다 — 누르면 아무 반응이 없는 것이
+              「아직 안 만든 것」인지 「고장난 것」인지 사용자는 구분할 수 없다.
+              만들 때 되돌린다. 자리와 이유는 `doc/DESIGN_HANDOFF_DIFF.md` §G 에 적었다.
+          */}
+
+          {/*
+            ══════════════════════════════════════════════════════════════════
+            계정 메뉴 — **화면에서 로그아웃할 유일한 길**
+            ══════════════════════════════════════════════════════════════════
+            시안의 계정 블록은 표시 전용이다(`04-shell.md`). 그대로 두면 로그인한
+            사람이 나갈 길이 없어 주소를 직접 치거나 쿠키를 지워야 한다 — 그래서
+            **누를 수 있게** 바꾸고 그 안에 [로그아웃] 을 둔다.
+
+            ★ 접근권한없음 화면(`/no-access`)에도 로그아웃이 있지만 그쪽은 **셸이 없는**
+              화면이다(AuthShell). 둘은 서로 닿지 않는 출구다(대표 결정 2026-09-30).
+          */}
+          <UserMenu display={display} />
         </header>
 
         <main className={styles.main}>{children}</main>

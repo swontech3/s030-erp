@@ -12,6 +12,12 @@ import { SESSION_COOKIE } from '@swonbiz/shared';
  * ★ 쿠키의 유효성(만료·폐기)은 검사하지 않는다. 검사하려면 DB 를 봐야 하고,
  *   그러면 미들웨어가 데이터 조회를 하게 된다(공식 문서가 말리는 그 용법).
  *   폐기된 세션은 페이지의 서버 컴포넌트가 /auth/me 에서 401 을 받고 걸러낸다.
+ *
+ * ★★ **로그아웃 뒤 [뒤로] 를 막는 일은 여기서 할 수 없다.** 여기서
+ *    `Cache-Control: no-store` 를 붙여 봤지만 **Next 가 페이지 응답의 그 헤더를
+ *    덮어쓴다**(실측 2026-09-30 — 붙여도 `no-cache, must-revalidate` 로 나간다).
+ *    그래서 bfcache 는 이 미들웨어가 막지 못하고, `AppShell` 이 `pageshow` 로
+ *    되살아난 것을 보고 다시 불러온다. 같은 시도를 반복하지 않도록 적어 둔다.
  */
 export function proxy(request: NextRequest) {
   const hasSession = request.cookies.has(SESSION_COOKIE);
