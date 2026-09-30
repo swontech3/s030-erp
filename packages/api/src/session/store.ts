@@ -159,7 +159,16 @@ export async function lookupSession(rawSid: string): Promise<ErpSession | null> 
 
 /** 세션 폐기. 이미 폐기된 세션을 다시 폐기해도 오류가 아니다(로그아웃은 멱등해야 한다). */
 export async function revokeSession(rawSid: string): Promise<void> {
-  const erpSid = hashSessionId(rawSid);
+  await revokeSessionByHash(hashSessionId(rawSid));
+}
+
+/**
+ * 해시로 세션을 폐기한다 — **쿠키 원문이 없는 자리**가 쓴다.
+ *
+ * ★ 라우트 안에서는 원문 sid 대신 `ErpSession.erpSid`(=해시)만 들고 있다.
+ *   삐용 토큰을 되살릴 수 없을 때(`withFreshAccess`) 그 자리에서 세션을 끊어야 한다.
+ */
+export async function revokeSessionByHash(erpSid: string): Promise<void> {
   await pool.query(
     `UPDATE public.tb_s080_auth_session SET revoked_at = now() WHERE erp_sid = $1 AND revoked_at IS NULL`,
     [erpSid],

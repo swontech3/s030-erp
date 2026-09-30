@@ -43,6 +43,45 @@ if (!bbiyongMock && !bbiyongBaseUrl) {
   throw new Error('BBIYONG_MOCK=false 인데 BBIYONG_BASE_URL 이 없다. 삐용 로그인 API 주소를 설정할 것.');
 }
 
+// =============================================================================
+// 계통(개발계 / 가동계) — **주소와 한 쌍이다.** 2026-09-30
+// =============================================================================
+// ★★ **주소에서 추측하지 않는다.** 예전에는 포트로 갈랐다(8082=개발계 · 8080=가동계).
+//    그 규칙이 깨졌다 — 삐용 개발계는 `192.168.0.22:8082`, 가동계는
+//    `192.168.0.14:8082` 로 **포트가 같고 호스트가 다르다.** 호스트로 갈라도 같은
+//    사고가 반복된다: 가동계가 도메인·HTTPS 로 바뀌는 순간 또 틀린다.
+//    그래서 계통은 **사람이 선언하고** ERP 는 그 선언을 읽는다.
+//
+// ★ 주소가 있으면 계통도 반드시 있다. 둘은 함께 바꾼다 — 주소만 가동계로 바꾸고
+//   계통을 개발계로 남겨 두면 배너가 "개발계"라고 찍으면서 운영 계정으로 로그인한다.
+//   (반대로 **계통 하나만 바꿔도 주소는 그대로**이므로, 어긋남 자체를 코드가 잡아낼
+//    방법은 없다. 그래서 기동 배너가 주소와 계통을 **함께** 찍는다.)
+const bbiyongSystemRaw = process.env.BBIYONG_SYSTEM?.trim() || null;
+if (bbiyongBaseUrl && bbiyongSystemRaw === null) {
+  throw new Error(
+    'BBIYONG_BASE_URL 이 있는데 BBIYONG_SYSTEM 이 없다. ' +
+      "개발계는 BBIYONG_SYSTEM=dev, 가동계는 BBIYONG_SYSTEM=prod 다 — 주소와 계통은 한 쌍이고, " +
+      '포트·호스트로 추측하지 않는다(개발계 .22:8082 · 가동계 .14:8082 — 포트가 같다).',
+  );
+}
+if (bbiyongSystemRaw !== null && bbiyongSystemRaw !== 'dev' && bbiyongSystemRaw !== 'prod') {
+  throw new Error(`BBIYONG_SYSTEM 은 'dev'(개발계) 또는 'prod'(가동계) 여야 한다: ${bbiyongSystemRaw}`);
+}
+const bbiyongSystem: 'dev' | 'prod' | null = bbiyongSystemRaw;
+
+// ★★ 삐용 회신 ① — **가동계는 HTTPS 로만 주고받는다.** 지키지 않으면 기동을 막는다.
+//    삐용 로그인은 비밀번호를 평문 본문으로 보내고, 재발급은 토큰 2개를 쿼리스트링에
+//    싣는다(삐용 규격이라 바꿀 수 없다). 그 두 가지를 http 로 내보내는 것이
+//    가동계에서 일어나면 사설망이라도 되돌릴 수 없는 종류의 사고다.
+//    ★ **개발계(dev)에서는 아무 일도 없다** — 개발계는 http 다(연동규격 §3).
+if (bbiyongSystem === 'prod' && bbiyongBaseUrl && !/^https:\/\//i.test(bbiyongBaseUrl)) {
+  throw new Error(
+    '가동계는 HTTPS 로만 주고받습니다. BBIYONG_BASE_URL 을 https 로 바꾸세요 ' +
+      `(지금 값: ${bbiyongBaseUrl}). 삐용 회신 ① 의 조건이다. ` +
+      '개발계에 붙으려던 것이면 BBIYONG_SYSTEM=dev 와 개발계 주소(.22:8082)로 함께 되돌린다.',
+  );
+}
+
 // ★ 운영에서 mock 은 기동 자체를 막는다(리뷰 2026-09-07 M3). 환경변수 하나 빠진 배포가
 //   "전 화면 허용 + 고정 비밀번호" 로 뜨는 것이 이 파일이 막아야 할 가장 큰 사고다.
 if (process.env.NODE_ENV === 'production' && (aclMode === 'mock' || process.env.BBIYONG_MOCK === 'true')) {
@@ -131,6 +170,14 @@ export const env = {
    * mock 일 때는 null — mock 경로가 이 값을 쓰지 않는다는 뜻이다.
    */
   bbiyongBaseUrl: bbiyongBaseUrl ?? null,
+  /**
+   * 계통 — `'dev'`(개발계) · `'prod'`(가동계) · `null`(주소 없음 = MOCK).
+   *
+   * ★ 이 값으로 **동작을 가르지 않는다.** 기동 배너가 찍고, 가동계 HTTPS 검사가 쓴다.
+   *   계통에 따라 코드가 다르게 도는 자리를 만들면 개발계에서 시험하지 않은 경로가
+   *   가동계에서 처음 돌게 된다.
+   */
+  bbiyongSystem,
   aclMode,
   /** Supabase 게이트웨이. ★ 스토리지 경로(`/storage/v1/...`)는 `lib/storage.ts` 가 붙인다. */
   storageUrl,

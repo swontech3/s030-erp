@@ -18,7 +18,13 @@ import {
   INVALID_CREDENTIALS_MESSAGE,
   ORG_SELECT_MESSAGE,
 } from './HttpBbiyongAuth.ts';
-import { BbiyongAuthError, BbiyongOrgSelectRequiredError, BbiyongUnavailableError } from './types.ts';
+import {
+  BbiyongAuthError,
+  BbiyongOrgSelectRequiredError,
+  BbiyongReloginRequiredError,
+  BbiyongTokenExpiredError,
+  BbiyongUnavailableError,
+} from './types.ts';
 
 // ── 회신에 실린 실제 응답 예시 ────────────────────────────────────────────────
 const SUCCESS_BODY = {
@@ -420,5 +426,44 @@ describe('HttpBbiyongAuth.reIssue', () => {
     const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
 
     await expect(auth.reIssue('eyJ.old', 'eyJ.refresh')).rejects.toBeInstanceOf(BbiyongAuthError);
+    await expect(auth.reIssue('eyJ.old', 'eyJ.refresh')).rejects.toBeInstanceOf(BbiyongReloginRequiredError);
+  });
+
+  it('★ 재발급 요청 자체가 401 이면 refresh 도 죽었다 — 재로그인이다(만료로 되돌리지 않는다)', async () => {
+    // 이것을 BbiyongTokenExpiredError 로 올려보내면 호출자가 「또 재발급하면 되겠지」로
+    // 읽고 무한히 돈다. 되살릴 수 없다는 사실을 타입으로 못박는다.
+    const { impl } = stubFetch(new Response('', { status: 401 }));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+
+    const err = await auth.reIssue('eyJ.old', 'eyJ.refresh').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(BbiyongReloginRequiredError);
+    expect(err).not.toBeInstanceOf(BbiyongTokenExpiredError);
+  });
+});
+
+// =============================================================================
+// 3. ★★ 401 은 연결 실패가 아니다 (2026-09-30)
+// =============================================================================
+// 이 구분이 없던 동안, 토큰이 만료되면 화면에 「서버에 연결할 수 없습니다」가 떴다.
+// 삐용은 멀쩡히 살아 있고 필요한 것은 재발급 한 번이었다.
+describe('HttpBbiyongAuth — HTTP 상태 번역', () => {
+  it('★ 401 은 BbiyongTokenExpiredError 다 — 재발급으로 이어질 수 있게', async () => {
+    const { impl } = stubFetch(new Response('', { status: 401 }));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+
+    const err = await auth.signIn('a@b.c', 'pw').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(BbiyongTokenExpiredError);
+    // ★ 「연결할 수 없습니다」로 뭉개지 않는다. 그것이 이 줄이 막는 증상이다.
+    expect(err).not.toBeInstanceOf(BbiyongUnavailableError);
+  });
+
+  it('401 이 아닌 HTTP 비정상은 그대로 연결·인프라 문제다', async () => {
+    for (const status of [403, 500, 502, 504]) {
+      const { impl } = stubFetch(new Response('', { status }));
+      const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+      const err = await auth.signIn('a@b.c', 'pw').catch((e: unknown) => e);
+      expect(err, `HTTP ${status}`).toBeInstanceOf(BbiyongUnavailableError);
+      expect(err, `HTTP ${status}`).not.toBeInstanceOf(BbiyongTokenExpiredError);
+    }
   });
 });

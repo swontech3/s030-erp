@@ -30,3 +30,5 @@ export const bbiyongAcl: BbiyongAcl = (() => {
 })();
 
 export * from './types.ts';
+export { accessTokenExpiresAt, isAccessTokenExpired, EXPIRY_SKEW_MS } from './accessToken.ts';
+export { withFreshAccess, type AccessTokenStore, type SessionTokens } from './withFreshAccess.ts';

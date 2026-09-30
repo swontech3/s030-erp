@@ -38,6 +38,14 @@ export const ORG_SELECT_MESSAGE =
   '이 계정은 여러 단체에 소속되어 있습니다. 삐용에서 로그인한 뒤 다시 시도해 주세요.';
 
 /**
+ * 재발급도 실패했다 — **되살릴 방법이 없으니 다시 로그인하라**는 안내.
+ *
+ * ★ web 의 `lib/forward.ts` 가 세션 없는 요청에 쓰는 문구와 **같은 문장**이다.
+ *   사용자에게는 같은 상황이므로 문구가 달라야 할 이유가 없다.
+ */
+export const RELOGIN_MESSAGE = '세션이 만료되었습니다. 다시 로그인해 주세요';
+
+/**
  * 로그인 실패. **삐용은 실패해도 HTTP 200 을 준다**(BBIYONG-AUTH.md §2.4 함정 1) —
  * `body.status !== 200` 을 검사하는 책임은 어댑터 구현체에 있고, 바깥은 이 예외만 본다.
  */
@@ -66,6 +74,46 @@ export class BbiyongOrgSelectRequiredError extends BbiyongAuthError {
   ) {
     super(message);
     this.name = 'BbiyongOrgSelectRequiredError';
+  }
+}
+
+/**
+ * 삐용이 **HTTP 401** 을 줬다 — 실은 토큰이 만료·무효라는 뜻이다.
+ *
+ * ★★ 이것을 `BbiyongUnavailableError` 로 뭉개면 안 된다. 그게 2026-09-30 에 고친
+ *    바로 그 증상이다: 토큰이 만료되면 화면에 「서버에 연결할 수 없습니다」가 떴다.
+ *    삐용은 멀쩡히 살아 있는데 사용자는 네트워크를 의심하며 새로 고침을 반복했다.
+ *
+ * ★ 이 예외는 **바깥으로 새어나가지 않는 것이 정상이다.** `withFreshAccess` 가 받아서
+ *   재발급(auth/re-issue)을 한 번 시도하고, 그래도 안 되면
+ *   `BbiyongReloginRequiredError` 로 바꿔 던진다. 라우트가 이 예외를 직접 보게 되면
+ *   재발급을 거치지 않은 호출 경로가 있다는 뜻이다.
+ *
+ * ★ 로그인(`sign-in`)은 이 예외를 쓰지 않는다 — 삐용은 로그인 실패를 **HTTP 200 +**
+ *   **본문 result:'fail'** 로 준다. 401 이 오는 것은 토큰을 싣는 호출뿐이다.
+ */
+export class BbiyongTokenExpiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BbiyongTokenExpiredError';
+  }
+}
+
+/**
+ * 재발급까지 실패했다 — **세션을 되살릴 방법이 없다.** 다시 로그인해야 한다.
+ *
+ * ★ `BbiyongAuthError` 를 상속하므로 기존 401 번역 경로를 그대로 탄다. 다만 이것은
+ *   「비밀번호가 틀렸다」가 아니라 「만료됐다」이므로 문구와 오류코드가 다르다
+ *   (`session_expired`).
+ *
+ * ★★ 이 예외가 나가는 자리에서 **ERP 세션도 폐기한다**(`revoked_at`). 삐용 refresh 가
+ *    죽었으면 그 ERP 세션(7일)으로는 삐용을 다시 부를 수 없다 — 살려 두면 사용자가
+ *    같은 오류를 반복해서 만난다. 폐기하면 다음 요청이 곧바로 /login 으로 간다.
+ */
+export class BbiyongReloginRequiredError extends BbiyongAuthError {
+  constructor(message: string = RELOGIN_MESSAGE) {
+    super(message);
+    this.name = 'BbiyongReloginRequiredError';
   }
 }
 
@@ -107,6 +155,19 @@ export interface BbiyongAuth {
    *   이 메서드가 무엇을 부를지 정해야 한다 — 없으면 로그인 응답을 세션에 얹는 쪽으로 간다.
    */
   getProfile(memberId: number): Promise<BbiyongProfile | null>;
+
+  /**
+   * access 토큰 재발급 — 새 access 토큰을 돌려준다. refresh 는 **회전하지 않는다.**
+   *
+   * ★★ **이 메서드가 인터페이스에 있는 이유**: 2026-09-30 까지 재발급은
+   *    `HttpBbiyongAuth` 에만 있고 `BbiyongAuth` 에는 없어서, 어댑터 경계 바깥에서는
+   *    **부를 수가 없었다.** 그래서 만들어만 두고 아무도 안 부르는 함수였고,
+   *    토큰이 만료되면 화면에 「서버에 연결할 수 없습니다」가 떴다.
+   *
+   * ★ 만료 시각을 계산해서 미리 부르는 책임은 여기 없다 — `withFreshAccess` 가 진다.
+   *   실패하면 `BbiyongReloginRequiredError` 를 던진다(되살릴 방법이 없다).
+   */
+  reIssue(accessToken: string, refreshToken: string): Promise<string>;
 }
 
 /** 동작 어휘 4종 — ACL-10. APPROVE·EXPORT 는 쓰지 않는다. 런타임 검사와 타입이 한 원천이다. */

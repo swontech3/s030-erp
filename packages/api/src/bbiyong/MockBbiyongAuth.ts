@@ -130,4 +130,18 @@ export class MockBbiyongAuth implements BbiyongAuth {
     // 삐용 세션 테이블이 없으므로 할 일이 없다. 실제 구현은 refresh-token 헤더로
     // POST /rest/v1/s021200010/sign-out 을 호출한다.
   }
+
+  /**
+   * 재발급 — mock 토큰은 **만료되지 않는다.**
+   *
+   * ★ mock 토큰은 JWT 가 아니므로 `exp` 가 없다. `isAccessTokenExpired` 가 "모른다"로
+   *   판정해 `false` 를 돌려주므로, MOCK 모드에서는 선검사가 재발급을 부르지 않는다.
+   *   삐용을 부르지 않으니 401 도 오지 않는다 — 즉 **MOCK 에서는 이 메서드가 돌지 않는다.**
+   *   그래도 구현해 두는 이유는 인터페이스를 만족시켜야 하고, 어느 날 누가
+   *   `withFreshAccess` 를 mock 위에서 시험할 때 던지지 않아야 하기 때문이다.
+   */
+  async reIssue(_accessToken: string, refreshToken: string): Promise<string> {
+    const memberId = refreshToken.split('.')[1] ?? '0';
+    return `mock-access.${memberId}.${Date.now()}`;
+  }
 }

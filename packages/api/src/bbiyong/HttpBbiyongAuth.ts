@@ -23,6 +23,8 @@ import { BBIYONG } from '@swonbiz/shared';
 import {
   BbiyongAuthError,
   BbiyongOrgSelectRequiredError,
+  BbiyongReloginRequiredError,
+  BbiyongTokenExpiredError,
   BbiyongUnavailableError,
   INVALID_CREDENTIALS_MESSAGE,
   ORG_SELECT_MESSAGE,
@@ -31,7 +33,7 @@ import {
   type BbiyongProfile,
 } from './types.ts';
 
-export { INVALID_CREDENTIALS_MESSAGE, ORG_SELECT_MESSAGE } from './types.ts';
+export { INVALID_CREDENTIALS_MESSAGE, ORG_SELECT_MESSAGE, RELOGIN_MESSAGE } from './types.ts';
 
 /** 삐용 응답 하나를 해석한 결과. 성공만이 토큰을 들고 있다. */
 export type SignInOutcome =
@@ -294,21 +296,33 @@ export class HttpBbiyongAuth implements BbiyongAuth {
    * ⚠️ 토큰 2개가 쿼리스트링에 실린다. 삐용 규격이라 바꿀 수 없고, ERP 는 이 URL 을
    *    로그에 남기지 않는 것으로 대응한다(`redact`).
    *
-   * ★ 아직 호출자가 없다 — 페이즈 1 은 삐용 API 를 로그인·로그아웃에만 쓴다.
-   *   HttpBbiyongAcl(회신 ⑫)이 붙어 삐용에 인증 요청을 보내기 시작하면 그 401 처리에서
-   *   이 메서드를 부른다. 파싱 함정이 sign-in 과 같아서 지금 같이 시험해 둔다.
+   * ★ 부르는 자리는 `session/bbiyongToken.ts` 의 `withFreshAccess` 하나다(2026-09-30).
+   *   그 전까지는 이 메서드가 **인터페이스에 없어서 아무도 부를 수 없었다.**
    */
   async reIssue(accessToken: string, refreshToken: string): Promise<string> {
     const url = new URL(`${this.#baseUrl}${BBIYONG.REFRESH_PATH}`);
     url.searchParams.set('access-token', accessToken);
     url.searchParams.set('refresh-token', refreshToken);
 
-    const body = await this.#call(url.toString(), { method: 'GET' }, 're-issue');
+    let body: unknown;
+    try {
+      body = await this.#call(url.toString(), { method: 'GET' }, 're-issue');
+    } catch (err) {
+      // ★★ **재발급 요청 자체가 401 이면 refresh 도 죽은 것이다.** 여기서 만료 예외를
+      //    그대로 올려보내면 호출자가 「또 재발급하면 되겠지」로 읽고 무한히 돈다.
+      //    되살릴 수 없다는 사실을 타입으로 못박아 재로그인으로 보낸다.
+      if (err instanceof BbiyongTokenExpiredError) {
+        console.warn('[bbiyong] re-issue 가 401 — refresh 토큰도 만료됐다. 재로그인만 남았다');
+        throw new BbiyongReloginRequiredError();
+      }
+      throw err;
+    }
+
     const out = parseReIssue(body);
     if (out.kind === 'fail') {
       console.warn(`[bbiyong] re-issue 실패 code=${out.errorCode ?? '-'} massage=${out.serverMessage ?? '-'}`);
       // 갱신 실패는 재로그인으로 보낸다 — 세션을 되살릴 방법이 없다.
-      throw new BbiyongAuthError('세션이 만료되었습니다. 다시 로그인해 주세요');
+      throw new BbiyongReloginRequiredError();
     }
     return out.accessToken;
   }
@@ -327,7 +341,17 @@ export class HttpBbiyongAuth implements BbiyongAuth {
       throw new BbiyongUnavailableError(`삐용 ${label} 호출 실패: ${redact((err as Error).message)}`);
     }
 
-    // HTTP 비정상은 삐용의 업무 실패가 아니라 인프라 문제다(업무 실패는 200 으로 온다).
+    // ★★ **401 만은 인프라 문제가 아니다 — 토큰이 만료·무효라는 뜻이다**(2026-09-30).
+    //    이것을 아래 `BbiyongUnavailableError` 로 뭉개던 것이 「토큰이 만료되면 화면에
+    //    〈서버에 연결할 수 없습니다〉가 뜬다」의 원인이었다. 삐용은 살아 있고,
+    //    필요한 것은 재발급 한 번이다(`withFreshAccess`).
+    //    ★ 삐용 규격상 401 은 **토큰을 싣는 호출**에만 온다 — 로그인 실패는 HTTP 200 이고
+    //      토큰을 아예 안 실으면 403 이다(연동규격 §2 표).
+    if (res.status === 401) {
+      throw new BbiyongTokenExpiredError(`삐용 ${label} 이 401 — access 토큰이 만료됐다`);
+    }
+
+    // 나머지 HTTP 비정상은 삐용의 업무 실패가 아니라 인프라 문제다(업무 실패는 200 으로 온다).
     if (!res.ok) throw new BbiyongUnavailableError(`삐용 ${label} 이 HTTP ${res.status} 로 응답했다`);
 
     const text = await res.text();

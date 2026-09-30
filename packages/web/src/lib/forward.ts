@@ -22,6 +22,24 @@ import { readSid } from './session';
  *   4. Fastify 응답의 상태와 본문을 **그대로** 돌려준다 — 4xx 의 message 는 사용자용이다
  */
 /**
+ * Fastify 의 응답을 그대로 돌려주되, **401 이면 세션 쿠키까지 지운다.**
+ *
+ * ★★ 로그인이 필요한 통로에서 Fastify 가 내는 401 은 세 가지뿐이고 셋 다 「이 세션은
+ *    끝났다」는 뜻이다 — 세션 없음 · 만료 · 삐용 토큰을 되살릴 수 없음
+ *    (`session_expired`, 2026-09-30). 쿠키를 남겨 두면 브라우저가 죽은 sid 를 계속
+ *    들고 다니고, 화면은 「다시 로그인해 주세요」를 본 뒤에도 로그인한 것처럼 보인다.
+ *
+ * ★ **공개 통로(`forwardPublic*`)에는 쓰지 않는다.** 그쪽 401 은 문의 게시판의
+ *   «비밀번호가 맞지 않습니다» 이고, 세션과 아무 관계가 없다 — 거기서 쿠키를 지우면
+ *   글 비밀번호를 한 번 틀린 운영자가 로그아웃된다.
+ */
+function passThrough(body: unknown, status: number): NextResponse {
+  const res = NextResponse.json((body ?? {}) as Record<string, unknown>, { status });
+  if (status === 401) res.cookies.delete(SESSION_COOKIE);
+  return res;
+}
+
+/**
  * 조회를 그대로 넘긴다. 본문도 CSRF 검사도 없다 — GET 은 상태를 바꾸지 않는다.
  *
  * ★ 그래도 세션은 반드시 넘긴다. 빼면 Fastify 가 401 을 내고, 그게 «데이터 없음»으로
@@ -120,7 +138,7 @@ export async function forwardGetJson(path: string): Promise<NextResponse> {
   if (!res.ok && res.status >= 500) {
     return NextResponse.json({ message: '서버 오류가 났습니다. 잠시 후 다시 시도해 주세요' }, { status: res.status });
   }
-  return NextResponse.json(res.body ?? {}, { status: res.status });
+  return passThrough(res.body, res.status);
 }
 
 export async function forwardJson(
@@ -159,7 +177,7 @@ export async function forwardJson(
   if (!res.ok && res.status >= 500) {
     return NextResponse.json({ message: '서버 오류가 났습니다. 잠시 후 다시 시도해 주세요' }, { status: res.status });
   }
-  return NextResponse.json(res.body ?? {}, { status: res.status });
+  return passThrough(res.body, res.status);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -244,7 +262,7 @@ export async function forwardUpload(request: Request, path: string): Promise<Nex
       { status: res.status },
     );
   }
-  return NextResponse.json((body ?? {}) as Record<string, unknown>, { status: res.status });
+  return passThrough(body, res.status);
 }
 
 /**
@@ -277,5 +295,5 @@ export async function forwardDelete(request: Request, path: string): Promise<Nex
   if (!res.ok && res.status >= 500) {
     return NextResponse.json({ message: '서버 오류가 났습니다. 잠시 후 다시 시도해 주세요' }, { status: res.status });
   }
-  return NextResponse.json(res.body ?? {}, { status: res.status });
+  return passThrough(res.body, res.status);
 }

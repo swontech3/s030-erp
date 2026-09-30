@@ -9,6 +9,7 @@
 import Fastify, { type FastifyError, type FastifyReply, type FastifyRequest } from 'fastify';
 import { env } from './env.ts';
 import { bbiyongBanner } from './lib/bbiyongBanner.ts';
+import { BbiyongReloginRequiredError, BbiyongUnavailableError } from './bbiyong/index.ts';
 import { registerSessionHook } from './session/hook.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerAclRoutes } from './routes/acl.ts';
@@ -26,8 +27,15 @@ import { closePool } from './db/pool.ts';
 import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
 
 // ★★ 어느 삐용에 붙었는지를 **가장 먼저** 찍는다. pino 의 JSON 한 줄에 섞으면 눈에 안 띄어서
-//    일부러 평문으로 낸다 — 8080(가동계)과 8082(개발계)를 눈으로 가르는 것이 목적이다.
-for (const line of bbiyongBanner({ mock: env.bbiyongMock, baseUrl: env.bbiyongBaseUrl })) console.log(line);
+//    일부러 평문으로 낸다 — 개발계와 가동계를 눈으로 가르는 것이 목적이다.
+//    ★ 계통은 주소에서 추측하지 않는다. `BBIYONG_SYSTEM` 이 선언한 값을 그대로 찍는다.
+for (const line of bbiyongBanner({
+  mock: env.bbiyongMock,
+  baseUrl: env.bbiyongBaseUrl,
+  system: env.bbiyongSystem,
+})) {
+  console.log(line);
+}
 
 const app = Fastify({ logger: true });
 
@@ -35,6 +43,28 @@ const app = Fastify({ logger: true });
 //   Fastify 기본값은 { statusCode, error: 'Bad Request', message } 라 우리 라우트가 내는 모양과
 //   달랐고, 5xx 에서는 pg 예외 문구(호스트·역할명)가 그대로 브라우저까지 갔다(리뷰 2026-09-07 H3).
 app.setErrorHandler((err: FastifyError, req: FastifyRequest, reply: FastifyReply) => {
+  /*
+   * ★★ 삐용 예외를 **여기서 한 번** 번역한다(2026-09-30). 라우트마다 하면 어느 날
+   *    한 라우트만 빠지고, 그 화면에서는 토큰 만료가 「서버 오류가 났습니다」로 보인다.
+   *
+   *   · 재로그인 필요 → 401 session_expired. `withFreshAccess` 가 여기까지 올려보낸다는
+   *     것은 재발급을 이미 시도했고 실패했다는 뜻이다. ERP 세션도 그 자리에서 폐기됐다.
+   *   · 삐용 장애    → 503. **401 로 내리지 않는다** — 그러면 삐용이 잠깐 흔들릴 때마다
+   *     전원이 로그인 화면으로 튕기고, 다시 로그인하면 멀쩡한 세션이 하나 더 생긴다.
+   *
+   *   ★ 토큰 만료(`BbiyongTokenExpiredError`)는 일부러 여기 없다. 그것이 여기까지
+   *     올라온다면 `withFreshAccess` 를 거치지 않고 삐용을 부른 경로가 있다는 뜻이고,
+   *     조용히 401 로 덮으면 그 사실이 숨는다. 500 으로 떠서 로그에 남는 쪽이 낫다.
+   */
+  if (err instanceof BbiyongReloginRequiredError) {
+    req.log.warn('삐용 토큰 재발급 실패 — 세션 폐기 후 재로그인 안내');
+    return reply.code(401).send({ error: 'session_expired', message: err.message });
+  }
+  if (err instanceof BbiyongUnavailableError) {
+    req.log.error({ err }, '삐용 연결 실패');
+    return reply.code(503).send({ error: 'bbiyong_unavailable', message: '인증 서버에 연결할 수 없습니다' });
+  }
+
   const status = err.statusCode ?? 500;
   if (status >= 500) {
     req.log.error({ err }, '처리되지 않은 오류');
@@ -93,7 +123,8 @@ registerOcrRoutes(app);
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,
   service: 'swonbiz-erp-api',
-  bbiyong: { mock: env.bbiyongMock, aclMode: env.aclMode },
+  // ★ `system` 은 「지금 어느 계통에 붙어 있는가」다. 기동 배너를 놓쳤을 때 확인하는 자리다.
+  bbiyong: { mock: env.bbiyongMock, aclMode: env.aclMode, system: env.bbiyongSystem },
 }));
 
 // 종료 시 커넥션 풀을 닫는다. 안 닫으면 개발 중 재시작이 쌓여 커넥션이 고갈된다.
