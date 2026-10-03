@@ -2,7 +2,7 @@ import { type NextRequest } from 'next/server';
 import { forwardGetJson } from '@/lib/forward';
 
 /**
- * 문의 관리 목록 (s0300200080) — `GET /admin/inquiries` 로 넘긴다.
+ * 문의 관리 목록 (s030200080) — `GET /admin/inquiries` 로 넘긴다.
  *
  * ★★ **운영사 전용이다.** 이 홉은 판정하지 않는다 — 입주사 세션이면 Fastify 가 403 을
  *    낸다(`routes/inquiryAdmin.ts`). 공개 문의 라우트(`/api/inquiries`)와 달리

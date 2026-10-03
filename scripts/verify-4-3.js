@@ -18,6 +18,7 @@ import { randomUUID } from 'node:crypto';
 import { registerContractRoutes } from '../packages/api/src/routes/contracts.ts';
 import { pool, closePool } from '../packages/api/src/db/pool.ts';
 import { withCompanyScope } from '../packages/api/src/db/withCompanyScope.ts';
+import { syncAllSpaceStatuses } from '../packages/api/src/db/spaceStatus.ts';
 
 /**
  * ★★ RLS 가 걸린 표는 `pool.query` 로 직접 못 읽는다.
@@ -107,13 +108,25 @@ const json = (res) => {
   const BUILD_ID = fkRows[0].build_id;
   const COMPANY_ID = fkRows[0].company_id;
 
+  /*
+   * ★★ **비어 있는 호실만 빌린다**(2026-10-03). 호실마다 「입주 가능 회사 수」가
+   *    있고 기본이 1곳이라, 아무 호실이나 집으면 이미 계약이 든 방(예: Room 1)에
+   *    걸려 준비 단계에서 409 가 난다. 다른 검증들(`verify-3-2`·`3-5`·`4-6`·
+   *    `billing`·`print`)이 쓰는 것과 **같은 조건**이다.
+   */
   const { rows: spaceRows } = await pool.query(
-    `SELECT space_id, room_type, standard_fee FROM public.tb_s080_spaces
-      WHERE build_id = $1 ORDER BY room_name LIMIT 3`,
+    `SELECT s.space_id, s.room_type, s.standard_fee
+       FROM public.tb_s080_spaces s
+      WHERE s.build_id = $1 AND s.is_active
+        AND NOT EXISTS (
+          SELECT 1 FROM public.tb_s080_contract_spaces cs
+            JOIN public.tb_s080_contracts k ON k.contract_id = cs.contract_id
+           WHERE cs.space_id = s.space_id AND k.status IN ('confirmed', 'draft'))
+      ORDER BY s.room_name LIMIT 3`,
     [BUILD_ID],
   );
   if (!BUILD_ID || !COMPANY_ID || spaceRows.length < 2) {
-    console.error('✘ 건물·회사·호실이 모자라 검증할 수 없다');
+    console.error('✘ 건물·회사·빈 호실이 모자라 검증할 수 없다');
     process.exit(1);
   }
   console.log(`준비 — build=${BUILD_ID} company=${COMPANY_ID} 호실 ${spaceRows.length}개\n`);
@@ -337,6 +350,19 @@ const json = (res) => {
     );
     check('검증 데이터가 남지 않았다', left.rows[0].n === 0, `${left.rows[0].n}행 남음`);
     check('만든 만큼 지웠다', del.rowCount === created.length, `${del.rowCount} ≠ ${created.length}`);
+    /*
+     * ★★ 호실상태를 되맞춘다 — **계약을 SQL 로 지웠기 때문이다.**
+     *
+     * 호실상태는 계약이 정한다(`packages/api/src/db/spaceStatus.ts`). 업무 경로는 계약을
+     * 지우지 않고 종료·취소로 닫으므로 앱이 알아서 맞춘다. 뒷정리는 그 길을 건너뛰고
+     * 행을 지우므로, 여기서 한 번 다시 세지 않으면 **개발계 DB 에 「입주중」이 남는다**
+     * (실측 2026-10-03: 검증을 몇 번 돌리자 72실 중 18실이 어긋났다).
+     */
+    const restored = await withCompanyScope({ role: 'operator', companyId: null }, (c) =>
+      syncAllSpaceStatuses(c, 'verify-cleanup'),
+    );
+    if (restored > 0) console.log(`  호실상태 ${restored}실 되맞춤`);
+
     await closePool();
   }
 

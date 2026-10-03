@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { forwardGetJson } from '@/lib/forward';
 
 /**
- * 월별 청구 (s0300200070) — `GET /billing/invoices?yearMonth=` 로 넘긴다.
+ * 월별 청구 (s030200070) — `GET /billing/invoices?yearMonth=` 로 넘긴다.
  *
  * ★ 운영사 전용이다. 입주사 세션이면 Fastify 가 403 을 낸다 — 이 홉은 판정하지 않는다.
  */

@@ -29,6 +29,8 @@ export interface SpaceRow {
   room_type: string;
   standard_fee: number | null;
   deposit: number | null;
+  /** 「입주 가능 회사 수」 — 고를 수 있느냐를 정하는 수다(`domain/space-occupancy`). */
+  max_companies: number;
 }
 
 /**
@@ -53,7 +55,7 @@ export async function listSpaces(client: ScopedClient): Promise<SpaceRow[]> {
   const { rows } = await q<SpaceRow>(
     client,
     `SELECT s.space_id, s.build_id, b.name AS build_name, s.floor_id, f.name AS floor_name,
-            s.room_name, s.room_type, s.standard_fee, s.deposit
+            s.room_name, s.room_type, s.standard_fee, s.deposit, s.max_companies
        FROM public.tb_s080_spaces s
        LEFT JOIN public.tb_s080_buildings b ON b.build_id = s.build_id
        LEFT JOIN public.tb_s080_floors    f ON f.floor_id = s.floor_id

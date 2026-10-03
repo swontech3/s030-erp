@@ -83,7 +83,7 @@ export async function lockRoom(client: ScopedClient, facilityId: string): Promis
 }
 
 /**
- * 회의실 한 칸 — 잠그지 않고 읽는다. 현황판(s0300500060)이 쓴다.
+ * 회의실 한 칸 — 잠그지 않고 읽는다. 현황판(s030500060)이 쓴다.
  *
  * ★ `is_reservable` 을 보지 않는다 — 지금 예약을 못 받는 방이어도 **벽에 걸린 화면은
  *   오늘 일정을 보여 줘야 한다**. 예약을 만드는 길은 이 화면에 없다.

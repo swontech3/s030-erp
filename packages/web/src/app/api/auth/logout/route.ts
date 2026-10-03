@@ -7,7 +7,7 @@ import { rejectCrossSite } from '@/lib/csrf';
 /**
  * 로그아웃 — 세션을 끊고 쿠키를 지우고 /login 으로 보낸다.
  *
- * 접근권한없음 화면(s0300000080)에서 나갈 길이 이것뿐이라 **장식이면 사용자가 갇힌다**.
+ * 접근권한없음 화면(s030000080)에서 나갈 길이 이것뿐이라 **장식이면 사용자가 갇힌다**.
  *
  * 세 단계 (ORG_ARCHITECTURE.md §3-5)
  *   1. tb_s080_auth_session.revoked_at = now()   ← Fastify 가 한다. 즉시 무효(캐시도 버림)

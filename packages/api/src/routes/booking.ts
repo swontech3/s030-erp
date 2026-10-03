@@ -1,5 +1,5 @@
 /**
- * 회의실 예약 라우트 — s0300600010.
+ * 회의실 예약 라우트 — s030600010.
  *
  * `routes/billing.ts` 와 같은 규칙이다. 판정은 `@swonbiz/shared/domain/reservation-rules`
  * 의 순수 함수가 하고 이 파일은 배선만 한다.

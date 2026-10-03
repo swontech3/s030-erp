@@ -33,12 +33,18 @@ export interface CompanyRow {
   ceo_address_detail: string | null;
   memo: string | null;
   status: string;
+  /* ── 삐용 연동(3-2) — 조회 전용. 목록과 상세가 「미연동」을 표시하는 근거다. ── */
+  link_s020_org_id: number | null;
+  link_org_code: string | null;
+  link_status: string | null;
+  link_failed_reason: string | null;
 }
 
 const COMPANY_COLUMNS = `
   company_id, build_id, company_name, biz_number, corp_number, ceo_name,
   business_type, business_item, member_type, tel, email,
-  ceo_zip_code, ceo_address, ceo_address_detail, memo, status`;
+  ceo_zip_code, ceo_address, ceo_address_detail, memo, status,
+  link_s020_org_id, link_org_code, link_status, link_failed_reason`;
 
 export async function listCompanies(client: ScopedClient): Promise<CompanyRow[]> {
   const { rows } = await q<CompanyRow>(
@@ -173,12 +179,18 @@ export interface CompanyPatch {
  * 입주사를 새로 만든다 — 계약 폼을 `companyId` 없이 열었을 때의 첫 저장이다.
  *
  * =============================================================================
- * ★★ 삐용에는 아직 만들지 않는다
+ * ★★ 삐용에는 여기서 만들지 않는다 — **계약을 확정할 때** 만든다
  * =============================================================================
  * 여기서 만드는 것은 **ERP 테이블 한 행**뿐이다. 삐용 조직 등록과 단체코드 발급은
- * 3-2 에서 이 저장 경로에 얹는다(ROADMAP 페이즈 4 작업 15). 그래서
- * `link_s020_org_id` 는 비워 둔다 — 연결되지 않은 입주사라는 뜻이고, 스코프 해석은
- * 그 상태를 이미 알고 있다(`ORG_ARCHITECTURE.md` §1-2 「연결이 없으면 빈 스코프」).
+ * **계약 확정 시점**이다(대표 결정 2026-09-30 · `companies/registerOrg.ts`).
+ *
+ * ★ 3-2 를 「이 저장 경로에 얹는다」고 적어 두었던 것을 **확정 시점으로 바꿨다.**
+ *   사업자등록 신청 중인 가계약은 회사명 없이 임시저장으로 들어오고, 그 상태로
+ *   삐용에 회사를 만들면 취소됐을 때 **삐용에 지울 수 없는 회사**가 남는다
+ *   (삭제 규격이 확인되지 않았다). 확정된 계약이 있는 회사만 삐용에 만든다.
+ *
+ * 그래서 `link_s020_org_id` 는 비워 둔다 — 연결되지 않은 입주사라는 뜻이고, 스코프
+ * 해석은 그 상태를 이미 알고 있다(`ORG_ARCHITECTURE.md` §1-2 「연결이 없으면 빈 스코프」).
  *
  * ★ `company_name` 이 `NOT NULL` 이라 **빈 이름은 빈 문자열로 넣는다.** 막지 않는
  *   이유는 `updateCompany` 와 같다 — 사업자등록 신청 중인 가계약은 회사명 없이
@@ -433,4 +445,154 @@ export async function replaceMembers(
   );
 
   return { inserted, updated, deactivated: res.rowCount ?? 0 };
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   삐용 조직 연결 (3-2) — `link_*` 7칸
+   ══════════════════════════════════════════════════════════════════════════
+   001 이 `link_s020_org_id` · `link_linked_at` · `link_linked_by` 를 만들었고,
+   031 이 `link_org_code` · `link_status` · `link_failed_reason` · `link_failed_at` 을
+   더했다. 앞의 셋은 「연결됐다」만, 뒤의 넷은 「왜 아직 아닌가」를 말한다.
+
+   ★★ 판정의 진실원은 `link_s020_org_id` 다. `link_status` 는 사람에게 설명하기 위한
+      값이다 — 둘이 어긋나면 `link_s020_org_id` 를 믿는다(031 주석).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export interface OrgLinkRow {
+  company_id: string;
+  company_name: string | null;
+  ceo_name: string | null;
+  tel: string | null;
+  email: string | null;
+  link_s020_org_id: number | null;
+  /** 퇴실·재입주·수정이 이 코드로 회사를 지목한다. */
+  link_org_code: string | null;
+  /** NULL·pending·linked. ★ [다시 시도]가 **고칠 것이 있는지**를 이 값으로 본다. */
+  link_status: string | null;
+  /**
+   * 살아 있는 계약 **개수** — 퇴실·재입주를 이것으로 가른다.
+   *
+   * ★ 어휘는 `isPreviousLive` 와 같다: 계약중(`confirmed`) · 계약대기(`draft`).
+   *   종료·취소는 살아 있지 않다. 둘이 어긋나면 재입주한 회사가 꺼진 채로 남는다.
+   * ★★ 개수까지 보는 이유는 **재입주와 재계약을 가려야** 하기 때문이다. 확정 직후 개수가
+   *    1 이면 그 전에는 0 이었다는 뜻이고(= 삐용이 꺼져 있었다) 재입주다. 2 이상이면
+   *    이미 입주 중인 회사가 계약을 하나 더 한 것이라 삐용에 보낼 것이 없다.
+   */
+  live_contract_count: number;
+}
+
+/** 삐용에 보낼 칸만 읽는다. ★ 주소는 읽지 않는다 — 보내지 않는 값이다. */
+export async function readOrgLinkTarget(
+  client: ScopedClient,
+  companyId: string,
+): Promise<OrgLinkRow | null> {
+  const { rows } = await q<OrgLinkRow>(
+    client,
+    /*
+     * ★ 살아 있는 계약을 센다 — 개수로 **재입주와 재계약을 가른다**(위 컬럼 주석).
+     *   계약 표에 (status, end_date) 인덱스가 있고 company_id 로 좁히므로 비싸지 않다.
+     * ★★ 상태 어휘를 여기 박는다: 계약중·계약대기가 살아 있는 것이다(`isPreviousLive`).
+     *    이 둘이 어긋나면 **재입주한 회사가 꺼진 채로 남거나, 입주 중인 회사가 꺼진다.**
+     */
+    `SELECT c.company_id, c.company_name, c.ceo_name, c.tel, c.email,
+            c.link_s020_org_id, c.link_org_code, c.link_status,
+            (
+              SELECT count(*)::int FROM public.tb_s080_contracts t
+               WHERE t.company_id = c.company_id
+                 AND t.status IN ('confirmed', 'draft')
+            ) AS live_contract_count
+       FROM public.tb_s080_companies c
+      WHERE c.company_id = $1`,
+    [companyId],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * 이미 발급된 단체코드 전부. 채번이 이 목록의 빈 자리를 고른다.
+ *
+ * ★ `operator` 스코프에서 부른다 — 전 입주사의 코드를 봐야 중복을 피할 수 있다.
+ *   입주사 스코프로 부르면 자기 것만 보이고 **모두가 Z01 을 발급받는다.**
+ */
+export async function listTakenOrgCodes(client: ScopedClient): Promise<string[]> {
+  const { rows } = await q<{ link_org_code: string }>(
+    client,
+    `SELECT link_org_code FROM public.tb_s080_companies WHERE link_org_code IS NOT NULL`,
+  );
+  return rows.map((r) => r.link_org_code);
+}
+
+/**
+ * 연결 성공을 남긴다. ★ 실패 사유를 **지운다** — 지난 실패가 화면에 계속 뜨면 안 된다.
+ *
+ * ★★ `link_s020_org_id` 와 `link_org_code` 는 둘 다 UNIQUE 다. 위반은 던진다 —
+ *    같은 삐용 조직이 두 입주사에 붙는 것이 격리가 무너지는 모양이고, 조용히
+ *    덮어쓰는 것보다 실패하는 쪽이 낫다(호출자가 「대기」로 돌린다).
+ */
+export async function saveOrgLinked(
+  client: ScopedClient,
+  args: { companyId: string; orgId: number; orgCode: string; actor: string },
+): Promise<void> {
+  await q(
+    client,
+    `UPDATE public.tb_s080_companies
+        SET link_s020_org_id   = $2,
+            link_org_code      = $3,
+            link_status        = 'linked',
+            link_linked_at     = now(),
+            link_linked_by     = $4,
+            link_failed_reason = NULL,
+            link_failed_at     = NULL,
+            updated_at         = now(),
+            updated_by         = $4
+      WHERE company_id = $1`,
+    [args.companyId, args.orgId, args.orgCode, args.actor],
+  );
+}
+
+/**
+ * 「계약은 확정됐고 삐용 연결만 아직」을 남긴다.
+ *
+ * ★ `reason` 은 운영자에게 **그대로 보여주는 문구**다. 삐용 내부 메시지를 넣지 않는다.
+ * ★ `link_org_code` 는 건드리지 않는다 — 발급 성공 전이라 값이 없고, 있다면 그건
+ *   이전에 성공한 코드이므로 지우면 안 된다.
+ */
+export async function saveOrgLinkPending(
+  client: ScopedClient,
+  args: { companyId: string; reason: string; actor: string },
+): Promise<void> {
+  await q(
+    client,
+    `UPDATE public.tb_s080_companies
+        SET link_status        = 'pending',
+            link_failed_reason = $2,
+            link_failed_at     = now(),
+            updated_at         = now(),
+            updated_by         = $3
+      WHERE company_id = $1`,
+    [args.companyId, args.reason, args.actor],
+  );
+}
+
+/** 화면이 읽는 연동 상태. 조회 전용이다. */
+export interface OrgLinkStatusRow {
+  link_s020_org_id: number | null;
+  link_org_code: string | null;
+  link_status: string | null;
+  link_failed_reason: string | null;
+  link_failed_at: Date | null;
+}
+
+export async function readOrgLinkStatus(
+  client: ScopedClient,
+  companyId: string,
+): Promise<OrgLinkStatusRow | null> {
+  const { rows } = await q<OrgLinkStatusRow>(
+    client,
+    `SELECT link_s020_org_id, link_org_code, link_status, link_failed_reason, link_failed_at
+       FROM public.tb_s080_companies
+      WHERE company_id = $1`,
+    [companyId],
+  );
+  return rows[0] ?? null;
 }

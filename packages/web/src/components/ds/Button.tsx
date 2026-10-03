@@ -29,6 +29,18 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
   iconRight?: ReactNode;
   /** "a" 로 렌더할 수 있다. href 등은 rest 로 넘어간다. */
   as?: 'button' | 'a';
+  /**
+   * `as="a"` 일 때의 링크 속성.
+   *
+   * ★★ **DS 원본 `Button.d.ts` 에 없다.** 원본은 props 를 `ButtonHTMLAttributes` 로만
+   *    선언해 두고 `as` 주석에 「e.g. "a"」 라고 적어 놨다 — 그래서 `as="a"` 를 쓰면
+   *    `href` 가 타입에 없어 컴파일이 깨진다(2026-10-01 랜딩에서 처음 썼다).
+   *    이름은 원본 그대로 두고 **셋만 더했다.** 원본에 돌려줄 때도 이 셋만 보면 된다.
+   * ★ `as="button"` 에 href 를 주면 DOM 에 의미 없는 속성이 붙는다 — 쓰지 않는다.
+   */
+  href?: string;
+  target?: string;
+  rel?: string;
   children?: ReactNode;
   style?: CSSProperties;
 }

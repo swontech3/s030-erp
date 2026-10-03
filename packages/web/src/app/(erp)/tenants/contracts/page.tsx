@@ -1,4 +1,4 @@
-/** @screen s0300200030 입주사·계약 마스터-디테일 · 020 입주사관리 · 1차 */
+/** @screen s030200030 입주사·계약 마스터-디테일 · 020 입주사관리 · 1차 */
 
 /**
  * 입주사·계약 마스터-디테일.
@@ -26,7 +26,7 @@ interface CodeOption {
 }
 
 export default async function TenantContractsPage() {
-  await requireScreen('s0300200030', '/tenants/contracts');
+  await requireScreen('s030200030', '/tenants/contracts');
   const sid = await readSid();
 
   const [listRes, codesRes] = await Promise.all([

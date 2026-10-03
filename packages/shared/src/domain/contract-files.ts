@@ -189,6 +189,25 @@ export interface UploadCandidate {
   memberType: string;
 }
 
+/**
+ * 형식·크기 — **서류 종류와 무관한 부분**만 본다.
+ *
+ * ★★ 건물·층 첨부(`facility-files`)가 **이 함수를 부른다.** 형식·크기 규칙을 두 벌로
+ *    적으면 한쪽만 고쳐지는 날이 오고, 버킷 설정(`erp-files`)과 갈리는 순간 화면은
+ *    통과시키는데 업로드가 500 으로 죽는다. 규칙은 여기 한 곳이다.
+ */
+export function rejectBytes(mimeType: string, size: number): string | null {
+  if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(mimeType)) {
+    return 'JPG · PNG · PDF 만 올릴 수 있습니다';
+  }
+
+  // 0바이트는 «고르다 만 파일»이다. 스토리지에 넣으면 열리지 않는 첨부가 생긴다.
+  if (size <= 0) return '빈 파일입니다';
+  if (size > MAX_FILE_BYTES) return `파일당 최대 ${MAX_FILE_MB}MB 까지 올릴 수 있습니다`;
+
+  return null;
+}
+
 /** 통과면 `null`, 아니면 **사용자에게 보여줄 문구**. 기계용 코드가 아니다. */
 export function rejectUpload(c: UploadCandidate): string | null {
   if (!isFilePurpose(c.purpose)) return '알 수 없는 서류 종류입니다';
@@ -199,15 +218,7 @@ export function rejectUpload(c: UploadCandidate): string | null {
     return '이 회원구분에서는 등록할 수 없는 서류입니다';
   }
 
-  if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(c.mimeType)) {
-    return 'JPG · PNG · PDF 만 올릴 수 있습니다';
-  }
-
-  // 0바이트는 «고르다 만 파일»이다. 스토리지에 넣으면 열리지 않는 첨부가 생긴다.
-  if (c.size <= 0) return '빈 파일입니다';
-  if (c.size > MAX_FILE_BYTES) return `파일당 최대 ${MAX_FILE_MB}MB 까지 올릴 수 있습니다`;
-
-  return null;
+  return rejectBytes(c.mimeType, c.size);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

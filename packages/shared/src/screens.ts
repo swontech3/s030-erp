@@ -4,7 +4,7 @@
  * web(라우팅·사이드바)과 api(화면코드 판정)가 둘 다 쓴다 — 복사본을 만들지 않는다.
  *
  * 규칙 (doc/SWONBIZ_PROJECT_STRUCTURE.md §1·§3)
- * - 화면 ID는 URL에 노출하지 않는다. `/no-access`이지 `/s0300000080`이 아니다.
+ * - 화면 ID는 URL에 노출하지 않는다. `/no-access`이지 `/s030000080`이 아니다.
  * - 팝업(`p{n}`)은 화면 ID를 갖되 라우트를 갖지 않으므로 이 표에 넣지 않는다.
  * - ★ `role` 필드를 두지 않는다. 사이드바 렌더와 접근 판정은 삐용이 준
  *   화면 목록만 쓴다(ACL-07′). 역할 필드가 생기는 순간 ERP가 역할로 판정하게 되고
@@ -32,26 +32,26 @@ export interface ScreenMeta {
 
 export const SCREENS = {
   // --- 000 공통 ---
-  s0300000010: { route: '/login',          name: '로그인',          group: '000' },
-  s0300000050: { route: null,              name: 'ERP 셸',          group: '000' }, // (erp)/layout.tsx — 라우트 없음
-  s0300000060: { route: '/dashboard',      name: '대시보드',        group: '000' },
-  s0300000070: { route: '/settings',       name: '설정',            group: '000' },
-  s0300000080: { route: '/no-access',      name: '접근 권한 없음',  group: '000' },
+  s030000010: { route: '/login',          name: '로그인',          group: '000' },
+  s030000050: { route: null,              name: 'ERP 셸',          group: '000' }, // (erp)/layout.tsx — 라우트 없음
+  s030000060: { route: '/dashboard',      name: '대시보드',        group: '000' },
+  s030000070: { route: '/settings',       name: '설정',            group: '000' },
+  s030000080: { route: '/no-access',      name: '접근 권한 없음',  group: '000' },
 
   // --- 010 기준설정 ---
-  s0300100010: { route: '/facility',       name: '센터 관리',       group: '010' },
+  s030100010: { route: '/facility',       name: '센터 관리',       group: '010' },
 
   // --- 020 입주사관리 ---
-  s0300200010: { route: '/tenants',        name: '입주사 목록',     group: '020' },
-  s0300200020: { route: '/tenants/[id]',   name: '입주사 상세',     group: '020' },
-  s0300200030: { route: '/tenants/contracts', name: '입주사·계약',  group: '020' },
-  s0300200040: { route: '/contracts/[id]', name: '계약 폼',         group: '020' },
+  s030200010: { route: '/tenants',        name: '입주사 목록',     group: '020' },
+  s030200020: { route: '/tenants/[id]',   name: '입주사 상세',     group: '020' },
+  s030200030: { route: '/tenants/contracts', name: '입주사·계약',  group: '020' },
+  s030200040: { route: '/contracts/[id]', name: '계약 폼',         group: '020' },
   // ★ 시안(ErpTenants 「청구」)과 화면 목록(SWONBIZ_SCREEN_LIST)은 3차였지만 청구 1단계와 함께 당겼다.
   //   **삐용 화면 시드 2차 제출 대상**이다(BBIYONG_SCREEN_SEED_1.md §0-1).
   // ★ 이름이 곧 사이드바 문구다 — 시안 사이드바가 「청구」다(화면 목록 이름은 「월별 청구 관리」).
-  s0300200070: { route: '/billing',        name: '청구',            group: '020' },
+  s030200070: { route: '/billing',        name: '청구',            group: '020' },
   /**
-   * 문의상담관리 — 고객이 남긴 문의에 운영자가 답하는 화면(s0300500070 의 뒷면).
+   * 문의상담관리 — 고객이 남긴 문의에 운영자가 답하는 화면(s030500070 의 뒷면).
    *
    * ★ **운영사 전용(audience_tp='P')** 이다. 이름·연락처·이메일·본문이 한 화면에 모인다 —
    *   `requireScreen` 이 URL 직접 접근을 막고, `/admin/inquiries` 는 Fastify 가 403 으로 막는다.
@@ -59,11 +59,11 @@ export const SCREENS = {
    *   (`doc/BBIYONG_SCREEN_SEED_1.md` §0-1 · 모듈 OFFICE).
    * ★ 이름이 곧 사이드바 문구이자 화면 제목이다 — 「문의상담관리」(2026-09-28 개칭).
    */
-  s0300200080: { route: '/inquiry-admin',  name: '문의상담관리',    group: '020' },
+  s030200080: { route: '/inquiry-admin',  name: '문의상담관리',    group: '020' },
 
   // --- 050 공개 화면 (인증 없음) ---
-  s0300500010: { route: '/',               name: '랜딩',            group: '050', public: true },
-  s0300500060: { route: '/kiosk',          name: '회의실 현황판',   group: '050', public: true },
+  s030500010: { route: '/',               name: '랜딩',            group: '050', public: true },
+  s030500060: { route: '/kiosk',          name: '회의실 현황판',   group: '050', public: true },
   /**
    * ★ 문의상담 셋은 **팝업이 아니라 페이지**라 이 표에 있다.
    *   「팝업(p{n})은 넣지 않는다」는 규칙의 이유는 **라우트가 없어서**인데(머리말),
@@ -71,14 +71,14 @@ export const SCREENS = {
    *   (`inquiry-board/01-flow.md` 「화면 형태」). 라우트가 있으면 여기 적는다.
    * ★ 셋 다 공개 화면이라 삐용 화면 마스터에는 **등록하지 않는다**(회신 ⑨).
    */
-  s0300500070:   { route: '/inquiry',      name: '문의상담',        group: '050', public: true },
-  s0300500070p1: { route: '/inquiry/new',  name: '문의하기',        group: '050', public: true },
-  s0300500070p2: { route: '/inquiry/[id]', name: '문의 보기',       group: '050', public: true },
+  s030500070:   { route: '/inquiry',      name: '문의상담',        group: '050', public: true },
+  s030500070p1: { route: '/inquiry/new',  name: '문의하기',        group: '050', public: true },
+  s030500070p2: { route: '/inquiry/[id]', name: '문의 보기',       group: '050', public: true },
 
   // --- 060 공간운영 ---
   // ★ 이름이 곧 사이드바 문구다 — 화면이 하는 일이 「회의실 예약」이다(2026-09-26 개칭).
   //   화면 목록·삐용 시드의 「회의실 예약 현황」도 같이 고쳤다.
-  s0300600010: { route: '/booking',        name: '회의실 예약',     group: '060' },
+  s030600010: { route: '/booking',        name: '회의실 예약',     group: '060' },
 } as const satisfies Record<string, ScreenMeta>;
 
 export type ScreenId = keyof typeof SCREENS;
@@ -94,8 +94,8 @@ export function has(screens: readonly string[], id: ScreenId): boolean {
  */
 export function homeRouteFor(screens: readonly string[]): string {
   if (screens.length === 0) return '/no-access';        // AUTH-13
-  if (has(screens, 's0300000060')) return '/dashboard'; // 대시보드 권한 = 운영사
-  if (has(screens, 's0300600010')) return '/booking';   // 예약 권한 = 입주사
+  if (has(screens, 's030000060')) return '/dashboard'; // 대시보드 권한 = 운영사
+  if (has(screens, 's030600010')) return '/booking';   // 예약 권한 = 입주사
   // 폴백 — 목록의 첫 "홈이 될 수 있는" 화면. (리뷰 2026-09-07)
   //   · `in` 이 아니라 hasOwn: 'toString' 같은 프로토타입 키가 화면으로 잡혀 undefined 를 돌려줬다
   //   · 인증 화면(000 로그인·접근권한없음)·공개 화면(050)·동적 세그먼트('/tenants/[id]')는 홈이 아니다
@@ -109,6 +109,6 @@ function isHomeCandidate(id: ScreenId): boolean {
   const meta: ScreenMeta = SCREENS[id];
   if (meta.route === null || meta.route.includes('[')) return false;
   if (meta.public) return false;
-  if (id === 's0300000010' || id === 's0300000080') return false;
+  if (id === 's030000010' || id === 's030000080') return false;
   return true;
 }

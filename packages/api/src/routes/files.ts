@@ -54,11 +54,12 @@ import { requireSession } from '../session/hook.ts';
 import { withCompanyScope, type CompanyScope } from '../db/withCompanyScope.ts';
 import { findCompany } from '../db/companies.ts';
 import {
-  deleteCompanyFile,
-  findCompanyFile,
-  listCompanyFiles,
+  companyTarget,
+  deleteFile,
+  findFile,
+  listFiles,
   operatorIdForCompany,
-  replaceCompanyFile,
+  replaceFile,
   type FileRow,
 } from '../db/files.ts';
 import { putObject, removeObject, signedUrl, StorageError } from '../lib/storage.ts';
@@ -119,7 +120,7 @@ export function registerFileRoutes(app: FastifyInstance): void {
     const rows = await withCompanyScope(scopeOf(requireSession(req)), async (client) => {
       const company = await findCompany(client, req.params.id);
       if (!company) return null;
-      return listCompanyFiles(client, req.params.id);
+      return listFiles(client, companyTarget(req.params.id));
     });
     if (rows === null) return notFound(reply);
 
@@ -231,8 +232,8 @@ export function registerFileRoutes(app: FastifyInstance): void {
       let previous: FileRow | null = null;
       try {
         const result = await withCompanyScope(scopeOf(session), (client) =>
-          replaceCompanyFile(client, {
-            companyId: req.params.id,
+          replaceFile(client, {
+            target: companyTarget(req.params.id),
             purpose,
             fileId,
             originalName,
@@ -317,9 +318,9 @@ export function registerFileRoutes(app: FastifyInstance): void {
 
       // ★ 지우기 **전에** 경로를 읽어 둔다. 지운 뒤에는 어디에 있는지 알 수 없다.
       const target = await withCompanyScope(scopeOf(requireSession(req)), async (client) => {
-        const row = await findCompanyFile(client, req.params.id, req.params.fileId);
+        const row = await findFile(client, companyTarget(req.params.id), req.params.fileId);
         if (!row) return null;
-        const removed = await deleteCompanyFile(client, req.params.id, req.params.fileId);
+        const removed = await deleteFile(client, companyTarget(req.params.id), req.params.fileId);
         return removed ? row : null;
       });
 

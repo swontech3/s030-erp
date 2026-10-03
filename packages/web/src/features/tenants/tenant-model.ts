@@ -1,5 +1,5 @@
 /**
- * s0300200030 이 쓰는 모양과 표시 형식.
+ * s030200030 이 쓰는 모양과 표시 형식.
  *
  * ★ 상태 판정은 여기 없다 — `@swonbiz/shared/domain/tenant-status` 가 갖는다.
  *   이 파일은 서버가 준 값을 화면 문자열로 바꾸는 일만 한다.
@@ -25,6 +25,13 @@ export interface TenantCard {
    */
   sortDays: number | null;
   contractCount: number;
+  /**
+   * 삐용 연동이 대기 중인가 — 계약은 확정됐는데 삐용에 회사가 아직 없다(3-2).
+   *
+   * ★ **표시 전용이다.** 이 화면에 [다시 시도] 버튼을 두지 않는다 — 처리는 계약 폼
+   *   한 곳이고(`CLAUDE.md` 한 업무 한 화면), 여기서는 계약으로 링크한다.
+   */
+  bbiyongPending?: boolean;
   roomSummary: string;
 }
 
@@ -103,7 +110,7 @@ export function isExpiringSoon(contract: ContractSummaryResponse, today: Date, s
  *   이전에는 여기 「대기 / 진행중 / 종료 / 취소」가 박혀 있었는데, 계약 폼은 같은
  *   상태를 다른 이름으로 부르고 있었다. 이름을 한 곳으로 모았다 —
  *   `features/contracts/contract-status-name.ts`.
- *   `codeNames` 는 s0300200030 이 들고 있는 `카테고리:코드 → 이름` 사전이다.
+ *   `codeNames` 는 s030200030 이 들고 있는 `카테고리:코드 → 이름` 사전이다.
  *   코드를 못 받으면 그쪽 기본값이 받는다. **빈 칸이 되지 않는다.**
  *
  * ★ 만료는 상태값이 아니라 **날짜**다. `confirmed` 인데 종료일이 지났으면

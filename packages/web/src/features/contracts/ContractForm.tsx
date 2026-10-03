@@ -1,6 +1,6 @@
 'use client';
 
-/** @screen s0300200040 계약 폼 · 020 입주사관리 · 1차 */
+/** @screen s030200040 계약 폼 · 020 입주사관리 · 1차 */
 
 /**
  * 계약 폼 — 상태 5종(create / draft / confirmed / terminated / cancelled)을 한 페이지가 맡는다.
@@ -143,6 +143,24 @@ export interface CompanyResponse {
   ceoAddress: string | null;
   ceoAddressDetail: string | null;
   memo: string | null;
+  /**
+   * 삐용 연동 상태(3-2). 계약을 확정하면 삐용에도 회사가 만들어지고, 그 결과가 여기다.
+   *
+   * ★ `status: 'pending'` 이면 **계약은 확정됐고 삐용 연결만 아직**이다. 그 상태를
+   *   화면에 띄우지 않으면 아무도 모르고 지나가고, 그 회사 대표는 영원히 로그인할 수
+   *   없다 — 그 사실은 대표가 전화할 때나 드러난다.
+   */
+  bbiyong?: BbiyongLinkState;
+}
+
+/** `GET /companies/:id` 의 `bbiyong` 칸. */
+export interface BbiyongLinkState {
+  orgId: number | null;
+  orgCode: string | null;
+  /** `'linked'` · `'pending'` · `null`(계약 확정 전 = 연동 대상 아님). */
+  status: string | null;
+  /** ★ 운영자에게 **그대로 보여주는** 문구. 연결된 뒤에는 비어 있다. */
+  reason: string | null;
 }
 
 /** 3-4 의 `GET /companies/:id/members`. */
@@ -325,14 +343,28 @@ export function ContractForm({
   const [invalid, setInvalid] = useState<RequiredKey[]>([]);
   const [bizCheck, setBizCheck] = useState<BizCheck>({ kind: 'idle' });
   const [confirmKind, setConfirmKind] = useState<ConfirmKind | null>(null);
-  /** 계약서 2종 미리보기(s0300200040p1). 확정 이후에만 열린다. */
+  /** 계약서 2종 미리보기(s030200040p1). 확정 이후에만 열린다. */
   const [docsOpen, setDocsOpen] = useState(false);
-  /** 계약호실 확인 팝업(s0300200040p3). 계약호실은 이 팝업으로만 넣는다. */
+  /** 계약호실 확인 팝업(s030200040p3). 계약호실은 이 팝업으로만 넣는다. */
   const [roomPickerOpen, setRoomPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * 삐용 연동 상태(3-2). 서버가 준 값으로 시작하고, 확정·재시도가 그 자리에서 갱신한다.
+   *
+   * ★ 서버 값으로 **시작하는** 것이 중요하다. 확정 응답만 보고 배너를 띄우면 새로
+   *   고치는 순간 사라지고, 「계약은 됐는데 연결은 아직」인 회사가 조용히 남는다.
+   */
+  const [link, setLink] = useState<BbiyongLinkState | null>(company?.bbiyong ?? null);
+  /**
+   * 연동 대상 회사. 저장된 계약이면 그 계약의 회사이고, 없으면 폼이 받은 회사다.
+   *
+   * ★ 새로 만드는 계약(둘 다 `null`)에서는 배너가 뜨지 않는다 — 확정하면 `router.replace`
+   *   로 저장된 계약 화면으로 넘어가고, 그때 서버 값으로 다시 판정된다.
+   */
+  const linkCompanyId = contract?.companyId ?? companyId;
 
   /**
    * ★ 자동 줄(할인 · 무상)은 특기사항 **맨 위에만** 들어간다. 사용자가 쓴 줄은
@@ -540,6 +572,12 @@ export function ContractForm({
       /** 입주사를 새로 만든 경우에만 온다(`POST /api/companies`). */
       companyId?: string;
       members?: { memberId: string }[];
+      /**
+       * 삐용 연동 결과(3-2) — 확정하는 두 경로(`POST /contracts` · `POST .../status`)가
+       * 함께 내려준다. `'pending'` 이면 **계약은 확정됐고 연결만 아직**이다.
+       */
+      bbiyong?: string | null;
+      bbiyongReason?: string | null;
     };
     if (!res.ok) throw new Error(data.message ?? '저장에 실패했습니다');
     return data;
@@ -664,9 +702,70 @@ export function ContractForm({
        */
       renewedFromContractId: renewal?.contractId ?? null,
     });
+    applyLink(data);
     if (!data.contractId) throw new Error('저장은 됐는데 계약 ID 가 오지 않았습니다');
     return data.contractId;
   }
+
+  /**
+   * 확정 응답의 삐용 연동 결과를 배너에 반영한다.
+   *
+   * ★ 확정이 아닌 응답에는 `bbiyong` 이 없다(`null`). 그때는 **건드리지 않는다** —
+   *   덮어쓰면 임시저장 한 번으로 「연동 대기」 배너가 사라진다.
+   */
+  function applyLink(data: { bbiyong?: string | null; bbiyongReason?: string | null }): void {
+    if (!data.bbiyong) return;
+    setLink((prev) => ({
+      orgId: prev?.orgId ?? null,
+      orgCode: prev?.orgCode ?? null,
+      status: data.bbiyong === 'pending' ? 'pending' : 'linked',
+      reason: data.bbiyongReason ?? null,
+    }));
+  }
+
+  /**
+   * [다시 시도] — 삐용 회사 등록을 한 번 더.
+   *
+   * ★★ 이 버튼은 **이 화면에만 있다.** 삐용 회사 생성은 계약 확정의 뒷부분이고,
+   *    확정을 누르는 자리가 여기다. 입주사 목록은 「미연동」을 보여 주기만 한다
+   *    (`CLAUDE.md` 한 업무 한 화면).
+   *
+   * ★ 서버가 멱등이다 — 이미 연결된 회사는 `already` 로 답하고 삐용을 부르지 않는다.
+   *   두 번 눌러 회사가 둘 만들어지는 일이 없다.
+   */
+  const retryLink = (forCompany: string) =>
+    run(async () => {
+      const res = await fetch(`/api/companies/${encodeURIComponent(forCompany)}/bbiyong-link`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        message?: string;
+        bbiyong?: string;
+        orgCode?: string | null;
+        orgId?: number | null;
+        reason?: string | null;
+      };
+      if (!res.ok) throw new Error(data.message ?? '다시 시도하지 못했습니다');
+
+      /*
+       * ★ [다시 시도] 는 등록만이 아니다 — 회사 상태에 따라 퇴실·재입주도 한다
+       *   (`retryBbiyongForCompany`). `pending` 만이 아직이고 나머지는 다 끝난 것이다:
+       *     linked  새로 등록했다        already  이미 등록돼 있었다
+       *     synced  퇴실·재입주를 보냈다  skipped  보낼 것이 없었다
+       * ★★ 목록에 없는 값이 와도 **대기로 떨어지지 않게** `pending` 만 본다. 서버가
+       *    결과 종류를 더 늘렸을 때 화면이 멀쩡한 회사에 배너를 띄우지 않는다.
+       */
+      const done = data.bbiyong !== 'pending';
+      setLink({
+        orgId: data.orgId ?? null,
+        orgCode: data.orgCode ?? link?.orgCode ?? null,
+        status: done ? 'linked' : 'pending',
+        reason: done ? null : (data.reason ?? null),
+      });
+      notify(done ? '삐용에 반영했습니다' : (data.reason ?? '아직 연결하지 못했습니다'));
+    });
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -771,7 +870,8 @@ export function ContractForm({
         // create 는 한 번에 confirmed 로 만들고, draft 는 섹션 2 를 먼저 저장한 뒤 전이한다 —
         // 저장하지 않고 전이하면 화면에 보이는 값과 확정된 값이 갈린다.
         const id = await saveContract('confirmed', savedCompanyId);
-        if (contract) await send(`/api/contracts/${id}/status`, 'POST', { to: 'confirmed' });
+        // ★ draft → confirmed 는 이쪽 응답이 삐용 연동 결과를 들고 온다.
+        if (contract) applyLink(await send(`/api/contracts/${id}/status`, 'POST', { to: 'confirmed' }));
         setConfirmKind(null);
         notify('확정 처리했습니다');
         if (!contract) router.replace(`/contracts/${id}`);
@@ -837,7 +937,7 @@ export function ContractForm({
         setConfirmKind('terminate');
         return;
       case 'docs':
-        // 계약서 2종(s0300200040p1). 확정 이후에만 이 버튼이 뜬다(`ACTIONS`).
+        // 계약서 2종(s030200040p1). 확정 이후에만 이 버튼이 뜬다(`ACTIONS`).
         setDocsOpen(true);
         return;
       case 'save':
@@ -933,6 +1033,37 @@ export function ContractForm({
             </div>
           ) : null}
 
+          {/*
+            ══════════════════════════════════════════════════════════════════
+            ★★ 삐용 연동 대기 (3-2)
+            ══════════════════════════════════════════════════════════════════
+            계약 확정은 삐용을 기다리지 않는다 — 삐용이 죽어도 계약은 확정되고 청구서도
+            만들어진다(대표 결정 2026-09-30). 그 대가로 **「계약은 됐는데 삐용 연결은
+            아직」인 상태가 존재한다.** 이 배너가 그 상태의 유일한 출구다. 없으면 아무도
+            모르고 지나가고, 그 회사 대표는 영원히 로그인할 수 없다.
+
+            ★ 사유는 서버가 준 문구를 **그대로** 쓴다 — 무엇을 고쳐야 하는지가 거기 있다
+              (값이 비었는지, 권한이 없는지, 삐용이 안 떠 있는지).
+            ★ 연결된 뒤에는 배너가 사라진다. 단체코드를 읽기 전용으로 보여주는 것은
+              입주사 상세(3-4)의 일이다 — 여기는 계약 화면이다.
+          */}
+          {link?.status === 'pending' && linkCompanyId ? (
+            <div className={styles.linkPending} role="status" data-bbiyong-link="pending">
+              <Icon name="circle-alert" size={16} />
+              <span>
+                <b>삐용 연동 대기</b> — 계약은 확정됐습니다. {link.reason ?? '삐용에 회사를 만들지 못했습니다.'}
+              </span>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnGhost}`}
+                disabled={busy}
+                onClick={() => retryLink(linkCompanyId)}
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : null}
+
           <SectionCompany
             value={companyState}
             onChange={(patch) => {
@@ -1001,6 +1132,12 @@ export function ContractForm({
              */
             spaceHolders={spaceHolders}
             selfContractIds={self}
+            /*
+             * ★★★ 이 계약을 쓰는 입주사도 뺀다 — 한 회사의 계약 둘은 1곳이다.
+             *    저장된 계약이면 그 계약의 회사, 재계약이면 이전 계약의 회사, 신규면
+             *    고른 입주사다. 아직 안 골랐으면 `null` — 뺄 것이 없다.
+             */
+            selfCompanyId={contract?.companyId ?? renewal?.companyId ?? companyId ?? null}
           />
 
           <SectionUsers
@@ -1038,7 +1175,7 @@ export function ContractForm({
           그때는 보고 있는 것이 찍히는 편이 덜 놀랍다.
       */}
       {/*
-        계약호실 확인 팝업(s0300200040p3).
+        계약호실 확인 팝업(s030200040p3).
 
         ★ `sec2Editable` 일 때만 연다 — `terminated`·`cancelled` 에서는 버튼 자체가
           비활성이지만, 상태가 밖에서 바뀌는 경우까지 생각하면 여는 조건도 같이 본다.

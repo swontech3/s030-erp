@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * s0300500070 문의 목록 — 공개. 2열 · 20건 · 즉시 검색.
+ * s030500070 문의 목록 — 공개. 2열 · 20건 · 즉시 검색.
  *
  * 시안: design/handoff/prototypes/s0300500070.html (`data-screen="list"`)
  * 명세: design/handoff/inquiry-board/02-screens.md §2

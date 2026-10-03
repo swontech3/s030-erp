@@ -45,6 +45,10 @@ import {
   type CompanyRow,
   type MemberRow,
 } from '../db/companies.ts';
+import {
+  patchOrgForCompany,
+  retryBbiyongForCompany,
+} from '../companies/registerOrg.ts';
 
 /** 입주사 화면은 운영사 업무다. 계약 라우트의 `WRITE_ROLE` 과 같은 값이다. */
 const OPERATOR = 'operator';
@@ -89,6 +93,20 @@ function toCompany(row: CompanyRow) {
     ceoAddressDetail: row.ceo_address_detail,
     memo: row.memo,
     status: row.status,
+    /**
+     * 삐용 연동(3-2) — **조회 전용**. 화면은 이 값으로 「미연동」을 표시하고,
+     * 처리([다시 시도])는 계약 폼에서만 한다(`CLAUDE.md` 한 업무 한 화면).
+     *
+     * ★ `linked` 판정은 `orgId` 로 한다 — `status` 는 「왜 아직 아닌가」를 말하는
+     *   값이고, 둘이 어긋나면 `orgId` 를 믿는다(마이그레이션 031 주석).
+     */
+    bbiyong: {
+      orgId: row.link_s020_org_id,
+      orgCode: row.link_org_code,
+      status: row.link_s020_org_id !== null ? 'linked' : (row.link_status ?? null),
+      /** ★ 운영자에게 그대로 보여주는 문구다. 연결된 뒤에는 비어 있다. */
+      reason: row.link_s020_org_id !== null ? null : row.link_failed_reason,
+    },
   };
 }
 
@@ -177,6 +195,15 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
           /** 정렬용 — 종료일이 가장 가까운 확정 계약까지의 일수. 지났으면 음수다. */
           sortDays: status.sortDays,
           contractCount: contracts.length,
+          /**
+           * 삐용 미연동 — **조회 전용 표시**다(3-2).
+           *
+           * ★ 「계약은 확정됐는데 삐용 연결은 아직」인 회사만 `true` 다. 계약이 없거나
+           *   임시저장뿐인 회사는 연동 대상이 아니므로 `false` 다(`link_status` 가 NULL).
+           * ★★ 이 화면에는 [다시 시도] 버튼을 두지 않는다 — 처리는 계약 폼 한 곳이다
+           *    (`CLAUDE.md` 한 업무 한 화면).
+           */
+          bbiyongPending: c.link_s020_org_id === null && c.link_status === 'pending',
           roomSummary: room
             ? [room.room_name, room.contract_room ? `(${room.contract_room})` : null]
                 .filter(Boolean)
@@ -399,11 +426,18 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
      * ★★ try/catch 가 `withCompanyScope` **밖**이어야 한다. 안에서 삼키면 이미 abort 된
      *   트랜잭션에 COMMIT 을 부른다 — 등록 쪽 주석에 그 이유가 적혀 있다.
      */
-    let result: 'ok' | 'not_found';
+    /**
+     * ★ 회사명이 **실제로 바뀌었는지**를 들고 나온다 — 바뀐 때만 삐용에 수정을 보낸다.
+     *   매번 보내면 연락처만 고친 요청에도 삐용 호출이 나가고, 삐용이 그것을 어떻게
+     *   취급하는지는 규격에 없다.
+     */
+    let result: { kind: 'ok'; nameChanged: boolean } | { kind: 'not_found' };
     try {
       result = await withCompanyScope(scopeOf(session), async (client) => {
         const company = await findCompany(client, req.params.id);
-        if (!company) return 'not_found' as const;
+        if (!company) return { kind: 'not_found' } as const;
+        // ★ 빈 이름은 `updateCompany` 가 무시한다 — 그때는 바뀐 것이 아니다.
+        const nameChanged = companyName !== null && companyName !== company.company_name;
 
         await updateCompany(client, {
           companyId: company.company_id,
@@ -424,7 +458,7 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
             memo: text(req.body?.memo),
           },
         });
-        return 'ok' as const;
+        return { kind: 'ok', nameChanged } as const;
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
@@ -436,8 +470,23 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
       throw err;
     }
 
-    if (result === 'not_found') return notFound(reply);
-    return reply.send({ companyId: req.params.id });
+    if (result.kind === 'not_found') return notFound(reply);
+
+    /*
+     * ★★ 삐용 회사명 수정 — **트랜잭션이 커밋된 뒤다**(등록·퇴실과 같은 이유).
+     *    연결되지 않은 입주사면 `patchOrgName` 이 보내지 않는다(`skipped`).
+     *    실패해도 ERP 수정은 그대로다 — 「연동 대기」로 남고 [다시 시도] 가 있다.
+     */
+    const bbiyong = result.nameChanged
+      ? await patchOrgForCompany({ companyId: req.params.id, session, actor })
+      : null;
+
+    return reply.send({
+      companyId: req.params.id,
+      /** 삐용 반영 결과. 회사명이 안 바뀌었으면 null. `pending` 이면 화면이 배너를 띄운다. */
+      bbiyong: bbiyong?.kind ?? null,
+      bbiyongReason: bbiyong?.kind === 'pending' ? bbiyong.reason : null,
+    });
   });
 
   // ── 구성원 조회 ─────────────────────────────────────────────────────────
@@ -494,4 +543,62 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
       });
     },
   );
+
+  // ── 삐용 연동 다시 시도 (3-2) ───────────────────────────────────────────
+  /**
+   * 실패한 삐용 연동을 **다시 시도한다** — 등록 · 퇴실 · 재입주.
+   *
+   * =============================================================================
+   * ★★ 「한 업무는 한 화면에서」 — 이 API 를 부르는 화면은 **계약 폼 하나다**
+   * =============================================================================
+   * 삐용 회사 생성은 **계약 확정의 뒷부분**이고, 계약 확정을 누르는 자리는 계약 폼
+   * (`s030200040`)이다. 그래서 [다시 시도] 버튼도 거기에만 둔다. 입주사 목록
+   * (`s030200030`)은 「삐용 미연동」을 **보여 주기만** 하고 계약으로 링크한다
+   * (프로젝트 규칙 `CLAUDE.md`).
+   *
+   * ★ 이 라우트가 회사 하위 경로인 것은 **대상이 회사**이기 때문이다. 화면의 자리와는
+   *   다른 이야기다 — 연결은 `tb_s080_companies` 한 행에 붙는다.
+   *
+   * ★★ **버튼 하나가 「지금 필요한 것」을 한다**(결정 2026-10-03). 회사의 지금 상태를
+   *    보고 고른다 — 버튼을 셋으로 늘리지 않는다:
+   *
+   *      연결 안 됨            → 등록 (채번부터)
+   *      연결됨 + 살아 있는 계약 있음 → 재입주 (회사를 다시 만들지 않는다)
+   *      연결됨 + 살아 있는 계약 없음 → 퇴실
+   *
+   *    회사명 수정은 여기서 고르지 않는다 — 「이름이 달라졌는가」는 삐용에 물어야 알고,
+   *    ERP 는 마지막으로 보낸 이름을 적지 않는다. 이름은 **바뀌는 순간** 보낸다
+   *    (`PATCH /companies/:id`).
+   *
+   * ★★ 등록은 **멱등이다.** 이미 연결된 회사에 등록을 또 하지 않는다 — 두 번 눌러 회사가
+   *    둘 만들어지는 일이 없다(`linkOrg` ⑤). 퇴실·재입주를 두 번 보내면 삐용이 거부하고,
+   *    그 거부가 사유로 남는다 — ERP 가 미리 막지 않는다(사본을 두지 않는다).
+   *
+   * ★ **계약이 확정됐는지 여기서 보지 않는다.** 확정 없이 부르면 회사가 만들어지는데,
+   *   그건 이 API 를 직접 부르는 경로뿐이고 운영사 계정이 필요하다. 막지 않는 이유는
+   *   「확정했는데 연동만 실패한 회사」를 되살리는 것이 이 API 의 목적이고, 확정 여부를
+   *   조건으로 걸면 계약이 그 뒤에 종료된 회사를 되살릴 수 없게 되기 때문이다.
+   */
+  app.post<{ Params: { id: string } }>('/companies/:id/bbiyong-link', async (req, reply) => {
+    const session = requireSession(req);
+    if (session.role !== OPERATOR) return forbidden(reply);
+
+    const result = await retryBbiyongForCompany({
+      companyId: req.params.id,
+      session,
+      actor: String(session.s020MemberId),
+    });
+
+    if (result.kind === 'not_found') return notFound(reply);
+
+    // ★ `pending` 도 200 이다. 요청 처리는 정상으로 끝났고, 결과가 「아직」인 것이다 —
+    //   4xx/5xx 로 내리면 화면이 오류 배너를 띄우고 사유를 보여줄 자리를 잃는다.
+    return reply.send({
+      companyId: req.params.id,
+      bbiyong: result.kind,
+      orgId: result.kind === 'linked' || result.kind === 'already' ? result.orgId : null,
+      orgCode: result.kind === 'linked' ? result.orgCode : null,
+      reason: result.kind === 'pending' ? result.reason : null,
+    });
+  });
 }

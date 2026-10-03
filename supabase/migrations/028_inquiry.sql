@@ -1,7 +1,7 @@
 -- =============================================================================
 -- 028_inquiry.sql
 --
--- 문의상담 게시판 (s0300500070 · p1 · p2) — **로그인 없는 공개 게시판**.
+-- 문의상담 게시판 (s030500070 · p1 · p2) — **로그인 없는 공개 게시판**.
 --   ① tb_s080_inquiries                원글
 --   ② tb_s080_inquiry_messages         스레드 (운영자 답변 · 전화 기록 · 고객 추가 질문)
 --   ③ tb_s080_inquiry_tokens           열람 토큰 (비밀번호를 맞춘 사람)
@@ -67,7 +67,7 @@ CREATE INDEX IF NOT EXISTS ix_inquiries_created ON public.tb_s080_inquiries (cre
 CREATE INDEX IF NOT EXISTS ix_inquiries_phone_created ON public.tb_s080_inquiries (phone_digits, created_at DESC);
 
 COMMENT ON TABLE public.tb_s080_inquiries IS
-  '문의상담 원글(s0300500070). 공개 게시판이라 RLS 가 없다 — 보호는 응답 모양과 비밀번호다.';
+  '문의상담 원글(s030500070). 공개 게시판이라 RLS 가 없다 — 보호는 응답 모양과 비밀번호다.';
 COMMENT ON COLUMN public.tb_s080_inquiries.phone_digits IS
   '연락처 숫자만. 하루 3건·1분 간격 판정이 표기 차이에 속지 않게 한다.';
 
@@ -144,7 +144,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.tb_s080_inquiry_unlock_attempts T
 INSERT INTO public.tb_s080_code_masters
   (code_id, build_id, category, name, description, is_system, updated_at)
 VALUES ('cm_1_QU_ST', '1', 'QU_ST', '문의상태',
-        '문의상담 게시판(s0300500070)의 상태. ★ 저장 컬럼이 아니다 — 스레드의 마지막 글로 '
+        '문의상담 게시판(s030500070)의 상태. ★ 저장 컬럼이 아니다 — 스레드의 마지막 글로 '
         '판정한 결과를 이 코드로 표시한다(03-thread.md §2)',
         false, CURRENT_TIMESTAMP),
        ('cm_1_QU_TP', '1', 'QU_TP', '문의유형',

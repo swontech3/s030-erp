@@ -28,6 +28,7 @@ import { PREVIOUS_TERMINATION_REASON } from '../packages/shared/src/domain/contr
 import { dayAfter } from '../packages/shared/src/domain/day.ts';
 import { pool, closePool } from '../packages/api/src/db/pool.ts';
 import { withCompanyScope } from '../packages/api/src/db/withCompanyScope.ts';
+import { syncAllSpaceStatuses } from '../packages/api/src/db/spaceStatus.ts';
 
 /**
  * ★★ RLS 가 걸린 표는 `pool.query` 로 직접 못 읽는다 — GUC 없는 커넥션은 정책이
@@ -624,6 +625,19 @@ const json = (res) => {
       del.rowCount === created.length - createdRemoved,
       `${del.rowCount} ≠ ${created.length} - ${createdRemoved}`,
     );
+    /*
+     * ★★ 호실상태를 되맞춘다 — **계약을 SQL 로 지웠기 때문이다.**
+     *
+     * 호실상태는 계약이 정한다(`packages/api/src/db/spaceStatus.ts`). 업무 경로는 계약을
+     * 지우지 않고 종료·취소로 닫으므로 앱이 알아서 맞춘다. 뒷정리는 그 길을 건너뛰고
+     * 행을 지우므로, 여기서 한 번 다시 세지 않으면 **개발계 DB 에 「입주중」이 남는다**
+     * (실측 2026-10-03: 검증을 몇 번 돌리자 72실 중 18실이 어긋났다).
+     */
+    const restored = await withCompanyScope({ role: 'operator', companyId: null }, (c) =>
+      syncAllSpaceStatuses(c, 'verify-cleanup'),
+    );
+    if (restored > 0) console.log(`  호실상태 ${restored}실 되맞춤`);
+
     await closePool();
   }
 

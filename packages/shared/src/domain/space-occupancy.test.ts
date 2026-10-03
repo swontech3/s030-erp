@@ -6,14 +6,18 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_MAX_COMPANIES,
   EMPTY_OCCUPANCY,
+  MIN_MAX_COMPANIES,
   OCCUPANCY_LIVE_STATUSES,
   VIRTUAL_ROOM_TYPE,
   canPickSpace,
   isVirtualRoomType,
+  maxCompaniesOf,
   occupancyBySpace,
   rejectSpacePick,
   spaceOptionLabel,
+  warnVirtualShared,
   type SpaceHolder,
 } from './space-occupancy.ts';
 
@@ -95,6 +99,34 @@ describe('호실별 입주 현황', () => {
     expect(occ.get('sp1')).toEqual({ count: 1, companyNames: ['남'] });
   });
 
+  /**
+   * ★★★ 「한 회사의 계약 둘은 1 이다」 — 자기 회사는 세지 않는다. 세면 1곳짜리
+   *    호실에서 같은 회사가 계약을 하나 더 맺는 길이 막히고, 그것은 「회사 수로
+   *    센다」와 어긋난다.
+   */
+  it('★★★ 자기 회사는 세지 않는다 — 계약이 달라도 같은 회사면 자리를 더 먹지 않는다', () => {
+    const holders = [holder({ contractId: 'k1', companyId: 'c1' })];
+    /* 계약 ID 는 다르다(새 계약) — 그래도 회사가 같아 세지 않는다. */
+    expect(occupancyBySpace(holders, [], 'c1').get('sp1')).toBeUndefined();
+    expect(occupancyBySpace(holders, [], 'c2').get('sp1')?.count).toBe(1);
+  });
+
+  it('자기 회사를 빼도 다른 회사는 그대로 센다', () => {
+    const occ = occupancyBySpace(
+      [holder({ companyId: 'c1' }), holder({ contractId: 'k2', companyId: 'c2', companyName: '남' })],
+      [],
+      'c1',
+    );
+    expect(occ.get('sp1')).toEqual({ count: 1, companyNames: ['남'] });
+  });
+
+  it('입주사를 아직 안 골랐으면(null·빈 문자열) 아무것도 빼지 않는다', () => {
+    const holders = [holder({ companyId: 'c1' })];
+    expect(occupancyBySpace(holders, [], null).get('sp1')?.count).toBe(1);
+    expect(occupancyBySpace(holders, [], '').get('sp1')?.count).toBe(1);
+    expect(occupancyBySpace(holders, []).get('sp1')?.count).toBe(1);
+  });
+
   it('호실이 다르면 따로 센다', () => {
     const occ = occupancyBySpace(
       [holder({ spaceId: 'a' }), holder({ spaceId: 'b', contractId: 'k2', companyId: 'c2' })],
@@ -105,35 +137,83 @@ describe('호실별 입주 현황', () => {
   });
 });
 
+describe('호실이 정한 수 — 「입주 가능 회사 수」', () => {
+  it('값이 없거나 1 미만이면 기본값이다 — 느슨한 쪽으로 넘어가지 않는다', () => {
+    expect(DEFAULT_MAX_COMPANIES).toBe(1);
+    expect(MIN_MAX_COMPANIES).toBe(1);
+    expect(maxCompaniesOf(null)).toBe(1);
+    expect(maxCompaniesOf(undefined)).toBe(1);
+    expect(maxCompaniesOf(0)).toBe(1);
+    expect(maxCompaniesOf(-3)).toBe(1);
+    expect(maxCompaniesOf(Number.NaN)).toBe(1);
+  });
+
+  it('준 수는 그대로 쓴다. 소수는 버린다', () => {
+    expect(maxCompaniesOf(1)).toBe(1);
+    expect(maxCompaniesOf(3)).toBe(3);
+    expect(maxCompaniesOf(2.9)).toBe(2);
+  });
+});
+
 describe('고를 수 있는가', () => {
   const occOf = (count: number) => ({ count, companyNames: Array.from({ length: count }, (_, i) => `회사${i}`) });
 
-  it('★ 비상주는 아무도 없어야 고른다 — 한 호실에 한 회사다', () => {
-    expect(canPickSpace({ roomType: VIRTUAL_ROOM_TYPE, occupancy: EMPTY_OCCUPANCY })).toBe(true);
-    expect(canPickSpace({ roomType: VIRTUAL_ROOM_TYPE, occupancy: occOf(1) })).toBe(false);
-    expect(canPickSpace({ roomType: VIRTUAL_ROOM_TYPE, occupancy: occOf(2) })).toBe(false);
+  it('★ 1곳짜리 호실은 아무도 없어야 고른다 — 기본값이 이것이다', () => {
+    expect(canPickSpace({ occupancy: EMPTY_OCCUPANCY, maxCompanies: 1 })).toBe(true);
+    expect(canPickSpace({ occupancy: occOf(1), maxCompanies: 1 })).toBe(false);
+    expect(canPickSpace({ occupancy: occOf(2), maxCompanies: 1 })).toBe(false);
   });
 
-  it('그 외 구분은 1곳까지 고른다. 2곳이면 막는다', () => {
-    for (const type of ['R1', 'R2', 'FI', 'FR']) {
-      expect(canPickSpace({ roomType: type, occupancy: EMPTY_OCCUPANCY })).toBe(true);
-      expect(canPickSpace({ roomType: type, occupancy: occOf(1) })).toBe(true);
-      expect(canPickSpace({ roomType: type, occupancy: occOf(2) })).toBe(false);
-      expect(canPickSpace({ roomType: type, occupancy: occOf(3) })).toBe(false);
-    }
+  it('2곳짜리는 1곳까지 고른다. 2곳이면 막는다', () => {
+    expect(canPickSpace({ occupancy: EMPTY_OCCUPANCY, maxCompanies: 2 })).toBe(true);
+    expect(canPickSpace({ occupancy: occOf(1), maxCompanies: 2 })).toBe(true);
+    expect(canPickSpace({ occupancy: occOf(2), maxCompanies: 2 })).toBe(false);
+    expect(canPickSpace({ occupancy: occOf(3), maxCompanies: 2 })).toBe(false);
+  });
+
+  it('운영자가 올린 수만큼 늘어난다 — 코드에 박힌 2 가 아니다', () => {
+    expect(canPickSpace({ occupancy: occOf(2), maxCompanies: 3 })).toBe(true);
+    expect(canPickSpace({ occupancy: occOf(3), maxCompanies: 3 })).toBe(false);
+  });
+
+  it('★ 수를 모르면 1곳으로 본다 — 목록에 뜨는데 저장이 막히는 쪽이 더 나쁘다', () => {
+    expect(canPickSpace({ occupancy: EMPTY_OCCUPANCY })).toBe(true);
+    expect(canPickSpace({ occupancy: occOf(1) })).toBe(false);
+    expect(canPickSpace({ occupancy: occOf(1), maxCompanies: null })).toBe(false);
   });
 
   it('현황을 모르는 호실은 빈 것으로 본다', () => {
-    expect(canPickSpace({ roomType: VIRTUAL_ROOM_TYPE, occupancy: undefined })).toBe(true);
+    expect(canPickSpace({ occupancy: undefined, maxCompanies: 1 })).toBe(true);
   });
 
-  it('★ 같은 계약 안에서 이미 고른 호실은 못 고른다', () => {
-    expect(canPickSpace({ roomType: 'R1', occupancy: EMPTY_OCCUPANCY, pickedElsewhere: true })).toBe(false);
+  it('★ 같은 계약 안에서 이미 고른 호실은 못 고른다 — 수가 남아 있어도', () => {
+    expect(canPickSpace({ occupancy: EMPTY_OCCUPANCY, maxCompanies: 9, pickedElsewhere: true })).toBe(false);
+  });
+
+  it('★ 계약구분을 보지 않는다 — 비상주 특례를 없앴다', () => {
+    /* 비상주도 수가 2 면 1곳까지 고른다. 막는 것은 「수」 하나다. */
+    expect(canPickSpace({ occupancy: occOf(1), maxCompanies: 2 })).toBe(true);
+  });
+});
+
+describe('비상주를 여러 곳에 열 때의 알림', () => {
+  it('막지 않고 알린다 — 같은 주소로 사업자가 여럿 등록된다', () => {
+    const msg = warnVirtualShared(VIRTUAL_ROOM_TYPE, 2);
+    expect(msg).toContain('비상주');
+    expect(msg).toContain('2곳');
+  });
+
+  it('1곳이면 알릴 것이 없다', () => {
+    expect(warnVirtualShared(VIRTUAL_ROOM_TYPE, 1)).toBeNull();
+  });
+
+  it('비상주가 아니면 알리지 않는다', () => {
+    expect(warnVirtualShared('R1', 5)).toBeNull();
   });
 
   it('계약구분에 공백이 섞여도 비상주로 본다 — 코드 값이 늘 깨끗하지는 않다', () => {
     expect(isVirtualRoomType(' VR ')).toBe(true);
-    expect(canPickSpace({ roomType: ' VR ', occupancy: occOf(1) })).toBe(false);
+    expect(warnVirtualShared(' VR ', 3)).not.toBeNull();
   });
 });
 
@@ -147,32 +227,57 @@ describe('셀렉트 글자', () => {
     expect(spaceOptionLabel('Room 1', { count: 1, companyNames: ['에스원3DP'] })).toBe('Room 1 (에스원3DP)');
   });
 
+  it('★ 여러 곳이면 전부 적는다 — 한 곳만 보이면 나머지는 모르고 겹치는 것이 된다', () => {
+    expect(spaceOptionLabel('Room 1', { count: 2, companyNames: ['가나', '다라'] })).toBe('Room 1 (가나 · 다라)');
+  });
+
   it('이름이 비어 있으면 붙이지 않는다', () => {
     expect(spaceOptionLabel('Room 1', { count: 1, companyNames: [''] })).toBe('Room 1');
   });
 });
 
 describe('저장 거절', () => {
-  const names: Record<string, string> = { a: 'Room 1', v: 'VIR 01' };
-  const nameOf = (id: string) => names[id] ?? '';
+  /** 이름과 「입주 가능 회사 수」를 같은 줄에서 준다 — 서버가 보는 모양 그대로다. */
+  const spaces: Record<string, { roomName: string; maxCompanies: number }> = {
+    a: { roomName: 'Room 1', maxCompanies: 2 },
+    v: { roomName: 'VIR 01', maxCompanies: 1 },
+  };
+  const spaceOf = (id: string) => spaces[id];
 
   it('빈 현황이면 통과한다', () => {
-    expect(rejectSpacePick([{ roomType: 'R1', spaceId: 'a' }], new Map(), nameOf)).toBeNull();
+    expect(rejectSpacePick([{ roomType: 'R1', spaceId: 'a' }], new Map(), spaceOf)).toBeNull();
   });
 
-  it('★ 비상주에 이미 한 곳이 있으면 거절한다 — 누가 쓰는지까지 말한다', () => {
+  it('★ 1곳짜리에 이미 한 곳이 있으면 거절한다 — 몇 곳까지인지와 누가 쓰는지를 말한다', () => {
     const occ = new Map([['v', { count: 1, companyNames: ['디데이'] }]]);
-    const msg = rejectSpacePick([{ roomType: 'VR', spaceId: 'v' }], occ, nameOf);
+    const msg = rejectSpacePick([{ roomType: 'VR', spaceId: 'v' }], occ, spaceOf);
     expect(msg).toContain('VIR 01');
+    expect(msg).toContain('1곳까지');
     expect(msg).toContain('디데이');
-    expect(msg).toContain('비상주');
   });
 
-  it('상주는 1곳까지 통과하고 2곳이면 거절한다', () => {
+  it('2곳짜리는 1곳까지 통과하고 2곳이면 거절한다', () => {
     const one = new Map([['a', { count: 1, companyNames: ['가나'] }]]);
-    expect(rejectSpacePick([{ roomType: 'R1', spaceId: 'a' }], one, nameOf)).toBeNull();
+    expect(rejectSpacePick([{ roomType: 'R1', spaceId: 'a' }], one, spaceOf)).toBeNull();
     const two = new Map([['a', { count: 2, companyNames: ['가나', '다라'] }]]);
-    expect(rejectSpacePick([{ roomType: 'R1', spaceId: 'a' }], two, nameOf)).toContain('2곳');
+    const msg = rejectSpacePick([{ roomType: 'R1', spaceId: 'a' }], two, spaceOf);
+    expect(msg).toContain('2곳까지');
+    expect(msg).toContain('가나 · 다라');
+  });
+
+  it('★★ 화면이 거르는 것과 같은 답을 낸다 — 두 규칙이 갈리면 목록과 저장이 어긋난다', () => {
+    for (const max of [1, 2, 3]) {
+      for (let count = 0; count <= 4; count += 1) {
+        const occ = new Map([['a', { count, companyNames: Array.from({ length: count }, (_, i) => `회사${i}`) }]]);
+        const screen = canPickSpace({ occupancy: occ.get('a'), maxCompanies: max });
+        const server = rejectSpacePick(
+          [{ roomType: 'R1', spaceId: 'a' }],
+          occ,
+          () => ({ roomName: 'Room 1', maxCompanies: max }),
+        );
+        expect(server === null).toBe(screen);
+      }
+    }
   });
 
   it('★ 같은 호실을 두 줄에 넣으면 거절한다', () => {
@@ -182,7 +287,7 @@ describe('저장 거절', () => {
         { roomType: 'R1', spaceId: 'a' },
       ],
       new Map(),
-      nameOf,
+      spaceOf,
     );
     expect(msg).toContain('두 줄');
   });
@@ -195,13 +300,18 @@ describe('저장 거절', () => {
           { roomType: 'R1', spaceId: '' },
         ],
         new Map(),
-        nameOf,
+        spaceOf,
       ),
     ).toBeNull();
   });
 
   it('이름을 모르면 식별자로 말한다 — 「 은(는) 이미」로 시작하는 문구가 되면 안 된다', () => {
     const occ = new Map([['zz', { count: 2, companyNames: ['가', '나'] }]]);
-    expect(rejectSpacePick([{ roomType: 'R1', spaceId: 'zz' }], occ, nameOf)).toContain('zz');
+    expect(rejectSpacePick([{ roomType: 'R1', spaceId: 'zz' }], occ, spaceOf)).toContain('zz');
+  });
+
+  it('★ 모르는 호실은 1곳으로 본다 — 폐쇄한 호실을 API 로 밀어 넣어도 막힌다', () => {
+    const occ = new Map([['zz', { count: 1, companyNames: ['가'] }]]);
+    expect(rejectSpacePick([{ roomType: 'R1', spaceId: 'zz' }], occ, spaceOf)).toContain('1곳까지');
   });
 });

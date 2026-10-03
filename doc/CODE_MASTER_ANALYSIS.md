@@ -33,8 +33,8 @@
 ```
 packages/api/src/db/lookups.ts:85      listCodes()        조회 전용 (약 12줄)
 packages/api/src/routes/lookups.ts:87  GET /codes         운영사 전용 (약 12줄)
-  └ packages/web/.../contracts/[id]/page.tsx:51        s0300200040 계약 폼 — 셀렉트
-  └ packages/web/.../tenants/contracts/page.tsx:35     s0300200030 계약 목록 — 표시명 변환
+  └ packages/web/.../contracts/[id]/page.tsx:51        s030200040 계약 폼 — 셀렉트
+  └ packages/web/.../tenants/contracts/page.tsx:35     s030200030 계약 목록 — 표시명 변환
 ```
 
 노출 카테고리는 서버 상수 `CONTRACT_FORM_CODES` 로 고정되어 있다 — `ROOM_TP` ·

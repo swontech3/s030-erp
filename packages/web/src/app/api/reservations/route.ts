@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { forwardGetJson, forwardJson } from '@/lib/forward';
 
 /**
- * 예약 목록 (s0300600010) — `GET /reservations?facilityId=&from=&to=`.
+ * 예약 목록 (s030600010) — `GET /reservations?facilityId=&from=&to=`.
  *
  * ★ **보이는 범위는 Fastify 의 RLS 가 정한다.** 이 홉은 주소만 조립한다 — 입주사 세션은
  *   자기 회사 예약만, 운영사는 전부 본다(003 의 `erp_company_scope`).

@@ -1,5 +1,5 @@
 /*
- * s0300200030 입주사·계약 마스터-디테일.
+ * s030200030 입주사·계약 마스터-디테일.
  *
  * 원본: design/handoff/prototypes/s0300200030.html  ← ★ 시각 정본(2차 인계분)
  * 명세: design/handoff/tenant-contract/02-master-detail.md
@@ -649,7 +649,7 @@
   margin-top: 20px;
 }
 
-/* ── 계약 상세 모달 (s0300200030p1) ── 이 화면 안에서 열린다 ── */
+/* ── 계약 상세 모달 (s030200030p1) ── 이 화면 안에서 열린다 ── */
 .overlay {
   position: fixed;
   inset: 0;
@@ -747,7 +747,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── 토스트 ── 원본 s0300200040 의 것과 같은 규격이다 ── */
+/* ── 토스트 ── 원본 s030200040 의 것과 같은 규격이다 ── */
 .toast {
   position: fixed;
   right: 32px;

@@ -63,7 +63,7 @@ export class BbiyongAuthError extends Error {
  *   "이메일 또는 비밀번호가 올바르지 않습니다"로 뭉개면 사용자는 영원히 못 들어온다.
  *   `BbiyongAuthError` 를 상속하므로 라우트의 401 번역은 그대로 타고, 메시지만 다르다.
  *
- * 2단계 로그인 팝업(s0300000010p1)은 아직 만들지 않는다 — 겸직 계정이 실제로 없다.
+ * 2단계 로그인 팝업(s030000010p1)은 아직 만들지 않는다 — 겸직 계정이 실제로 없다.
  * 이 예외가 서버 로그에 찍히면 그때가 팝업을 만들 때다.
  */
 export class BbiyongOrgSelectRequiredError extends BbiyongAuthError {
@@ -225,6 +225,119 @@ export interface BbiyongAcl {
    * null 이면 **빈 스코프**다(전체가 아니다).
    */
   getScope(subject: AclSubject, companyId: string | null): AclScope;
+}
+
+// =============================================================================
+// 회사(단체) 등록 — 3-2. `POST /rest/v1/s021100020/org`
+// =============================================================================
+
+/**
+ * 삐용에 보내는 회사+대표 등록 요청. **회사와 대표가 한 번의 호출로 함께 만들어진다.**
+ *
+ * ★★ 필드 구성의 근거는 `@swonbiz/shared` 의 `tenant-registration.ts` 다 — 항목마다
+ *    `sink` 가 붙어 있고, `sink: 'bbiyong' | 'both'` 인 것만 여기 있다. 항목을 더하기
+ *    전에 그 파일에서 `sink` 를 먼저 정한다. **삐용은 모르는 필드를 오류 없이 조용히
+ *    버리므로**, 여기 없는 값을 넣어 두고 저장됐다고 믿는 것이 이 타입이 막는 사고다.
+ *
+ * ★ 일부러 **없는** 것들:
+ *   · `zipCode`·`address`·`detailAddress` — 그 칸이 받는 것은 **대표자 자택 주소**이고
+ *     삐용 `org010.ADDRESS` 는 사업장 주소다. 보내면 대표자 집 주소가 회사 주소로
+ *     등록되고 세금계산서·계약서에 인쇄된다. **수정 API 도 없어 되돌릴 수 없다.**
+ *   · `telNo`(회사 전화) — ERP 계약 폼에 전화 칸이 「연락처」 하나뿐이고 그것이
+ *     대표 휴대전화(`hpNo`)다. 같은 값을 두 칸에 보내지 않는다. 선택 항목이다.
+ *   · `pwd`·`org_tp`·`member_tp`·`mailAgentYn`·`bizNumber` — `NEVER_SENT` 참조.
+ */
+export interface BbiyongOrgRequest {
+  orgName: string;
+  /** ★ `Z01`~`Z99`. 삐용이 이 Z 접두사로 「ERP 가 만든 회사」를 알아본다(회신 5). */
+  orgCode: string;
+  /** 대표자명. 삐용 계정을 받는 사람이고 세금계산서에 찍는 이름이다(같은 사람으로 못 박았다). */
+  memberName: string;
+  /** 대표 휴대전화. **숫자만** 보낸다. */
+  hpNo: string;
+  /** 대표 이메일 = 로그인 아이디. */
+  email: string;
+  /** 항상 `'KR'`. 운영자가 고르는 값이 아니다. */
+  countryCode: 'KR';
+  /**
+   * 구독 모듈. ★★ **`['OFFICE', 'AUTHZ']` 고정이다**(삐용 회신 2026-10-01).
+   *
+   * 2026-10-01 전까지는 빈 배열이었다(회신 2) — ERP 서비스 5종이 삐용에서 `use_yn='N'`
+   * 이었고, 켜지지 않은 코드를 보내면 **회사가 아예 만들어지지 않는다.** 회신으로
+   * `OFFICE` 가 열렸고 `AUTHZ`(권한관리, 2026-09-27 추가)를 함께 보낸다.
+   *
+   * ★ 계약별로 고르지 않는다 — 지금 ERP 가 파는 것은 공유오피스 하나다. 계약마다
+   *   서비스가 갈리면 그때 계약에서 읽어 온다(연동규격 §2-3 「계약한 서비스를 함께
+   *   보낸다」 `[결정 Q3]`).
+   * ★★ 쓸 수 없는 코드를 보내면 본문 `status: 400` 「○○(CODE) 은(는) 지금 선택할 수
+   *    없는 서비스입니다」가 온다 — 회사는 만들어지지 않는다(연동규격 §2-4).
+   */
+  moduleCodes: readonly string[];
+}
+
+/**
+ * 등록 결과. **업무 실패는 예외가 아니라 결과다** — 호출자가 그걸 보고 다음 행동을 정한다.
+ *
+ * ★ 삐용 장애·토큰 만료는 여기 없다. 그것들은 `BbiyongUnavailableError` ·
+ *   `BbiyongTokenExpiredError` 로 던져진다(인프라 문제와 업무 실패는 다른 일이다).
+ */
+export type CreateOrgOutcome =
+  | { kind: 'created'; orgId: number; orgCode: string }
+  /**
+   * 「이미 사용중인 단체코드입니다」 — 호출자가 **다음 번호로 다시 시도한다**.
+   *
+   * ★★ 삐용은 이 응답에 `data.orgId` 를 함께 준다. **그 값을 가져다 쓰지 않는다.**
+   *    그 회사는 같은 코드를 이미 쓰는 **남의 회사**일 수 있고, 그 org_id 를 우리
+   *    입주사에 연결하면 그 입주사가 남의 데이터를 보게 된다 — 격리의 뿌리가
+   *    `link_s020_org_id` 하나다(`domain/org-code.ts` 의 `nextOrgCode` 주석).
+   */
+  | { kind: 'duplicate_code'; orgCode: string }
+  /**
+   * 삐용이 업무 실패로 답했다. `message` 는 **운영자에게 그대로 보여줄 문구**다 —
+   * 삐용 내부 메시지를 그대로 흘리지 않는다.
+   *
+   * `retryable: false` 는 **같은 조건으로 다시 눌러도 안 풀린다**는 뜻이다. 권한이
+   * 없거나(AUTHZ_DENY) 값이 규격에 안 맞는 경우다 — 계정이나 값을 바꿔야 한다.
+   */
+  | { kind: 'rejected'; message: string; retryable: boolean };
+
+/**
+ * 회사 등록 포트. mock / http 를 갈아 끼우는 자리다.
+ *
+ * ★★ `accessToken` 을 인자로 받는다 — **ERP 서버는 삐용 계정을 갖지 않는다**(결정 Q1).
+ *    부르는 것은 **ERP 를 쓰는 운영사 직원의 자기 토큰**이고, 그 토큰에 「단체관리」
+ *    (S021100010) 화면 권한이 있어야 한다. 서버끼리 쓰는 API 키는 만들지 않는다.
+ *    토큰을 살려서 넘기는 일은 `session/bbiyongToken.ts` 의 `callBbiyong` 이 한다.
+ */
+/**
+ * 퇴실 · 재입주 · 수정의 결과 (삐용 회신 2026-10-02).
+ *
+ * ★ 등록(`CreateOrgOutcome`)과 달리 **돌려받을 식별자가 없다.** 이미 그 회사가 누구인지
+ *   알고 부르는 것이고(단체코드로 지목한다), 중복 재시도도 없다 — 코드를 새로 뽑지 않는다.
+ *
+ * ★★ 두 번 보내면 삐용이 거부한다(이미 꺼져 있다 / 이미 켜져 있다). 그것도 `rejected` 다 —
+ *    ERP 가 미리 막지 않는다. 막으려면 「지금 삐용에서 켜져 있는가」를 ERP 가 따라 적어야
+ *    하고, 그 사본은 반드시 어긋난다. 판정은 삐용이 한다.
+ */
+export type OrgOpOutcome =
+  | { kind: 'ok' }
+  /** `message` 는 **운영자에게 그대로 보여줄 문구**다. */
+  | { kind: 'rejected'; message: string; retryable: boolean };
+
+/** 삐용 회사 수정 — 보내는 칸은 이 둘뿐이다. ★ 주소 3칸은 **일부러 없다**(constants.ts). */
+export interface BbiyongOrgPatch {
+  orgCode: string;
+  orgName: string;
+}
+
+export interface BbiyongOrg {
+  createOrg(req: BbiyongOrgRequest, accessToken: string): Promise<CreateOrgOutcome>;
+  /** 퇴실 — OFFICE 구독을 끈다. 계약이 종료될 때. */
+  moduleOff(orgCode: string, accessToken: string): Promise<OrgOpOutcome>;
+  /** 재입주 — OFFICE 구독을 다시 켠다. ★ 회사를 다시 만들지 않는다. */
+  moduleOn(orgCode: string, accessToken: string): Promise<OrgOpOutcome>;
+  /** 회사명 수정. ★ 주소는 보내지 않는다. */
+  patchOrg(patch: BbiyongOrgPatch, accessToken: string): Promise<OrgOpOutcome>;
 }
 
 /** shadow 로그에 남길 요청 맥락. 판정에는 쓰지 않는다. */

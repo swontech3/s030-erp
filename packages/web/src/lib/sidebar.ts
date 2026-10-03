@@ -19,24 +19,24 @@ import type { IconName } from '@/components/ds';
  *   담아 보내도 사이드바에는 나타나지 않는다.
  */
 const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
-  s0300000010: null, // 로그인 — 셸 밖
-  s0300000050: null, // ERP 셸 자신 — 라우트 없음
-  s0300000060: 'layout-dashboard',
-  s0300000070: 'settings',
-  s0300000080: null, // 접근 권한 없음 — 셸 밖
-  s0300100010: 'door-open',
-  s0300200010: 'building-2',
-  s0300200020: null, // 입주사 상세 — 목록에서 들어간다. 사이드바 항목이 아니다
-  s0300200030: 'file-pen-line',
-  s0300200040: null, // 계약 폼 — 상세에서 들어간다
-  s0300200070: 'receipt',
-  s0300200080: 'message-square-text',
-  s0300500010: null, // 랜딩 — 공개 화면
-  s0300500060: null, // 회의실 현황판 — 공개 화면(키오스크)
-  s0300500070: null, // 문의상담 목록 — 공개 화면
-  s0300500070p1: null, // 문의하기 — 공개 화면
-  s0300500070p2: null, // 문의 보기 — 공개 화면
-  s0300600010: 'calendar-check',
+  s030000010: null, // 로그인 — 셸 밖
+  s030000050: null, // ERP 셸 자신 — 라우트 없음
+  s030000060: 'layout-dashboard',
+  s030000070: 'settings',
+  s030000080: null, // 접근 권한 없음 — 셸 밖
+  s030100010: 'door-open',
+  s030200010: 'building-2',
+  s030200020: null, // 입주사 상세 — 목록에서 들어간다. 사이드바 항목이 아니다
+  s030200030: 'file-pen-line',
+  s030200040: null, // 계약 폼 — 상세에서 들어간다
+  s030200070: 'receipt',
+  s030200080: 'message-square-text',
+  s030500010: null, // 랜딩 — 공개 화면
+  s030500060: null, // 회의실 현황판 — 공개 화면(키오스크)
+  s030500070: null, // 문의상담 목록 — 공개 화면
+  s030500070p1: null, // 문의하기 — 공개 화면
+  s030500070p2: null, // 문의 보기 — 공개 화면
+  s030600010: 'calendar-check',
 };
 
 export interface NavItem {

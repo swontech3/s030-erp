@@ -8,12 +8,12 @@ erp.swonbiz.com / 에스원비즈 공유오피스 운영 시스템
 
 **화면 ID와 라우트를 분리한다.**
 
-화면 ID(`s0300200040`)는 문서·소통·이력 관리용 식별자다. URL에 노출하지 않는다.
-`/s0300200040` 같은 주소는 사용자에게 의미가 없고 SEO·공유·기억 어느 쪽에도 불리하다.
+화면 ID(`s030200040`)는 문서·소통·이력 관리용 식별자다. URL에 노출하지 않는다.
+`/s030200040` 같은 주소는 사용자에게 의미가 없고 SEO·공유·기억 어느 쪽에도 불리하다.
 라우트는 의미 있는 경로로 두고, 화면 ID는 파일 상단 메타와 중앙 매핑 테이블에서 관리한다.
 
 ```
-화면 ID   s0300200040          ← 문서·이슈·소통용
+화면 ID   s030200040          ← 문서·이슈·소통용
 라우트    /contracts/[id]       ← 사용자에게 보이는 주소
 파일      app/(erp)/contracts/[id]/page.tsx
 ```
@@ -34,34 +34,34 @@ SwonBiz-erp/                             ← 모노레포 루트 · npm workspac
 │  ├─ web/                               Next.js 16 · App Router
 │  │  ├─ src/
 │  │  │  ├─ app/
-│  │  │  │  ├─ page.tsx                  # s0300500010 랜딩 (050 공개)
-│  │  │  │  ├─ kiosk/page.tsx            # s0300500060 회의실 현황판 (050 공개 · 셸 없음)
+│  │  │  │  ├─ page.tsx                  # s030500010 랜딩 (050 공개)
+│  │  │  │  ├─ kiosk/page.tsx            # s030500060 회의실 현황판 (050 공개 · 셸 없음)
 │  │  │  │  ├─ inquiry/                  # 050 공개 · 문의상담 (로그인 대신 글 비밀번호)
-│  │  │  │  │  ├─ page.tsx                  # s0300500070 목록
-│  │  │  │  │  ├─ new/page.tsx              # s0300500070p1 문의하기 (모달 아님)
-│  │  │  │  │  └─ [id]/page.tsx             # s0300500070p2 글 보기
+│  │  │  │  │  ├─ page.tsx                  # s030500070 목록
+│  │  │  │  │  ├─ new/page.tsx              # s030500070p1 문의하기 (모달 아님)
+│  │  │  │  │  └─ [id]/page.tsx             # s030500070p2 글 보기
 │  │  │  │  │                            #   ★ (public) 라우트 그룹은 만들지 않았다 —
 │  │  │  │  │                            #     공개 화면이 둘뿐이고 그룹이 공유할 레이아웃이
 │  │  │  │  │                            #     없다. 보호는 proxy.ts matcher 가 한다
-│  │  │  │  ├─ apply/                    # s0300500020 온라인 신청 (보류)
+│  │  │  │  ├─ apply/                    # s030500020 온라인 신청 (보류)
 │  │  │  │  ├─ (auth)/                   # 000 · 인증 화면
-│  │  │  │  │  ├─ login/page.tsx            # s0300000010
-│  │  │  │  │  └─ no-access/page.tsx        # s0300000080 접근 권한 없음
+│  │  │  │  │  ├─ login/page.tsx            # s030000010
+│  │  │  │  │  └─ no-access/page.tsx        # s030000080 접근 권한 없음
 │  │  │  │  ├─ (erp)/                    # 인증 필요 · ERP 셸 적용
-│  │  │  │  │  ├─ layout.tsx                # s0300000050 셸 (사이드바·헤더)
-│  │  │  │  │  ├─ dashboard/page.tsx        # s0300000060
-│  │  │  │  │  ├─ settings/page.tsx         # s0300000070
-│  │  │  │  │  ├─ facility/page.tsx         # s0300100010 센터 관리
+│  │  │  │  │  ├─ layout.tsx                # s030000050 셸 (사이드바·헤더)
+│  │  │  │  │  ├─ dashboard/page.tsx        # s030000060
+│  │  │  │  │  ├─ settings/page.tsx         # s030000070
+│  │  │  │  │  ├─ facility/page.tsx         # s030100010 센터 관리
 │  │  │  │  │  ├─ tenants/
-│  │  │  │  │  │  ├─ page.tsx               # s0300200010 목록
-│  │  │  │  │  │  ├─ [id]/page.tsx          # s0300200020 상세
-│  │  │  │  │  │  └─ contracts/page.tsx     # s0300200030 마스터-디테일
-│  │  │  │  │  ├─ contracts/[id]/page.tsx   # s0300200040 계약 폼
-│  │  │  │  │  ├─ applications/page.tsx     # s0300200060 신청 대기
-│  │  │  │  │  ├─ billing/page.tsx          # s0300200070 월별 청구 (3차)
+│  │  │  │  │  │  ├─ page.tsx               # s030200010 목록
+│  │  │  │  │  │  ├─ [id]/page.tsx          # s030200020 상세
+│  │  │  │  │  │  └─ contracts/page.tsx     # s030200030 마스터-디테일
+│  │  │  │  │  ├─ contracts/[id]/page.tsx   # s030200040 계약 폼
+│  │  │  │  │  ├─ applications/page.tsx     # s030200060 신청 대기
+│  │  │  │  │  ├─ billing/page.tsx          # s030200070 월별 청구 (3차)
 │  │  │  │  │  └─ booking/
-│  │  │  │  │     ├─ page.tsx               # s0300600010 회의실 예약
-│  │  │  │  │     └─ approvals/page.tsx     # s0300600020 승인 큐
+│  │  │  │  │     ├─ page.tsx               # s030600010 회의실 예약
+│  │  │  │  │     └─ approvals/page.tsx     # s030600020 승인 큐
 │  │  │  │  └─ layout.tsx                # 루트 · 폰트(next/font/local) · 전역 토큰
 │  │  │  ├─ components/
 │  │  │  │  ├─ ds/                       # 디자인 시스템 15종 이관
@@ -101,8 +101,8 @@ SwonBiz-erp/                             ← 모노레포 루트 · npm workspac
 ├─ design/                               ★ Claude Design 산출물 (읽기 전용 · 개발이 고치지 않음)
 │  ├─ _ds/swonbiz/                       디자인 시스템 — tokens 6파일(119변수) · 컴포넌트 15종
 │  │  └─ tokens/ components/ assets/ styles.css
-│  ├─ erp-auth/ErpAuth.dc.html           # s0300000010 · s0300000080(sent 블록 재사용)
-│  ├─ erp-tenants/                       # ★ 셸 기준(접기·툴팁·상태저장) + s0300200010·020
+│  ├─ erp-auth/ErpAuth.dc.html           # s030000010 · s030000080(sent 블록 재사용)
+│  ├─ erp-tenants/                       # ★ 셸 기준(접기·툴팁·상태저장) + s030200010·020
 │  ├─ erp-master-detail/ erp-contract-form/ erp-dashboard/ erp-settings/
 │  ├─ erp-booking/ erp-booking-compare/ erp-booking-kiosk/
 │  └─ landing-hero/ erp-apply-form/
@@ -121,18 +121,18 @@ SwonBiz-erp/                             ← 모노레포 루트 · npm workspac
 
 ```ts
 export const SCREENS = {
-  s0300000010: { route: '/login',              name: '로그인',         group: '000' },
-  s0300000050: { route: null,                  name: 'ERP 셸',        group: '000' },  // layout · 라우트 없음
-  s0300000060: { route: '/dashboard',          name: '대시보드',       group: '000' },
-  s0300000070: { route: '/settings',           name: '설정',           group: '000' },
-  s0300000080: { route: '/no-access',          name: '접근 권한 없음',  group: '000' },
-  s0300100010: { route: '/facility',           name: '센터 관리',       group: '010' },
-  s0300200010: { route: '/tenants',            name: '입주사 목록',     group: '020' },
-  s0300200040: { route: '/contracts/[id]',     name: '계약 폼',         group: '020' },
-  s0300500010: { route: '/',                   name: '랜딩',           group: '050', public: true },
-  s0300500060: { route: '/kiosk',              name: '회의실 현황판',    group: '050', public: true },
-  s0300500070: { route: '/inquiry',            name: '문의상담',         group: '050', public: true },
-  s0300600010: { route: '/booking',            name: '회의실 예약',     group: '060' },
+  s030000010: { route: '/login',              name: '로그인',         group: '000' },
+  s030000050: { route: null,                  name: 'ERP 셸',        group: '000' },  // layout · 라우트 없음
+  s030000060: { route: '/dashboard',          name: '대시보드',       group: '000' },
+  s030000070: { route: '/settings',           name: '설정',           group: '000' },
+  s030000080: { route: '/no-access',          name: '접근 권한 없음',  group: '000' },
+  s030100010: { route: '/facility',           name: '센터 관리',       group: '010' },
+  s030200010: { route: '/tenants',            name: '입주사 목록',     group: '020' },
+  s030200040: { route: '/contracts/[id]',     name: '계약 폼',         group: '020' },
+  s030500010: { route: '/',                   name: '랜딩',           group: '050', public: true },
+  s030500060: { route: '/kiosk',              name: '회의실 현황판',    group: '050', public: true },
+  s030500070: { route: '/inquiry',            name: '문의상담',         group: '050', public: true },
+  s030600010: { route: '/booking',            name: '회의실 예약',     group: '060' },
   // ... 전체 목록은 doc/SWONBIZ_SCREEN_LIST.md 참조
 } as const;
 ```
@@ -146,7 +146,7 @@ export const SCREENS = {
 **각 page.tsx 상단에 화면 ID를 주석으로 명시한다.**
 
 ```tsx
-/** @screen s0300200040 계약 폼 · 020 입주사관리 · 1차 */
+/** @screen s030200040 계약 폼 · 020 입주사관리 · 1차 */
 ```
 
 ---
@@ -169,9 +169,9 @@ export const SCREENS = {
 ```ts
 const screens = await bbiyongAcl.listScreens(session.s020MemberId)
 
-if (screens.length === 0)        return '/no-access'   // s0300000080 · AUTH-13
-if (has(screens, 's0300000060')) return '/dashboard'   // 대시보드 권한 = 운영사
-if (has(screens, 's0300600010')) return '/booking'     // 예약 권한 = 입주사
+if (screens.length === 0)        return '/no-access'   // s030000080 · AUTH-13
+if (has(screens, 's030000060')) return '/dashboard'   // 대시보드 권한 = 운영사
+if (has(screens, 's030600010')) return '/booking'     // 예약 권한 = 입주사
 return routeOf(screens[0])
 ```
 
@@ -219,8 +219,8 @@ return routeOf(screens[0])
 
 기본은 고정 1440px 기준. 단 아래 두 화면만 3단 대응한다.
 
-- `s0300600010` 회의실 예약 — 1280+ 주간 / 768~1279 축약 / ~767 일간
-- `s0300500060` 현황판 — `100dvh` 고정, 스크롤 없음
+- `s030600010` 회의실 예약 — 1280+ 주간 / 768~1279 축약 / ~767 일간
+- `s030500060` 현황판 — `100dvh` 고정, 스크롤 없음
 
 브레이크포인트 토큰: `--bp-tablet: 768px` / `--bp-desktop: 1280px`
 

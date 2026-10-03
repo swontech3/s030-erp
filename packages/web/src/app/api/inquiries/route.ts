@@ -2,7 +2,7 @@ import { type NextRequest } from 'next/server';
 import { forwardPublicGetJson, forwardPublicJson } from '@/lib/forward';
 
 /**
- * 문의 목록·등록 (s0300500070 · p1) — **인증 없음**.
+ * 문의 목록·등록 (s030500070 · p1) — **인증 없음**.
  *
  * ★ 목록 응답에는 유형 · 가린 이름 · 날짜 · 상태뿐이다. 이름을 가리는 것도, 무엇을
  *   고를지도 서버가 정한다(`api/src/routes/inquiry.ts`) — 이 홉은 그대로 넘긴다.

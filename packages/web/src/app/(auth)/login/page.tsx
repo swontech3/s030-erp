@@ -1,11 +1,11 @@
 'use client';
 
-/** @screen s0300000010 로그인 · 000 공통 · 1차 */
+/** @screen s030000010 로그인 · 000 공통 · 1차 */
 
 /**
  * 로그인 화면 — 원본: design/erp-auth/ErpAuth.dc.html 의 isLogin 블록(23~67행).
  * 바깥 껍데기(좌 44% + 로고)와 우측 브랜드 패널은 AuthShell 로 뺐다 —
- * 접근권한없음(s0300000080)과 공유한다. 원본에서도 그 부분은 sc-if 밖에 있다.
+ * 접근권한없음(s030000080)과 공유한다. 원본에서도 그 부분은 sc-if 밖에 있다.
  *
  * 버린 것 (지시서 2-5)
  *   isReset(70~81) · isSent(83~92) · isInvite(94~137)  — 화면 3종 폐기
@@ -193,7 +193,7 @@ export default function LoginPage() {
 
               {/*
                 비밀번호 찾기 — 원본은 data-goto="reset" 으로 같은 템플릿의 재설정 화면을 열었다.
-                ERP 는 계정을 발급하지 않으므로 그 화면(s0300000020)을 만들지 않는다.
+                ERP 는 계정을 발급하지 않으므로 그 화면(s030000020)을 만들지 않는다.
                 삐용 재설정 화면으로 나가는 외부 링크로 바꿨다. URL 은 상수에 있다.
 
                 ★ 회신 ⑦(2026-09-08): 재설정 **딥링크가 없다.** 전용 URL 이 없고 삐용 `/SignIn`
@@ -290,7 +290,7 @@ export default function LoginPage() {
             }}
           >
             <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>아직 입주사가 아니신가요?</span>
-            {/* 무료 상담 신청 → 랜딩의 상담 문의 모달(s0300500010p1). 랜딩은 아직 없다. */}
+            {/* 무료 상담 신청 → 랜딩의 상담 문의 모달(s030500010p1). 랜딩은 아직 없다. */}
             <a
               href={LINKS.CONSULT}
               className={styles.link}

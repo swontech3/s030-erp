@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * s0300200030 입주사·계약 마스터-디테일 — 3-4 에서 실제 데이터로 채웠다.
+ * s030200030 입주사·계약 마스터-디테일 — 3-4 에서 실제 데이터로 채웠다.
  *
  * 원본: design/handoff/prototypes/s0300200030.html  ← ★ 시각 정본(2차 인계분)
  * 명세: design/handoff/tenant-contract/02-master-detail.md
@@ -402,7 +402,17 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                     <span className={`${styles.badge} ${badgeClass(t.statusLabel)}`}>{t.statusLabel}</span>
                   </span>
                   <span className={styles.cardMeta}>
-                    {[t.ceoName, t.tel, t.provisional ? '사업자등록 신청 중' : t.bizNumber]
+                    {[
+                      t.ceoName,
+                      t.tel,
+                      t.provisional ? '사업자등록 신청 중' : t.bizNumber,
+                      /*
+                       * ★ 삐용 미연동(3-2) — 계약은 확정됐는데 그 회사 대표가 아직
+                       *   로그인할 수 없는 상태다. **표시만 한다** — 처리([다시 시도])는
+                       *   계약 폼 한 곳이다(`CLAUDE.md`). 계약 행을 누르면 그 화면으로 간다.
+                       */
+                      t.bbiyongPending ? '삐용 미연동' : null,
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </span>

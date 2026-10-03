@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * s0300500070p2 글 보기 — 비밀번호 확인 → 원글 + 스레드 + 추가 질문.
+ * s030500070p2 글 보기 — 비밀번호 확인 → 원글 + 스레드 + 추가 질문.
  *
  * 시안: prototypes/s0300500070.html (`data-screen="password"` · `"view"`)
  * 명세: design/handoff/inquiry-board/02-screens.md §4 · 03-thread.md

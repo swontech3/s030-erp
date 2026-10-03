@@ -1,7 +1,7 @@
 -- =============================================================================
 -- 029_inquiry_purge.sql
 --
--- 문의 관리(s0300200080)의 **글 전체 삭제**가 표를 어떻게 남기는지 적는다.
+-- 문의 관리(s030200080)의 **글 전체 삭제**가 표를 어떻게 남기는지 적는다.
 -- 표도 컬럼도 늘지 않는다 — 028 의 컬럼을 그대로 쓰고, **뜻이 하나 늘었다.**
 --
 -- 명세: design/handoff/inquiry-board/04-data-model.md §5 · 03-thread.md §5
@@ -39,13 +39,13 @@ COMMENT ON COLUMN public.tb_s080_inquiries.phone_digits IS
   '집계는 그대로 돌고 번호는 남지 않는다(029). 집계 SQL 은 둘을 함께 찾는다(= ANY).';
 
 COMMENT ON COLUMN public.tb_s080_inquiries.deleted_at IS
-  '운영자가 글 전체를 지운 시각(s0300200080). **자동 삭제는 없다**(04-data-model §5). '
+  '운영자가 글 전체를 지운 시각(s030200080). **자동 삭제는 없다**(04-data-model §5). '
   '★ 이 값이 있는 행은 개인정보가 이미 지워진 껍데기다 — 남은 것은 type·created_at·'
   '연락처 해시뿐이고, 스레드 행은 함께 삭제됐다. 목록·글 보기·비밀번호 확인 모두 제외한다.';
 
 COMMENT ON COLUMN public.tb_s080_inquiries.name IS
   '문의한 사람 이름. ★ 공개 목록에는 가린 이름(김**)만 나간다. '
-  '운영자 화면(s0300200080)에는 실명이 나간다 — 답해야 할 사람이다. '
+  '운영자 화면(s030200080)에는 실명이 나간다 — 답해야 할 사람이다. '
   '★ 지운 글에는 ''(삭제)'' 가 들어 있다(029).';
 
 COMMENT ON COLUMN public.tb_s080_inquiry_messages.edited_at IS

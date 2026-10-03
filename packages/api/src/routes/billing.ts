@@ -250,7 +250,7 @@ function parseYearMonth(value: unknown): string | null {
 }
 
 export function registerBillingRoutes(app: FastifyInstance): void {
-  /* ── 월별 청구 (s0300200070) ─────────────────────────────────────────────
+  /* ── 월별 청구 (s030200070) ─────────────────────────────────────────────
      ★ 운영사 전용. 남의 입주사 청구액이 한 화면에 모이는 자리다 — RLS 가 입주사
        세션을 자기 것으로 좁히긴 하지만, 화면 자체가 운영 업무라 403 으로 닫는다. */
   app.get<{ Querystring: { yearMonth?: string } }>('/billing/invoices', async (req, reply) => {
@@ -267,7 +267,7 @@ export function registerBillingRoutes(app: FastifyInstance): void {
     return reply.send({ yearMonth, invoices: rows.map(toBillingItem) });
   });
 
-  /* ── 입주사 청구 탭 (s0300200030 오른쪽) — 청구서 전부 + 정산 원장 ─────── */
+  /* ── 입주사 청구 탭 (s030200030 오른쪽) — 청구서 전부 + 정산 원장 ─────── */
   app.get<{ Params: { id: string } }>('/companies/:id/billing', async (req, reply) => {
     const session = requireSession(req);
     if (session.role !== WRITE_ROLE) return forbidden(reply);
@@ -287,7 +287,7 @@ export function registerBillingRoutes(app: FastifyInstance): void {
     });
   });
 
-  /* ── 정산 탭 (s0300200070 「정산」) — 처리 대기 · 최근 처리 완료 ──────────
+  /* ── 정산 탭 (s030200070 「정산」) — 처리 대기 · 최근 처리 완료 ──────────
      ★ 대기인지는 `pendingKind`(shared) 하나가 정한다. 정산서 한 장을 그릴 수 있게 정산
        전체도 같이 준다(계좌는 가린다 — 전체 번호는 정산서를 열 때 입주사 청구 API 로 받는다). */
   app.get('/billing/settlements', async (req, reply) => {

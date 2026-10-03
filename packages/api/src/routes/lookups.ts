@@ -106,6 +106,11 @@ export function registerLookupRoutes(app: FastifyInstance): void {
         standardFee: s.standard_fee,
         // ★ 72건 전부 NULL 이다(§A-2). 화면은 예치금 기본값을 월회비에서 가져온다.
         deposit: s.deposit,
+        /**
+         * 「입주 가능 회사 수」 — 계약 폼이 셀렉트를 거를 때 쓴다. 서버도 저장할 때
+         * **같은 수**로 다시 본다(`routes/contracts.ts`).
+         */
+        maxCompanies: s.max_companies,
       })),
     });
   });

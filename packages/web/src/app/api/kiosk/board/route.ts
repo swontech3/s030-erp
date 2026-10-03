@@ -2,7 +2,7 @@ import { type NextRequest } from 'next/server';
 import { forwardPublicGetJson } from '@/lib/forward';
 
 /**
- * 회의실 현황판 한 판 (s0300500060) — `GET /kiosk/board?room=…`.
+ * 회의실 현황판 한 판 (s030500060) — `GET /kiosk/board?room=…`.
  *
  * ★★ **인증이 없다.** 벽에 걸린 태블릿이 30초마다 부르는 유일한 주소다.
  *    응답에는 시각과 회의실 이름뿐이다 — 회사명·제목·예약자는 서버에서부터 오지 않는다

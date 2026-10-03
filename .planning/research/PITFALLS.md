@@ -157,7 +157,7 @@ Middleware feels like a central choke point, so it's tempting to treat it as the
 
 ### Pitfall 7: Contract state machine enforced only in the UI
 
-**What goes wrong:** The "상태 전이 확인" modal (`s0300200040p2`) correctly hides buttons for impossible transitions per the spec ("불가능한 전이는 버튼을 렌더링하지 않는다"), which is good UX — but if the actual transition (`draft → confirmed`, `confirmed → terminated`, etc.) and the section-2 lock-after-confirmed rule are enforced *only* by which buttons are rendered and which form fields are disabled in React, then a direct API call (`PATCH /api/contracts/:id`) from a script, a replayed request, or a bug elsewhere in the app can: confirm a contract twice, terminate a `draft` contract (skipping `confirmed`), or edit section-2 fields on an already-`confirmed` contract.
+**What goes wrong:** The "상태 전이 확인" modal (`s030200040p2`) correctly hides buttons for impossible transitions per the spec ("불가능한 전이는 버튼을 렌더링하지 않는다"), which is good UX — but if the actual transition (`draft → confirmed`, `confirmed → terminated`, etc.) and the section-2 lock-after-confirmed rule are enforced *only* by which buttons are rendered and which form fields are disabled in React, then a direct API call (`PATCH /api/contracts/:id`) from a script, a replayed request, or a bug elsewhere in the app can: confirm a contract twice, terminate a `draft` contract (skipping `confirmed`), or edit section-2 fields on an already-`confirmed` contract.
 
 **Why it happens:** The state machine is *specified* as a UI/UX concept (which buttons appear, which sections are editable) in `doc/SWONBIZ_MODAL_COMPOSITION_P1.md`, so it's natural for the first implementation pass to only implement it where it's specified — in the components.
 
@@ -289,7 +289,7 @@ Middleware feels like a central choke point, so it's tempting to treat it as the
 
 ### Pitfall 13: Focus-trap and accessibility regressions when hand-written modals become React components
 
-**What goes wrong:** The original `.dc.html` templates are static, hand-written HTML/CSS/JS. The five ported popups (`s0300200030p1/p2`, `s0300200040p1/p2`, `s0300000010p1`) route through a shared `components/ds/Dialog.tsx` per the composition spec — which is good — but the risk is in the *content* each modal wraps: the contract-preview modal has a large scrollable body inside a fixed-height (`92vh`) shell with a fixed header/footer, and the state-change confirmation modal needs autofocus behavior that differs by which of the 3 actions triggered it (e.g., a required 취소 사유/종료 사유 textarea should likely receive focus for the destructive-with-reason variants). If focus-trap, Escape-to-close, return-focus-to-trigger, and scroll containment aren't each explicitly verified per popup (not just "the Dialog component handles it in general"), regressions are easy to introduce per-instance — e.g., a long contract-preview body that traps page scroll instead of just modal-body scroll, or a confirm modal where Tab cycles out of the dialog into the page behind it.
+**What goes wrong:** The original `.dc.html` templates are static, hand-written HTML/CSS/JS. The five ported popups (`s030200030p1/p2`, `s030200040p1/p2`, `s030000010p1`) route through a shared `components/ds/Dialog.tsx` per the composition spec — which is good — but the risk is in the *content* each modal wraps: the contract-preview modal has a large scrollable body inside a fixed-height (`92vh`) shell with a fixed header/footer, and the state-change confirmation modal needs autofocus behavior that differs by which of the 3 actions triggered it (e.g., a required 취소 사유/종료 사유 textarea should likely receive focus for the destructive-with-reason variants). If focus-trap, Escape-to-close, return-focus-to-trigger, and scroll containment aren't each explicitly verified per popup (not just "the Dialog component handles it in general"), regressions are easy to introduce per-instance — e.g., a long contract-preview body that traps page scroll instead of just modal-body scroll, or a confirm modal where Tab cycles out of the dialog into the page behind it.
 
 **Why it happens:** "The Dialog component has a focus trap" is true in general but doesn't guarantee every specific modal instance composes correctly with it (e.g., an autoFocus element inside content that renders asynchronously after the dialog opens, or nested scrollable regions confusing trap boundaries).
 
@@ -297,7 +297,7 @@ Middleware feels like a central choke point, so it's tempting to treat it as the
 
 **Warning signs:** Keyboard Tab from the last focusable element in a modal landing on page content behind it; page scroll moving when a modal with overflowing content is open.
 
-**Phase to address:** Phase 8 (contract form popups) and wherever `s0300200030p1/p2`/`s0300000010p1` are built (Phases 4, 6–7).
+**Phase to address:** Phase 8 (contract form popups) and wherever `s030200030p1/p2`/`s030000010p1` are built (Phases 4, 6–7).
 
 ---
 

@@ -59,7 +59,7 @@ export function contractStatusName(
 /**
  * `카테고리:코드 → 이름` 사전에서 바로 꺼내는 형태.
  *
- * s0300200030 은 코드를 행 목록이 아니라 이 모양으로 들고 있다(`page.tsx` 가 그렇게
+ * s030200030 은 코드를 행 목록이 아니라 이 모양으로 들고 있다(`page.tsx` 가 그렇게
  * 묶는다). 두 화면이 같은 이름을 쓰게 하려고 입구만 둘로 냈다.
  */
 export function contractStatusNameFromMap(

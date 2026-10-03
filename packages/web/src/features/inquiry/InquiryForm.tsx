@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * s0300500070p1 문의하기 — 공개. 등록 완료까지 **한 화면 안에서** 바뀐다.
+ * s030500070p1 문의하기 — 공개. 등록 완료까지 **한 화면 안에서** 바뀐다.
  *
  * 시안: prototypes/s0300500070.html (`data-screen="write"` · `"done"`)
  * 명세: design/handoff/inquiry-board/02-screens.md §3
@@ -20,9 +20,19 @@
  * 올려 보낼 뿐, 적어 둔 내용은 그대로 둔다 — 다시 쓰라고 하면 그만 쓴다.
  *
  * ★ 판정은 `@swonbiz/shared/domain/inquiry` 하나다. 화면 검사는 친절이고 서버가 정본이다.
+ *
+ * =============================================================================
+ * ★ `?type=` — 랜딩에서 유형이 골라진 채로 들어온다
+ * =============================================================================
+ * 랜딩(`s030500010`)의 CTA 는 전부 이 화면으로 온다. 입주하려고 누른 사람에게
+ * 유형을 다시 고르게 하지 않으므로 주소에 유형을 실어 보낸다
+ * (`features/landing/landing-model` 의 `inquiryHref`).
+ *   · 받는 값은 **코드 마스터에 실제로 있는 코드**뿐이다 — 없는 값은 조용히 버린다
+ *   · 고정하지 않는다. 들어와서도 손님이 다른 유형으로 바꿀 수 있다
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { BODY_MAX, validateInquiry, type InquiryField } from '@swonbiz/shared/domain/inquiry';
 import { Icon } from '@/components/ds';
 import styles from './inquiry.module.css';
@@ -55,6 +65,21 @@ export function InquiryForm() {
   }, []);
 
   const typeCodes = useMemo(() => codes.types.map((t) => t.code), [codes]);
+
+  /**
+   * `?type=` 을 유형에 얹는다 — 랜딩에서 들어온 길.
+   *
+   * ★ 코드가 **도착한 뒤에** 판정한다. 먼저 넣으면 코드 마스터에 없는 값이
+   *   `validateInquiry` 를 통과하지 못해 손님이 고르지도 않은 오류를 본다.
+   * ★ 한 번만 얹는다 — 손님이 바꾼 뒤 코드가 다시 와도 되돌리지 않는다.
+   */
+  const wanted = useSearchParams().get('type');
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current || !wanted || typeCodes.length === 0) return;
+    seeded.current = true;
+    if (typeCodes.includes(wanted)) setType(wanted);
+  }, [wanted, typeCodes]);
   const bad = useMemo(
     () =>
       validateInquiry({ name, phone, email, companyName, type, body, password, agreed }, typeCodes),

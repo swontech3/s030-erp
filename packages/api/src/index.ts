@@ -23,6 +23,7 @@ import { registerInquiryAdminRoutes } from './routes/inquiryAdmin.ts';
 import { registerCompanyRoutes } from './routes/companies.ts';
 import { registerFileRoutes } from './routes/files.ts';
 import { registerOcrRoutes } from './routes/ocr.ts';
+import { registerFacilityRoutes } from './routes/facility.ts';
 import { closePool } from './db/pool.ts';
 import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
 
@@ -101,15 +102,15 @@ registerAclRoutes(app);
 registerContractRoutes(app);
 registerBillingRoutes(app);
 registerLookupRoutes(app);
-// ★ 회의실 예약(s0300600010). 조회는 입주사도 하고, 종료 처리만 운영사다.
+// ★ 회의실 예약(s030600010). 조회는 입주사도 하고, 종료 처리만 운영사다.
 registerBookingRoutes(app);
-// ★ 회의실 현황판(s0300500060). **인증 없는 라우트**라 따로 둔다 — 세션을 쓰는 코드와
+// ★ 회의실 현황판(s030500060). **인증 없는 라우트**라 따로 둔다 — 세션을 쓰는 코드와
 //   같은 파일에 섞이면 `config.public` 을 옆 라우트에 잘못 붙이는 사고가 난다.
 registerKioskRoutes(app);
-// ★ 문의상담 게시판(s0300500070). **인증 없는 라우트**라 현황판과 같은 이유로 따로 둔다 —
+// ★ 문의상담 게시판(s030500070). **인증 없는 라우트**라 현황판과 같은 이유로 따로 둔다 —
 //   쓰기가 둘(원글·추가 질문) 있고, 추가 질문은 열람 토큰을 따로 본다.
 registerInquiryRoutes(app);
-// ★ 문의 관리(s0300200080). **운영사 전용**이고 공개 라우트와 **파일이 다르다** —
+// ★ 문의 관리(s030200080). **운영사 전용**이고 공개 라우트와 **파일이 다르다** —
 //   같은 파일에 두면 `config.public` 을 잘못 붙여 개인정보가 로그인 없이 열릴 수 있다.
 registerInquiryAdminRoutes(app);
 registerCompanyRoutes(app);
@@ -119,6 +120,9 @@ registerFileRoutes(app);
 // ★ 사업자등록증 **판독만** 하는 라우트. 아직 입주사가 없는 신규 폼이 쓴다 —
 //   회사가 있으면 첨부 업로드가 판독까지 겸한다(`routes/ocr.ts` 머리말).
 registerOcrRoutes(app);
+// ★ 센터 관리(s030100010) — 건물·층·호실·회의실. **운영사 전용**이고 네 표에 FK 가 없어
+//   「쓰고 있는지」를 핸들러가 직접 센다(`db/facility.ts` 머리말).
+registerFacilityRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,

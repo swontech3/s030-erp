@@ -1,10 +1,14 @@
 /**
  * 공개 영역 틀 — 헤더 · 본문 800px · 푸터.
  *
- * ★★ **ERP 셸이 아니다.** 사이드바도 세션도 없다. 문의상담 세 화면(s0300500070 ·
+ * ★★ **ERP 셸이 아니다.** 사이드바도 세션도 없다. 문의상담 세 화면(s030500070 ·
  *    p1 · p2)이 이 틀 하나를 함께 쓴다.
  * ★ 푸터의 사업자 정보는 **실제 값**이다(02-screens.md §1) — 시안에서 그대로 옮겼다.
+ * ★ 로고는 **랜딩(`/`)으로 간다**(2026-10-01). 전에는 `/inquiry` 였는데, 목록 화면에서
+ *   누르면 같은 화면이라 **아무 일도 안 일어나는 것처럼 보였다.** 공개 영역의 로고는
+ *   랜딩으로 가는 것이 통례이고, 랜딩 머리의 로고도 랜딩 맨 위(`#top`)로 간다.
  */
+import Link from 'next/link';
 import { Icon } from '@/components/ds';
 import styles from './inquiry.module.css';
 import { TEL_HREF, TEL_LABEL } from './inquiry-model';
@@ -14,14 +18,14 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
     <div className={styles.page}>
       <header className={styles.head}>
         <div className={styles.headIn}>
-          <a className={styles.logo} href="/inquiry">
+          <Link className={styles.logo} href="/" aria-label="SwonBiz 홈으로">
             {/* eslint-disable-next-line @next/next/no-img-element -- 고정 크기 워드마크 하나 */}
             <img src="/brand/swonbiz-logo.png" alt="SwonBiz" />
             <span className={styles.wordmark}>
               S<span className={styles.wordmarkDot}>·</span>won
               <span className={styles.wordmarkSuffix}>Biz</span>
             </span>
-          </a>
+          </Link>
           {/* 44px 터치 영역 — 모바일에서 바로 걸 수 있어야 한다 */}
           <a className={styles.tel} href={TEL_HREF}>
             <Icon name="phone" size={16} />

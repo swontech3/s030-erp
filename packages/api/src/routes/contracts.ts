@@ -56,8 +56,12 @@ import { contractDepositState } from '../db/deposits.ts';
 import { pendingKind } from '@swonbiz/shared/domain/settlement-view';
 import { requireSession } from '../session/hook.ts';
 import { findCompany } from '../db/companies.ts';
+import {
+  moduleOffForCompany,
+  onContractConfirmed,
+} from '../companies/registerOrg.ts';
 import { listSpaces } from '../db/lookups.ts';
-import { listCompanyFiles } from '../db/files.ts';
+import { companyTarget, listFiles } from '../db/files.ts';
 import { withCompanyScope, type CompanyScope } from '../db/withCompanyScope.ts';
 import {
   findContract,
@@ -240,11 +244,11 @@ async function roomConflict(
  *   모르는 상태에서 통과시키지 않는다(fail-closed).
  */
 async function missingDocs(
-  client: Parameters<typeof listCompanyFiles>[0],
+  client: Parameters<typeof listFiles>[0],
   companyId: string,
 ): Promise<string | null> {
   const company = await findCompany(client, companyId);
-  const files = await listCompanyFiles(client, companyId);
+  const files = await listFiles(client, companyTarget(companyId));
   return missingDocsMessage(
     company?.member_type ?? '',
     files.map((f) => f.file_purpose),
@@ -266,11 +270,16 @@ const docsMissing = (reply: FastifyReply, message: string) =>
  * ★ `self` — 자기 계약이 잡고 있는 호실은 자기 것으로 세지 않는다.
  *   안 그러면 열어서 그대로 저장하는 것조차 막힌다. **재계약에서는 이전 계약도
  *   여기 들어간다**(`selfContractIds`).
+ *
+ * ★★★ `companyId` — **이 입주사는 세지 않는다.** 한 회사의 계약 둘은 1곳이다
+ *    (결정 2026-10-03). 세면 1곳짜리 호실에서 같은 회사가 계약을 하나 더 맺는 길이
+ *    막힌다. 화면도 같은 값을 넘긴다(`SectionContract` 의 `selfCompanyId`).
  */
 async function spaceConflict(
   client: Parameters<typeof listSpaceHolders>[0],
   rows: readonly { roomType: string; spaceId: string }[],
   self: readonly string[],
+  companyId: string,
 ): Promise<string | null> {
   if (rows.every((r) => r.spaceId === '')) return null;
 
@@ -284,13 +293,21 @@ async function spaceConflict(
     companyId: r.company_id,
     companyName: r.company_name,
   }));
-  const names = new Map(spaceRows.map((s) => [s.space_id, s.room_name ?? '']));
-
-  return rejectSpacePick(
-    rows,
-    occupancyBySpace(holders, self),
-    (id) => names.get(id) ?? '',
+  /*
+   * ★★ 이름과 **「입주 가능 회사 수」를 같은 줄에서** 가져온다. 수를 따로 조회하면
+   *    그 사이에 운영자가 호실을 고칠 수 있고, 그때 이름과 수가 다른 순간의 것이 된다.
+   *
+   * ★ `listSpaces` 는 `is_active = true` 만 준다 — 계약 폼의 셀렉트와 **같은 목록**이다.
+   *   폐쇄한 호실은 여기서도 없으니 `maxCompanies` 가 비고, 기본값 1 로 판정된다.
+   */
+  const limits = new Map(
+    spaceRows.map((s) => [
+      s.space_id,
+      { roomName: s.room_name ?? '', maxCompanies: s.max_companies },
+    ]),
   );
+
+  return rejectSpacePick(rows, occupancyBySpace(holders, self, companyId), (id) => limits.get(id));
 }
 
 const spaceTaken = (reply: FastifyReply, message: string) =>
@@ -305,7 +322,7 @@ const roomTaken = (reply: FastifyReply, conflict: RoomHolder) =>
   });
 
 export function registerContractRoutes(app: FastifyInstance): void {
-  /* ── 계약호실 조회 팝업 (s0300200040p3) ─────────────────────────────────
+  /* ── 계약호실 조회 팝업 (s030200040p3) ─────────────────────────────────
      ★ 운영사 전용이다. 이 목록은 **어느 회사가 어느 호실을 쓰는지**를 통째로 내려
        준다 — 입주사가 볼 것이 아니다(명부 유출과 같은 모양).
      ★ 아무것도 저장하지 않는다. */
@@ -509,7 +526,7 @@ export function registerContractRoutes(app: FastifyInstance): void {
       const conflict = await roomConflict(client, write.contract.contractRoom, self);
       if (conflict) return { kind: 'room_taken' as const, conflict };
 
-      const spaceMessage = await spaceConflict(client, write.spaces, self);
+      const spaceMessage = await spaceConflict(client, write.spaces, self, companyId);
       if (spaceMessage) return { kind: 'space_taken' as const, message: spaceMessage };
 
       // ★ 첫 저장이 바로 확정일 수 있다(create → confirmed). 그 길도 서류를 본다.
@@ -616,6 +633,15 @@ export function registerContractRoutes(app: FastifyInstance): void {
       // ★ 끄지 말 것. 프런트가 Math.round 를 쓰는 동안 계속 뜬다 — 그게 이 경고의 목적이다.
       req.log.warn({ contractId, mismatches: write.warnings }, '화면 금액이 서버 계산과 어긋났다 — 서버 값을 저장했다');
     }
+    /*
+     * ★★ 삐용 회사 등록(3-2) — **트랜잭션이 커밋된 뒤다.**
+     *    이유는 `companies/registerOrg.ts` 머리말에 있다. 실패해도 던지지 않으므로
+     *    확정 응답은 그대로 201 이고, 연동 상태만 `bbiyong` 으로 알려 준다.
+     */
+    const bbiyong = status === 'confirmed'
+      ? await onContractConfirmed({ companyId, session, actor, closedPrevious: created.closedPrevious })
+      : null;
+
     // ★ 이전 계약을 닫았는지 알려 준다. 화면이 「이전 계약이 종료됐습니다」를 말할
     //   근거이고, 검증 스크립트가 보는 값이기도 하다.
     return reply.code(201).send({
@@ -627,6 +653,12 @@ export function registerContractRoutes(app: FastifyInstance): void {
       invoiceCount: created.invoiceCount,
       // ★ 예치금 장부에 무엇이 남았는지 — recorded / none / previous_unrecorded(재계약인데 이전 장부 없음).
       deposit: created.deposit,
+      /**
+       * 삐용 연동 결과 — linked / already / pending / not_found, 확정이 아니면 null.
+       * ★ `pending` 이면 화면이 배너를 띄운다. 계약은 **확정된 상태다.**
+       */
+      bbiyong: bbiyong?.kind ?? null,
+      bbiyongReason: bbiyong?.kind === 'pending' ? bbiyong.reason : null,
     });
   });
 
@@ -683,7 +715,7 @@ export function registerContractRoutes(app: FastifyInstance): void {
       const conflict = await roomConflict(client, write.contract.contractRoom, self);
       if (conflict) return { kind: 'room_taken' as const, conflict };
 
-      const spaceMessage = await spaceConflict(client, write.spaces, self);
+      const spaceMessage = await spaceConflict(client, write.spaces, self, contract.company_id);
       if (spaceMessage) return { kind: 'space_taken' as const, message: spaceMessage };
 
       await updateContract(client, { contractId: contract.contract_id, write: write.contract, actor });
@@ -804,7 +836,14 @@ export function registerContractRoutes(app: FastifyInstance): void {
         billing = settled.kind;
       }
 
-      return { kind: 'ok' as const, invoiceCount, billing, deposit };
+      return {
+        kind: 'ok' as const,
+        invoiceCount,
+        billing,
+        deposit,
+        // ★ 삐용 등록은 이 트랜잭션 **밖**에서 한다. 여기서는 어느 회사인지만 들고 나간다.
+        companyId: contract.company_id,
+      };
     });
 
     /*
@@ -823,6 +862,24 @@ export function registerContractRoutes(app: FastifyInstance): void {
     if (result.kind === 'rejected') {
       return reply.code(400).send({ error: 'invalid_transition', message: result.message });
     }
+    /*
+     * ★★ 삐용 연동 — **트랜잭션이 커밋된 뒤다**(`registerOrg.ts` 머리말).
+     *
+     *    확정  신규 등록 또는 재입주(`onContractConfirmed` 가 가린다)
+     *    종료  퇴실 — ★ 살아 있는 계약이 남아 있으면 보내지 않는다
+     *    취소  보낼 것이 없다 — 아직 아무것도 일어나지 않은 계약을 접는 것이다
+     *
+     *    어느 쪽도 던지지 않는다. 실패는 `pending` 이고 화면이 배너를 띄운다.
+     */
+    const bbiyong =
+      to === 'confirmed'
+        ? /* 이 경로는 이전 계약을 닫지 않는다 — 재계약은 생성 경로에서만 일어난다. */
+          await onContractConfirmed({ companyId: result.companyId, session, actor, closedPrevious: null })
+        : to === 'terminated'
+          ? /* ★ 퇴실 — 살아 있는 계약이 남아 있으면 moduleOffOrg 가 보내지 않는다. */
+            await moduleOffForCompany({ companyId: result.companyId, session, actor })
+          : null;
+
     // ★ `billing` 은 청구 쪽에서 무슨 일이 있었는지다 — created / already / untouched /
     //   settled / no_invoices / none. 화면은 아직 안 쓰고 검증 스크립트가 본다.
     return reply.send({
@@ -831,6 +888,9 @@ export function registerContractRoutes(app: FastifyInstance): void {
       invoiceCount: result.invoiceCount,
       billing: result.billing,
       deposit: result.deposit,
+      /** 삐용 연동 결과. 확정이 아니면 null. `pending` 이면 화면이 배너를 띄운다. */
+      bbiyong: bbiyong?.kind ?? null,
+      bbiyongReason: bbiyong?.kind === 'pending' ? bbiyong.reason : null,
     });
   });
 }

@@ -1,4 +1,4 @@
-/** @screen s0300200040 계약 폼 · 020 입주사관리 · 1차 */
+/** @screen s030200040 계약 폼 · 020 입주사관리 · 1차 */
 
 /**
  * 계약 폼 페이지.
@@ -17,7 +17,7 @@
  *   회사를 따로 받을 이유가 없고, 둘이 어긋나면 어느 쪽이 맞는지 알 수 없다.
  *   서버도 같은 것을 다시 본다(`rejectRenewal`).
  *
- * ★ 사이드바에 없는 화면이다(`lib/sidebar.ts` 의 `s0300200040: null`). 계약 목록·상세에서
+ * ★ 사이드바에 없는 화면이다(`lib/sidebar.ts` 의 `s030200040: null`). 계약 목록·상세에서
  *   들어온다. 그래도 `requireScreen` 은 반드시 거친다 — 메뉴에 없다는 것은 방어가 아니고,
  *   URL 을 직접 치면 열리기 때문이다.
  *
@@ -48,7 +48,7 @@ export default async function ContractFormPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ companyId?: string; renewFrom?: string }>;
 }) {
-  await requireScreen('s0300200040', '/contracts/[id]');
+  await requireScreen('s030200040', '/contracts/[id]');
 
   const { id } = await params;
   const { companyId, renewFrom } = await searchParams;

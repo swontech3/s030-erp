@@ -125,7 +125,7 @@ export function parseSignIn(body: unknown): SignInOutcome {
   //
   //   ★★ **1단계 응답에는 orgTp 가 없다**(회신 2026-09-12 §4). 겸직 계정이 이 가지를
   //      타면 후보 목록만으로는 어느 후보가 운영사인지 알 수 없다 — orgTp 는 2단계
-  //      `/sign-in-org` 응답에서 비로소 나온다. 2단계 로그인 팝업(s0300000010p1)을
+  //      `/sign-in-org` 응답에서 비로소 나온다. 2단계 로그인 팝업(s030000010p1)을
   //      만들 때 orgTp 는 **반드시 2단계 응답에서** 읽어야 하고, 후보에 붙은 조직
   //      이름이나 목록 순서로 운영사를 추측해서는 안 된다(같은 회신 §3② — '에스원3DP'
   //      · '에스원BD' 는 org_tp='N' 인 고객사다).
@@ -242,12 +242,12 @@ export class HttpBbiyongAuth implements BbiyongAuth {
     const out = parseSignIn(body);
 
     if (out.kind === 'orgSelect') {
-      // ★ 조용히 실패시키지 않는다. 이 줄이 로그에 찍히면 2단계 로그인 팝업(s0300000010p1)을
+      // ★ 조용히 실패시키지 않는다. 이 줄이 로그에 찍히면 2단계 로그인 팝업(s030000010p1)을
       //   만들 때가 된 것이다. 이메일을 남기는 것은 이 경로만이다 — 자격 증명은 이미
       //   통과했고(계정 열거가 아니다), 누구를 도와줘야 하는지 알아야 한다.
       console.warn(
         `[bbiyong] needOrgSelect — 겸직 계정 로그인 시도: ${email} (후보 ${out.candidateCount}개). ` +
-          '2단계 로그인 팝업 s0300000010p1 이 필요하다는 신호다.',
+          '2단계 로그인 팝업 s030000010p1 이 필요하다는 신호다.',
       );
       throw new BbiyongOrgSelectRequiredError(ORG_SELECT_MESSAGE, out.candidateCount);
     }

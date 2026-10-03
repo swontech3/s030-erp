@@ -15,6 +15,7 @@
  */
 import type { ScopedClient } from './withCompanyScope.ts';
 import type { ContractWrite } from '@swonbiz/shared/domain/contract-payload';
+import { syncSpaceStatuses, syncSpaceStatusesOfContract } from './spaceStatus.ts';
 
 /** pg 의 결과 모양. `ScopedClient.query` 가 `unknown` 을 돌려주므로 여기서 좁힌다. */
 interface Rows<T> {
@@ -139,7 +140,7 @@ export async function listContracts(
 }
 
 /**
- * 계약호실을 쓰고 있는 계약들 — 조회 팝업(`s0300200040p3`)과 저장 검증이 **같은 함수**를 쓴다.
+ * 계약호실을 쓰고 있는 계약들 — 조회 팝업(`s030200040p3`)과 저장 검증이 **같은 함수**를 쓴다.
  *
  * ★ 「살아 있는 계약」만 본다(`ROOM_LIVE_STATUSES`). 종료·취소된 계약의 번호는
  *   다시 쓸 수 있다 — 퇴실했으면 그 호실로 다시 신고한다.
@@ -273,6 +274,18 @@ export async function replaceSpaces(
   },
 ): Promise<void> {
   const { contractId, companyId, spaces, actor, newId } = args;
+
+  /*
+   * ★★ 지우기 **전에** 옛 호실을 들고 있는다. 계약에서 **빠진** 호실도 상태를 다시
+   *    세야 하는데, 지운 뒤에는 그 호실이 이 계약의 것이 아니라 찾을 길이 없다
+   *    (`db/spaceStatus.ts` 머리말).
+   */
+  const { rows: before } = await q<{ space_id: string }>(
+    client,
+    `SELECT space_id FROM public.tb_s080_contract_spaces WHERE contract_id = $1`,
+    [contractId],
+  );
+
   await q(client, `DELETE FROM public.tb_s080_contract_spaces WHERE contract_id = $1`, [contractId]);
 
   for (const row of spaces) {
@@ -290,6 +303,13 @@ export async function replaceSpaces(
       ],
     );
   }
+
+  /* ★ 옛 호실 ∪ 새 호실 — 뺀 방은 「공실」로, 넣은 방은 계약 상태대로 간다. */
+  await syncSpaceStatuses(
+    client,
+    [...before.map((r) => r.space_id), ...spaces.map((row) => row.spaceId)],
+    actor,
+  );
 }
 
 /**
@@ -340,4 +360,11 @@ export async function updateStatus(
       WHERE contract_id=$1`,
     [args.contractId, args.toStatus, args.terminatedDate, args.terminationReason, args.actor],
   );
+
+  /*
+   * ★★ 계약 상태가 바뀌면 그 계약의 호실도 따라 바뀐다 — 확정이면 「입주중」,
+   *    종료·취소면 「공실」(다른 살아 있는 계약이 없을 때). **같은 트랜잭션**이라
+   *    계약만 바뀌고 호실은 안 바뀐 순간이 없다(`db/spaceStatus.ts` 머리말).
+   */
+  await syncSpaceStatusesOfContract(client, args.contractId, args.actor);
 }

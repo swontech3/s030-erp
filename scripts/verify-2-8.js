@@ -124,12 +124,12 @@ async function apiLogin(email) {
   {
     const raw = sessions['tenant@test.com'].erpSid;
     const countDeny = async () => (await c.query(
-      `SELECT count(*)::int n FROM tb_s080_acl_shadow_log WHERE s020_member_id = 2001 AND screen_code = 's0300000060' AND verdict = 'DENY' AND enforced = false`)).rows[0].n;
+      `SELECT count(*)::int n FROM tb_s080_acl_shadow_log WHERE s020_member_id = 2001 AND screen_code = 's030000060' AND verdict = 'DENY' AND enforced = false`)).rows[0].n;
     const before = await countDeny();
     await fetch(`${API}/acl/verify`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: `erp_sid=${raw}` },
-      body: JSON.stringify({ screenCode: 's0300000060', action: 'VIEW', route: '/dashboard' }),
+      body: JSON.stringify({ screenCode: 's030000060', action: 'VIEW', route: '/dashboard' }),
     });
     await new Promise((r) => setTimeout(r, 300)); // 기록은 fire-and-forget 이라 잠깐 기다린다
     const after = await countDeny();

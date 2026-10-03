@@ -1,10 +1,10 @@
-/** @screen s0300200070 월별 청구 · 020 입주사관리 · 3차(청구 1단계와 함께 당김) */
+/** @screen s030200070 월별 청구 · 020 입주사관리 · 3차(청구 1단계와 함께 당김) */
 
 /**
  * 월별 청구 — 사이드바 「청구」.
  *
  * 원본: design/erp-tenants/ErpTenants.dc.html 의 `data-view="billing"` ← 구성
- * 모양: design/handoff (s0300200030 목록 · s0300200040 확인 모달) ← 색·글꼴·표·버튼
+ * 모양: design/handoff (s030200030 목록 · s030200040 확인 모달) ← 색·글꼴·표·버튼
  *
  * ★ 시안의 **세금계산서 칸과 「청구서 발행」·「미발행 N건 발행」 버튼은 만들지 않는다.**
  *   청구서는 계약 확정이 만들고(발행 절차가 없다), 세금계산서는 이번 범위가 아니다.
@@ -18,6 +18,6 @@ import { requireScreen } from '@/lib/session';
 import { BillingView } from './BillingView';
 
 export default async function BillingPage() {
-  await requireScreen('s0300200070', '/billing');
+  await requireScreen('s030200070', '/billing');
   return <BillingView />;
 }

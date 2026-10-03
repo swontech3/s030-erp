@@ -22,25 +22,11 @@ const only = process.argv[2];
 //   3) ★ 여기 있는 자원이 **생기면 STALE 로 실패한다** — 디자인이 전달한 순간 이 목록은
 //      낡은 것이 되고, 지우지 않으면 다음 누락을 이 항목이 가려 버린다.
 //      "회신이 오면 자동으로 다시 빨개진다"는 것이 3번이다.
-const KNOWN_MISSING = [
-  {
-    folder: 'landing-hero',
-    urls: [
-      '../_ds/swonbiz/assets/spaces/lounge.png',
-      '../_ds/swonbiz/assets/spaces/single-room.png',
-      '../_ds/swonbiz/assets/spaces/two-person-room.png',
-      '../_ds/swonbiz/assets/spaces/dedicated-desk.png',
-      '../_ds/swonbiz/assets/spaces/team-office.png',
-      '../_ds/swonbiz/assets/spaces/meeting-room.png',
-      '../_ds/swonbiz/assets/spaces/pantry.png',
-    ],
-    since: '2026-09-08',
-    reason: '공간 사진 7장이 디자인 전달분에 없다. 랜딩(0차)에서만 쓰고 1차 화면은 막지 않는다.',
-    recover:
-      '디자인 회신 ②(doc/DESIGN_QUESTIONS.md). 파일이 도착하면 이 항목을 지운다 — ' +
-      '지우지 않아도 이 스크립트가 STALE 로 실패시킨다.',
-  },
-];
+// ★ 2026-10-01 — 공간 사진 7장 항목을 지웠다. 3번이 실제로 작동한 자리다:
+//   사진은 2026-09-13 2차 인계분(`시안_2/assets/spaces/`)에 이미 들어와 있었는데
+//   `_ds/swonbiz/assets/` 사본만 갱신이 안 돼서 18일 동안 아무도 몰랐다. 랜딩을
+//   만들려고 사본을 채운 순간 이 스크립트가 STALE 7건으로 터졌다 — 그래서 알았다.
+const KNOWN_MISSING = [];
 
 const knownFor = (folder, url) =>
   KNOWN_MISSING.find((k) => k.folder === folder && k.urls.includes(url));

@@ -1,7 +1,7 @@
 /**
  * 계약 금액 계산 규칙 — 테스트가 규칙의 기록이다.
  *
- * 정본은 `doc/CONTRACT_DATA_MODEL.md`. 시안(`s0300200040.html`)은 모양의 정본이지
+ * 정본은 `doc/CONTRACT_DATA_MODEL.md`. 시안(`s030200040.html`)은 모양의 정본이지
  * 계산의 정본이 아니다 — 시안은 `Math.round`, 확정 규칙은 **버림**이다.
  */
 import { describe, it, expect } from 'vitest';

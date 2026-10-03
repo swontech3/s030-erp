@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * s0300600010 회의실 예약 — 주간 그리드 · 월간 · 등록/수정 모달.
+ * s030600010 회의실 예약 — 주간 그리드 · 월간 · 등록/수정 모달.
  *
  * 시안: design/handoff/prototypes/s0300600010.html  (2026-09-27 2차 인계)
  * 명세: design/handoff/room-booking/ 01~05 · 07 · 08
@@ -26,7 +26,7 @@
  * `usedMinutesByDate` 는 **전 회의실 합산**이고(화면이 세면 다른 방 시간이 빠진다),
  * `busy` 는 **시각 넷뿐**이다(026 — 회사명·제목·예약자가 오지 않는다).
  *
- * ★ 아직 없는 것: 키오스크(s0300500060) · 외부 예약(2차).
+ * ★ 아직 없는 것: 키오스크(s030500060) · 외부 예약(2차).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {

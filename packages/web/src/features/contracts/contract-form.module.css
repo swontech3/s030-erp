@@ -1,12 +1,12 @@
 /*
- * s0300200040 계약 폼 — 원본: design/handoff/prototypes/s0300200040.html
+ * s030200040 계약 폼 — 원본: design/handoff/prototypes/s0300200040.html
  *                      명세: design/handoff/tenant-contract/03-contract-form.md · 04-status.md
  *
  * 값은 원본의 <style> 블록 그대로다. 개발이 토큰을 새로 만들지 않고, 원본에 없는 값을
  * 지어내지 않는다.
  *
  * ★ 원본은 셸까지 한 파일에 그린 통짜 미리보기라 .shell / .sidebar / .topbar / .devbar 를
- *   자기가 들고 있다. 그 넷은 여기 없다 — 셸은 AppShell(s0300000050)이고, devbar 는
+ *   자기가 들고 있다. 그 넷은 여기 없다 — 셸은 AppShell(s030000050)이고, devbar 는
  *   원본이 「개발 확인용입니다. 실서비스 화면에는 포함되지 않습니다」라고 못박은 것이다.
  *
  * ★ .main 이 padding:32px 를 이미 준다(AppShell.module.css). 원본의 바깥 패딩을 그대로
@@ -1044,7 +1044,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   계약호실 확인 팝업 (s0300200040p3)
+   계약호실 확인 팝업 (s030200040p3)
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* 6열이 들어가야 해서 확인 모달(480px)보다 넓다. */
@@ -1128,4 +1128,37 @@
 
 .roomPick:hover {
   background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   삐용 연동 대기 (3-2)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ `.saveError` 와 **색이 다르다.** 저장은 실패하지 않았다 — 계약은 확정됐고
+     청구서도 만들어졌다. 삐용 연결만 아직이다. 빨강으로 두면 운영자가 계약이
+     안 된 줄 읽고 다시 확정을 누른다. 경고(amber)가 이 상태의 정확한 색이다.
+   ★ 버튼은 오른쪽 끝으로 밀어 둔다 — 문구가 길어져도 자리가 흔들리지 않는다.
+   ══════════════════════════════════════════════════════════════════════════ */
+.linkPending {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-warning-text);
+}
+
+.linkPending > span {
+  flex: 1 1 auto;
+}
+
+/* 배너 안의 버튼은 한 줄 높이에 맞춘다 — 헤더 버튼(40px)은 여기서 너무 크다. */
+.linkPending .btn {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+  flex: 0 0 auto;
 }

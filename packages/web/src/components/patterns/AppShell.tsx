@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * ERP 셸 s0300000050 — 원본: design/erp-tenants/ErpTenants.dc.html 의 <aside> + 헤더.
+ * ERP 셸 s030000050 — 원본: design/erp-tenants/ErpTenants.dc.html 의 <aside> + 헤더.
  *
  * ★ erp-dashboard · erp-settings 의 셸은 정적이라 참고하지 않았다. 접기·툴팁·상태 저장이
  *   온전한 것은 erp-tenants 뿐이다(지시서 2-7).
@@ -238,7 +238,7 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
             </button>
           ) : null}
           <div>
-            {/* TODO(페이즈 3): 지점명은 기준설정(s0300100010)이 생기면 실제 값으로 바꾼다. */}
+            {/* TODO(페이즈 3): 지점명은 기준설정(s030100010)이 생기면 실제 값으로 바꾼다. */}
             <div className={styles.crumb}>{display ? display.orgName : ''}</div>
             <div className={styles.title}>{title}</div>
           </div>

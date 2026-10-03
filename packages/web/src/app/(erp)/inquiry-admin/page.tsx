@@ -1,10 +1,10 @@
-/** @screen s0300200080 문의상담관리 · 020 입주사관리 · 3차 */
+/** @screen s030200080 문의상담관리 · 020 입주사관리 · 3차 */
 
 /**
  * 문의상담관리 — 사이드바 「문의상담관리」. 고객이 남긴 문의에 **운영자가 답하는 화면**이다.
  *
  * ★ **시안이 없다.** 기존 ERP 목록 화면의 모양으로 만들었다 — 2단 레이아웃은
- *   `s0300200030`(입주사·계약), 스레드 카드는 고객 글 보기(`s0300500070p2`) 의 것이다.
+ *   `s030200030`(입주사·계약), 스레드 카드는 고객 글 보기(`s030500070p2`) 의 것이다.
  *   맞춰야 할 점은 `design/handoff/inquiry-board/03-thread.md` §5 다.
  *
  * ★★ **운영사 전용(audience_tp='P').** 남이 남긴 이름·연락처·이메일·본문이 한 화면에
@@ -23,7 +23,7 @@ import type { InquiryCodes } from '@/features/inquiry/inquiry-model';
 import { InquiryAdminView } from './InquiryAdminView';
 
 export default async function InquiryAdminPage() {
-  await requireScreen('s0300200080', '/inquiry-admin');
+  await requireScreen('s030200080', '/inquiry-admin');
 
   // ★ 코드 조회가 실패해도 화면은 연다 — 뱃지에 코드값(R·O)이 보이는 편이 오류 화면보다 낫다.
   const res = await callApi<InquiryCodes>('/inquiries/codes');

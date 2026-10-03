@@ -1,4 +1,4 @@
-/** @screen s0300600010 회의실 예약 · 060 공간운영 */
+/** @screen s030600010 회의실 예약 · 060 공간운영 */
 
 /**
  * 회의실 예약 — 사이드바 「예약」.
@@ -36,7 +36,7 @@ export default async function BookingPage({
    */
   searchParams: Promise<{ room?: string; src?: string }>;
 }) {
-  await verifyScreen('s0300600010', '/booking');
+  await verifyScreen('s030600010', '/booking');
   const me = await getMe();
   if (!me) redirect('/login');
   const { room } = await searchParams;

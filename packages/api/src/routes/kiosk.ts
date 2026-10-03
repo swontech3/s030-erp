@@ -1,5 +1,5 @@
 /**
- * 회의실 현황판 라우트 — s0300500060.
+ * 회의실 현황판 라우트 — s030500060.
  *
  * 명세: design/handoff/room-booking/06-kiosk.md · 시안 prototypes/s0300500060.html
  *

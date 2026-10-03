@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * s0300500060 회의실 현황판 — 벽면 태블릿. **로그인 없음 · 표시 전용 · 24시간 켜 둠.**
+ * s030500060 회의실 현황판 — 벽면 태블릿. **로그인 없음 · 표시 전용 · 24시간 켜 둠.**
  *
  * 시안: design/handoff/prototypes/s0300500060.html (2026-09-27 2차 인계)
  * 명세: design/handoff/room-booking/06-kiosk.md

@@ -2,7 +2,7 @@
  * 입주사 상태 판정 시험.
  *
  * 정본은 `design/handoff/tenant-contract/02-master-detail.md` 와 시안
- * `s0300200030.html` 의 `DEMO_TENANTS` 다 — 시안 5건이 어떤 상태로 그려져 있는지가
+ * `s030200030.html` 의 `DEMO_TENANTS` 다 — 시안 5건이 어떤 상태로 그려져 있는지가
  * 이 규칙의 근거이므로, 그 5건을 그대로 재현하는 시험을 마지막에 둔다.
  */
 import { describe, expect, it } from 'vitest';
@@ -161,7 +161,7 @@ describe('deriveTenantStatus', () => {
   });
 
   it('★ 시안 5건을 그대로 재현한다', () => {
-    // s0300200030.html 의 DEMO_TENANTS — 노틸러스·오르카·한결(계약중) /
+    // s030200030.html 의 DEMO_TENANTS — 노틸러스·오르카·한결(계약중) /
     // 브릿지랩(D-9, 계약 2건) / 세움(계약 0건 → 검토중).
     const cases: [string, TenantContractFact[], string, string[]][] = [
       ['노틸러스', [confirmed('2027-03-01')], '계약중', ['active']],

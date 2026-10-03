@@ -1,6 +1,6 @@
 'use client';
 
-/** @screen s0300200040 계약 폼 · 섹션 2 계약정보 · 020 입주사관리 · 1차 */
+/** @screen s030200040 계약 폼 · 섹션 2 계약정보 · 020 입주사관리 · 1차 */
 
 /**
  * 섹션 2 — 계약정보. **계약 1건 = 계약 항목 N개 + 계약 조건 1세트**.
@@ -70,6 +70,16 @@ interface Props {
    *   사용 중」이 되어 자기 이전 계약 때문에 재계약이 막힌다.
    */
   selfContractIds: readonly string[];
+  /**
+   * 이 계약을 쓰는 입주사 — **입주 계산에서 뺀다.**
+   *
+   * ★★★ 한 회사의 계약 둘은 1곳이다(결정 2026-10-03). 자기 회사를 세면 1곳짜리 호실에
+   *    같은 회사가 계약을 하나 더 맺는 길이 막힌다. 서버도 같은 값을 뺀다
+   *    (`routes/contracts.ts` 의 `spaceConflict`).
+   *
+   * ★ 아직 입주사를 안 고른 신규면 `null` 이다. 그때는 뺄 것이 없다.
+   */
+  selfCompanyId: string | null;
   codes: readonly CodeOption[];
   /** 섹션 2 를 수정할 수 있는가. `editableSections()` 이 판정한 값이다. */
   editable: boolean;
@@ -77,7 +87,7 @@ interface Props {
   onItems: (next: ItemRow[]) => void;
   onTerms: (patch: Partial<TermsState>) => void;
   onStub: (message: string) => void;
-  /** 계약호실 확인 팝업(`s0300200040p3`)을 연다. 계약호실은 팝업으로만 넣는다. */
+  /** 계약호실 확인 팝업(`s030200040p3`)을 연다. 계약호실은 팝업으로만 넣는다. */
   onOpenRoomPicker: () => void;
 }
 
@@ -99,6 +109,7 @@ export function SectionContract({
   spaces,
   spaceHolders,
   selfContractIds,
+  selfCompanyId,
   codes,
   editable,
   invalid,
@@ -124,16 +135,20 @@ export function SectionContract({
   const floors = floorsOf(spaces, terms.buildId);
 
   /*
-   * ★★ 호실별 입주 현황. **자기 계약은 빼고** 센다 — 세면 자기 계약을 열어 그대로
-   *    저장할 때 자기 호실이 목록에서 사라지고, 빈 줄로 저장된다.
+   * ★★ 호실별 입주 현황 — **다른 회사가 몇 곳 들어 있는가**.
+   *
+   * ★ **자기 계약은 빼고** 센다 — 세면 자기 계약을 열어 그대로 저장할 때 자기 호실이
+   *   목록에서 사라지고, 빈 줄로 저장된다.
+   *
+   * ★★★ **자기 회사도 뺀다**(`selfCompanyId`) — 한 회사의 계약 둘은 1곳이다.
    *
    * ★ 판정도 문구도 `@swonbiz/shared/domain/space-occupancy` 한 곳이다. 서버가
    *   저장할 때 **같은 함수**로 다시 본다 — 셀렉트에서 사라진 호실이 API 로는
    *   들어가면 막은 의미가 없다.
    */
   const occupancy = useMemo(
-    () => occupancyBySpace(spaceHolders, selfContractIds),
-    [spaceHolders, selfContractIds],
+    () => occupancyBySpace(spaceHolders, selfContractIds, selfCompanyId),
+    [spaceHolders, selfContractIds, selfCompanyId],
   );
 
   const patchRow = (index: number, patch: Partial<ItemRow>) =>
@@ -332,9 +347,11 @@ export function SectionContract({
 
                 {/*
                   호실 — ★ 표시는 room_name, 값은 space_id. 계약구분·건물·층으로 거르고,
-                  그 위에 **입주 현황**으로 한 번 더 거른다:
-                    비상주(VR)  아무도 없는 호실만
-                    그 외        1곳까지. 그때는 「Room 1 (에스원3DP)」로 누가 쓰는지 보여준다
+                  그 위에 **입주 현황**으로 한 번 더 거른다.
+
+                  ★★ 몇 곳까지인지는 **호실이 정한다**(`maxCompanies` · 센터 관리 p3).
+                     2026-10-03 까지는 「비상주 1곳 · 그 외 2곳」이 코드에 박혀 있었다.
+                  ★ 자리가 남아 목록에 남은 호실은 「Room 1 (에스원3DP)」로 누가 쓰는지 적는다.
                 */}
                 <span className={styles.cell}>
                   <span className={styles.selectWrap}>
@@ -356,8 +373,8 @@ export function SectionContract({
                             //   서버가 이유를 말하며 거절한다.
                             s.spaceId === row.spaceId ||
                             canPickSpace({
-                              roomType: row.roomType,
                               occupancy: occupancy.get(s.spaceId),
+                              maxCompanies: s.maxCompanies,
                               pickedElsewhere: pickedElsewhere.has(s.spaceId),
                             }),
                         )
@@ -468,7 +485,7 @@ export function SectionContract({
             {/*
               국세청 신고용 대표 호실. 계약당 1개다.
 
-              ★★ **읽기 전용이다. 팝업으로만 넣는다**(`s0300200040p3`).
+              ★★ **읽기 전용이다. 팝업으로만 넣는다**(`s030200040p3`).
                  직접 타이핑을 열어 두면 중복 판정을 거치지 않은 번호가 들어온다 —
                  이 번호는 세무서에 내는 번호라 겹치면 밖에서 사고가 난다.
                  명세도 「ReadOnly + 조회 아이콘」이다(`03-contract-form.md` 섹션 2).

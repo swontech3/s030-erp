@@ -62,11 +62,11 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       login = await bbiyongAuth.signIn(email, password);
     } catch (err) {
       // ★ 겸직 계정 — 자격 증명은 맞았고 단체를 못 고른 것뿐이다. 조용히 실패시키지 않는다.
-      //   이 줄이 로그에 찍히면 2단계 로그인 팝업(s0300000010p1)을 만들 때가 된 것이다(회신 ⑦ §4).
+      //   이 줄이 로그에 찍히면 2단계 로그인 팝업(s030000010p1)을 만들 때가 된 것이다(회신 ⑦ §4).
       if (err instanceof BbiyongOrgSelectRequiredError) {
         req.log.warn(
           { candidateCount: err.candidateCount },
-          '겸직 계정 로그인 시도 — needOrgSelect. 2단계 로그인 팝업 s0300000010p1 이 필요하다',
+          '겸직 계정 로그인 시도 — needOrgSelect. 2단계 로그인 팝업 s030000010p1 이 필요하다',
         );
         return reply.code(401).send({ error: 'org_select_required', message: err.message });
       }

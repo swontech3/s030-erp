@@ -18,7 +18,7 @@ CREATE TABLE public.tb_s080_acl_shadow_log (
   occurred_at    timestamptz NOT NULL DEFAULT now(),
   s020_member_id integer,
   s020_org_id    integer,
-  screen_code    text,                       -- ERP 화면 ID (s0300000060 …)
+  screen_code    text,                       -- ERP 화면 ID (s030000060 …)
   action         text,                       -- VIEW | CREATE | UPDATE | DELETE
   verdict        text,                       -- DENY | ALLOW_STALE | NO_GRANT_LIST
   route          text,                       -- 실제 라우트

@@ -269,7 +269,7 @@ UI의 `terminated`가 생성·수정 경로에서는 **취소(C)**, 전용 해�
 |---|---|---:|---|
 | **법인설립** | `/api/incorporations/**` | 10 | 4차. 새 설계에 화면이 없다(`SCREEN_LIST` 040 미확정). 손대면 순수 손실 |
 | **법인변경** | `/api/corp-changes/**` | 6 | 동일 |
-| **양식 빌더** | `/api/form-templates/**` · `/api/form-data-sources/**` · `/api/admin/doc-form-settings/**` | 8 | `s0300100020` 표양식 관리(4차)에 대응. 이미 완성돼 있다 |
+| **양식 빌더** | `/api/form-templates/**` · `/api/form-data-sources/**` · `/api/admin/doc-form-settings/**` | 8 | `s030100020` 표양식 관리(4차)에 대응. 이미 완성돼 있다 |
 | **사업목적 카탈로그** | `/api/biz-purposes/catalog` · `/api/admin/biz-purposes/review` | 2 | 법무 부속 |
 | **공통코드** | `/api/codes` · `/api/admin/codes/**` | 6 | `code_masters` + `codes_line` 계층형. 신규 설계에 대응 화면 없음. 그대로 쓴다 |
 | **사업자등록증 OCR** | `/api/contracts/ocr-biz-reg` | 1 | Google Vision 연동. 신규 설계에 없는 기능이고 계약 폼 입력 보조로 값어치가 크다 |
@@ -283,7 +283,7 @@ UI의 `terminated`가 생성·수정 경로에서는 **취소(C)**, 전용 해�
 | 그룹 | 라우트 | 수 | 재작성 이유 |
 |---|---|---:|---|
 | **계약** | `/api/contracts` · `/[id]` · `/[id]/cancel` · `/[id]/midterm` · `/[id]/midterm-cancel` · `/[id]/settlement-preview` · `/check-biz-number` · `/check-company` · `/check-room` · `/companies` | 10 | 격리축(§1-7) · 상태어휘(§1-8) · 계약항목/사용자 확장(N1·N2) · 스냅샷(N7)이 전부 여기 |
-| **기준관리** | `/api/admin/spaces/{buildings,floors,rooms,meeting-rooms}[/**]` | 11 | 격리축 · `s0300100010` 화면 재구성 · 예약 정책 기본값(N10) |
+| **기준관리** | `/api/admin/spaces/{buildings,floors,rooms,meeting-rooms}[/**]` | 11 | 격리축 · `s030100010` 화면 재구성 · 예약 정책 기본값(N10) |
 | **조회용 기준정보** | `/api/buildings` · `/api/floors` · `/api/spaces` · `/api/spaces/buildings` · `/api/spaces/status` · `/api/facilities` | 6 | 위와 같은 테이블. 스코프 헬퍼를 태워야 한다 |
 | **청구·수납** | `/api/invoices` · `/api/invoices/[id]/payments` · `/api/payments/[id]` | 3 | 격리축. BILLING은 운영사 전용 여부가 회신 ⑧에 걸림 |
 | **예약** | `/api/reservations` · `/api/reservations/[id]` | 2 | 격리축 · 타임존(C1) · 배타제약(C2) · 상태 확장(C6) · 「본인 것만」 범위(O5) |
@@ -407,10 +407,10 @@ export async function getAuthContext(): Promise<AuthContext | null> {
 | 취소 | ● | `/api/reservations/[id]` PATCH |
 | 슬롯·겹침·요금 검증 | ● | `lib/reservation-validation.ts` (06:00~24:00, 30분) |
 | 예약자 이름 해석 | ● | 직원 → 구성원 → User 순 |
-| **상태 `requested`·`rejected`** | **○** | 외부 예약 승인 큐(`s0300600020`)에 필요 |
+| **상태 `requested`·`rejected`** | **○** | 외부 예약 승인 큐(`s030600020`)에 필요 |
 | **타사 예약 마스킹** | **○** | ACL-06 |
 | **「본인 것만」 범위** | **○** | `created_by_s020_member_id` 없음 |
-| **외부(비로그인) 예약** | **○** | `s0300500040`. 미구현 |
+| **외부(비로그인) 예약** | **○** | `s030500040`. 미구현 |
 
 기본 운영시간이 코드 상수(06:00~24:00)로 박혀 있다. 신규 설계는 `lib/constants.ts` + 회의실별 override 구조이므로 재작성 시 옮긴다.
 
@@ -432,7 +432,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
 
 건물 → 층 → 호실 → 회의실 4계층 CRUD가 `/api/admin/spaces/**` 12개 라우트로 완성돼 있다. 호실 일괄 등록(`rooms/bulk`), 도면 첨부(`files`), 지점 담당자(`managers`)까지 있다.
 
-**`s0300100010` 센터 관리 화면은 신규 디자인이 불필요하다**(SCREEN_LIST 주석)는 판단과 맞물려, 이 영역은 API를 [B]로 재작성하되 로직 손실이 거의 없다.
+**`s030100010` 센터 관리 화면은 신규 디자인이 불필요하다**(SCREEN_LIST 주석)는 판단과 맞물려, 이 영역은 API를 [B]로 재작성하되 로직 손실이 거의 없다.
 
 ## 3-6. 인증 — ● (전부 폐기)
 
@@ -792,7 +792,7 @@ node scripts/inspect-deps.js .env     # 제약·인덱스 정합
 | **7** | `lib/contract-status.ts` 단일화 + 어휘 분리 | §4-5. `009` CHECK 제약의 선행 | 없음 |
 | **8** | `tb_cm_file` 조회 단일 헬퍼 + 부모 경유 검증 | 첨부파일 격리 사각지대 (§4-2) | 없음 |
 | **9** | `006_rename_operator.sql` 작성 + `schema.prisma` 치환 | 격리축 혼동 제거 | 앱 정지 창 확보 |
-| **10** | 랜딩·로그인 UI 이관 (`s0300500010` · `s0300000010`) | 디자인 완료 상태 | 없음 |
+| **10** | 랜딩·로그인 UI 이관 (`s030500010` · `s030000010`) | 디자인 완료 상태 | 없음 |
 
 **2번이 가장 급하다.** anon 키가 클라이언트 번들에 들어가 있고 테이블 전권이 열려 있다. 운영 데이터가 들어가기 전에 닫는다. 코드 변경 없이 SQL 한 건이다.
 

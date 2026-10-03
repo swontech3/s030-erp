@@ -14,8 +14,16 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ACL_ACTIONS, bbiyongAcl, type AclAction } from '../bbiyong/index.ts';
 import { requireSession } from '../session/hook.ts';
 
-/** ERP 화면코드 형식 — s030 + 3자리 업무구분 + 4자리 순번 [+ p{n}] (ORG §5-1). */
-const SCREEN_CODE = /^s030\d{7}(p\d{1,2})?$/;
+/**
+ * ERP 화면코드 형식 — `s03` + 3자리 업무구분 + 4자리 순번 [+ `p{n}`] = **10자리**.
+ *
+ * ★★ 2026-10-02 에 11자리(`s030` + 7자리)에서 10자리로 줄였다 — 삐용이 `s02`+`120`+`0010`
+ *    으로 10자리를 쓰는데 우리만 시스템코드가 4자리였다(`SWONBIZ_SCREEN_LIST.md` §1).
+ *    ★ 이 정규식은 그때 **놓쳤다.** 코드 문자열이 아니라 패턴이라 일괄 치환에 걸리지 않았고,
+ *      그래서 모든 `/acl/verify` 호출이 400 「화면코드 형식이 올바르지 않습니다」가 됐다
+ *      (verify-2-8 의 A8 이 이것을 잡았다). 자리수를 바꿀 때 **여기도 같이 본다.**
+ */
+const SCREEN_CODE = /^s03\d{7}(p\d{1,2})?$/;
 /** shadow 로그의 route 컬럼 상한. 클라이언트가 보낸 문자열이라 길이를 자른다. */
 const ROUTE_MAX = 200;
 
