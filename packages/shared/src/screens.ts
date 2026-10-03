@@ -40,6 +40,16 @@ export const SCREENS = {
 
   // --- 010 기준설정 ---
   s030100010: { route: '/facility',       name: '센터 관리',       group: '010' },
+  /**
+   * 코드 관리 — ERP 전체가 읽는 기준자료(분류 · 파티션 · 코드값)를 다루는 화면.
+   *
+   * ★ **운영사 전용(audience_tp='P')** 이다. `requireScreen` 이 주소 직접 접근을 막고,
+   *   Fastify 쪽 `/codes-admin/**` 가 `role !== 'operator'` 를 403 으로 막는다 — 두 겹이다.
+   * ★ 이름이 곧 사이드바 문구다 — 「코드 관리」.
+   * ★★ 소비용 조회(`GET /codes`)와 **다른 화면이다.** 계약 폼은 코드를 읽기만 하고,
+   *    고치는 자리는 이 화면 하나다(CLAUDE.md 「한 업무는 한 화면에서」).
+   */
+  s030100030: { route: '/codes',          name: '코드 관리',       group: '010' },
 
   // --- 020 입주사관리 ---
   s030200010: { route: '/tenants',        name: '입주사 목록',     group: '020' },

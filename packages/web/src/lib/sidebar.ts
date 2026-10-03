@@ -25,6 +25,9 @@ const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
   s030000070: 'settings',
   s030000080: null, // 접근 권한 없음 — 셸 밖
   s030100010: 'door-open',
+  // ★ 코드 관리 — 기준자료라 톱니다. 설정(s030000070)과 같은 아이콘이지만 그쪽은
+  //   운영사 설정이고 이쪽은 ERP 전체가 읽는 코드다. 아이콘 목록에 더 맞는 것이 없다.
+  s030100030: 'settings',
   s030200010: 'building-2',
   s030200020: null, // 입주사 상세 — 목록에서 들어간다. 사이드바 항목이 아니다
   s030200030: 'file-pen-line',

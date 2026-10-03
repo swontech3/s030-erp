@@ -24,6 +24,7 @@ import { registerCompanyRoutes } from './routes/companies.ts';
 import { registerFileRoutes } from './routes/files.ts';
 import { registerOcrRoutes } from './routes/ocr.ts';
 import { registerFacilityRoutes } from './routes/facility.ts';
+import { registerCodeRoutes } from './routes/codes.ts';
 import { closePool } from './db/pool.ts';
 import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
 
@@ -123,6 +124,11 @@ registerOcrRoutes(app);
 // ★ 센터 관리(s030100010) — 건물·층·호실·회의실. **운영사 전용**이고 네 표에 FK 가 없어
 //   「쓰고 있는지」를 핸들러가 직접 센다(`db/facility.ts` 머리말).
 registerFacilityRoutes(app);
+// ★ 코드 관리(s030100030) — 머리·파티션·값 3층. **운영사 전용**이고, 업무 표에서 코드표로
+//   오는 FK 가 0건이라 「쓰고 있는지」를 선언표(`domain/code-usage.ts`)로 센다.
+// ★★ 소비용 조회는 `registerLookupRoutes` 의 `GET /codes` 다 — 경로가 겹치지 않게 이쪽은
+//    `/codes-admin/**` 를 쓴다. 같은 접두사를 쓰면 `/codes/:category` 가 `/codes` 를 가린다.
+registerCodeRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,
