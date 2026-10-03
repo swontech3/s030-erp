@@ -3,16 +3,21 @@
 /** @screen s030100030p4 삭제 확인 · 010 기준설정 */
 
 /**
- * 분류 · 파티션 · 코드값 삭제 확인.
+ * 분류코드 · 사용타입 · 코드값 삭제 확인.
  *
- * ★ 레거시는 `confirm("이 코드를 삭제하시겠습니까?")` 였다. 브라우저 기본 창은 무엇이
- *   지워지는지·왜 못 지우는지를 담을 자리가 없다 — 센터 관리와 같이 팝업으로 간다.
+ * ★★ **삭제 확인은 이 창 하나다**(사용자 지시 2026-10-03: 「같은 일을 두 곳에서 하지
+ *    않게 할 것」). 따로 `confirm()` 을 띄우지 않는다 — 이 창이 이미 확인 창이고,
+ *    브라우저 기본 창은 **무엇이 지워지는지·왜 못 지우는지**를 담을 자리가 없다.
+ *    레거시가 그 `confirm("이 코드를 삭제하시겠습니까?")` 였다.
  *
  * ★★★ **막는 판정은 서버가 한다.** 여기서 미리 이유를 보여 주는 것은 편의이고, [삭제] 를
  *    눌러도 서버가 409 를 돌려주면 그 문구를 **안내로** 그린다(오류 아님).
  *
- * ★ 지우는 순서가 있다: 코드값 → 파티션 → 분류. 아래에서 위로만 비워진다. 그 이유를
- *   문구에 담는다 — 「파티션을 먼저 지워 주세요」.
+ * ★ 지우는 순서가 있다: 코드값 → 사용타입 → 분류코드. 아래에서 위로만 비워진다.
+ *   그 이유를 문구에 담는다 — 「사용타입을 먼저 지워 주세요」.
+ *
+ * ★★ 2026-10-03 — **「시스템이라서 못 지운다」가 없어졌다**(사용자 결정). 남은 차단은
+ *    자료가 바로 깨지는 둘뿐이다: 쓰고 있는 코드값 · 앱이 직접 쓰는 코드값.
  */
 import { useState } from 'react';
 import { ModalShell } from '@/features/facility/ModalShell';
@@ -21,7 +26,6 @@ import {
   lineBlockReason,
   masterBlockReason,
   partitionBlockReason,
-  partitionLabel,
   removeLine,
   removeMaster,
   removePartition,
@@ -42,32 +46,38 @@ interface Props {
   onDeleted: () => void;
 }
 
-/** 무엇을 지우는가 — 제목·설명·미리 아는 차단 이유. */
-function describe(t: DeleteTarget): { title: string; what: string; blocked: string | null } {
+/**
+ * 무엇을 지우는가 — 제목·묻는 말·미리 아는 차단 이유.
+ *
+ * ★★ 묻는 말은 **「{이름}({값})를 삭제하시겠습니까?」** 한 모양이다(사용자 지시
+ *    2026-10-03). 무엇이 지워지는지 **이름과 값이 둘 다** 들어가야 한다 — 「삭제
+ *    하시겠습니까?」만 띄우면 잘못 고른 행을 그대로 지운다.
+ */
+function describe(t: DeleteTarget): { title: string; ask: string; blocked: string | null } {
   switch (t.kind) {
     case 'master':
       return {
-        title: '분류 삭제',
-        what: `${t.master.name} (${t.master.category})`,
+        title: '분류코드 삭제',
+        ask: `${t.master.name}(${t.master.category})를 삭제하시겠습니까?`,
         blocked: masterBlockReason(t.master),
       };
     case 'partition':
       return {
-        title: '파티션 삭제',
-        what: `${t.partition.category} · ${partitionLabel(t.partition)}`,
+        title: '사용타입 삭제',
+        ask: `${t.partition.name}(${t.partition.useTp})를 삭제하시겠습니까?`,
         blocked: partitionBlockReason(t.partition),
       };
     default:
       return {
-        title: '코드 삭제',
-        what: `${t.category}/${t.useTp} · ${t.line.code} ${t.line.name}`,
+        title: '코드값 삭제',
+        ask: `${t.line.name}(${t.line.code})를 삭제하시겠습니까?`,
         blocked: lineBlockReason(t.line),
       };
   }
 }
 
 export function DeleteCodeDialog({ target, onClose, onDeleted }: Props) {
-  const { title, what, blocked: known } = describe(target);
+  const { title, ask, blocked: known } = describe(target);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** 서버가 돌려준 차단 사유. ★ 미리 안 것(`known`)보다 이쪽이 정확하다. */
@@ -96,7 +106,7 @@ export function DeleteCodeDialog({ target, onClose, onDeleted }: Props) {
   return (
     <ModalShell
       title={title}
-      desc={what}
+      desc={ask}
       busy={busy}
       error={error}
       blocked={why}

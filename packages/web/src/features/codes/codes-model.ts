@@ -43,6 +43,10 @@ export interface CodeUsage {
 /** 코드값 — `tb_s080_codes_line`. */
 export interface CodeLine {
   lineId: string;
+  /** 사용타입(`use_tp`). 공통은 `000`. ★ 표의 첫 칸이자 검색 조건이다. */
+  useTp: string;
+  /** 사용타입 이름 — 「공통」·「납부관리용」. 서버가 붙여 보낸다. */
+  useTpName: string;
   code: string;
   name: string;
   description: string | null;
@@ -59,6 +63,8 @@ export interface CodeLine {
 export interface UsageRef {
   label: string;
   table: string;
+  /** 어느 사용타입의 코드값이 그 자리에 저장되는가. */
+  useTp: string;
 }
 
 export interface CodesTree {
@@ -67,6 +73,19 @@ export interface CodesTree {
 }
 
 export interface LinesPage {
+  lines: CodeLine[];
+  usageRefs: UsageRef[];
+}
+
+/**
+ * 한 분류의 코드값 **전부** — 사용타입을 가리지 않는다.
+ *
+ * ★ 2026-10-03 개편: 왼쪽 목록에서 사용타입을 빼고 분류코드만 두었으므로, 오른쪽이
+ *   분류 하나를 통째로 받아 사용타입을 **첫 칸이자 검색 조건**으로 둔다.
+ */
+export interface MasterLinesPage {
+  /** 검색 조건의 선택지이자, 행에 붙일 이름의 출처. */
+  partitions: CodePartition[];
   lines: CodeLine[];
   usageRefs: UsageRef[];
 }
@@ -131,6 +150,15 @@ export const loadTree = (): Promise<CodesTree> =>
 export const loadLines = (category: string, useTp: string): Promise<LinesPage> =>
   call<LinesPage>(`/api/codes-admin/${seg(category)}/${seg(useTp)}/lines`);
 
+/**
+ * 한 분류의 코드값 전부 — **화면이 쓰는 것은 이쪽이다**(2026-10-03 개편).
+ *
+ * ★ 위 `loadLines`(사용타입 하나)는 남겨 둔다 — 라우트가 그대로이고 검증 스크립트가
+ *   사용타입 단위로 확인한다. 화면만 분류 단위로 받는다.
+ */
+export const loadMasterLines = (category: string): Promise<MasterLinesPage> =>
+  call<MasterLinesPage>(`/api/codes-admin/masters/${seg(category)}/lines`);
+
 // ── 분류 ──────────────────────────────────────────────────────────────────
 
 export const createMaster = (input: { category: string; name: string; description: string }) =>
@@ -193,8 +221,18 @@ export const removeLine = (lineId: string) =>
 
 // ── 문구 ──────────────────────────────────────────────────────────────────
 
-/** 「공통 (000)」 */
+/**
+ * 「공통 (000)」 — 화면에 쓰는 사용타입 표기.
+ *
+ * ★★ **화면에서는 「파티션」이라고 쓰지 않는다 — 「사용타입」이다**(사용자 지시
+ *    2026-10-03). 코드·DB·분석 문서의 이름(`use_tp` · 파티션)은 그대로 둔다: 그쪽은
+ *    `doc/CODE_MASTER_ANALYSIS.md` §B 가 정의한 개념 이름이고, 바꾸면 그 문서와
+ *    마이그레이션 013 의 주석이 전부 어긋난다.
+ */
 export const partitionLabel = (p: CodePartition): string => `${p.name} (${p.useTp})`;
+
+/** 코드값 행의 사용타입 표기 — 「공통 (000)」. */
+export const lineUseTpLabel = (l: CodeLine): string => `${l.useTpName} (${l.useTp})`;
 
 /** 「호실 72건 · 계약 호실 2건」 */
 export const usageText = (usage: readonly CodeUsage[]): string =>
@@ -207,7 +245,10 @@ export const usageText = (usage: readonly CodeUsage[]): string =>
  *    문구만 만든다 — 두 곳이 따로 판정하면 화면은 통과시키는데 저장이 막힌다.
  */
 export function lineBlockReason(line: CodeLine): string | null {
-  if (line.isSystem) return '시스템 코드라 지울 수 없습니다';
+  /*
+   * ★★ 2026-10-03 — **「시스템이라서」는 더 이상 막지 않는다**(사용자 결정). 지울지
+   *    말지는 운영자가 판단할 몫이고, 여기 남은 둘은 **자료가 바로 깨지는** 경우다.
+   */
   if (line.pinnedBy) return `앱이 이 코드값을 직접 씁니다 (${line.pinnedBy})`;
   if (line.usage.length > 0) {
     return `${usageText(line.usage)}에서 쓰고 있습니다. 이름만 고치려면 수정을 쓰세요`;
@@ -217,12 +258,11 @@ export function lineBlockReason(line: CodeLine): string | null {
 
 /** 코드값 칸·사용여부 칸을 잠가야 하는가 — 이름 칸은 **언제나 열려 있다**. */
 export function codeLocked(line: CodeLine): boolean {
-  return line.isSystem || line.pinnedBy !== null || line.usage.length > 0;
+  return line.pinnedBy !== null || line.usage.length > 0;
 }
 
 /** 코드값·사용여부를 잠근 이유. 폼이 칸 아래에 적는다. */
 export function codeLockReason(line: CodeLine): string | null {
-  if (line.isSystem) return '시스템 코드는 코드값을 바꿀 수 없습니다. 이름은 바꿀 수 있습니다';
   if (line.pinnedBy) {
     return `앱이 이 코드값을 직접 써서 코드값·사용여부를 바꿀 수 없습니다 (${line.pinnedBy}). 이름은 바꿀 수 있습니다`;
   }
@@ -232,19 +272,29 @@ export function codeLockReason(line: CodeLine): string | null {
   return null;
 }
 
-/** 파티션을 **왜 못 지우는가** — 없으면 `null`. */
+/** 사용타입을 **왜 못 지우는가** — 없으면 `null`. */
 export function partitionBlockReason(p: CodePartition): string | null {
-  if (p.useTp === '000') return '공통(000) 파티션은 지울 수 없습니다. 분류를 지우면 함께 사라집니다';
-  if (p.isSystem) return '시스템 파티션이라 지울 수 없습니다';
-  if (p.lineCount > 0) return `코드 ${p.lineCount}개가 남아 있습니다. 코드를 먼저 지워 주세요`;
+  if (p.useTp === '000') {
+    return '공통(000) 사용타입은 지울 수 없습니다. 분류코드를 지우면 함께 사라집니다';
+  }
+  if (p.lineCount > 0) return `코드값 ${p.lineCount}개가 남아 있습니다. 코드값을 먼저 지워 주세요`;
   return null;
 }
 
-/** 분류를 **왜 못 지우는가** — 없으면 `null`. */
+/**
+ * 분류코드를 **왜 못 지우는가** — 없으면 `null`.
+ *
+ * ★★ 2026-10-03 — **공통(000)은 세지 않는다.** 분류코드를 만들면 000 이 함께 생기므로
+ *    「사용타입이 0개일 때만 지운다」로 두면 **어떤 분류코드도 지워지지 않는다**(실측으로
+ *    확인한 교착이다). 삭제가 000 을 함께 지우도록 바꿨고, 여기도 같은 규칙을 본다 —
+ *    서버와 화면이 다른 규칙을 보면 화면은 통과시키는데 저장이 막힌다.
+ */
 export function masterBlockReason(m: CodeMaster): string | null {
-  if (m.isSystem) return '시스템 분류라 지울 수 없습니다';
-  if (m.partitionCount > 0) {
-    return `파티션 ${m.partitionCount}개 · 코드 ${m.lineCount}개가 남아 있습니다. 파티션을 먼저 지워 주세요`;
+  if (m.lineCount > 0) {
+    return `코드값 ${m.lineCount}개가 남아 있습니다. 코드값을 먼저 지워 주세요`;
+  }
+  if (m.partitionCount > 1) {
+    return `공통(000) 말고 사용타입 ${m.partitionCount - 1}개가 남아 있습니다. 사용타입을 먼저 지워 주세요`;
   }
   return null;
 }

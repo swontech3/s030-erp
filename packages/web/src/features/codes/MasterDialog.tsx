@@ -69,8 +69,8 @@ export function MasterDialog({ master, onClose, onSaved }: Props) {
 
   return (
     <ModalShell
-      title={master ? '분류 수정' : '분류 등록'}
-      desc={master ? master.category : '분류를 만들면 공통(000) 파티션이 함께 생깁니다'}
+      title={master ? '분류코드 수정' : '분류코드 추가'}
+      desc={master ? master.category : '분류코드를 만들면 공통(000) 사용타입이 함께 생깁니다'}
       busy={busy}
       error={error}
       blocked={blocked}
@@ -80,7 +80,7 @@ export function MasterDialog({ master, onClose, onSaved }: Props) {
       onOk={submit}
     >
       <div className={styles.grid2}>
-        <Field label="분류 키">
+        <Field label="분류코드">
           <input
             className={cf.input}
             value={form.category}
@@ -91,7 +91,7 @@ export function MasterDialog({ master, onClose, onSaved }: Props) {
             autoFocus={master === null}
           />
         </Field>
-        <Field label="분류 이름">
+        <Field label="분류코드명">
           <input
             className={cf.input}
             value={form.name}
@@ -112,8 +112,8 @@ export function MasterDialog({ master, onClose, onSaved }: Props) {
 
       <p className={styles.formNote}>
         {master
-          ? '분류 키는 바꿀 수 없습니다 — 코드에 문자열로 박혀 있어서, 바꾸면 그 분류를 읽는 화면이 빈 목록을 받습니다.'
-          : '분류 키는 영문 대문자로 시작하고 영문 대문자·숫자·밑줄만 쓸 수 있습니다. 만든 뒤에는 바꿀 수 없습니다.'}
+          ? '분류코드는 바꿀 수 없습니다 — 소스에 문자열로 박혀 있어서, 바꾸면 그 분류코드를 읽는 화면이 빈 목록을 받습니다.'
+          : '분류코드는 영문 대문자로 시작하고 영문 대문자·숫자·밑줄만 쓸 수 있습니다. 만든 뒤에는 바꿀 수 없습니다.'}
       </p>
     </ModalShell>
   );

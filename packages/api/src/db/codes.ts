@@ -149,6 +149,74 @@ export async function listLines(
   return rows;
 }
 
+/**
+ * 한 분류의 **모든** 코드값 — 사용타입을 가리지 않는다.
+ *
+ * ★ 화면이 분류 하나를 고르면 그 아래 코드값을 **한 표**에 그린다(2026-10-03 개편).
+ *   예전에는 사용타입을 고른 뒤에야 코드값이 나왔는데, 왼쪽 목록에서 사용타입을 빼면서
+ *   오른쪽이 분류 전체를 받게 됐다. 사용타입은 표의 첫 칸이고 검색 조건이다.
+ *
+ * ★ 정렬은 **사용타입 → 순서 → 코드값**이다. 사용타입이 첫 칸이므로 그것으로 먼저 묶인다.
+ */
+export async function listLinesOfMaster(
+  client: ScopedClient,
+  buildId: string,
+  category: string,
+): Promise<LineRow[]> {
+  const { rows } = await q<LineRow>(
+    client,
+    `SELECT line_id, build_id, category, use_tp, code, name, description,
+            sort_order, is_active, is_system
+       FROM public.tb_s080_codes_line
+      WHERE build_id = $1 AND category = $2
+      ORDER BY use_tp, sort_order, code`,
+    [buildId, category],
+  );
+  return rows;
+}
+
+/**
+ * 한 분류의 **모든** 코드값 쓰임 — `(use_tp, code)` 로 묶어 돌려준다.
+ *
+ * ★★ 키에 **사용타입이 들어간다.** 같은 코드값이 사용타입마다 따로 있고, 선언표도
+ *    사용타입별로 적혀 있기 때문이다 — `ROOM_TP/000` 의 `R1` 은 호실이 쓰지만
+ *    `ROOM_TP/001` 의 `R1` 은 아무도 안 쓴다. 코드값만으로 묶으면 둘이 섞여서
+ *    **쓰지 않는 코드를 못 지우게** 된다.
+ */
+export async function countUsageByMaster(
+  client: ScopedClient,
+  category: string,
+): Promise<Map<string, UsageHit[]>> {
+  const out = new Map<string, UsageHit[]>();
+
+  for (const ref of CODE_USAGE.filter((u) => u.category === category)) {
+    if (!isSafeIdentifier(ref.table) || !isSafeIdentifier(ref.column)) {
+      throw new Error(
+        `CODE_USAGE 의 표·컬럼 이름이 식별자가 아니다: ${ref.table}.${ref.column} — domain/code-usage.ts 를 확인할 것`,
+      );
+    }
+    const { rows } = await q<{ v: string; n: number }>(
+      client,
+      `SELECT ${ref.column} AS v, count(*)::int AS n
+         FROM public.${ref.table}
+        WHERE ${ref.column} IS NOT NULL
+        GROUP BY ${ref.column}`,
+      [],
+    );
+    for (const r of rows) {
+      if (r.n <= 0) continue;
+      const key = usageKey(ref.useTp, r.v);
+      const list = out.get(key) ?? [];
+      list.push({ label: ref.label, table: ref.table, column: ref.column, count: r.n });
+      out.set(key, list);
+    }
+  }
+  return out;
+}
+
+/** `countUsageByMaster` 의 키. ★ 사용타입과 코드값을 섞지 않으려고 NUL 로 가른다. */
+export const usageKey = (useTp: string, code: string): string => `${useTp}\u0000${code}`;
+
 export async function findMaster(
   client: ScopedClient,
   buildId: string,

@@ -35,20 +35,29 @@ import {
   createLine,
   saveLine,
   type CodeLine,
+  type CodePartition,
 } from './codes-model';
 import styles from './codes.module.css';
 
 interface Props {
   category: string;
-  useTp: string;
+  /**
+   * 고를 수 있는 사용타입들.
+   *
+   * ★ 2026-10-03 개편으로 **사용타입이 미리 정해져 있지 않다** — 왼쪽에서 분류코드만
+   *   고르므로, 새 코드값을 어느 사용타입에 넣을지 이 폼이 물어야 한다.
+   */
+  partitions: readonly CodePartition[];
   /** `null` 이면 신규다. */
   line: CodeLine | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export function LineDialog({ category, useTp, line, onClose, onSaved }: Props) {
+export function LineDialog({ category, partitions, line, onClose, onSaved }: Props) {
   const [form, setForm] = useState({
+    /* 신규는 공통(000)을 기본으로 — 24개 분류가 그것 하나뿐이다. */
+    useTp: line?.useTp ?? partitions.find((p) => p.useTp === '000')?.useTp ?? partitions[0]?.useTp ?? '000',
     code: line?.code ?? '',
     name: line?.name ?? '',
     description: line?.description ?? '',
@@ -81,7 +90,7 @@ export function LineDialog({ category, useTp, line, onClose, onSaved }: Props) {
           isActive: form.isActive,
         });
       } else {
-        await createLine(category, useTp, {
+        await createLine(category, form.useTp, {
           code: form.code.trim(),
           name: form.name,
           description: form.description,
@@ -100,8 +109,8 @@ export function LineDialog({ category, useTp, line, onClose, onSaved }: Props) {
 
   return (
     <ModalShell
-      title={line ? '코드 수정' : '코드 등록'}
-      desc={`${category}/${useTp}`}
+      title={line ? '코드값 수정' : '코드값 추가'}
+      desc={line ? `${category}/${line.useTp}` : category}
       busy={busy}
       error={error}
       blocked={blocked}
@@ -111,6 +120,28 @@ export function LineDialog({ category, useTp, line, onClose, onSaved }: Props) {
       onOk={submit}
     >
       <div className={styles.grid2}>
+        {/*
+          ★ 사용타입 — **신규일 때만 고른다.** 수정에서 사용타입을 옮기면 그 코드값을
+            쓰는 자료가 다른 목록으로 건너가는 것이라, 옮기는 길을 열지 않는다
+            (옮기려면 지우고 다시 만든다).
+        */}
+        <Field label="사용타입" full>
+          {line ? (
+            <input className={cf.input} value={`${line.useTpName} (${line.useTp})`} disabled />
+          ) : (
+            <select
+              className={cf.input}
+              value={form.useTp}
+              onChange={(e) => setForm((f) => ({ ...f, useTp: e.target.value }))}
+            >
+              {partitions.map((p) => (
+                <option key={p.useTp} value={p.useTp}>
+                  {p.name} ({p.useTp})
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
         <Field label="코드값">
           <input
             className={cf.input}
@@ -121,7 +152,7 @@ export function LineDialog({ category, useTp, line, onClose, onSaved }: Props) {
             autoFocus={line === null}
           />
         </Field>
-        <Field label="이름">
+        <Field label="코드값 이름">
           <input
             className={cf.input}
             value={form.name}

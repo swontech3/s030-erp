@@ -50,13 +50,16 @@ import {
   findLine,
   findLineByCode,
   findMaster,
+  countUsageByMaster,
   insertCategory,
   insertLine,
   insertMaster,
   listCategories,
   listLines,
+  listLinesOfMaster,
   listMasters,
   nextSortOrder,
+  usageKey,
   updateCategory,
   updateLine,
   updateMaster,
@@ -65,7 +68,7 @@ import {
   type MasterRow,
   type UsageHit,
 } from '../db/codes.ts';
-import { pinnedRefFor, usageRefsFor } from '@swonbiz/shared/domain/code-usage';
+import { CODE_USAGE, pinnedRefFor, usageRefsFor } from '@swonbiz/shared/domain/code-usage';
 
 const OPERATOR = 'operator';
 
@@ -94,12 +97,45 @@ const conflict = (reply: FastifyReply, message: string) =>
 const badRequest = (reply: FastifyReply, message: string) =>
   reply.code(400).send({ error: 'invalid_request', message });
 
-const systemLocked = (reply: FastifyReply, message: string) =>
-  reply.code(403).send({ error: 'system_locked', message });
+/**
+ * 규칙상 **허용되지 않는** 처리. ★ 409(지금 상태와 충돌)와 다르다 — 자료를 치워도 풀리지 않는다.
+ *
+ * ★★ 2026-10-03 에 **「시스템」 차단을 전부 걷어냈다**(사용자 결정). `is_system` 이라는
+ *    이유로 막던 다섯 자리(분류코드·사용타입·코드값 삭제, 코드값 변경)가 사라졌다 —
+ *    **지울지 말지는 운영자가 판단할 몫이다.** DB 의 `is_system` 칸은 그대로 두었다.
+ *    지금 이것을 쓰는 자리는 **공통(000) 사용타입** 하나뿐이다. 그쪽은 시스템 규칙이
+ *    아니라 「분류코드는 코드값을 담을 자리를 항상 하나 가진다」는 구조 규칙이다.
+ */
+const notAllowed = (reply: FastifyReply, message: string) =>
+  reply.code(403).send({ error: 'not_allowed', message });
 
 function actorOf(session: { s020MemberId: number }): string {
   return String(session.s020MemberId);
 }
+
+/**
+ * 앞 낱말에 **받침이 있는가** — 조사를 고르는 데 쓴다.
+ *
+ * ★ 한글 음절은 `0xAC00` 부터 28개씩 묶여 있고, 그 안에서 받침이 0번이면 받침이 없다.
+ *   한글이 아니면(영문·숫자) 받침 없음으로 본다 — 코드값은 `R1` 처럼 영문이 섞인다.
+ */
+function hasFinalConsonant(word: string): boolean {
+  const last = word.trim().slice(-1);
+  if (!last) return false;
+  const code = last.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) return false;
+  return (code - 0xac00) % 28 !== 0;
+}
+
+/**
+ * 조사를 붙인다 — 「계약 상태 전이**가**」 · 「첫 납부액 계산**이**」.
+ *
+ * ★★ 선언표의 이름(`PINNED_CODES` 의 `label`)이 문장에 들어가는데, 그 이름이 받침으로
+ *    끝나기도 하고 아니기도 한다. 고정 조사를 쓰면 「계약 상태 전이**이**」처럼 적힌다
+ *    (2026-10-03 검증에서 실제로 나왔다). 문구는 화면이 그대로 보여 주는 것이라 고친다.
+ */
+const withParticle = (word: string, withJong: string, withoutJong: string): string =>
+  `${word}${hasFinalConsonant(word) ? withJong : withoutJong}`;
 
 /** 빈 문자열은 `null` 로. 화면이 칸을 비운 것과 안 보낸 것을 가르지 않는다. */
 function text(v: unknown): string | null {
@@ -233,7 +269,7 @@ export function registerCodeRoutes(app: FastifyInstance): void {
           usage: await countUsageByCode(client, category, useTp),
         };
       });
-      if (!result) return notFound(reply, '파티션');
+      if (!result) return notFound(reply, '사용타입');
 
       return reply.send({
         lines: result.lines.map((l) =>
@@ -245,6 +281,61 @@ export function registerCodeRoutes(app: FastifyInstance): void {
          *   운영자에게 경고한다 — 빠뜨린 줄을 사람이 알아차리는 유일한 자리다.
          */
         usageRefs: usageRefsFor(category, useTp).map((r) => ({ label: r.label, table: r.table })),
+      });
+    },
+  );
+
+  /**
+   * ★★ 한 분류의 **코드값 전부** — 사용타입을 가리지 않는다.
+   *
+   * 화면이 왼쪽에서 분류를 고르면 이것을 받는다(2026-10-03 개편). 예전에는 사용타입을
+   * 고른 뒤에야 코드값이 나왔는데, 왼쪽 목록에서 사용타입을 뺐으므로 오른쪽이 분류
+   * 전체를 받고 **사용타입을 첫 칸이자 검색 조건**으로 둔다.
+   *
+   * ★ 사용타입 목록도 함께 보낸다 — 검색 조건의 선택지이고, 코드값 행에 붙일 **이름**
+   *   (「공통」·「납부관리용」)이 거기 있다.
+   */
+  app.get<{ Params: { category: string } }>(
+    '/codes-admin/masters/:category/lines',
+    async (req, reply) => {
+      const session = requireSession(req);
+      if (session.role !== OPERATOR) return forbidden(reply);
+
+      const { category } = req.params;
+      const result = await withCompanyScope(OPERATOR_SCOPE, async (client) => {
+        const master = await findMaster(client, BUILD_ID, category);
+        if (!master) return null;
+        const all = await listCategories(client);
+        return {
+          partitions: all.filter((c) => c.category === category),
+          lines: await listLinesOfMaster(client, BUILD_ID, category),
+          usage: await countUsageByMaster(client, category),
+        };
+      });
+      if (!result) return notFound(reply, '분류코드');
+
+      const nameOf = new Map(result.partitions.map((p) => [p.use_tp, p.name]));
+
+      return reply.send({
+        partitions: result.partitions.map(toCategory),
+        lines: result.lines.map((l) => ({
+          ...toLine(
+            l,
+            result.usage.get(usageKey(l.use_tp, l.code)) ?? [],
+            pinnedRefFor(l.category, l.use_tp, l.code)?.source ?? null,
+          ),
+          useTp: l.use_tp,
+          useTpName: nameOf.get(l.use_tp) ?? l.use_tp,
+        })),
+        /**
+         * 이 분류의 코드값이 저장되는 자리 — 사용타입마다 다를 수 있어 **합쳐서** 보낸다.
+         * ★ 비어 있고 박아 둔 코드값도 없으면 화면이 경고 띠를 띄운다.
+         */
+        usageRefs: CODE_USAGE.filter((u) => u.category === category).map((r) => ({
+          label: r.label,
+          table: r.table,
+          useTp: r.useTp,
+        })),
       });
     },
   );
@@ -261,14 +352,14 @@ export function registerCodeRoutes(app: FastifyInstance): void {
 
       const category = text(req.body?.category)?.toUpperCase() ?? null;
       const name = text(req.body?.name);
-      if (!category) return badRequest(reply, '분류 키를 입력해 주세요');
+      if (!category) return badRequest(reply, '분류코드를 입력해 주세요');
       if (!CATEGORY_RE.test(category)) {
         return badRequest(
           reply,
-          '분류 키는 영문 대문자로 시작하고 영문 대문자·숫자·밑줄만 쓸 수 있습니다 (예: ROOM_TP)',
+          '분류코드는 영문 대문자로 시작하고 영문 대문자·숫자·밑줄만 쓸 수 있습니다 (예: ROOM_TP)',
         );
       }
-      if (!name) return badRequest(reply, '분류 이름을 입력해 주세요');
+      if (!name) return badRequest(reply, '분류코드명을 입력해 주세요');
 
       const made = await withCompanyScope(OPERATOR_SCOPE, async (client) => {
         if (await findMaster(client, BUILD_ID, category)) return false;
@@ -281,7 +372,7 @@ export function registerCodeRoutes(app: FastifyInstance): void {
         });
         return true;
       });
-      if (!made) return conflict(reply, `이미 있는 분류입니다: ${category}`);
+      if (!made) return conflict(reply, `이미 있는 분류코드입니다: ${category}`);
 
       return reply.code(201).send({ category, useTp: COMMON_USE_TP });
     },
@@ -295,7 +386,7 @@ export function registerCodeRoutes(app: FastifyInstance): void {
       if (session.role !== OPERATOR) return forbidden(reply);
 
       const name = text(req.body?.name);
-      if (!name) return badRequest(reply, '분류 이름을 입력해 주세요');
+      if (!name) return badRequest(reply, '분류코드명을 입력해 주세요');
 
       const changed = await withCompanyScope(OPERATOR_SCOPE, (client) =>
         updateMaster(client, {
@@ -305,16 +396,28 @@ export function registerCodeRoutes(app: FastifyInstance): void {
           actor: actorOf(session),
         }),
       );
-      if (changed === 0) return notFound(reply, '분류');
+      if (changed === 0) return notFound(reply, '분류코드');
       return reply.send({ category: req.params.category });
     },
   );
 
   /**
-   * 머리 삭제.
+   * 분류코드 삭제 — ★★ **공통(000) 사용타입을 함께 지운다.**
    *
-   * ★ 파티션이 남아 있으면 막는다. FK `ON DELETE RESTRICT` 가 DB 에서도 막지만, 여기서
-   *   **먼저 세어** 사람이 읽는 문구를 만든다 — 23505 를 그대로 올리면 문구가 없다.
+   * =============================================================================
+   * ★★★ 2026-10-03 — 여기에 **교착**이 있었다 (사용자 결정으로 풀었다)
+   * =============================================================================
+   * 예전에는 「사용타입이 하나라도 남아 있으면 409」였다. 그런데 분류코드를 만들면
+   * 공통(000)이 **함께 생기고**, 그 000 은 「분류코드를 지우면 함께 사라집니다」라며
+   * 403 으로 막혀 있었다. 그래서 **어떤 분류코드도 영원히 지워지지 않았다** —
+   * 실측(2026-10-03): 생성 201 → 삭제 409 → 000 삭제 403 → 삭제 409.
+   *
+   * 문구가 약속한 대로 고쳤다. 지금은:
+   *   · 남은 것이 **공통(000) 하나뿐이고 코드값이 0개**면 → 000 을 지우고 분류코드를 지운다
+   *   · **다른 사용타입**이 있거나 **코드값이 하나라도** 있으면 → 409 그대로
+   *
+   * ★ 둘을 **한 트랜잭션 안에서** 지운다(`withCompanyScope` 한 번). 000 만 지워지고
+   *   분류코드가 남으면 코드값을 담을 자리가 없는 분류코드가 생긴다 — 교착의 반대 모양이다.
    */
   app.delete<{ Params: { category: string } }>(
     '/codes-admin/masters/:category',
@@ -326,23 +429,27 @@ export function registerCodeRoutes(app: FastifyInstance): void {
       const result = await withCompanyScope(OPERATOR_SCOPE, async (client) => {
         const master = await findMaster(client, BUILD_ID, category);
         if (!master) return { kind: 'missing' as const };
-        if (master.is_system) return { kind: 'system' as const };
 
         const { partitions, lines } = await countMasterPartitions(client, BUILD_ID, category);
-        if (partitions > 0) return { kind: 'blocked' as const, partitions, lines };
+        /* 코드값이 하나라도 남아 있으면 막는다 — 자료를 말없이 버리지 않는다. */
+        if (lines > 0) return { kind: 'blocked' as const, partitions, lines };
+        /* 공통(000) 말고 다른 사용타입이 남아 있으면 막는다. */
+        if (partitions > 1) return { kind: 'blocked' as const, partitions, lines };
 
+        /* 남은 것은 공통(000) 하나뿐(또는 없음) — 함께 지운다. */
+        await deleteCategory(client, BUILD_ID, category, COMMON_USE_TP);
         await deleteMaster(client, BUILD_ID, category);
         return { kind: 'deleted' as const };
       });
 
-      if (result.kind === 'missing') return notFound(reply, '분류');
-      if (result.kind === 'system') {
-        return systemLocked(reply, '시스템 분류는 지울 수 없습니다');
-      }
+      if (result.kind === 'missing') return notFound(reply, '분류코드');
       if (result.kind === 'blocked') {
         return inUse(
           reply,
-          `파티션 ${result.partitions}개 · 코드 ${result.lines}개가 남아 있어 지울 수 없습니다. 파티션을 먼저 지워 주세요`,
+          result.lines > 0
+            ? `코드값 ${result.lines}개가 남아 있어 지울 수 없습니다. 코드값을 먼저 지워 주세요`
+            : `공통(000) 말고 사용타입 ${result.partitions - 1}개가 남아 있어 지울 수 없습니다. ` +
+              '사용타입을 먼저 지워 주세요',
         );
       }
       return reply.send({ category });
@@ -363,11 +470,11 @@ export function registerCodeRoutes(app: FastifyInstance): void {
     const { category } = req.params;
     const useTp = text(req.body?.useTp);
     const name = text(req.body?.name);
-    if (!useTp) return badRequest(reply, '파티션 번호를 입력해 주세요');
+    if (!useTp) return badRequest(reply, '사용타입 번호를 입력해 주세요');
     if (!USE_TP_RE.test(useTp)) {
-      return badRequest(reply, '파티션 번호는 숫자 3자입니다 (000 · 001 · 002 …)');
+      return badRequest(reply, '사용타입 번호는 숫자 3자입니다 (000 · 001 · 002 …)');
     }
-    if (!name) return badRequest(reply, '파티션 이름을 입력해 주세요');
+    if (!name) return badRequest(reply, '사용타입 이름을 입력해 주세요');
 
     const result = await withCompanyScope(OPERATOR_SCOPE, async (client) => {
       if (!(await findMaster(client, BUILD_ID, category))) return 'no-master' as const;
@@ -382,9 +489,9 @@ export function registerCodeRoutes(app: FastifyInstance): void {
       return 'created' as const;
     });
 
-    if (result === 'no-master') return notFound(reply, '분류');
+    if (result === 'no-master') return notFound(reply, '분류코드');
     if (result === 'duplicate') {
-      return conflict(reply, `이미 있는 파티션입니다: ${category}/${useTp}`);
+      return conflict(reply, `이미 있는 사용타입입니다: ${category}/${useTp}`);
     }
     return reply.code(201).send({ category, useTp });
   });
@@ -397,7 +504,7 @@ export function registerCodeRoutes(app: FastifyInstance): void {
     if (session.role !== OPERATOR) return forbidden(reply);
 
     const name = text(req.body?.name);
-    if (!name) return badRequest(reply, '파티션 이름을 입력해 주세요');
+    if (!name) return badRequest(reply, '사용타입 이름을 입력해 주세요');
 
     const { category, useTp } = req.params;
     const changed = await withCompanyScope(OPERATOR_SCOPE, (client) =>
@@ -409,7 +516,7 @@ export function registerCodeRoutes(app: FastifyInstance): void {
         actor: actorOf(session),
       }),
     );
-    if (changed === 0) return notFound(reply, '파티션');
+    if (changed === 0) return notFound(reply, '사용타입');
     return reply.send({ category, useTp });
   });
 
@@ -427,16 +534,20 @@ export function registerCodeRoutes(app: FastifyInstance): void {
 
       const { category, useTp } = req.params;
       if (useTp === COMMON_USE_TP) {
-        return systemLocked(
+        /*
+         * ★ 이것은 **시스템 차단이 아니다**(사용자 확인 2026-10-03). 분류코드는 코드값을
+         *   담을 자리를 항상 하나 가져야 하고, 000 이 그 자리다 — 만들 때 함께 생기고
+         *   분류코드를 지울 때 함께 사라진다.
+         */
+        return notAllowed(
           reply,
-          '공통(000) 파티션은 지울 수 없습니다. 분류를 지우면 함께 사라집니다',
+          '공통(000) 사용타입은 지울 수 없습니다. 분류코드를 지우면 함께 사라집니다',
         );
       }
 
       const result = await withCompanyScope(OPERATOR_SCOPE, async (client) => {
         const found = await findCategory(client, BUILD_ID, category, useTp);
         if (!found) return { kind: 'missing' as const };
-        if (found.is_system) return { kind: 'system' as const };
 
         const lines = await countCategoryLines(client, BUILD_ID, category, useTp);
         if (lines > 0) return { kind: 'blocked' as const, lines };
@@ -445,12 +556,11 @@ export function registerCodeRoutes(app: FastifyInstance): void {
         return { kind: 'deleted' as const };
       });
 
-      if (result.kind === 'missing') return notFound(reply, '파티션');
-      if (result.kind === 'system') return systemLocked(reply, '시스템 파티션은 지울 수 없습니다');
+      if (result.kind === 'missing') return notFound(reply, '사용타입');
       if (result.kind === 'blocked') {
         return inUse(
           reply,
-          `코드 ${result.lines}개가 남아 있어 지울 수 없습니다. 코드를 먼저 지워 주세요`,
+          `코드값 ${result.lines}개가 남아 있어 지울 수 없습니다. 코드값을 먼저 지워 주세요`,
         );
       }
       return reply.send({ category, useTp });
@@ -473,7 +583,7 @@ export function registerCodeRoutes(app: FastifyInstance): void {
     const name = text(req.body?.name);
     if (!code) return badRequest(reply, '코드값을 입력해 주세요');
     if (!CODE_RE.test(code)) return badRequest(reply, '코드값은 공백 없이 1~20자입니다');
-    if (!name) return badRequest(reply, '코드 이름을 입력해 주세요');
+    if (!name) return badRequest(reply, '코드값 이름을 입력해 주세요');
 
     const sortOrder = int(req.body?.sortOrder);
     if (sortOrder !== null && sortOrder < 0) return badRequest(reply, '순서는 0 이상입니다');
@@ -499,10 +609,10 @@ export function registerCodeRoutes(app: FastifyInstance): void {
       return { lineId };
     });
 
-    if (result === 'no-partition') return notFound(reply, '파티션');
+    if (result === 'no-partition') return notFound(reply, '사용타입');
     if (result === 'duplicate') {
       /* ★ 같은 code 라도 **다른 파티션**이면 별개다. 그래서 파티션까지 넣어 말한다. */
-      return conflict(reply, `이 파티션(${category}/${useTp})에 이미 있는 코드값입니다: ${code}`);
+      return conflict(reply, `이 사용타입(${category}/${useTp})에 이미 있는 코드값입니다: ${code}`);
     }
     return reply.code(201).send(result);
   });
@@ -531,7 +641,7 @@ export function registerCodeRoutes(app: FastifyInstance): void {
     if (session.role !== OPERATOR) return forbidden(reply);
 
     const name = text(req.body?.name);
-    if (!name) return badRequest(reply, '코드 이름을 입력해 주세요');
+    if (!name) return badRequest(reply, '코드값 이름을 입력해 주세요');
 
     const nextCode = text(req.body?.code);
     if (nextCode !== null && !CODE_RE.test(nextCode)) {
@@ -548,9 +658,6 @@ export function registerCodeRoutes(app: FastifyInstance): void {
       const isActive = req.body?.isActive ?? line.is_active;
       const codeChanging = code !== line.code;
       const turningOff = line.is_active && !isActive;
-
-      /* ★ 시스템 코드는 코드값을 잠근다(레거시와 같다). 이름·순서는 고칠 수 있다. */
-      if (codeChanging && line.is_system) return { kind: 'system-code' as const };
 
       /* ③ 앱이 박아 둔 코드값 — 자료가 없어도 막는다. */
       if (codeChanging || turningOff) {
@@ -599,19 +706,18 @@ export function registerCodeRoutes(app: FastifyInstance): void {
 
     switch (result.kind) {
       case 'missing':
-        return notFound(reply, '코드');
-      case 'system-code':
-        return systemLocked(reply, '시스템 코드의 코드값은 바꿀 수 없습니다. 이름은 바꿀 수 있습니다');
+        return notFound(reply, '코드값');
       case 'pinned':
         return inUse(
           reply,
-          `${result.label}이 이 코드값을 직접 쓰고 있어 ${result.what}을 바꿀 수 없습니다. ` +
+          `${withParticle(result.label, '이', '가')} 이 코드값을 직접 쓰고 있어 ` +
+            `${withParticle(result.what, '을', '를')} 바꿀 수 없습니다. ` +
             `이름은 바꿀 수 있습니다 (${result.source})`,
         );
       case 'in-use':
         return inUse(
           reply,
-          `${usageText(result.hits)}에서 쓰고 있어 ${result.what}을 바꿀 수 없습니다. ` +
+          `${usageText(result.hits)}에서 쓰고 있어 ${withParticle(result.what, '을', '를')} 바꿀 수 없습니다. ` +
             '이름은 바꿀 수 있습니다',
         );
       case 'duplicate':
@@ -636,7 +742,6 @@ export function registerCodeRoutes(app: FastifyInstance): void {
     const result = await withCompanyScope(OPERATOR_SCOPE, async (client) => {
       const line = await findLine(client, req.params.id);
       if (!line) return { kind: 'missing' as const };
-      if (line.is_system) return { kind: 'system' as const };
 
       const pinned = pinnedRefFor(line.category, line.use_tp, line.code);
       if (pinned) {
@@ -652,13 +757,11 @@ export function registerCodeRoutes(app: FastifyInstance): void {
 
     switch (result.kind) {
       case 'missing':
-        return notFound(reply, '코드');
-      case 'system':
-        return systemLocked(reply, '시스템 코드는 지울 수 없습니다');
+        return notFound(reply, '코드값');
       case 'pinned':
         return inUse(
           reply,
-          `${result.label}이 이 코드값을 직접 쓰고 있어 지울 수 없습니다 (${result.source})`,
+          `${withParticle(result.label, '이', '가')} 이 코드값을 직접 쓰고 있어 지울 수 없습니다 (${result.source})`,
         );
       case 'in-use':
         return inUse(

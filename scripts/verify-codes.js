@@ -36,7 +36,7 @@ import { CODE_USAGE, PINNED_CODES } from '../packages/shared/src/domain/code-usa
 /** ★ RLS 가 걸린 표는 `pool.query` 로 못 읽는다. 코드 3표에는 RLS 가 없지만 길을 맞춘다. */
 const asOperator = (fn) => withCompanyScope({ role: 'operator', companyId: null }, fn);
 
-const EXPECTED_ITEMS = 100;
+const EXPECTED_ITEMS = 116;
 let pass = 0;
 let fail = 0;
 const failures = [];
@@ -517,19 +517,29 @@ function buildApp(session) {
       check('★ 코드값도 그대로다', back?.code === 'A', String(back?.code));
 
       /*
-       * ★ 시스템이면서 pinned 인 코드는 **시스템 잠금이 먼저** 걸린다(403). 둘 다 막으므로
-       *   안전하지만, 어느 쪽 문구가 나오는지 적어 둔다 — 나중에 「왜 pinned 문구가 안
-       *   나오나」를 묻게 될 자리다.
+       * ★★ 2026-10-03 에 **시스템 잠금이 없어지면서 이 단언의 답이 바뀌었다.**
+       *
+       *   예전: `CONTRACT_ST/cancelled` 는 `is_system` 이라 **403 이 먼저** 나갔다 —
+       *         pinned 경로를 지나가지도 않아 「어느 파일이 쓰는지」가 문구에 없었다
+       *   지금: 시스템 잠금이 없으니 **pinned 가 막고**, 문구에 그 파일이 적힌다
+       *
+       * 막히는 것은 그대로이고 **문구가 더 쓸모 있어졌다.** 그래서 403 을 409 로 바꿨다.
        */
       const cst = json(await op.inject({ method: 'GET', url: '/codes-admin/CONTRACT_ST/000/lines' })).lines
         .find((l) => l.code === 'cancelled');
+      check('★ 그 코드값은 시스템 표시가 있다', cst?.isSystem === true, String(cst?.isSystem));
       res = await op.inject({
         method: 'PATCH',
         url: `/codes-admin/lines/${cst.lineId}`,
         payload: { code: 'canceled', name: cst.name },
       });
-      check('★ 시스템+pinned 코드는 시스템 잠금(403)이 먼저 — 역시 막힌다', res.statusCode === 403,
+      check('★★★ 시스템+pinned 는 이제 **pinned 가 막는다** (409, 예전 403)', res.statusCode === 409,
         `${res.statusCode} ${res.body.slice(0, 120)}`);
+      check('★★ 그래서 문구에 어느 파일이 쓰는지가 적힌다', json(res).message?.includes('contract-status'),
+        json(res).message);
+      /* ★ 조사 — 받침 없는 이름 뒤에 「이」가 붙던 것을 고쳤다(「계약 상태 전이이」). */
+      check('★ 조사가 맞다 — 「계약 상태 전이가」', json(res).message?.includes('계약 상태 전이가'),
+        json(res).message);
     }
 
     /* ── 8. 비우지 않으면 파티션 · 분류를 지울 수 없다 ──────────────────── */
@@ -540,35 +550,162 @@ function buildApp(session) {
       check('★ 사유에 코드 수가 있다', json(res).message?.includes('1개'), json(res).message);
 
       res = await op.inject({ method: 'DELETE', url: `/codes-admin/masters/${VCAT}` });
-      check('파티션 남은 분류 삭제 → 409', res.statusCode === 409, `${res.statusCode} ${res.body.slice(0, 120)}`);
-      check('★ 사유에 파티션·코드 수가 함께 적힌다',
-        json(res).message?.includes('파티션') && json(res).message?.includes('코드'), json(res).message);
+      check('사용타입 남은 분류코드 삭제 → 409', res.statusCode === 409, `${res.statusCode} ${res.body.slice(0, 120)}`);
+      /*
+       * ★ 문구는 **화면이 그대로 보여 주는 것**이라 낱말까지 본다. 두 번 깨졌고 두 번
+       *   다 깨진 것이 옳았다:
+       *     2026-10-03 ① 「파티션」을 화면에서 없애고 「사용타입」으로 바꿨다
+       *     2026-10-03 ② 분류코드 삭제의 교착을 풀면서 사유를 **둘로 갈랐다** —
+       *        코드값이 남았으면 「코드값 N개」, 사용타입이 남았으면 「사용타입 N개」.
+       *        예전처럼 둘을 한 문장에 붙이면 **무엇을 먼저 지워야 하는지**가 흐려진다.
+       *   여기(VCAT)는 코드값이 남아 있는 경우다.
+       */
+      check('★ 사유가 먼저 치울 것을 짚는다 — 코드값',
+        json(res).message?.includes('코드값 1개'), json(res).message);
 
       /* ★★ 공통(000) 은 아예 못 지운다. */
       res = await op.inject({ method: 'DELETE', url: `/codes-admin/masters/${VCAT}/partitions/000` });
-      check('★★ 공통(000) 파티션 삭제 → 403', res.statusCode === 403, `${res.statusCode} ${res.body.slice(0, 120)}`);
+      check('★★ 공통(000) 사용타입 삭제 → 403', res.statusCode === 403, `${res.statusCode} ${res.body.slice(0, 120)}`);
     }
 
-    /* ── 9. 시스템 것은 지킨다 ──────────────────────────────────────────── */
-    console.log('\n9. 시스템 분류 · 시스템 코드');
+    /* ── 9. ★★ 시스템 차단은 없다 — 운영자가 판단한다 ──────────────────── */
+    console.log('\n9. ★★ 「시스템」은 더 이상 막지 않는다 (사용자 결정 2026-10-03)');
     {
-      const { rows } = await asOperator((c) =>
-        c.query(`SELECT category FROM public.tb_s080_code_masters WHERE is_system LIMIT 1`),
+      /*
+       * ★★★ **이 구역은 2026-10-03 에 뜻이 뒤집혔다.**
+       *
+       *   예전: 「시스템 분류·시스템 코드는 **지울 수 없다**(403)」를 확인했다
+       *   지금: 「`is_system` 이라는 이유로는 **막지 않는다**」를 확인한다
+       *
+       * 지울지 말지는 운영자가 판단할 몫이고, 서버가 막는 것은 **자료가 바로 깨지는**
+       * 둘뿐이다 — 쓰고 있는 코드값(§5) · 앱이 직접 쓰는 코드값(§7).
+       *
+       * ★ DB 의 `is_system` 칸은 **지우지 않았다**(사용자 지시). 값은 그대로 있고
+       *   아무도 그것으로 막지 않을 뿐이다 — 아래에서 그 둘을 함께 확인한다.
+       */
+      const sysCount = await asOperator(async (c) => {
+        const { rows } = await c.query(
+          `SELECT (SELECT count(*)::int FROM public.tb_s080_code_masters WHERE is_system) m,
+                  (SELECT count(*)::int FROM public.tb_s080_codes_line WHERE is_system) l`,
+        );
+        return rows[0];
+      });
+      check('★ DB 의 is_system 칸은 그대로 있다', sysCount.m > 0 && sysCount.l > 0,
+        `분류 ${sysCount.m} · 코드값 ${sysCount.l}`);
+
+      /* 검증 분류에 코드값을 하나 만들고 **시스템으로 표시**한 뒤, 지워지는지 본다. */
+      let res = await op.inject({
+        method: 'POST',
+        url: `/codes-admin/${VCAT}/007/lines`,
+        payload: { code: 'SYS1', name: '시스템표시 검증' },
+      });
+      const sysLineId = json(res).lineId;
+      check('검증용 코드값 생성 201', res.statusCode === 201, `${res.statusCode} ${res.body.slice(0, 120)}`);
+
+      await asOperator((c) =>
+        c.query(`UPDATE public.tb_s080_codes_line SET is_system = true WHERE line_id = $1`, [sysLineId]),
       );
-      const sysCat = rows[0]?.category;
-      check('시스템 분류를 찾았다', typeof sysCat === 'string', String(sysCat));
-      let res = await op.inject({ method: 'DELETE', url: `/codes-admin/masters/${sysCat}` });
-      check('★ 시스템 분류 삭제 → 403 또는 409', [403, 409].includes(res.statusCode),
+      const marked = json(await op.inject({ method: 'GET', url: `/codes-admin/${VCAT}/007/lines` })).lines
+        .find((l) => l.code === 'SYS1');
+      check('★ 그 코드값이 시스템으로 표시됐다', marked?.isSystem === true, String(marked?.isSystem));
+
+      /* ★★★ 예전에는 여기가 403 이었다. */
+      res = await op.inject({
+        method: 'PATCH',
+        url: `/codes-admin/lines/${sysLineId}`,
+        payload: { code: 'SYS2', name: '시스템표시 검증' },
+      });
+      check('★★★ 시스템 표시가 있어도 **코드값을 바꿀 수 있다** (예전 403)', res.statusCode === 200,
         `${res.statusCode} ${res.body.slice(0, 120)}`);
 
-      const { rows: sl } = await asOperator((c) =>
-        c.query(`SELECT line_id, category, use_tp, code, name FROM public.tb_s080_codes_line
-                  WHERE is_system LIMIT 1`),
-      );
-      const sys = sl[0];
-      res = await op.inject({ method: 'DELETE', url: `/codes-admin/lines/${sys.line_id}` });
-      check('★ 시스템 코드 삭제 → 403 또는 409', [403, 409].includes(res.statusCode),
+      res = await op.inject({ method: 'DELETE', url: `/codes-admin/lines/${sysLineId}` });
+      check('★★★ 시스템 표시가 있어도 **지울 수 있다** (예전 403)', res.statusCode === 200,
         `${res.statusCode} ${res.body.slice(0, 120)}`);
+
+      const gone = json(await op.inject({ method: 'GET', url: `/codes-admin/${VCAT}/007/lines` })).lines
+        .some((l) => l.code === 'SYS2');
+      check('★ 실제로 사라졌다', gone === false);
+
+      /* 사용타입도 같다 — 시스템으로 표시해도 비어 있으면 지워진다. */
+      res = await op.inject({
+        method: 'POST',
+        url: `/codes-admin/masters/${VCAT}/partitions`,
+        payload: { useTp: '009', name: '시스템표시 사용타입' },
+      });
+      check('검증용 사용타입 생성 201', res.statusCode === 201, `${res.statusCode} ${res.body.slice(0, 120)}`);
+      await asOperator((c) =>
+        c.query(
+          `UPDATE public.tb_s080_code_categories SET is_system = true WHERE category = $1 AND use_tp = '009'`,
+          [VCAT],
+        ),
+      );
+      res = await op.inject({ method: 'DELETE', url: `/codes-admin/masters/${VCAT}/partitions/009` });
+      check('★★★ 시스템 표시된 사용타입도 비어 있으면 지워진다 (예전 403)', res.statusCode === 200,
+        `${res.statusCode} ${res.body.slice(0, 120)}`);
+
+      /* ★ 공통(000) 은 **그대로 막는다** — 시스템 규칙이 아니라 구조 규칙이다(사용자 확인). */
+      res = await op.inject({ method: 'DELETE', url: `/codes-admin/masters/${VCAT}/partitions/000` });
+      check('★★ 공통(000)은 여전히 막힌다 — 시스템 차단과 다른 규칙이다', res.statusCode === 403,
+        `${res.statusCode} ${res.body.slice(0, 120)}`);
+    }
+
+    /* ── 9-2. ★★★ 분류코드가 끝까지 지워지는가 (교착 회귀) ───────────────── */
+    console.log('\n9-2. ★★★ 분류코드 삭제 — 공통(000)을 함께 지운다 (교착 회귀)');
+    {
+      /*
+       * ★★★ **2026-10-03 에 고친 교착의 회귀 시험이다.**
+       *
+       * 예전에는 분류코드를 만들면 공통(000)이 함께 생기고, 그 000 은 「분류코드를
+       * 지우면 함께 사라집니다」라며 403 이었다. 그런데 분류코드 삭제는 「사용타입이
+       * 남아 있으면 409」였다 — 그래서 **어떤 분류코드도 영원히 지워지지 않았다.**
+       * 화면의 [삭제] 가 26줄 전부 비활성인 것으로 드러났다.
+       */
+      const DCAT = `DLOCK${STAMP}`;
+      let res = await op.inject({
+        method: 'POST',
+        url: '/codes-admin/masters',
+        payload: { category: DCAT, name: '교착검증' },
+      });
+      check('분류코드 생성 201', res.statusCode === 201, `${res.statusCode} ${res.body.slice(0, 120)}`);
+
+      /* 코드값이 있으면 막힌다. */
+      res = await op.inject({
+        method: 'POST',
+        url: `/codes-admin/${DCAT}/000/lines`,
+        payload: { code: 'X1', name: '막는 코드값' },
+      });
+      const dLine = json(res).lineId;
+      res = await op.inject({ method: 'DELETE', url: `/codes-admin/masters/${DCAT}` });
+      check('★ 코드값이 남아 있으면 409', res.statusCode === 409, `${res.statusCode} ${res.body.slice(0, 120)}`);
+      check('★ 사유가 코드값이라고 말한다', json(res).message?.includes('코드값'), json(res).message);
+      await op.inject({ method: 'DELETE', url: `/codes-admin/lines/${dLine}` });
+
+      /* 다른 사용타입이 있으면 막힌다. */
+      await op.inject({
+        method: 'POST',
+        url: `/codes-admin/masters/${DCAT}/partitions`,
+        payload: { useTp: '001', name: '남는 사용타입' },
+      });
+      res = await op.inject({ method: 'DELETE', url: `/codes-admin/masters/${DCAT}` });
+      check('★ 다른 사용타입이 남아 있으면 409', res.statusCode === 409, `${res.statusCode} ${res.body.slice(0, 120)}`);
+      check('★ 사유가 공통(000) 말고 몇 개인지 말한다', json(res).message?.includes('1개'), json(res).message);
+      await op.inject({ method: 'DELETE', url: `/codes-admin/masters/${DCAT}/partitions/001` });
+
+      /* ★★★ 공통(000) 하나만 남았을 때 — 함께 지워진다. */
+      res = await op.inject({ method: 'DELETE', url: `/codes-admin/masters/${DCAT}` });
+      check('★★★ 공통(000)만 남으면 **분류코드가 지워진다** (예전엔 영원히 409)',
+        res.statusCode === 200, `${res.statusCode} ${res.body.slice(0, 120)}`);
+
+      const left = await asOperator(async (c) => {
+        const { rows } = await c.query(
+          `SELECT (SELECT count(*)::int FROM public.tb_s080_code_masters WHERE category=$1) m,
+                  (SELECT count(*)::int FROM public.tb_s080_code_categories WHERE category=$1) c`,
+          [DCAT],
+        );
+        return rows[0];
+      });
+      check('★★ 공통(000)도 함께 사라졌다 — 고아 사용타입이 남지 않는다',
+        left.m === 0 && left.c === 0, `분류 ${left.m} · 사용타입 ${left.c}`);
     }
 
     /* ── 10. 없는 대상은 404 ────────────────────────────────────────────── */
