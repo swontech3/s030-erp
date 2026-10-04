@@ -136,7 +136,17 @@ function check(label, ok, detail) {
     await pg.query('ROLLBACK');
   }
 
-  const left = await pg.query(`SELECT count(*)::int n FROM ${TABLE}`);
+  /*
+   * ★★ **이 시험이 넣은 것만 센다.** 예전에는 표를 통째로 세어 「0행이어야 한다」고
+   *    했다. 운영자가 화면에서 계약 상태를 한 번만 바꿔도 이력이 쌓이고, 그 순간
+   *    이 항목은 **마이그레이션과 무관하게 영원히 실패한다**(2026-10-04 에 42행이
+   *    쌓여 있었다). 늘 빨간 시험은 아무도 안 본다.
+   *
+   * ★ 그리고 표가 비어 있어야만 통과하는 시험은 **빈 DB 에서만 도는 시험**이다.
+   *   실제 자료가 있는 DB 에서 못 돌면 정작 봐야 할 때 못 본다.
+   */
+  const MINE = `contract_id LIKE 'verify010%'`;
+  const left = await pg.query(`SELECT count(*)::int n FROM ${TABLE} WHERE ${MINE}`);
   check('검증 데이터가 남지 않았다', left.rows[0].n === 0, `${left.rows[0].n}행 남음`);
   await pg.end();
 
@@ -180,8 +190,18 @@ function check(label, ok, detail) {
 
     await erp.query('BEGIN');
     await erp.query(`SELECT set_config('app.current_role', 'operator', true)`);
-    const asOperator = await erp.query(`SELECT count(*)::int n FROM ${TABLE}`);
-    check('운영사 세션은 보인다', asOperator.rows[0].n === 1, `${asOperator.rows[0].n}행 보임`);
+    /*
+     * ★ **심어 둔 그 행**을 보는지만 본다. 예전에는 표 전체를 세어 「1행이어야 한다」고
+     *   했는데, 그건 «표에 다른 자료가 하나도 없다»는 뜻이지 «운영사가 본다»는 뜻이
+     *   아니다. 실제 이력이 쌓이자 43행이 보이며 실패했다 — 정책은 멀쩡한데 말이다.
+     *
+     * ★ 바로 위의 「입주사는 0행」과 짝이다. 같은 행을 두고 한쪽은 보고 한쪽은 못 보는
+     *   것을 보여야 판정이 **종류가 아니라 역할** 때문임이 드러난다.
+     */
+    const asOperator = await erp.query(
+      `SELECT count(*)::int n FROM ${TABLE} WHERE history_id='verify010b-h'`,
+    );
+    check('운영사 세션은 심어 둔 행을 본다 (대조군)', asOperator.rows[0].n === 1, `${asOperator.rows[0].n}행 보임`);
     await erp.query('ROLLBACK');
 
     // ── 5. 감사 이력이라 지우지 못한다 ─────────────────────────────────────
@@ -221,7 +241,8 @@ function check(label, ok, detail) {
     await erp.end();
     // 심어 둔 검증 데이터 제거 (history 는 계약 CASCADE 로 함께 지워진다)
     await seed.query(`DELETE FROM public.tb_s080_contracts WHERE contract_id='verify010b'`);
-    const after = await seed.query(`SELECT count(*)::int n FROM ${TABLE}`);
+    // ★ 여기도 이 시험이 넣은 것만 센다 — 위와 같은 이유다.
+    const after = await seed.query(`SELECT count(*)::int n FROM ${TABLE} WHERE ${MINE}`);
     check('검증 데이터가 남지 않았다 (2)', after.rows[0].n === 0, `${after.rows[0].n}행 남음`);
     await seed.end();
   }

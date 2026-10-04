@@ -30,7 +30,7 @@ const { itemCountGate } = require('./verify-count.js');
  * 기대 항목 수 — 모자라면 **실패**다. 항목이 조용히 사라지는 것을 막는 유일한 장치이고,
  * 경위는 `verify-count.js` 머리말에 있다. 항목을 늘리면 끝에서 이 수를 고치라고 알려 준다.
  */
-const EXPECTED_ITEMS = 13;
+const EXPECTED_ITEMS = 14;
 let pass = 0;
 let fail = 0;
 
@@ -58,9 +58,31 @@ function check(label, ok, detail) {
 
   console.log('\n020 — tb_cm_file 이 첨부 서류를 받을 수 있는 상태인가');
 
-  // ① 실물 없는 레거시 기록이 사라졌는가
-  const n = await one(`SELECT count(*)::int n FROM public.tb_cm_file`);
-  check('실물 없는 레거시 48행이 없다', n.n === 0, `현재 ${n.n}행`);
+  /* ① 실물 없는 기록이 없는가
+   *
+   * ══════════════════════════════════════════════════════════════════════
+   * ★★ **「표가 비어 있다」가 아니라 「실물 없는 기록이 없다」를 본다**
+   * ══════════════════════════════════════════════════════════════════════
+   * 020 이 지운 것은 레거시 48행인데, 그 48행의 문제는 **수가 48이라는 것이
+   * 아니라 가리키는 파일이 없다는 것**이었다. 화면에는 「등록됨」으로 보이고
+   * 눌러야 비로소 깨지는 상태다(레거시 결함 ②).
+   *
+   * 예전에는 표를 통째로 세어 「0행」을 기대했다. CONT-17 이 돌기 시작해 진짜
+   * 첨부가 쌓이자 이 항목은 **기능이 멀쩡한데도 영원히 실패**했다(2026-10-04 에
+   * 8행). 게다가 그 기대는 틀렸다 — 표가 비어 있는 것은 020 의 목표가 아니다.
+   *
+   * 지금은 `storage.objects` 와 맞대어 본다. 020 이 치운 바로 그 상태를 직접
+   * 보고, 자료가 쌓일수록 **더 센 시험**이 된다.
+   */
+  const ghost = await one(`
+    SELECT count(*)::int n, string_agg(f.storage_path, ' | ') paths
+      FROM public.tb_cm_file f
+     WHERE NOT EXISTS (SELECT 1 FROM storage.objects o WHERE o.name = f.storage_path)`);
+  check('★ 기록은 있는데 실물이 없는 행이 0건이다', ghost.n === 0, `${ghost.n}행 (${ghost.paths})`);
+
+  // ★ 대조군 — 맞대어 볼 기록이 하나도 없으면 위 검사는 공짜로 통과한다.
+  const rows = await one(`SELECT count(*)::int n FROM public.tb_cm_file`);
+  check('대조군 — 맞대어 볼 첨부 기록이 1행 이상이다', rows.n >= 1, `${rows.n}행`);
 
   // ② 만료되는 값을 담는 칸이 없는가
   const url = await one(`

@@ -76,13 +76,30 @@ function check(label, ok, detail) {
                     WHERE l.category = 'MEMBER_TYPE' AND l.use_tp = '000' AND l.name = c.member_type)`);
   check('표시명이 그대로 들어간 행이 0건이다', asName.n === 0, `${asName.n}건`);
 
-  // 018 이 실제로 바꾼 행. 시드가 1행이라 지금은 여기서 확인된다.
-  const seed = await one(`SELECT member_type FROM public.tb_s080_companies
-                           WHERE company_id = 'MOCK_TENANT_9001'`);
+  /*
+   * ══════════════════════════════════════════════════════════════════════
+   * ★★ 대조군 — 위 둘이 **공짜로 통과하는 것**을 막는다
+   * ══════════════════════════════════════════════════════════════════════
+   * 위 두 검사는 「어긋난 행이 0건」이다. 회원구분이 든 회사가 **한 곳도 없으면
+   * 둘 다 저절로 통과한다.** 그래서 「셀 것이 있었다」를 함께 말해야 한다.
+   *
+   * ★ 예전에는 여기서 `MOCK_TENANT_9001` 이 `'P'` 인지를 봤다. 018 이 그 회사의
+   *   「개인사업자」를 `'P'` 로 바꿨으니 당시에는 맞는 말이었다. 그런데 그 값은
+   *   **계약 폼에서 운영자가 고칠 수 있다.** 실제로 주식회사(R)로 바뀌었고, 그
+   *   순간 이 항목은 018 과 아무 상관 없이 영원히 실패하기 시작했다
+   *   (2026-10-04 · `verify-cont17.js` [7] 도 같은 병이었다).
+   *
+   *   **마이그레이션 검증은 특정 회사의 지금 값에 기대면 안 된다.** 018 이 보장한
+   *   것은 「회원구분 칸에 표시명이 아니라 코드값이 들어간다」이지 「에스원3DP 가
+   *   개인사업자다」가 아니다.
+   */
+  const filled = await one(`
+    SELECT count(*)::int n FROM public.tb_s080_companies
+     WHERE member_type IS NOT NULL AND btrim(member_type) <> ''`);
   check(
-    'MOCK_TENANT_9001 이 P(개인사업자)다',
-    !!seed && seed.member_type === 'P',
-    seed ? seed.member_type : '행 없음',
+    '대조군 — 회원구분이 든 회사가 1곳 이상이다 (0곳이면 위 둘은 공짜로 통과한다)',
+    filled.n >= 1,
+    `${filled.n}곳`,
   );
 
   // 값이 의미를 유지했는지 — P 의 이름이 「개인사업자」여야 이 이관이 옳다(017).
