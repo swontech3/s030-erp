@@ -14,6 +14,8 @@ import {
   isFilePurpose,
   missingDocsMessage,
   missingRequiredDocs,
+  offRuleDocs,
+  offRuleNote,
   rejectUpload,
   storagePathFor,
   visibleDocs,
@@ -127,6 +129,46 @@ describe('업로드 검사', () => {
     expect(rejectUpload({ ...ok, purpose: 'CORP_REG', memberType: INDIV })).toMatch(/회원구분/);
     // 법인이면 같은 요청이 통과한다 — 막는 것이 종류가 아니라 조합임을 보인다
     expect(rejectUpload({ ...ok, purpose: 'CORP_REG', memberType: CORP })).toBeNull();
+  });
+});
+
+describe('규칙 밖 서류 — 회원구분을 바꾼 뒤 남는 것', () => {
+  it('★ 법인으로 올린 등기부등본은 개인사업자로 바뀌면 규칙 밖이 된다', () => {
+    // 올리는 길은 막혀 있다. 그래도 이 상태는 **회원구분을 바꾸면** 생긴다.
+    expect(
+      rejectUpload({ purpose: 'CORP_REG', mimeType: 'image/jpeg', size: 1024, memberType: SOLE }),
+    ).toMatch(/회원구분/);
+    expect(offRuleDocs(SOLE, ['CORP_REG']).map((d) => d.purpose)).toEqual(['CORP_REG']);
+    expect(offRuleDocs(INDIV, ['CORP_REG']).map((d) => d.purpose)).toEqual(['CORP_REG']);
+    expect(offRuleDocs('', ['CORP_REG']).map((d) => d.purpose)).toEqual(['CORP_REG']);
+  });
+
+  it('법인에게는 규칙 밖이 아니다 — 대조군', () => {
+    expect(offRuleDocs(CORP, ['CORP_REG'])).toEqual([]);
+  });
+
+  it('보이는 칸에 붙은 서류는 규칙 밖이 아니다', () => {
+    expect(offRuleDocs(SOLE, ['CEO_ID', 'BIZ_REG', 'EXISTING_CONTRACT'])).toEqual([]);
+  });
+
+  it('안 붙어 있으면 규칙 밖도 없다 — 빈 칸을 치우라고 하지 않는다', () => {
+    expect(offRuleDocs(SOLE, [])).toEqual([]);
+  });
+
+  it('모르는 값은 무시한다', () => {
+    expect(offRuleDocs(SOLE, ['PASSPORT', 'corp_reg'])).toEqual([]);
+  });
+
+  it('★ 규칙 밖은 **확정을 막지 않는다** — 필수가 아니라 치울 것이다', () => {
+    expect(missingRequiredDocs(SOLE, ['CEO_ID', 'BIZ_REG', 'CORP_REG'])).toEqual([]);
+  });
+
+  it('이유 한 줄 — 코드가 아니라 표시명으로 말한다', () => {
+    expect(offRuleNote('개인사업자')).toBe('개인사업자에는 필요 없는 서류입니다');
+    expect(offRuleNote('개인')).toBe('개인에는 필요 없는 서류입니다');
+    // 회원구분을 아직 안 골랐으면 이름이 없다. 그래도 문장이 돼야 한다.
+    expect(offRuleNote('')).toBe('지금 회원구분에는 필요 없는 서류입니다');
+    expect(offRuleNote('  ')).toBe('지금 회원구분에는 필요 없는 서류입니다');
   });
 });
 

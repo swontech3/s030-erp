@@ -27,6 +27,7 @@ import {
   type ContractTotals,
 } from '@swonbiz/shared/domain/contract-amounts';
 import { caretForMasked } from '@swonbiz/shared/domain/masked-caret';
+import { docRuleFor } from '@swonbiz/shared/domain/contract-files';
 
 /** 계약 항목 한 줄. 금액은 전부 원 단위 정수이고, 안 채운 칸은 0 이다. */
 export interface ItemRow {
@@ -150,22 +151,24 @@ export const MEMBER_TYPE_CATEGORY = 'MEMBER_TYPE';
 export const memberTypesOf = (codes: readonly CodeOption[]): readonly CodeOption[] =>
   codes.filter((c) => c.category === MEMBER_TYPE_CATEGORY);
 
-/** 개인사업자 — 사업자등록을 한 개인. */
-export const MEMBER_TYPE_SOLE_PROPRIETOR = 'P';
-/** 개인 — 사업자등록이 아직 없을 수 있다(시안의 「프리랜서」 자리다). 017 이 만들었다. */
-export const MEMBER_TYPE_INDIVIDUAL = 'Z';
-
-/** 비법인 코드 둘. 나머지(`R`·`A`·`C`·`S`)는 전부 법인격이다. */
-const NON_CORP_MEMBER_TYPES: readonly string[] = [MEMBER_TYPE_SOLE_PROPRIETOR, MEMBER_TYPE_INDIVIDUAL];
-
 /**
- * 법인격인가 — 법인등록번호 활성 · 법인등기부등본 카드 · 저장 시 `corpNumber` 포함.
+ * =============================================================================
+ * ★★ 회원구분 판정은 **여기 없다** — `@swonbiz/shared/domain/contract-files`
+ * =============================================================================
+ * 2026-10-04 까지 이 파일에 `isCorpMemberType` 이 **한 벌 더** 있었다. shared 에도
+ * 같은 이름의 함수가 있었고, 서버는 그쪽을 본다. 두 벌은 이미 갈려 있었다 —
+ * 이쪽은 `code.trim() !== ''` 로 비었는지만 보고 비교는 **다듬지 않은 값**으로 해서
+ * `' P '`(앞뒤 공백)를 **법인으로 읽었다.** shared 쪽은 비법인으로 읽는다.
+ * 같은 회원구분을 두고 화면은 법인등록번호 칸을 열고 서버는 등기부등본을 거절하는,
+ * 서로 다른 답이 나오는 상태였다.
  *
- * ★ 미선택(`''`)은 **법인이 아니다.** 안 고른 상태에서 법인 전용 칸이 열리면
- *   운영자가 채우고, 그 값은 저장될 때 버려진다(`corpNumber` 는 법인일 때만 실린다).
+ * 그래서 **다시 내보내기만 한다.** 규칙은 shared 한 곳이고 화면·서버가 그것을 본다.
  */
-export const isCorpMemberType = (code: string): boolean =>
-  code.trim() !== '' && !NON_CORP_MEMBER_TYPES.includes(code);
+export {
+  MEMBER_TYPE_SOLE_PROPRIETOR,
+  MEMBER_TYPE_INDIVIDUAL,
+  isCorpMemberType,
+} from '@swonbiz/shared/domain/contract-files';
 
 /**
  * 사업자등록증을 내야 하는가 — **개인(`Z`)만 면제**다.
@@ -175,9 +178,11 @@ export const isCorpMemberType = (code: string): boolean =>
  *   017 이 `P` 개인사업자 / `Z` 개인으로 나눠서 시안의 3분법이 그대로 표현된다.
  *
  * ★ 미선택(`''`)은 면제다. 구분을 고르기 전에 서류부터 요구하지 않는다.
+ *
+ * ★ 규칙을 여기서 다시 쓰지 않는다 — `docRuleFor('BIZ_REG', …).required` 가 바로
+ *   이 질문이고, 그 함수를 서버도 본다.
  */
-export const needsBizLicense = (code: string): boolean =>
-  code.trim() !== '' && code !== MEMBER_TYPE_INDIVIDUAL;
+export const needsBizLicense = (code: string): boolean => docRuleFor('BIZ_REG', code).required;
 
 /**
  * 이메일 도메인 카테고리 — ★ **코드 테이블에서 온다**(마이그레이션 016).

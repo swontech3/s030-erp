@@ -460,6 +460,15 @@ export function ContractForm({
   ]);
 
   /**
+   * 회원구분의 표시명. 섹션 4 가 「규칙 밖」 서류의 이유 한 줄에 쓴다.
+   *
+   * ★ 안 고른 상태(`''`)면 빈 문자열이고, 그때 문장을 어떻게 맺을지는 섹션이 아니라
+   *   `offRuleNote` 가 정한다 — 문구는 한 곳이다.
+   */
+  const memberTypeName =
+    memberTypes.find((t) => t.code === companyState.memberType)?.name ?? '';
+
+  /**
    * 붙들고 있던 파일을 올린다. **회사가 막 생긴 직후, 이동하기 전에** 부른다.
    *
    * ★ 한 장이 실패해도 나머지를 계속 올린다. 그리고 **저장 자체를 실패시키지 않는다** —
@@ -1103,6 +1112,8 @@ export function ContractForm({
           <SectionDocs
             companyId={companyId}
             memberType={companyState.memberType}
+            // ★ 「규칙 밖」 서류의 이유 한 줄에 쓴다. 코드가 아니라 표시명이 필요하다.
+            memberTypeName={memberTypeName}
             disabled={frozen}
             // ★ 재계약에는 [임시저장] 이 없다 — 안내 문구가 그걸 따라간다.
             draftable={!renewal}

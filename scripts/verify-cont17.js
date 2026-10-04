@@ -31,7 +31,9 @@ const API = 'http://127.0.0.1:3001';
 const STORAGE = apiEnv.SUPABASE_URL;
 const SERVICE_KEY = apiEnv.SUPABASE_SERVICE_ROLE_KEY;
 const BUCKET = 'erp-files';
-const COMPANY = 'MOCK_TENANT_9001'; // member_type = 'P' (개인사업자) — 법인이 아니다
+// ★ 회원구분은 여기 적지 않는다 — [7] 이 필요할 때 직접 세우고 되돌린다. 화면에서
+//   고칠 수 있는 값을 머리말에 적어 두면 그 값이 바뀌는 날 시험이 뒤집힌다.
+const COMPANY = 'MOCK_TENANT_9001';
 
 const { itemCountGate } = require('./verify-count.js');
 
@@ -39,7 +41,7 @@ const { itemCountGate } = require('./verify-count.js');
  * 기대 항목 수 — 모자라면 **실패**다. 항목이 조용히 사라지는 것을 막는 유일한 장치이고,
  * 경위는 `verify-count.js` 머리말에 있다. 항목을 늘리면 끝에서 이 수를 고치라고 알려 준다.
  */
-const EXPECTED_ITEMS = 42;
+const EXPECTED_ITEMS = 47;
 let pass = 0;
 let fail = 0;
 function check(label, ok, detail) {
@@ -223,17 +225,93 @@ async function objectExists(path) {
   const stillOne = await dbRows('CEO_ID');
   check('거절된 요청이 DB 를 바꾸지 않았다', stillOne.length === 1 && stillOne[0].storage_path === path2);
 
-  // ══ ⑦ 법인이 아니면 CORP_REG 를 못 올린다 ═══════════════════════════
+  /* ══ ⑦ 법인이 아니면 CORP_REG ═══════════════════════════════════════
+   *
+   * ★★ **회원구분을 이 시험이 직접 세운다.** 예전에는 `MOCK_TENANT_9001` 이 개인사업자
+   *    라고 머리말에 적어 두고 그 값을 믿었다. 그런데 그 회사는 **화면에서 고칠 수
+   *    있는 회사**다. 실제로 2026-10-04 에 법인(R)으로 바뀌어 있었고, 그 순간 이
+   *    항목은 «법인에게 등기부등본을 거절하라»는 뒤집힌 시험이 됐다 — 영원히
+   *    실패하면서 정작 진짜 회귀는 못 잡는 상태다. 주변 값에 기대지 않는다.
+   *    세웠다가 **반드시 되돌린다**(finally).
+   */
   console.log('\n[7] 법인 아니면 CORP_REG (카드도 안 보이고 API 도 막는다)');
-  const corp = await upload(operator, 'CORP_REG', jpeg(256), 'image/jpeg');
-  const corpBody = await corp.json().catch(() => ({}));
+
+  const memberTypeOf = async () =>
+    (
+      await db.query(`SELECT member_type FROM public.tb_s080_companies WHERE company_id=$1`, [
+        COMPANY,
+      ])
+    ).rows[0]?.member_type ?? null;
+  const setMemberType = (code) =>
+    db.query(`UPDATE public.tb_s080_companies SET member_type=$2 WHERE company_id=$1`, [
+      COMPANY,
+      code,
+    ]);
+
+  const originalMemberType = await memberTypeOf();
+  try {
+    // ★ 대조군 먼저 — 법인(R)에서는 **통과해야 한다.** 이것이 없으면 아래의 「막혔다」가
+    //   서류 종류 때문인지 회원구분과의 조합 때문인지 가릴 수 없다.
+    await setMemberType('R');
+    const asCorp = await upload(operator, 'CORP_REG', jpeg(256), 'image/jpeg', '등기부등본.jpg');
+    const asCorpBody = await asCorp.json().catch(() => ({}));
+    check(
+      '대조군 — 법인(R)에서는 CORP_REG 가 통과한다',
+      asCorp.status === 201,
+      `${asCorp.status} ${JSON.stringify(asCorpBody).slice(0, 120)}`,
+    );
+
+    /* ★★ **올린 뒤에 회원구분을 바꾼다.** 올리는 길은 막혀 있는데도 「개인사업자에게
+     *     법인등기부등본이 붙어 있는」 상태가 생기는 유일한 길이 이것이다. */
+    await setMemberType('P');
+
+    const blocked = await upload(operator, 'CORP_REG', jpeg(256), 'image/jpeg');
+    const blockedBody = await blocked.json().catch(() => ({}));
+    check(
+      '개인사업자(P) 회사에 CORP_REG 를 막는다',
+      blocked.status === 400 && /회원구분/.test(blockedBody.message ?? ''),
+      `${blocked.status} ${blockedBody.message}`,
+    );
+
+    const corpRows = await dbRows('CORP_REG');
+    check(
+      '막힌 요청이 DB 를 바꾸지 않았다 (대조군이 올린 1행 그대로)',
+      corpRows.length === 1 && corpRows[0].id === asCorpBody.file?.fileId,
+      `${corpRows.length}행`,
+    );
+
+    /* ★ 목록 API 가 이것을 **숨기면 안 된다.** 숨기는 순간 화면에 칸이 없어지고,
+     *   그 서류는 보이지도 지워지지도 않는다 — 운영자에게는 없는 셈인데 스토리지에는
+     *   남는다. 화면은 이 서류를 「규칙 밖」으로 그리고 삭제만 열어 둔다. */
+    const offList = await fetch(`${API}/companies/${COMPANY}/files`, { headers: withSid(operator) });
+    const offBody = await offList.json().catch(() => ({}));
+    check(
+      '★ 규칙 밖이 돼도 목록이 그 서류를 돌려준다 (화면이 치울 수 있어야 한다)',
+      (offBody.files ?? []).some((f) => f.purpose === 'CORP_REG'),
+      (offBody.files ?? []).map((f) => f.purpose).join(',') || '빈 목록',
+    );
+
+    const corpPath = corpRows[0]?.storage_path;
+    const delOff = await fetch(`${API}/companies/${COMPANY}/files/${asCorpBody.file?.fileId}`, {
+      method: 'DELETE',
+      headers: withSid(operator),
+    });
+    check('★ 규칙 밖이 된 서류를 지울 수 있다', delOff.status === 204, `status ${delOff.status}`);
+    check(
+      '지운 실물이 스토리지에서도 사라졌다',
+      corpPath ? !(await objectExists(corpPath)) : false,
+      corpPath,
+    );
+  } finally {
+    // ★ 던지든 말든 원래 값으로 돌려놓는다. 시험이 남의 데이터를 바꿔 둔 채 끝나면,
+    //   다음 번 이 시험이 또 엉뚱한 것을 보게 된다 — 지금 고치고 있는 바로 그 병이다.
+    await setMemberType(originalMemberType);
+  }
   check(
-    "개인사업자(P) 회사에 CORP_REG 를 막는다",
-    corp.status === 400 && /회원구분/.test(corpBody.message ?? ''),
-    `${corp.status} ${corpBody.message}`,
+    '★ 회원구분을 원래대로 돌려놨다',
+    (await memberTypeOf()) === originalMemberType,
+    `${originalMemberType}`,
   );
-  const corpRows = await dbRows('CORP_REG');
-  check('막힌 CORP_REG 가 DB 에 남지 않았다', corpRows.length === 0, `${corpRows.length}행`);
 
   // ══ ⑥ 입주사 계정은 셋 다 막힌다 ════════════════════════════════════
   console.log('\n[6] 입주사 계정으로 업로드·조회·삭제 전부 막힌다');
@@ -333,15 +411,25 @@ async function objectExists(path) {
   for (const row of leftovers) {
     await fetch(`${API}/companies/${COMPANY}/files/${row.id}`, { method: 'DELETE', headers: withSid(operator) });
   }
-  const finalRows = (await db.query(`SELECT count(*)::int n FROM public.tb_cm_file`)).rows[0].n;
-  check('tb_cm_file 이 비어 있다', finalRows === 0, `${finalRows}행`);
-
-  const listAfter = await fetch(`${API}/storage/v1/object/list/${BUCKET}`).catch(() => null);
-  void listAfter;
-  const objs = (
-    await db.query(`SELECT count(*)::int n FROM storage.objects WHERE bucket_id=$1`, [BUCKET])
+  /*
+   * ★★ **이 시험이 쓴 회사만 본다.** 예전에는 `tb_cm_file` 과 버킷을 **통째로** 세어
+   *    「비어 있어야 한다」고 했다. 운영자가 화면에서 실제 입주사에 서류를 올리는 순간
+   *    그 수가 0 이 아니게 되고, 이 두 항목은 **이 기능과 상관없이 영원히 실패한다**
+   *    (2026-10-04 에 8행·12건으로 걸려 있었다). 늘 빨간 시험은 아무도 안 본다.
+   */
+  const finalRows = (
+    await db.query(`SELECT count(*)::int n FROM public.tb_cm_file WHERE target_id=$1`, [COMPANY])
   ).rows[0].n;
-  check('★ erp-files 버킷에 고아 파일이 없다', objs === 0, `${objs}건`);
+  check('이 시험이 쓴 회사에 남은 기록이 없다', finalRows === 0, `${finalRows}행`);
+
+  const objs = (
+    await db.query(
+      `SELECT count(*)::int n FROM storage.objects
+        WHERE bucket_id=$1 AND name LIKE '%/companies/' || $2 || '/%'`,
+      [BUCKET, COMPANY],
+    )
+  ).rows[0].n;
+  check('★ 이 시험이 쓴 회사 경로에 남은 실물이 없다', objs === 0, `${objs}건`);
 
   await db.end();
   console.log(`\n  통과 ${pass} · 실패 ${fail}`);

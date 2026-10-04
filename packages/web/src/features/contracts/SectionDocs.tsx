@@ -34,8 +34,11 @@ import {
   MAX_FILE_MB,
   docRuleFor,
   isFilePurpose,
+  offRuleDocs,
+  offRuleNote,
   rejectUpload,
   visibleDocs,
+  type DocDef,
   type FilePurpose,
 } from '@swonbiz/shared/domain/contract-files';
 import type { BizRegFields } from '@swonbiz/shared/domain/biz-reg-ocr';
@@ -58,6 +61,13 @@ interface Props {
   /** `null` 이면 아직 저장되지 않은 계약이다 — 붙일 회사가 없다. */
   companyId: string | null;
   memberType: string;
+  /**
+   * 회원구분의 **표시명**(「개인사업자」). 「규칙 밖」 서류의 이유 한 줄에만 쓴다.
+   *
+   * ★ 코드(`memberType`)로는 그 문장을 만들 수 없다 — 「P에는 필요 없는 서류입니다」가
+   *   된다. 이름은 코드 응답에만 있고 그것을 아는 쪽이 폼이라 폼이 내려 준다.
+   */
+  memberTypeName: string;
   /** `terminated`·`cancelled` — 읽기 전용. 올리지도 지우지도 못한다. */
   disabled: boolean;
   /**
@@ -112,6 +122,7 @@ export const SECTION_DOCS_ID = 'contract-section-docs';
 export function SectionDocs({
   companyId,
   memberType,
+  memberTypeName,
   disabled: frozen,
   draftable,
   onNotify,
@@ -130,8 +141,32 @@ export function SectionDocs({
   const shown = visibleDocs(memberType);
   const byPurpose = new Map(files.map((f) => [f.purpose, f]));
   // ★ **보이는 칸만** 센다. 법인등기부등본이 숨겨진 회사에 그 파일이 남아 있어도
-  //   「1/3」이 「1/4」로 보이지 않는다.
+  //   「1/3」이 「1/4」로 보이지 않는다. 아래 「규칙 밖」 칸도 이 수에 넣지 않는다 —
+  //   채워야 할 서류가 아니라 **치워야 할 서류**다.
   const done = shown.filter((d) => byPurpose.has(d.purpose)).length;
+
+  /**
+   * ★★ 지금 회원구분에서는 안 보이는데 **이미 붙어 있는** 서류.
+   *
+   *    법인으로 등기부등본을 올린 뒤 개인사업자로 바꾸면 생긴다. 예전에는 `shown` 만
+   *    그려서 이 서류가 **보이지도 지워지지도 않았다** — 운영자에게는 없는 셈인데
+   *    스토리지에는 남아 있었다. 그려 주고 **지울 수 있게** 한다(2026-10-04).
+   *
+   * ★ 붙들고 있는 파일(`pending`)도 함께 센다. 고른 뒤 회원구분을 바꾸면 똑같이
+   *   취소할 칸이 사라지고, 저장할 때 서버가 거절해서 영문 모를 오류만 뜬다.
+   */
+  const offRule = offRuleDocs(memberType, [
+    ...files.map((f) => f.purpose),
+    ...Object.keys(pending),
+  ]);
+  /** 왜 규칙 밖인지 — 뱃지만 달면 이유를 알 수 없다. */
+  const offRuleReason = offRuleNote(memberTypeName);
+
+  /** 그릴 칸 전부. 규칙 안이 먼저고 규칙 밖이 뒤다 — 할 일과 치울 것을 섞지 않는다. */
+  const cards: { def: DocDef; off: boolean }[] = [
+    ...shown.map((def) => ({ def, off: false })),
+    ...offRule.map((def) => ({ def, off: true })),
+  ];
 
   /** 받은 목록을 화면과 폼에 함께 반영한다 — 두 곳이 갈리면 확정 게이트가 헛돈다. */
   const take = useCallback(
@@ -324,7 +359,7 @@ export function SectionDocs({
       ) : null}
 
       <div className={styles.docList}>
-        {shown.map((def) => {
+        {cards.map(({ def, off }) => {
           const rule = docRuleFor(def.purpose, memberType);
           const file = byPurpose.get(def.purpose);
           /** 아직 회사가 없어 붙들고 있는 파일. 저장할 때 올라간다. */
@@ -337,11 +372,16 @@ export function SectionDocs({
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <span className={styles.docName}>{def.name}</span>
-                  <span
-                    className={`${styles.badge} ${rule.required ? styles.badgeDanger : styles.badgeNeutral}`}
-                  >
-                    {rule.required ? '필수' : '선택'}
-                  </span>
+                  {/* ★ 규칙 밖에는 「선택」을 달지 않는다 — 올릴 수 있다는 말로 읽힌다. */}
+                  {off ? (
+                    <span className={`${styles.badge} ${styles.badgeDanger}`}>규칙 밖</span>
+                  ) : (
+                    <span
+                      className={`${styles.badge} ${rule.required ? styles.badgeDanger : styles.badgeNeutral}`}
+                    >
+                      {rule.required ? '필수' : '선택'}
+                    </span>
+                  )}
                   {file ? (
                     <span className={`${styles.badge} ${styles.badgeOk ?? styles.badgeNeutral}`}>
                       <Icon name="circle-check" size={12} />
@@ -360,6 +400,8 @@ export function SectionDocs({
                       ? `${waiting.name} · ${sizeLabel(waiting.size)}`
                       : def.desc}
                 </div>
+                {/* ★ 왜 규칙 밖인지 한 줄. 이유 없이 「규칙 밖」만 뜨면 손을 못 댄다. */}
+                {off ? <div className={styles.docDesc}>{offRuleReason}</div> : null}
               </div>
 
               <div className={styles.docActions}>
@@ -402,7 +444,12 @@ export function SectionDocs({
                   </button>
                 ) : null}
 
-                {!frozen ? (
+                {/*
+                  ★★ 규칙 밖 칸에는 **올리기를 두지 않는다.** 서버가 어차피 거절하지만
+                     (`rejectUpload`), 누를 수 있는 버튼을 두고 거절하는 것은 안내가
+                     아니라 함정이다. 여기서 할 수 있는 일은 치우는 것뿐이다.
+                */}
+                {!frozen && !off ? (
                   <>
                     <input
                       ref={(el) => {
