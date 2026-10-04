@@ -20,6 +20,7 @@
  * DB 를 붙이는 자리는 `companies/registerOrg.ts` 다.
  */
 import { firstFreeOrgCode, nextOrgCode } from '@swonbiz/shared/domain/org-code';
+import { ORG_MODULE_CODES } from './types.ts';
 import type {
   BbiyongOrg,
   BbiyongOrgRequest,
@@ -102,13 +103,14 @@ export type OrgOp = 'off' | 'on' | 'patch';
 const MAX_ATTEMPTS = 10;
 
 /**
- * 보낼 구독 모듈 — **고정이다**(삐용 회신 2026-10-01).
+ * 보낼 구독 모듈 — **정의는 `types.ts` 한 곳이다**(2026-10-04 에 그리로 옮겼다).
+ * 등록·퇴실·재입주 셋이 같은 목록을 본다. 여기서는 다시 내보내기만 한다.
  *
  * ★ 계약에서 읽지 않는다. 지금 ERP 가 파는 것은 공유오피스 하나이고, 권한관리(AUTHZ)는
  *   그 회사 대표가 역할 화면을 쓰려면 필요하다. 계약마다 서비스가 갈리는 날 계약에서
  *   읽어 오는 자리로 바꾼다(연동규격 §2-3 `[결정 Q3]`).
  */
-export const ORG_MODULE_CODES = ['OFFICE', 'AUTHZ'] as const;
+export { ORG_MODULE_CODES };
 
 /** 하이픈·공백을 떼고 숫자만. 삐용은 숫자만 받는다(`tenant-registration` 의 `digitsOnly`). */
 function digitsOf(value: string): string {

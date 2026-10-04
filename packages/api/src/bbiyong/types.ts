@@ -276,6 +276,20 @@ export interface BbiyongOrgRequest {
 }
 
 /**
+ * ★★★ ERP 가 다루는 구독 모듈 — **이 한 줄이 정본이다.**
+ *
+ * 등록(`createOrg`) · 퇴실(`moduleOff`) · 재입주(`moduleOn`) **세 곳이 모두 이것을 본다.**
+ * 2026-10-04 까지는 등록만 이 목록을 쓰고 퇴실·재입주는 `HttpBbiyongOrg` 안에 박힌
+ * `OFFICE` 한 글자를 따로 들고 있었다 — 그래서 **등록은 둘을 켜는데 퇴실은 하나만 끄는**
+ * 상태였다. 모듈이 늘거나 줄면 여기만 고친다.
+ *
+ * ★ `types.ts` 에 둔 이유: `orgLink`(등록 요청을 만드는 쪽)와 `HttpBbiyongOrg`(실제로
+ *   보내는 쪽)가 **둘 다 이미 이 파일을 보고 있다.** 어느 한쪽에 두면 다른 쪽이 그쪽을
+ *   import 해야 하고, 그건 방향이 이상한 의존이 된다.
+ */
+export const ORG_MODULE_CODES = ['OFFICE', 'AUTHZ'] as const;
+
+/**
  * 등록 결과. **업무 실패는 예외가 아니라 결과다** — 호출자가 그걸 보고 다음 행동을 정한다.
  *
  * ★ 삐용 장애·토큰 만료는 여기 없다. 그것들은 `BbiyongUnavailableError` ·

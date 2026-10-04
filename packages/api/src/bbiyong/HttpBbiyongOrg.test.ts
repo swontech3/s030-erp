@@ -40,6 +40,17 @@ function adapter(body: unknown, status = 200) {
   return { org: new HttpBbiyongOrg({ baseUrl: 'http://192.168.0.22:8082', fetchImpl: impl }), calls };
 }
 
+/** 호출마다 **다른** 본문을 돌려주는 대역 — 재입주처럼 여러 번 부르는 흐름에 쓴다. */
+function adapterSeq(bodies: readonly unknown[]) {
+  const calls: { url: string; init: RequestInit }[] = [];
+  const impl = (async (url: unknown, init: unknown) => {
+    const body = bodies[calls.length] ?? bodies[bodies.length - 1];
+    calls.push({ url: String(url), init: init as RequestInit });
+    return new Response(JSON.stringify(body), { status: 200 });
+  }) as unknown as typeof fetch;
+  return { org: new HttpBbiyongOrg({ baseUrl: 'http://192.168.0.22:8082', fetchImpl: impl }), calls };
+}
+
 const OK = { result: 'success', status: 200, massage: null, data: { orgId: 1234 } };
 
 describe('parseCreateOrg — ① 성공 게이트', () => {
@@ -200,22 +211,90 @@ describe('HttpBbiyongOrg — ⑤ 전송 실패', () => {
 describe('HttpBbiyongOrg — ⑥ 퇴실 · 재입주 · 수정 (회신 2026-10-02)', () => {
   const OKOP = { result: 'success', status: 200, massage: null, data: null };
 
-  it('★ 퇴실 — 경로와 본문', async () => {
+  /*
+   * ★★★ 퇴실은 **한 번**(복수 배열), 재입주는 **두 번**(단수 문자열)이다.
+   *     삐용이 그렇게 받는다(확인 2026-10-04). 보기에 어긋나 보여도 **맞추지 말 것** —
+   *     모양을 「정리」하면 삐용이 모르는 칸을 조용히 무시하고 success 를 돌려줄 수 있다.
+   *     아래 시험들이 그 비대칭을 그대로 굳힌다.
+   */
+  it('★★ 퇴실 — 한 번에 moduleCodes 배열로 둘을 보낸다', async () => {
     const { org, calls } = adapter(OKOP);
     const out = await org.moduleOff('Z01', 'tok');
 
     expect(out).toEqual({ kind: 'ok' });
+    expect(calls).toHaveLength(1); // ★ 한 번이다
     expect(calls[0]!.url).toBe('http://192.168.0.22:8082/rest/v1/s021100010/erp-module-off');
-    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ orgCode: 'Z01', moduleCode: 'OFFICE' });
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({
+      orgCode: 'Z01',
+      moduleCodes: ['OFFICE', 'AUTHZ'],
+    });
   });
 
-  it('★ 재입주 — 경로와 본문', async () => {
+  it('★★ 재입주 — 모듈마다 한 번씩, 단수 moduleCode 로 두 번 보낸다', async () => {
     const { org, calls } = adapter(OKOP);
     const out = await org.moduleOn('Z01', 'tok');
 
     expect(out).toEqual({ kind: 'ok' });
-    expect(calls[0]!.url).toBe('http://192.168.0.22:8082/rest/v1/s021100010/erp-module-on');
-    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ orgCode: 'Z01', moduleCode: 'OFFICE' });
+    expect(calls).toHaveLength(2); // ★ 두 번이다
+    for (const call of calls) {
+      expect(call.url).toBe('http://192.168.0.22:8082/rest/v1/s021100010/erp-module-on');
+    }
+    expect(calls.map((c) => JSON.parse(String(c.init.body)))).toEqual([
+      { orgCode: 'Z01', moduleCode: 'OFFICE' },
+      { orgCode: 'Z01', moduleCode: 'AUTHZ' },
+    ]);
+  });
+
+  it('★★ 재입주 — 첫 모듈이 거절되면 **거기서 멈춘다**(두 번째를 보내지 않는다)', async () => {
+    const { org, calls } = adapter({ result: 'fail', status: 403, massage: '권한이 없습니다', data: null });
+    const out = await org.moduleOn('Z01', 'tok');
+
+    expect(out.kind).toBe('rejected');
+    // 반쯤 켜 놓고 성공이라 답하지 않는다. 남은 모듈은 [다시 시도] 가 처음부터 켠다.
+    expect(calls).toHaveLength(1);
+  });
+
+  /*
+   * ★★ 「이미 구독 중」(400)은 성공으로 친다(삐용 회신 2026-10-04).
+   *    아래 둘이 **짝**이다 — 통과시키는 400 과 멈추는 400 을 함께 고정하지 않으면,
+   *    「400 이면 다 넘어가기」로 넓혀도 시험이 통과해 버린다.
+   */
+  it('★★ 재입주 — 첫 모듈이 「이미 구독 중」이면 넘어가고 둘째를 보낸다', async () => {
+    const { org, calls } = adapterSeq([
+      { result: 'fail', status: 400, massage: '이미 구독 중인 서비스입니다', data: null },
+      { result: 'success', status: 200, massage: null, data: null },
+    ]);
+    const out = await org.moduleOn('Z01', 'tok');
+
+    expect(out).toEqual({ kind: 'ok' });
+    expect(calls).toHaveLength(2);
+    expect(calls.map((c) => (JSON.parse(String(c.init.body)) as { moduleCode: string }).moduleCode)).toEqual([
+      ...ORG_MODULE_CODES,
+    ]);
+  });
+
+  it('★★★ 재입주 — 「선택할 수 없는 서비스」 400 은 **넘어가지 않는다**(안 켜졌는데 켜졌다고 믿으면 안 된다)', async () => {
+    const { org, calls } = adapterSeq([
+      { result: 'fail', status: 400, massage: 'AUTHZ(AUTHZ) 은(는) 지금 선택할 수 없는 서비스입니다', data: null },
+      { result: 'success', status: 200, massage: null, data: null },
+    ]);
+    const out = await org.moduleOn('Z01', 'tok');
+
+    expect(out.kind).toBe('rejected');
+    expect(calls).toHaveLength(1); // 멈췄다
+  });
+
+  it('★ 모듈 목록은 등록과 **같은 상수**다 — 한 곳만 고치면 셋이 같이 바뀐다', async () => {
+    const off = adapter(OKOP);
+    await off.org.moduleOff('Z01', 'tok');
+    const sentOff = JSON.parse(String(off.calls[0]!.init.body)) as { moduleCodes: string[] };
+
+    const on = adapter(OKOP);
+    await on.org.moduleOn('Z01', 'tok');
+    const sentOn = on.calls.map((c) => (JSON.parse(String(c.init.body)) as { moduleCode: string }).moduleCode);
+
+    expect(sentOff.moduleCodes).toEqual([...ORG_MODULE_CODES]);
+    expect(sentOn).toEqual([...ORG_MODULE_CODES]);
   });
 
   it('★★★ 수정 — 보내는 칸은 둘뿐이다. 주소를 빈 문자열로도 보내지 않는다', async () => {

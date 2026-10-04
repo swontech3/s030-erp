@@ -36,6 +36,8 @@ import { BBIYONG } from '@swonbiz/shared';
 import {
   BbiyongTokenExpiredError,
   BbiyongUnavailableError,
+  // ★ 등록·퇴실·재입주 셋이 같은 목록을 본다. 정의는 `types.ts` 한 곳이다.
+  ORG_MODULE_CODES,
   type BbiyongOrg,
   type BbiyongOrgPatch,
   type BbiyongOrgRequest,
@@ -89,8 +91,29 @@ function isDuplicateCode(massage: string | null): boolean {
   return massage !== null && massage.includes('이미 사용중인 단체코드');
 }
 
-/** 퇴실·재입주가 끄고 켜는 모듈. ERP 가 파는 것은 공유오피스 하나다(orgLink.ts 의 ORG_MODULE_CODES). */
-const OFFICE = 'OFFICE';
+/**
+ * 「이미 구독 중」인가 — **재입주에서만** 이것을 성공으로 친다(삐용 회신 2026-10-04:
+ * 「이미 구독 중(400)은 무시해도 된다」).
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★★★ **400 이라고 다 무시하면 안 된다**
+ * ══════════════════════════════════════════════════════════════════════════
+ * 같은 400 으로 「○○(CODE) 은(는) 지금 **선택할 수 없는 서비스**입니다」가 온다
+ * (연동규격 §2-4). 그것까지 성공으로 치면 **모듈이 안 켜졌는데 ERP 는 켜졌다고 믿는다.**
+ * 그래서 상태만 보지 않고 **문구에 「구독」이 있는지**까지 본다 — 위 문구에는 없다.
+ * `isDuplicateCode` 와 같은 방식이다(삐용은 기계용 코드를 안 주고 문장을 준다).
+ *
+ * ★ 틀려도 **안전한 쪽으로 틀린다.** 문구가 달라 못 알아보면 그냥 거절로 남아
+ *   「대기」가 될 뿐, 거짓 성공은 나지 않는다.
+ *
+ * ★★ **실제 응답 원문을 보면 더 좁힌다.** 지금은 「구독」 두 글자가 전부라 넓다 —
+ *    삐용이 돌려주는 문장을 한 번 받아 보면 `isDuplicateCode` 처럼 통문장으로 맞출 것.
+ */
+function isAlreadySubscribed(body: unknown): boolean {
+  const root = asRecord(body);
+  if (!root || toInt(root.status) !== 400) return false;
+  return (readMassage(root) ?? '').includes('구독');
+}
 
 const DENY_MESSAGE =
   '삐용에 회사를 만들 권한이 없습니다. 삐용 권한관리에서 「단체관리」 화면이 포함된 ERP 담당 역할을 받으세요';
@@ -304,30 +327,72 @@ export class HttpBbiyongOrg implements BbiyongOrg {
     return outcome;
   }
 
-  /** 퇴실 — OFFICE 구독을 끈다. 계약이 종료될 때. */
+  /**
+   * 퇴실 — 구독 모듈을 끈다. 계약이 종료될 때.
+   *
+   * ══════════════════════════════════════════════════════════════════════
+   * ★★★ **퇴실은 한 번, 재입주는 두 번이다.** 삐용이 그렇게 받는다(확인 2026-10-04)
+   * ══════════════════════════════════════════════════════════════════════
+   *   퇴실    `{ orgCode, moduleCodes: ["OFFICE","AUTHZ"] }`   ← 복수 · 배열 · **1회**
+   *   재입주  `{ orgCode, moduleCode: "OFFICE" }` 그리고
+   *           `{ orgCode, moduleCode: "AUTHZ"  }`              ← 단수 · 문자열 · **2회**
+   *
+   * 보기에 어긋나 보이지만 **맞추지 말 것.** 둘을 같은 모양으로 「정리」하면 삐용이
+   * 모르는 칸을 조용히 무시하고 `success` 를 돌려줄 수 있다 — 그러면 ERP 는 껐다고
+   * 믿는데 삐용에서는 켜져 있는 상태가 된다. 바꾸려면 삐용에 다시 확인해야 한다.
+   *
+   * ★ 2026-10-04 전에는 둘 다 `OFFICE` 하나만 보냈다. 등록은 둘을 켜는데 퇴실은
+   *   하나만 꺼서 **`AUTHZ` 가 영영 켜진 채 남았다.**
+   */
   async moduleOff(orgCode: string, accessToken: string): Promise<OrgOpOutcome> {
     const parsed = await this.#post(
       BBIYONG.ORG_MODULE_OFF_PATH,
-      { orgCode, moduleCode: OFFICE },
+      // ★ 복수형 배열. 한 번에 보낸다(위 머리말).
+      { orgCode, moduleCodes: [...ORG_MODULE_CODES] },
       accessToken,
       '퇴실',
     );
     const outcome = parseOrgOp(parsed, '퇴실');
-    console.log(`[bbiyong] 퇴실 — orgCode=${orgCode} → ${outcome.kind}`);
+    console.log(`[bbiyong] 퇴실 — orgCode=${orgCode} 모듈=${ORG_MODULE_CODES.join(',')} → ${outcome.kind}`);
     return outcome;
   }
 
-  /** 재입주 — 끊긴 OFFICE 구독을 다시 켠다. ★ 회사를 다시 만들지 않는다. */
+  /**
+   * 재입주 — 끊긴 구독을 다시 켠다. ★ 회사를 다시 만들지 않는다.
+   *
+   * ★★ **모듈마다 한 번씩 부른다**(단수 `moduleCode`). 퇴실과 모양이 다른 이유는
+   *    `moduleOff` 머리말에 있다.
+   *
+   * ★★ **「이미 구독 중」(400)은 성공으로 치고 다음 모듈로 간다**(삐용 회신 2026-10-04).
+   *    재입주를 두 번 눌렀거나, 앞선 시도가 한 모듈만 켜 놓고 멈췄을 때 그렇게 온다.
+   *    이미 원하는 상태이므로 실패가 아니다. 판정은 `isAlreadySubscribed` 한 곳이고
+   *    **400 이라고 다 통과시키지 않는다** — 그쪽 머리말에 이유가 있다.
+   *
+   * ★★ **그 밖의 거절은 거기서 멈추고 그 결과를 돌려준다.** 남은 모듈은 켜지지 않는다 —
+   *    반쯤 켜진 상태로 「성공」이라 답하면 아무도 그걸 모른다. 부르는 쪽
+   *    (`orgLink.applyOp`)이 「대기」로 남기고, [다시 시도] 는 **멈춘 그 모듈부터**
+   *    의미 있게 이어진다(앞 모듈은 「이미 구독 중」으로 통과하므로).
+   */
   async moduleOn(orgCode: string, accessToken: string): Promise<OrgOpOutcome> {
-    const parsed = await this.#post(
-      BBIYONG.ORG_MODULE_ON_PATH,
-      { orgCode, moduleCode: OFFICE },
-      accessToken,
-      '재입주',
-    );
-    const outcome = parseOrgOp(parsed, '재입주');
-    console.log(`[bbiyong] 재입주 — orgCode=${orgCode} → ${outcome.kind}`);
-    return outcome;
+    for (const moduleCode of ORG_MODULE_CODES) {
+      const parsed = await this.#post(
+        BBIYONG.ORG_MODULE_ON_PATH,
+        // ★ 단수형 문자열. 모듈 하나에 요청 하나다(위 머리말).
+        { orgCode, moduleCode },
+        accessToken,
+        '재입주',
+      );
+
+      if (isAlreadySubscribed(parsed)) {
+        console.log(`[bbiyong] 재입주 — orgCode=${orgCode} 모듈=${moduleCode} → 이미 구독 중(넘어간다)`);
+        continue;
+      }
+
+      const outcome = parseOrgOp(parsed, '재입주');
+      console.log(`[bbiyong] 재입주 — orgCode=${orgCode} 모듈=${moduleCode} → ${outcome.kind}`);
+      if (outcome.kind !== 'ok') return outcome;
+    }
+    return { kind: 'ok' };
   }
 
   /**
