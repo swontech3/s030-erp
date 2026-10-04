@@ -40,7 +40,7 @@ const env = readEnv('.env');
  * 기대 항목 수 — 모자라면 **실패**다(`verify-count.js` 머리말).
  * 항목을 늘리면 끝에서 이 수를 고치라고 알려 준다.
  */
-const EXPECTED_ITEMS = 73;
+const EXPECTED_ITEMS = 77;
 
 let pass = 0;
 let fail = 0;
@@ -169,8 +169,10 @@ const json = (res) => {
       `기대 23514, 실제 ${bogus.code || '성공(막히지 않음)'}`,
     );
 
-    // ★ 배타 제약은 status='confirmed' 에서만 걸린다 — 오타 상태가 통과하면
-    //   그 예약은 아무와도 다투지 않고 같은 시간에 몇 건이든 들어간다.
+    /* ★ 어휘 CHECK 이 왜 중요한가 — 배타 제약은 **취소가 아닌 전부**에 걸리므로
+     *   (034) `cancelld` 처럼 잘못 적힌 상태는 「취소가 아니」라서 오히려 자리를
+     *   잡는다. 반대로 034 전에는 `confirmd` 가 **아무와도 안 다퉈** 같은 시간에
+     *   몇 건이든 들어갔다. 어느 쪽이든 어휘가 새면 자리 판정이 어긋난다. */
     const three = ['confirmed', 'cancelled', 'completed'];
     const okAll = [];
     for (const st of three) {
@@ -186,14 +188,63 @@ const json = (res) => {
       `기대 23514, 실제 ${flipped.code || '성공(막히지 않음)'}`,
     );
 
-    /* ═══ 2. 겹침은 DB 가 정본 — 확정끼리만 ═══════════════════════════════ */
-    console.log('\n2. 겹침 — DB 배타 제약');
+    /* ═══ 2. 겹침은 DB 가 정본 — **취소가 아닌 전부** ═════════════════════
+     *
+     * ★★ 범위가 034 에서 넓어졌다. 예전에는 확정끼리만 다퉜고, 그래서 **종료된
+     *    예약 위에 겹쳐 넣을 수 있었다** — 화면(`erp_busy_slots`)은 그 자리를
+     *    「차 있음」으로 보여 주는데 DB 가 안 막던 상태다(2026-10-04 실측).
+     *    아래 넷은 그 선이 다시 좁아지지 않게 지킨다. **취소만 자리를 비운다.**
+     */
+    console.log('\n2. 겹침 — DB 배타 제약 (취소가 아닌 전부)');
+
+    const scope = await c.query(
+      `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+        WHERE conname = 'tb_s080_reservations_no_overlap'`,
+    );
+    check(
+      "★★ 제약 범위가 status <> 'cancelled' 다 — 026 erp_busy_slots 와 같은 선",
+      /status <> 'cancelled'/.test(scope.rows[0]?.def ?? ''),
+      scope.rows[0]?.def,
+    );
 
     const overlap = await tryInTx([
       ins({ id: `${TAG}-x`, s: '2099-01-03 10:00', e: '2099-01-03 11:00' }),
       ins({ id: `${TAG}-y`, s: '2099-01-03 10:30', e: '2099-01-03 11:30' }),
     ]);
     check('★ 겹치는 확정 예약은 막힌다 (23P01)', overlap.code === '23P01', `실제 ${overlap.code ?? '성공'}`);
+
+    // ★ 종료도 자리를 잡는다 — 034 가 고친 바로 그 구멍이다.
+    const overCompleted = await tryInTx([
+      ins({ id: `${TAG}-c1`, status: 'completed', s: '2099-01-06 10:00', e: '2099-01-06 11:00' }),
+      ins({ id: `${TAG}-c2`, s: '2099-01-06 10:30', e: '2099-01-06 11:30' }),
+    ]);
+    check(
+      '★★ 종료된 예약 위에 확정을 못 넣는다 (23P01)',
+      overCompleted.code === '23P01',
+      `실제 ${overCompleted.code ?? '성공(막히지 않음)'}`,
+    );
+
+    const completedPair = await tryInTx([
+      ins({ id: `${TAG}-c3`, status: 'completed', s: '2099-01-07 10:00', e: '2099-01-07 11:00' }),
+      ins({ id: `${TAG}-c4`, status: 'completed', s: '2099-01-07 10:15', e: '2099-01-07 10:45' }),
+    ]);
+    check(
+      '★ 종료끼리도 겹치지 못한다 (23P01) — 같은 방 같은 시간은 기록으로도 틀렸다',
+      completedPair.code === '23P01',
+      `실제 ${completedPair.code ?? '성공(막히지 않음)'}`,
+    );
+
+    /* ★★ 대조군 — **취소는 자리를 비운다.** 이것이 없으면 위 셋이 「다 막는다」로
+     *    읽히고, 범위를 `true` 로 넓혀 취소된 자리까지 막아도 통과한다. */
+    const overCancelled = await tryInTx([
+      ins({ id: `${TAG}-c5`, status: 'cancelled', s: '2099-01-08 10:00', e: '2099-01-08 11:00' }),
+      ins({ id: `${TAG}-c6`, s: '2099-01-08 10:30', e: '2099-01-08 11:30' }),
+    ]);
+    check(
+      '★★ 대조군 — 취소된 자리에는 들어간다 (취소만 자리를 비운다)',
+      overCancelled.code === null,
+      `실제 ${overCancelled.code ?? '성공'} ${overCancelled.message ?? ''}`,
+    );
 
     const adjacent = await tryInTx([
       ins({ id: `${TAG}-p`, s: '2099-01-04 10:00', e: '2099-01-04 11:00' }),
