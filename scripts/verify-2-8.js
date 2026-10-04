@@ -171,10 +171,17 @@ async function apiLogin(email) {
     const logout = await fetch(`${WEB}/api/auth/logout`, {
       method: 'POST', headers: { cookie: `erp_sid=${sid}`, origin: WEB }, redirect: 'manual',
     });
-    const gone = (await c.query(
-      'SELECT revoked_at FROM tb_s080_auth_session WHERE erp_sid = $1', [sha(decodeURIComponent(sid))])).rows[0];
-    check(logout.status === 303 && (logout.headers.get('location') || '').endsWith('/login') && !!gone && gone.revoked_at !== null,
-      'A10', '로그아웃 → 303 /login + revoked_at 설정', `${logout.status} ${logout.headers.get('location')}`);
+    /*
+     * ★★ **줄이 사라졌는지 본다.** 2026-10-04 까지는 `revoked_at` 이 찍혔는지를 봤다.
+     *    이제 로그아웃은 행을 그 자리에서 지운다 — 끝난 세션을 남겨 둘 이유가
+     *    없어서다(이 표로는 접속 기록이 안 된다 · `session/purge.ts` 머리말).
+     *    남은 행이 0이어야 하고, 그래야 **삐용 토큰도 함께 사라진 것**이다.
+     */
+    const left = (await c.query(
+      'SELECT count(*)::int n FROM tb_s080_auth_session WHERE erp_sid = $1',
+      [sha(decodeURIComponent(sid))])).rows[0].n;
+    check(logout.status === 303 && (logout.headers.get('location') || '').endsWith('/login') && left === 0,
+      'A10', '로그아웃 → 303 /login + 세션 줄이 사라진다', `${logout.status} ${logout.headers.get('location')} · 남은 행 ${left}`);
   }
 
   await c.end();

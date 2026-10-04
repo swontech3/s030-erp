@@ -169,10 +169,30 @@ export async function revokeSession(rawSid: string): Promise<void> {
  *   삐용 토큰을 되살릴 수 없을 때(`withFreshAccess`) 그 자리에서 세션을 끊어야 한다.
  */
 export async function revokeSessionByHash(erpSid: string): Promise<void> {
-  await pool.query(
-    `UPDATE public.tb_s080_auth_session SET revoked_at = now() WHERE erp_sid = $1 AND revoked_at IS NULL`,
-    [erpSid],
-  );
+  /*
+   * ══════════════════════════════════════════════════════════════════════
+   * ★★★ **행을 지운다.** `revoked_at` 을 찍어 두고 남기지 않는다 (2026-10-04)
+   * ══════════════════════════════════════════════════════════════════════
+   * 끝난 세션을 남겨 둘 이유가 하나뿐이었다 — 「누가 언제 로그인했나」의 기록.
+   * 그런데 이 표로는 그걸 알 수 없다: **로그인 실패도, 접속 IP 도, 기기도 없다.**
+   * 성공한 로그인의 시각과 회원번호뿐이라 해킹 판단에 쓸 수 없다. 그래서 남기지
+   * 않기로 했다 — 못 쓸 기록을 두면 「기록이 있다」고 착각하게 된다.
+   * 경위와 다음에 할 일은 `session/purge.ts` 머리말에 있다.
+   *
+   * ★★ 지우면 **삐용 access·refresh 토큰도 함께 사라진다.** 다시 쓸 일 없는
+   *    자격증명을 들고 있지 않는 것이 이 변경의 가장 큰 소득이다.
+   *
+   * ★ 로그아웃 흐름은 **읽은 뒤에** 여기로 온다(`routes/auth.ts` — refresh 를 먼저
+   *   읽고, 폐기하고, 그 다음 삐용 sign-out 을 부른다). 그래서 여기서 지워도 삐용
+   *   쪽 로그아웃이 끊기지 않는다. 순서를 바꾸면 그때부터 끊긴다.
+   *
+   * ★ 멱등하다. 없는 세션을 또 지워도 0행이 지워질 뿐 오류가 아니다.
+   *
+   * ★ `revoked_at` 칸은 **남겨 둔다.** 운영 중에 DB 에서 직접 세션을 끊는 길
+   *   (`verify-2-8` A7)이 그 칸을 쓰고, 읽는 쪽이 그것을 이미 「죽은 것」으로 본다
+   *   (`lookupSession` · `bbiyongToken`). 그렇게 끊긴 행은 하루 한 번 타이머가 치운다.
+   */
+  await pool.query(`DELETE FROM public.tb_s080_auth_session WHERE erp_sid = $1`, [erpSid]);
   dropCached(erpSid);
 }
 
