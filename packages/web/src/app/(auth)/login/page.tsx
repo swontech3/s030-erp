@@ -14,6 +14,12 @@
  * 2-8 에서 붙인 것: 실제 제출 → `/api/auth/login` → (서버끼리) Fastify → 삐용 어댑터.
  * 이 화면은 세션을 스스로 만들지 않는다. 쿠키를 굽는 것도 route handler 쪽이다.
  *
+ * 2026-10-05 에 붙인 것: 「비밀번호를 잊으셨나요?」 **펼침 안내**. 삐용은 직원을
+ * 등록해도 초기화 메일을 **자동으로 보내지 않고**, ERP 에는 보내는 API 가 없다
+ * (회신 2026-10-05) — 직원이 삐용 화면에서 직접 눌러야 한다. 그 사실과 유효시간·
+ * 재요청 규칙을 가기 전에 읽히는 것이 그 블록의 목적이다. 주소는 환경변수다
+ * (`BBIYONG_WEB_URL` 주석 참조).
+ *
  * ★ DS 컴포넌트를 쓰지 않은 이유 — 원본이 쓰지 않는다.
  *   템플릿의 입력은 48px·15px, 버튼은 52px 인데 DS 는 --control-h:54px 다.
  *   `.dc.html` 이 시각 기준이므로 원본 인라인 스타일을 따랐다. 이 화면에서
@@ -25,11 +31,49 @@ import { Icon } from '@/components/ds';
 import { AuthShell } from '@/components/patterns/AuthShell';
 import styles from './login.module.css';
 
-/** 비밀번호 재설정은 ERP 화면이 아니라 삐용으로 나간다. */
-const PASSWORD_RESET_URL = `${BBIYONG.BASE_URL}${BBIYONG.PASSWORD_RESET_PATH}`;
+/**
+ * 삐용 **화면** 주소 — 비밀번호 초기화가 그 화면에서만 되기 때문에 필요하다.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★★★ `NEXT_PUBLIC_` 접두사가 **필수다** · 기본값은 **두지 않는다**
+ * ══════════════════════════════════════════════════════════════════════════
+ * 이 파일은 `'use client'` 다. 접두사가 없는 환경변수는 Next 가 클라이언트 번들에서
+ * `undefined` 로 치환한다 — 2026-10-05 까지 이 링크가 바로 그 상태였다:
+ * `BBIYONG.BASE_URL`(= `BBIYONG_BASE_URL`, 삐용 **API** `:8082`)로 만들었는데
+ * 브라우저에서는 그 변수가 사라져 **기본값 `https://bbiyong.s-wontech.co.kr` 로만**
+ * 나갔다. 주소가 애초에 화면도 아니었다(화면은 `:3000`).
+ *
+ * ★ **기본값을 두지 않는다**(결정 2026-10-05). 주소를 모르면 **링크를 걸지 않는다** —
+ *   짐작한 주소를 걸면 사용자는 엉뚱한 곳에 도착하고 아무도 그 사실을 모른다.
+ *   비어 있으면 아래 안내가 링크 대신 「운영사에 문의」를 보여 준다.
+ *
+ * ★ `process.env.NEXT_PUBLIC_…` 을 **여기서 직접 읽는다.** `@swonbiz/shared` 에 두지
+ *   않은 이유는 그쪽 `constants.ts` 주석에 있다(워크스페이스 패키지까지 치환되는지
+ *   Next 문서에 없다 — 안 되면 값이 조용히 비어 링크가 영영 안 뜬다).
+ *
+ * ★★ 계통을 바꾸면 **web 을 다시 빌드해야 한다.** `NEXT_PUBLIC_*` 은 빌드 때 값이
+ *    박히고 그 뒤에는 환경변수를 바꿔도 반응하지 않는다(Next 16.3.4 문서 §Bundling
+ *    Environment Variables for the Browser). API 쪽 변수처럼 재기동만으로는 안 바뀐다.
+ */
+const BBIYONG_WEB_URL = process.env.NEXT_PUBLIC_BBIYONG_WEB_URL ?? '';
+
+/** 삐용 로그인 화면 — 그 아래 「메일 주소 찾기 및 비밀번호 초기화」가 있다. */
+const PASSWORD_RESET_URL = BBIYONG_WEB_URL ? `${BBIYONG_WEB_URL}${BBIYONG.PASSWORD_RESET_PATH}` : '';
+
+/** 펼침 안내의 id — 버튼의 `aria-controls` 와 한 쌍이다. */
+const RESET_HELP_ID = 'login-reset-help';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
+  /**
+   * 비밀번호 초기화 안내를 펼쳤는가.
+   *
+   * ★ 왜 펼침인가 — 삐용은 **재설정 딥링크가 없고**(회신 ⑦) 메일도 자동으로 나가지
+   *   않는다(회신 2026-10-05). 그래서 사용자가 삐용 화면에서 **직접 눌러야** 하고,
+   *   유효시간·재요청 규칙을 모르면 헤맨다. 눌렀을 때 그 설명을 먼저 보여 준다 —
+   *   늘 띄우면 로그인 화면이 길어지고, 안내가 필요 없는 사람에게도 매번 보인다.
+   */
+  const [resetOpen, setResetOpen] = useState(false);
 
   /**
    * 에러 표시 상태.
@@ -194,30 +238,124 @@ export default function LoginPage() {
               {/*
                 비밀번호 찾기 — 원본은 data-goto="reset" 으로 같은 템플릿의 재설정 화면을 열었다.
                 ERP 는 계정을 발급하지 않으므로 그 화면(s030000020)을 만들지 않는다.
-                삐용 재설정 화면으로 나가는 외부 링크로 바꿨다. URL 은 상수에 있다.
 
-                ★ 회신 ⑦(2026-09-08): 재설정 **딥링크가 없다.** 전용 URL 이 없고 삐용 `/SignIn`
-                  하단 링크를 눌러야 모달이 뜬다. 그래서 이 링크는 삐용 로그인 화면까지만
-                  데려다주고, 사용자는 거기서 한 번 더 눌러야 한다. 삐용이 진입 파라미터를
-                  만들어 주기 전에는 줄일 수 없는 단계다.
+                ★★ **바로 삐용으로 보내지 않고 안내를 먼저 펼친다**(2026-10-05). 삐용은
+                  재설정 딥링크가 없고(회신 ⑦) **메일도 자동으로 나가지 않는다**(회신
+                  2026-10-05) — 사용자가 삐용 화면에서 직접 눌러야 하고, 유효시간·재요청
+                  규칙을 모르면 헤맨다. 그 설명을 가기 전에 읽히는 것이 이 펼침의 목적이다.
               */}
-              <a
-                href={PASSWORD_RESET_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => setResetOpen((v) => !v)}
+                aria-expanded={resetOpen}
+                aria-controls={RESET_HELP_ID}
                 className={styles.link}
                 style={{
+                  padding: 0,
+                  border: 'none',
+                  background: 'none',
+                  fontFamily: 'inherit',
                   fontSize: 14,
                   color: 'var(--color-primary)',
-                  textDecoration: 'none',
                   fontWeight: 'var(--weight-bold)' as React.CSSProperties['fontWeight'],
                   whiteSpace: 'nowrap',
+                  cursor: 'pointer',
                   transition: 'color var(--dur) var(--ease-out)',
                 }}
               >
-                비밀번호 찾기
-              </a>
+                비밀번호를 잊으셨나요?
+              </button>
             </div>
+
+            {/*
+              ══════════════════════════════════════════════════════════════════
+              비밀번호 초기화 안내 (삐용 회신 2026-10-05)
+              ══════════════════════════════════════════════════════════════════
+              ★ ERP 에는 **보내는 API 가 없다.** 직원을 등록해도 메일이 자동으로 나가지
+                않고, 직원이 삐용 로그인 화면에서 직접 눌러야 링크 메일이 간다.
+              ★ 유효시간·재요청 규칙은 **삐용이 정한 값**을 그대로 적는다. ERP 코드가
+                그 시간을 쓰는 곳은 없다 — 적어 두는 것은 사람을 위한 안내일 뿐이다.
+              ★★ 아이디(이메일) 찾기를 **일부러 적었다.** 삐용 화면에 「메일 주소 찾기」
+                 버튼이 **보이는데**, 2026-10-05 에 열어 보니 그건 단체명·대표자명·휴대폰
+                 으로 조회하는 **대표자 기준**이라 직원은 자기 이메일을 찾을 수 없다.
+                 안 적으면 운영자가 보이는 버튼을 눌러 보며 헤맨다.
+            */}
+            {resetOpen ? (
+              <div
+                id={RESET_HELP_ID}
+                style={{
+                  marginTop: 14,
+                  padding: '14px 16px',
+                  background: 'var(--surface-alt)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 14,
+                    fontWeight: 'var(--weight-bold)' as React.CSSProperties['fontWeight'],
+                    color: 'var(--text-heading)',
+                  }}
+                >
+                  비밀번호는 삐용에서 초기화합니다
+                </p>
+                <ul
+                  style={{
+                    margin: '8px 0 0',
+                    paddingLeft: 18,
+                    fontSize: 13,
+                    lineHeight: 1.7,
+                    color: 'var(--text-body)',
+                  }}
+                >
+                  <li>삐용 화면에서 이메일만 넣으면 초기화 링크가 메일로 갑니다.</li>
+                  <li>링크 유효시간은 처음 설정 24시간, 다시 설정 30분입니다.</li>
+                  <li>다시 요청하면 이전 링크는 무효입니다. 마지막에 받은 메일을 쓰세요.</li>
+                  <li>
+                    메일이 안 보이면 스팸함도 확인해 주세요. 발신 주소는{' '}
+                    <span style={{ whiteSpace: 'nowrap' }}>noreply@s-wontech.co.kr</span> 입니다.
+                  </li>
+                  <li>
+                    아이디는 가입하신 이메일 주소입니다. 삐용의 「메일 주소 찾기」는 대표자
+                    기준(단체명·대표자명·휴대폰) 조회라 직원은 찾을 수 없습니다 — 기억나지
+                    않으면 운영사에 문의해 주세요.
+                  </li>
+                </ul>
+
+                {/*
+                  ★ 주소가 비어 있으면 **링크를 걸지 않는다**(위 `BBIYONG_WEB_URL` 주석).
+                    가동계 주소는 아직 받지 못했다 — 받으면 환경변수만 채운다.
+                */}
+                {PASSWORD_RESET_URL ? (
+                  <a
+                    href={PASSWORD_RESET_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.link}
+                    style={{
+                      marginTop: 12,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      fontSize: 14,
+                      fontWeight: 'var(--weight-bold)' as React.CSSProperties['fontWeight'],
+                      color: 'var(--color-primary)',
+                      textDecoration: 'none',
+                      transition: 'color var(--dur) var(--ease-out)',
+                    }}
+                  >
+                    삐용에서 초기화하기
+                    <Icon name="arrow-up-right" size={14} />
+                  </a>
+                ) : (
+                  <p style={{ margin: '12px 0 0', fontSize: 13, lineHeight: 1.6, color: 'var(--text-muted)' }}>
+                    삐용 로그인 화면 주소가 아직 설정되지 않았습니다. 운영사에 문의해 주세요.
+                  </p>
+                )}
+              </div>
+            ) : null}
 
             {/* 에러 — 원본의 showError 블록. 위 useState 주석의 body.status 함정 참조. */}
             {error ? (
