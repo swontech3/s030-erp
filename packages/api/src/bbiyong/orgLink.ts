@@ -12,6 +12,23 @@
  * 그래서 어떤 실패도 `pending` 이다. `pending` 은 「계약은 됐고 삐용 연결만 아직」이고,
  * 그 상태가 화면에 보이며 [다시 시도] 로 되살릴 수 있다.
  *
+ * -----------------------------------------------------------------------------
+ * ★★★ **예외가 하나 있다 — `BbiyongTokenExpiredError` 는 올려보낸다**(2026-10-05)
+ * -----------------------------------------------------------------------------
+ * 그 예외는 「실패」가 아니라 **「토큰을 갈아 끼우고 다시 부르라」는 신호**다.
+ * `withFreshAccess` 가 그것을 받아 재발급하고 이 함수를 처음부터 다시 부른다.
+ *
+ * ★★ 2026-10-05 까지 아래 두 catch 가 **그것까지 삼켰다.** 그래서 토큰이 만료되면
+ *    재발급이 **한 번도 돌지 않고** 「연동 대기」가 됐다 — 되살릴 수 있는 토큰인데
+ *    운영자는 「잠시 후 다시 시도해 주세요」를 읽었고, [다시 시도] 를 눌러도 같은
+ *    만료 토큰으로 또 불러서 또 대기가 됐다. 이 머리말이 적어 둔 「401 은 재발급으로
+ *    이어진다」는 경로가 실제로는 끊겨 있었다.
+ *    ★ 시험이 그 연결을 지킨다 — `orgLink.test.ts` ⑥ · `orgSync.test.ts` ⑥.
+ *
+ * ★ 이것은 확정 응답을 500 으로 만들지 않는다. 재발급이 성공하면 사용자는 아무것도
+ *   못 느끼고, 재발급까지 실패하면 `registerOrgForCompany` 의 catch 가 받아 「대기」로
+ *   남긴다(그쪽 주석). 즉 **바깥으로 새어나가지 않는 예외**다.
+ *
  * =============================================================================
  * 왜 저장소와 어댑터를 주입받는가
  * =============================================================================
@@ -20,7 +37,9 @@
  * DB 를 붙이는 자리는 `companies/registerOrg.ts` 다.
  */
 import { firstFreeOrgCode, nextOrgCode } from '@swonbiz/shared/domain/org-code';
-import { ORG_MODULE_CODES } from './types.ts';
+// ★ `BbiyongTokenExpiredError` 는 **값으로** 쓴다(instanceof) — 아래 두 catch 가
+//   만료만 골라 위로 올려보낸다. 그 둘이 이 파일의 유일한 throw 다.
+import { BbiyongTokenExpiredError, ORG_MODULE_CODES } from './types.ts';
 import type {
   BbiyongOrg,
   BbiyongOrgRequest,
@@ -189,8 +208,30 @@ export async function linkOrg(
       outcome = await org.createOrg(requestFor(company, orgCode), accessToken);
     } catch (err) {
       /*
-       * ★ 삐용 장애·토큰 만료다. **던지지 않는다**(파일 머리말). 다시 시도하면 풀릴
-       *   종류이므로 그렇게 안내한다.
+       * ══════════════════════════════════════════════════════════════════════
+       * ★★★ 토큰 만료는 **그대로 던진다** — 여기서 삼키면 재발급이 돌지 않는다
+       * ══════════════════════════════════════════════════════════════════════
+       * `withFreshAccess` 가 `BbiyongTokenExpiredError` 를 받아 재발급하고 **이 함수를
+       * 처음부터 다시 부른다.** 2026-10-05 까지 이 catch 가 그것까지 삼켜서, 토큰이
+       * 만료되면 **재발급 없이** 「연동 대기」로 떨어졌다 — 되살릴 수 있는 토큰인데
+       * 운영자는 「잠시 후 다시 시도해 주세요」를 읽었다. 파일 머리말이 「401 은
+       * 재발급한다」고 적어 둔 그 경로가 실제로는 끊겨 있었다.
+       *
+       * ★ 다시 불려도 안전하다 — 판정의 근거가 전부 `store.read()`(DB)다. 이미
+       *   연결됐으면 `already` 로 끝나고, 아니면 같은 코드부터 다시 채번한다.
+       *   ★★ 중복을 몇 번 따라간 뒤에 만료가 나면 **그 루프를 처음부터 다시 돈다.**
+       *      앞서 밟은 코드들은 또 중복으로 돌아오므로 결과는 같고, 호출 몇 번이
+       *      더 나가는 낭비만 있다 — 틀리지는 않는다.
+       *
+       * ★ 재발급까지 실패하면 `withFreshAccess` 가 `BbiyongReloginRequiredError` 로
+       *   바꿔 던지고, 그건 `registerOrgForCompany` 의 catch 가 받아 「대기」로 남긴다
+       *   (계약 확정은 이미 커밋됐으므로 500 을 내지 않는다 — 그쪽 주석).
+       */
+      if (err instanceof BbiyongTokenExpiredError) throw err;
+
+      /*
+       * ★ 여기 남는 것은 삐용 장애다. **던지지 않는다**(파일 머리말). 다시 시도하면
+       *   풀릴 종류이므로 그렇게 안내한다.
        *
        * ★★ 알려진 구멍: 삐용이 회사를 만든 **뒤** 응답이 유실되면 그 코드는 삐용에
        *    남고, 다음 시도는 그것을 중복으로 만나 **다음 번호로 넘어간다** — 삐용에
@@ -254,7 +295,18 @@ async function applyOp(
   try {
     outcome = await run();
   } catch (err) {
-    // ★ 삐용 장애·토큰 만료. 던지지 않는다 — ERP 업무(계약 종료·회사명 수정)는 이미 끝났다.
+    /*
+     * ★★★ 토큰 만료는 **그대로 던진다** — `linkOrg` 와 같은 이유다(그쪽 주석).
+     *    삼키면 `withFreshAccess` 가 재발급할 기회를 잃고, 멀쩡한 토큰으로 되살릴 수
+     *    있는 퇴실·재입주·수정이 「연동 대기」로 떨어진다.
+     *
+     * ★ 다시 불려도 안전하다 — `moduleOffOrg`·`moduleOnOrg`·`patchOrgName` 이 각자
+     *   `store.read()` 부터 다시 한다. 재입주는 이미 켠 모듈을 또 보내도 삐용이
+     *   「이미 구독 중」으로 답하고 그건 성공으로 센다(`HttpBbiyongOrg.moduleOn`).
+     */
+    if (err instanceof BbiyongTokenExpiredError) throw err;
+
+    // ★ 여기 남는 것은 삐용 장애다. 던지지 않는다 — ERP 업무(계약 종료·회사명 수정)는 이미 끝났다.
     console.warn(`[bbiyong] ${label} 실패(대기로 남긴다): ${(err as Error).message}`);
     const reason = `삐용에 연결할 수 없어 ${label}이 반영되지 않았습니다. 잠시 후 다시 시도해 주세요`;
     await store.savePending(reason);

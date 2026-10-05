@@ -12,7 +12,13 @@
  */
 import { describe, it, expect } from 'vitest';
 import { linkOrg, type OrgLinkStore, type OrgLinkTarget } from './orgLink.ts';
-import { BbiyongUnavailableError, type BbiyongOrg, type CreateOrgOutcome } from './types.ts';
+import { withFreshAccess, type AccessTokenStore } from './withFreshAccess.ts';
+import {
+  BbiyongTokenExpiredError,
+  BbiyongUnavailableError,
+  type BbiyongOrg,
+  type CreateOrgOutcome,
+} from './types.ts';
 
 const COMPANY: OrgLinkTarget = {
   companyId: 'C1',
@@ -268,5 +274,76 @@ describe('linkOrg — ⑤ 이미 연결된 회사', () => {
     expect(out.kind).toBe('not_found');
     expect(org.requests).toHaveLength(0);
     expect(s.pending).toEqual([]);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ⑥ 토큰 만료 — **재발급으로 이어져야 한다**
+   ══════════════════════════════════════════════════════════════════════════
+   ★★★ 이 시험이 지키는 것: `linkOrg` 의 catch 가 **`BbiyongTokenExpiredError` 까지
+        삼키면** 그 예외가 `withFreshAccess` 까지 올라가지 못하고, **재발급이 돌지 않은
+        채** 「연동 대기」로 떨어진다. 토큰은 멀쩡히 되살릴 수 있는데 운영자는
+        「잠시 후 다시 시도해 주세요」를 읽는다.
+
+   ★ 그래서 **`withFreshAccess` 와 함께** 돌린다. 단위로 갈라 놓으면 「던지는가」만
+     보게 되고, **정말 재발급이 돌고 다시 불리는가**는 아무도 지키지 않는다.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe('linkOrg — ⑥ 토큰 만료는 재발급으로 이어진다', () => {
+  /** 토큰 저장소 대역. ★ `revoke` 가 불리면 터진다 — 되살릴 수 있는 상황이다. */
+  function tokenStore(): AccessTokenStore & { saved: string[] } {
+    const saved: string[] = [];
+    return {
+      saved,
+      read: async () => ({ accessToken: 'old-access', refreshToken: 'refresh' }),
+      saveAccess: async (t) => void saved.push(t),
+      revoke: async () => {
+        throw new Error('★ 재발급으로 풀리는 상황에서 세션을 폐기해선 안 된다');
+      },
+    };
+  }
+
+  it('★★ 만료를 삼키지 않는다 — 재발급하고 **새 토큰으로 다시 부른다**', async () => {
+    const s = store({ company: COMPANY, takenCodes: [] });
+    const ts = tokenStore();
+    const 받은토큰: string[] = [];
+
+    const org = createOnly(async (req, accessToken) => {
+      받은토큰.push(accessToken);
+      // 첫 호출은 401 — 삐용이 만료된 토큰을 거부한 모양이다.
+      if (받은토큰.length === 1) throw new BbiyongTokenExpiredError('삐용 회사 등록이 401');
+      return { kind: 'created', orgId: 7001, orgCode: req.orgCode, memberId: 95_001 };
+    });
+
+    const result = await withFreshAccess(ts, { reIssue: async () => 'fresh-access' }, (token) =>
+      linkOrg(s, org, token),
+    );
+
+    // 재발급이 돌았고, 두 번째 호출은 **새 토큰**을 받았다.
+    expect(ts.saved).toEqual(['fresh-access']);
+    expect(받은토큰).toEqual(['old-access', 'fresh-access']);
+    // 결과는 성공이다 — 대기로 떨어지지 않는다.
+    expect(result).toEqual({ kind: 'linked', orgId: 7001, orgCode: 'Z01' });
+    expect(s.pending).toEqual([]);
+  });
+
+  it('★ 그 밖의 실패는 그대로 대기다 — 재발급을 부르지 않는다', async () => {
+    const s = store({ company: COMPANY, takenCodes: [] });
+    const ts = tokenStore();
+    let reissued = 0;
+
+    const org = createOnly(async () => {
+      throw new BbiyongUnavailableError('삐용 회사 등록 호출 실패');
+    });
+
+    const result = await withFreshAccess(
+      ts,
+      { reIssue: async () => { reissued += 1; return 'fresh-access'; } },
+      (token) => linkOrg(s, org, token),
+    );
+
+    expect(reissued).toBe(0);
+    expect(ts.saved).toEqual([]);
+    expect(result.kind).toBe('pending');
+    expect(s.pending).toHaveLength(1);
   });
 });

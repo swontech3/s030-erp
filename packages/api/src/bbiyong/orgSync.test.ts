@@ -13,7 +13,9 @@
 import { describe, it, expect } from 'vitest';
 import { moduleOffOrg, moduleOnOrg, patchOrgName, type OrgLinkStore, type OrgLinkTarget } from './orgLink.ts';
 import { MockBbiyongOrg } from './MockBbiyongOrg.ts';
+import { withFreshAccess, type AccessTokenStore } from './withFreshAccess.ts';
 import {
+  BbiyongTokenExpiredError,
   BbiyongUnavailableError,
   type BbiyongOrg,
   type BbiyongOrgPatch,
@@ -277,6 +279,89 @@ describe('성공하면 대기 사유를 지운다 — 배너가 남지 않는다
     await moduleOffOrg(s, org, 'token');
 
     expect(s.linked).toEqual([]);
+    expect(s.pending).toHaveLength(1);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ⑥ 토큰 만료 — 퇴실·재입주·수정도 재발급으로 이어진다
+   ══════════════════════════════════════════════════════════════════════════
+   ★★★ `applyOp` 의 catch 가 `BbiyongTokenExpiredError` 까지 삼키면 재발급이 돌지
+        않는다(`linkOrg` 과 같은 구멍이었다, 2026-10-05). 그래서 `withFreshAccess` 와
+        **함께** 돌려 「재발급하고 새 토큰으로 다시 부르는가」를 못 박는다.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe('퇴실·재입주 — ⑥ 토큰 만료는 재발급으로 이어진다', () => {
+  function tokenStore(): AccessTokenStore & { saved: string[] } {
+    const saved: string[] = [];
+    return {
+      saved,
+      read: async () => ({ accessToken: 'old-access', refreshToken: 'refresh' }),
+      saveAccess: async (t) => void saved.push(t),
+      revoke: async () => {
+        throw new Error('★ 재발급으로 풀리는 상황에서 세션을 폐기해선 안 된다');
+      },
+    };
+  }
+
+  /** 첫 호출만 401 을 던지는 퇴실 대역. 받은 토큰을 기록한다. */
+  function expiringOffAdapter(): BbiyongOrg & { tokens: string[] } {
+    const tokens: string[] = [];
+    const nope = (name: string) => async (): Promise<never> => {
+      throw new Error(`이 시험은 ${name} 을 부르지 않아야 한다`);
+    };
+    return {
+      tokens,
+      createOrg: nope('createOrg') as BbiyongOrg['createOrg'],
+      moduleOn: nope('moduleOn') as BbiyongOrg['moduleOn'],
+      patchOrg: nope('patchOrg') as BbiyongOrg['patchOrg'],
+      sendMember: nope('sendMember') as BbiyongOrg['sendMember'],
+      moduleOff: async (_orgCode, accessToken) => {
+        tokens.push(accessToken);
+        if (tokens.length === 1) throw new BbiyongTokenExpiredError('삐용 퇴실이 401');
+        return { kind: 'ok' };
+      },
+    };
+  }
+
+  it('★★ 퇴실이 401 이면 재발급하고 **새 토큰으로 다시 보낸다**', async () => {
+    const s = store(LINKED);
+    const ts = tokenStore();
+    const org = expiringOffAdapter();
+
+    const result = await withFreshAccess(ts, { reIssue: async () => 'fresh-access' }, (token) =>
+      moduleOffOrg(s, org, token),
+    );
+
+    expect(ts.saved).toEqual(['fresh-access']);
+    expect(org.tokens).toEqual(['old-access', 'fresh-access']);
+    expect(result).toEqual({ kind: 'synced', op: 'off' });
+    // ★ 대기로 떨어지지 않았다 — 성공이므로 사유도 남지 않는다.
+    expect(s.pending).toEqual([]);
+  });
+
+  it('★ 장애(연결 실패)는 그대로 대기다 — 재발급을 부르지 않는다', async () => {
+    const s = store(LINKED);
+    const ts = tokenStore();
+    let reissued = 0;
+
+    const result = await withFreshAccess(
+      ts,
+      { reIssue: async () => { reissued += 1; return 'fresh-access'; } },
+      (token) =>
+        moduleOffOrg(
+          s,
+          {
+            ...opAdapter(),
+            moduleOff: async () => {
+              throw new BbiyongUnavailableError('붙지 못했다');
+            },
+          },
+          token,
+        ),
+    );
+
+    expect(reissued).toBe(0);
+    expect(result.kind).toBe('pending');
     expect(s.pending).toHaveLength(1);
   });
 });
