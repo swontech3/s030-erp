@@ -65,7 +65,8 @@ function orgAdapter(duplicates: readonly string[] = []): BbiyongOrg & { requests
       });
       if (duplicates.includes(req.orgCode)) return { kind: 'duplicate_code', orgCode: req.orgCode };
       nextId += 1;
-      return { kind: 'created', orgId: nextId, orgCode: req.orgCode };
+      // ★ 대표 회원번호(규경 2026-10-05). 등록 응답만이 주는 값이다 — 여기서도 준다.
+      return { kind: 'created', orgId: nextId, orgCode: req.orgCode, memberId: 95_000 + nextId };
     },
   };
 }
@@ -85,6 +86,7 @@ function createOnly(createOrg: BbiyongOrg['createOrg']): BbiyongOrg {
     moduleOff: nope('moduleOff') as BbiyongOrg['moduleOff'],
     moduleOn: nope('moduleOn') as BbiyongOrg['moduleOn'],
     patchOrg: nope('patchOrg') as BbiyongOrg['patchOrg'],
+    sendMember: nope('sendMember') as BbiyongOrg['sendMember'],
   };
 }
 
@@ -99,7 +101,7 @@ describe('linkOrg — ① 채번', () => {
 
     expect(out.kind).toBe('linked');
     expect(org.requests.map((r) => r.orgCode)).toEqual(['Z01']);
-    expect(s.linked).toEqual([{ orgId: 5001, orgCode: 'Z01' }]);
+    expect(s.linked).toEqual([{ orgId: 5001, orgCode: 'Z01', repMemberId: 100_001 }]);
   });
 
   it('이미 쓴 번호는 건너뛴다', async () => {
@@ -132,7 +134,7 @@ describe('linkOrg — ② 중복이면 다음 번호', () => {
     expect(out).toEqual({ kind: 'linked', orgId: 5001, orgCode: 'Z02' });
     expect(org.requests.map((r) => r.orgCode)).toEqual(['Z01', 'Z02']);
     // ★ 저장되는 것은 **성공한** 코드다.
-    expect(s.linked).toEqual([{ orgId: 5001, orgCode: 'Z02' }]);
+    expect(s.linked).toEqual([{ orgId: 5001, orgCode: 'Z02', repMemberId: 100_001 }]);
   });
 
   it('여러 번 연달아 중복이어도 계속 올라간다', async () => {
@@ -181,7 +183,7 @@ describe('linkOrg — ③ 요청 본문', () => {
     const org: BbiyongOrg = createOnly(
       async (req) => {
         captured.push({ ...req });
-        return { kind: 'created', orgId: 1, orgCode: req.orgCode };
+        return { kind: 'created', orgId: 1, orgCode: req.orgCode, memberId: 95_001 };
       },
     );
 

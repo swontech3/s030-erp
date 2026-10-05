@@ -49,6 +49,7 @@ import {
   patchOrgForCompany,
   retryBbiyongForCompany,
 } from '../companies/registerOrg.ts';
+import { syncMembersForCompany } from '../companies/syncMembers.ts';
 
 /** 입주사 화면은 운영사 업무다. 계약 라우트의 `WRITE_ROLE` 과 같은 값이다. */
 const OPERATOR = 'operator';
@@ -119,6 +120,16 @@ function toMember(row: MemberRow) {
     // 화면은 boolean 으로 받는다. 코드값('C'/'M')은 서버 안에만 둔다.
     isRepresentative: row.is_representative === 'C',
     memo: row.memo,
+    /**
+     * 삐용 직원정보 연동(035) — **조회 전용**. 화면은 사유가 있으면 「연동 대기」를
+     * 띄우고, 처리는 **다시 저장**이다(한 업무는 한 화면에서 — 재시도 버튼을 늘리지
+     * 않는다). 번호 없는 행은 다음 저장에서 자동으로 `I` 로 나간다.
+     */
+    bbiyong: {
+      memberId: row.link_s020_member_id,
+      /** ★ 운영자에게 그대로 보여주는 문구다. 반영된 뒤에는 비어 있다. */
+      reason: row.link_failed_reason,
+    },
   };
 }
 
@@ -534,12 +545,45 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
       });
 
       if (result === 'not_found') return notFound(reply);
+
+      /*
+       * ══════════════════════════════════════════════════════════════════════
+       * ★★ 삐용 직원정보 — **트랜잭션이 커밋된 뒤다**(회사 등록·퇴실과 같은 이유)
+       * ══════════════════════════════════════════════════════════════════════
+       * 삐용이 죽어도 구성원 명부는 고칠 수 있어야 한다. 실패는 그 구성원 행의
+       * 「연동 대기」로 남고, **다음 저장이 곧 재시도다** — 번호 없는 행은 다음에도
+       * `I` 로 나간다(`memberSync.ts` 머리말).
+       *
+       * ★ 연결되지 않은 입주사(계약 확정 전)면 `syncMembers` 가 보내지 않는다.
+       *   확정이 끝나면 회사 등록이 그때 밀린 직원들을 보낸다(`registerOrg.ts`).
+       * ★★ `changed` 를 넘긴다 — 비고·순서만 고친 저장으로 삐용을 두드리지 않는다.
+       *    「무엇이 바뀌었나」를 아는 자리는 방금 저장한 `replaceMembers` 뿐이다.
+       */
+      const sync = await syncMembersForCompany({
+        companyId: req.params.id,
+        session,
+        actor,
+        changed: result.changed,
+      });
+
       return reply.send({
         companyId: req.params.id,
         inserted: result.inserted,
         updated: result.updated,
         deactivated: result.deactivated,
+        /**
+         * ★ 저장 **직후의** 구성원 목록이다 — 삐용 연동으로 바뀐 회원번호·사유는 아직
+         *   담겨 있지 않다(연동이 그 뒤에 돌았다). 화면은 연동 결과를 아래
+         *   `bbiyongPending` 으로 받는다. 목록을 다시 읽지 않는 것은 **화면이 보낸
+         *   순서와 1:1 로 맞아야** 새 `memberId` 를 되돌려 넣을 수 있기 때문이다
+         *   (`ContractForm.saveTenant`).
+         */
         members: result.members.map(toMember),
+        /**
+         * 삐용에 아직 반영되지 않은 구성원들. 비어 있으면 전부 반영됐거나 보낼 것이
+         * 없었다. ★ 사유는 **운영자에게 그대로 보여주는 문구**다.
+         */
+        bbiyongPending: sync.pending,
       });
     },
   );

@@ -296,7 +296,24 @@ export const ORG_MODULE_CODES = ['OFFICE', 'AUTHZ'] as const;
  *   `BbiyongTokenExpiredError` 로 던져진다(인프라 문제와 업무 실패는 다른 일이다).
  */
 export type CreateOrgOutcome =
-  | { kind: 'created'; orgId: number; orgCode: string }
+  | {
+      kind: 'created';
+      orgId: number;
+      orgCode: string;
+      /**
+       * 대표 회원번호 — 회사 등록 응답의 `data.memberId`(규격 2026-10-05 에 추가됐다).
+       *
+       * ★★ **반드시 저장한다**(`tb_s080_members.link_s020_member_id`). 삐용에서 대표는
+       *    지울 수도 새로 만들 수도 없어서, 대표 정보를 고치는 유일한 길이 이 번호로
+       *    보내는 `U` 다. 못 받아 두면 그 회사의 대표는 영원히 ERP 에서 못 고친다.
+       *
+       * ★ `null` 이면 **회사 등록 자체는 성공이다** — 거절로 바꾸지 않는다. 회사는
+       *   이미 삐용에 있고, 여기서 실패로 돌리면 다음 시도가 다음 단체코드로 회사를
+       *   하나 더 만든다(`orgLink.ts` 의 「알려진 구멍」과 같은 자리). 번호만 비는
+       *   것이고, 그 사실은 대표 행의 실패 사유로 남는다.
+       */
+      memberId: number | null;
+    }
   /**
    * 「이미 사용중인 단체코드입니다」 — 호출자가 **다음 번호로 다시 시도한다**.
    *
@@ -352,7 +369,55 @@ export interface BbiyongOrg {
   moduleOn(orgCode: string, accessToken: string): Promise<OrgOpOutcome>;
   /** 회사명 수정. ★ 주소는 보내지 않는다. */
   patchOrg(patch: BbiyongOrgPatch, accessToken: string): Promise<OrgOpOutcome>;
+  /** 직원정보 — 신규·수정·삭제. ★ 대표는 `U` 만 보낸다(`BbiyongMemberRequest`). */
+  sendMember(req: BbiyongMemberRequest, accessToken: string): Promise<MemberOpOutcome>;
 }
+
+// =============================================================================
+// 직원정보 — `POST /rest/v1/s021100010/erp-member` (삐용 규격 2026-10-05)
+// =============================================================================
+
+/**
+ * 구성원 한 명에 대한 한 번의 요청. **엔드포인트는 하나이고 `regTp` 가 가른다.**
+ *
+ * ★★★ **대표(`repYn: 'Y'`)는 `I` 와 `D` 가 거부된다.** 대표는 회사 등록으로만 생기고
+ *    삐용에서 지울 수 없다 — 고치는 길은 `U` 하나뿐이다. 그 판정은 보내기 전에
+ *    `memberSync.ts` 가 하고, 이 타입은 「무엇을 보냈는가」만 말한다.
+ *
+ * ★ `repYn` 은 **`I` 에서만 쓰는 칸이다**(규격). 그리고 ERP 가 `I` 를 보내는 것은
+ *   직원뿐이므로 실제로 나가는 값은 늘 `'N'` 이다 — 그래도 칸을 지우지 않는다.
+ *   삐용이 기본값을 어떻게 두는지 모르는 채 생략하면, 어느 날 대표로 만들어질 수 있다.
+ */
+export interface BbiyongMemberRequest {
+  /** `I` 신규 · `U` 수정 · `D` 삭제. */
+  regTp: 'I' | 'U' | 'D';
+  /** 단체코드(`Z01`~`Z99`). 필수 — 어느 회사의 직원인지다. */
+  orgCode: string;
+  /**
+   * 삐용 회원번호. ★ `I` 는 **보내지 않는다**(아직 없다), `U`·`D` 는 필수다.
+   * 값의 출처는 `erp-member` 의 `I` 응답 또는 회사 등록 응답(대표)이다.
+   */
+  memberId?: number;
+  memberName: string;
+  /** 로그인 아이디다. ★ 겹치면 삐용이 거절한다 — 그 문구를 운영자에게 그대로 보인다. */
+  email: string;
+  /** 연락처. 선택 항목이고 **숫자만** 보낸다(회사 등록의 `hpNo` 와 같은 규칙). */
+  hpNo?: string;
+  /** 대표여부. ★ `I` 에서만 쓴다. ERP 가 보내는 `I` 는 직원뿐이라 늘 `'N'` 이다. */
+  repYn?: 'Y' | 'N';
+}
+
+/**
+ * 직원정보 한 번의 결과. **업무 실패는 예외가 아니라 결과다**(회사 등록과 같은 규칙).
+ *
+ * ★ `created` 는 `I` 에만 온다 — 그 번호를 저장하지 않으면 그 직원은 다음 저장에서
+ *   또 `I` 로 나가고 삐용에 같은 사람이 둘 생긴다(이메일이 겹쳐 거절되므로 실제로는
+ *   둘이 되지 않고 **영원히 대기로 남는다**).
+ */
+export type MemberOpOutcome =
+  | { kind: 'created'; memberId: number }
+  | { kind: 'ok' }
+  | { kind: 'rejected'; message: string; retryable: boolean };
 
 /** shadow 로그에 남길 요청 맥락. 판정에는 쓰지 않는다. */
 export interface AclLogContext {

@@ -73,7 +73,12 @@ export interface OrgLinkStore {
    *   있으면 중복으로 돌아오고, 그때 다음 번호로 넘어간다.
    */
   read(): Promise<{ company: OrgLinkTarget; takenCodes: string[] } | null>;
-  saveLinked(args: { orgId: number; orgCode: string }): Promise<void>;
+  /**
+   * @param repMemberId 회사 등록 응답이 준 **대표 회원번호**(규격 2026-10-05).
+   *   ★ 등록에서만 온다. 퇴실·재입주·수정이 「대기 사유를 지우는 수단」으로 이 함수를
+   *     쓸 때는 **없다**(`undefined`) — 그때 번호를 덮어쓰면 안 된다.
+   */
+  saveLinked(args: { orgId: number; orgCode: string; repMemberId?: number | null }): Promise<void>;
   /** ★ `reason` 은 **운영자에게 그대로 보여줄 문구**다. */
   savePending(reason: string): Promise<void>;
 }
@@ -200,7 +205,12 @@ export async function linkOrg(
     }
 
     if (outcome.kind === 'created') {
-      await store.saveLinked({ orgId: outcome.orgId, orgCode: outcome.orgCode });
+      // ★ 대표 회원번호를 같이 넘긴다 — 저장은 `store` 가 한다(이 파일에는 DB 가 없다).
+      await store.saveLinked({
+        orgId: outcome.orgId,
+        orgCode: outcome.orgCode,
+        repMemberId: outcome.memberId,
+      });
       return { kind: 'linked', orgId: outcome.orgId, orgCode: outcome.orgCode };
     }
 

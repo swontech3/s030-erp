@@ -17,6 +17,7 @@
  *
  * ★ 미체크 행은 **입력값을 유지**하고 저장 때만 뺀다. 지우지 않는다.
  */
+import { Fragment } from 'react';
 import { Icon } from '@/components/ds';
 import styles from './contract-form.module.css';
 import {
@@ -109,7 +110,8 @@ export function SectionUsers({
           const readOnly = first || frozen;
 
           return (
-            <div className={`${styles.userRow}${on ? '' : ` ${styles.userRowOff}`}`} key={i}>
+            <Fragment key={i}>
+            <div className={`${styles.userRow}${on ? '' : ` ${styles.userRowOff}`}`}>
               <span className={`${styles.cell} ${styles.center}`}>
                 <input
                   type="checkbox"
@@ -242,6 +244,21 @@ export function SectionUsers({
                 </button>
               </span>
             </div>
+
+            {/*
+              ★ 삐용 직원정보 연동 대기(035) — **고칠 칸 바로 아래**에 붙인다. 머리말
+                배너만 두면 어느 줄을 고쳐야 하는지가 보이지 않는다(표가 길다).
+              ★★ 사유는 서버 문구를 **그대로** 쓴다. 재시도 버튼은 없다 — 고쳐서 저장하면
+                 그게 재시도다(한 업무는 한 화면에서).
+              ★ 표가 grid 라 행 안에 넣을 수 없다. 행의 **형제**로 둔다.
+            */}
+            {user.linkReason ? (
+              <p className={styles.userRowNote} data-bbiyong-member="pending">
+                <Icon name="circle-alert" size={12} />
+                삐용 미반영 — {user.linkReason}
+              </p>
+            ) : null}
+            </Fragment>
           );
         })
       )}

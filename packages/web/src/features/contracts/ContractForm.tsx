@@ -171,6 +171,8 @@ export interface MemberResponse {
   email: string | null;
   isRepresentative: boolean;
   memo: string | null;
+  /** 삐용 직원정보 연동 상태(035) — **조회 전용**. 사유가 있으면 화면이 그대로 보인다. */
+  bbiyong?: { memberId: number | null; reason: string | null };
 }
 
 type Mode = 'create' | 'draft' | 'confirmed' | 'terminated' | 'cancelled';
@@ -365,6 +367,18 @@ export function ContractForm({
    *   로 저장된 계약 화면으로 넘어가고, 그때 서버 값으로 다시 판정된다.
    */
   const linkCompanyId = contract?.companyId ?? companyId;
+
+  /**
+   * 삐용 직원정보 연동 대기(035) — 구성원 행에 남은 사유들.
+   *
+   * ★ 회사 연동(`link`)과 **다른 일이다.** 회사는 연결됐는데 직원 한 명의 이메일이
+   *   겹쳐 반영되지 않는 상태가 있고, 그걸 회사 배너로 말하면 운영자가 엉뚱한 곳을 본다.
+   * ★★ [다시 시도] 버튼이 **없다.** 고칠 자리가 바로 아래 섹션 3 이고, 고쳐서 저장하면
+   *    그게 재시도다(한 업무는 한 화면에서 — 처리 버튼을 늘리지 않는다).
+   */
+  const memberPending = users
+    .map((row, index) => ({ name: effectiveName(row, index, companyState), reason: row.linkReason }))
+    .filter((u): u is { name: string; reason: string } => Boolean(u.reason));
 
   /**
    * ★ 자동 줄(할인 · 무상)은 특기사항 **맨 위에만** 들어간다. 사용자가 쓴 줄은
@@ -582,6 +596,11 @@ export function ContractForm({
       companyId?: string;
       members?: { memberId: string }[];
       /**
+       * 삐용에 아직 반영되지 않은 구성원들(`PUT /companies/:id/members`, 035).
+       * 비어 있으면 전부 반영됐거나 보낼 것이 없었다(= 계약 확정 전).
+       */
+      bbiyongPending?: { memberId: string; name: string; reason: string }[];
+      /**
        * 삐용 연동 결과(3-2) — 확정하는 두 경로(`POST /contracts` · `POST .../status`)가
        * 함께 내려준다. `'pending'` 이면 **계약은 확정됐고 연결만 아직**이다.
        */
@@ -679,14 +698,21 @@ export function ContractForm({
 
     // 서버가 돌려준 순서는 우리가 보낸 순서(sort_order)와 같다.
     const assigned = saved.members ?? [];
-    if (assigned.length === kept.length) {
-      setUsers((prev) =>
-        prev.map((row, index) => {
-          const at = kept.findIndex((k) => k.index === index);
-          return at >= 0 ? { ...row, memberId: assigned[at]?.memberId ?? row.memberId } : row;
-        }),
-      );
-    }
+    /**
+     * 삐용에 아직 반영되지 않은 사람들 — ERP member_id → 사유 (035).
+     *
+     * ★ 사유는 **매번 다시 쓴다.** 남겨 두면 이메일을 고쳐 반영된 뒤에도 옛 사유가
+     *   화면에 남고, 운영자는 고치지 않은 줄 안다.
+     */
+    const pendingBy = new Map((saved.bbiyongPending ?? []).map((p) => [p.memberId, p.reason]));
+    setUsers((prev) =>
+      prev.map((row, index) => {
+        // ★ 길이가 어긋나면 id 를 건드리지 않는다 — 엉뚱한 사람에게 남의 id 를 붙이지 않는다.
+        const at = assigned.length === kept.length ? kept.findIndex((k) => k.index === index) : -1;
+        const memberId = at >= 0 ? (assigned[at]?.memberId ?? row.memberId) : row.memberId;
+        return { ...row, memberId, linkReason: memberId ? (pendingBy.get(memberId) ?? null) : null };
+      }),
+    );
 
     // ★ 만들었든 고쳤든 **확정된 입주사 ID** 를 돌려준다. 계약 저장이 이 값을 쓴다 —
     //   새로 만든 경우 `companyId` prop 은 아직 `null` 이라 그걸 보면 안 된다.
@@ -1073,6 +1099,16 @@ export function ContractForm({
             </div>
           ) : null}
 
+          {memberPending.length > 0 ? (
+            <div className={styles.linkPending} role="status" data-bbiyong-member="pending">
+              <Icon name="circle-alert" size={16} />
+              <span>
+                <b>직원 연동 대기</b> — 구성원은 저장됐고 삐용 반영만 아직입니다(
+                {memberPending.length}명). 아래 「입주자 사용자 정보」에서 고친 뒤 다시 저장해 주세요.
+              </span>
+            </div>
+          ) : null}
+
           <SectionCompany
             value={companyState}
             onChange={(patch) => {
@@ -1373,6 +1409,8 @@ function seedUsers(members: readonly MemberResponse[], emailDomains: readonly st
       domainCustom: emailDomainCustom,
       memo: m.memo ?? '',
       selected: true,
+      // ★ 삐용 연동 대기 사유. 서버 값이 유일한 원천이다 — 화면이 추측하지 않는다.
+      linkReason: m.bbiyong?.reason ?? null,
     };
   });
 }

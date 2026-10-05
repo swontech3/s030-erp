@@ -23,10 +23,12 @@
  *   (아래 `#byCode`). 재기동하면 비어 있다 — 진실원은 ERP DB 쪽 `link_org_code` 다.
  */
 import type {
+  BbiyongMemberRequest,
   BbiyongOrg,
   BbiyongOrgPatch,
   BbiyongOrgRequest,
   CreateOrgOutcome,
+  MemberOpOutcome,
   OrgOpOutcome,
 } from './types.ts';
 
@@ -45,6 +47,16 @@ import type {
  */
 export const MOCK_ORG_ID_BASE = 9100;
 
+/**
+ * mock 회원번호의 기준값. 회사 등록이 받는 대표 번호는 `기준값 + 단체코드 숫자` 이고
+ * (`Z01` → 95101), 직원은 그 뒤로 1씩 올라간다.
+ *
+ * ★ `MOCK_ORG_ID_BASE`(9100)·`MockBbiyongAuth`(9001·9002)와 **자리수를 벌려 둔다.**
+ *   `link_s020_member_id` 와 `link_s020_org_id` 는 다른 컬럼이지만, 번호대가 겹치면
+ *   로그를 읽는 사람이 둘을 헷갈린다(실제로 9101 을 org 로도 member 로도 읽게 된다).
+ */
+export const MOCK_MEMBER_ID_BASE = 95000;
+
 export class MockBbiyongOrg implements BbiyongOrg {
   /** 이 프로세스가 만든 회사들. 코드 → org_id. */
   readonly #byCode = new Map<string, number>();
@@ -59,6 +71,39 @@ export class MockBbiyongOrg implements BbiyongOrg {
    *    시험하는 것은 `MockBbiyongOrg.test.ts` 와 `orgLink.test.ts` 다.
    */
   readonly #officeOn = new Set<string>();
+
+  /** 단체코드 → 대표 회원번호. 회사 등록이 넣는다. 직원 삭제가 **대표인지** 볼 때 쓴다. */
+  readonly #repByCode = new Map<string, number>();
+
+  /**
+   * 이 프로세스가 만든 직원들. 회원번호 → { 단체코드, 이메일 }.
+   *
+   * ★ 이메일을 들고 있는 이유는 **겹침을 재현하기 위해서다.** 삐용은 이메일을 로그인
+   *   아이디로 쓰므로 같은 이메일을 두 번 등록하면 거절한다. mock 이 통과시키면 그
+   *   경로가 실연동에서 처음 터지고, 그때는 「어제까지 되던 것」이 안 되는 모양이 된다.
+   * ★★ 재기동하면 비어 있다 — 그래서 **모르는 번호는 거부하지 않고 통과시킨다**
+   *    (`moduleOff` 의 `#known` 과 같은 이유).
+   */
+  readonly #members = new Map<number, { orgCode: string; email: string }>();
+
+  /**
+   * 직원 회원번호를 **이메일에서 유도한다** — 증가 카운터가 아니다.
+   *
+   * ★★ 카운터로 두면 프로세스를 재기동할 때마다 같은 번호가 처음부터 다시 나오고, 그
+   *    번호는 앞선 실행이 남긴 `link_s020_member_id` 의 UNIQUE 에 걸려 **저장이 실패한다**
+   *    (`MOCK_ORG_ID_BASE` 머리말의 2026-09-30 사고와 같은 모양이다). 이메일은 삐용에서
+   *    유일하므로 그것에서 유도하면 번호도 유일해지고, 재기동해도 같은 사람이 같은
+   *    번호를 받는다.
+   *
+   * ★ 대표 번호대(기준값+100~199)를 피해 기준값+1000 위로 둔다.
+   */
+  #memberIdFor(email: string): number {
+    let hash = 0x811c9dc5;
+    for (const ch of email.toLowerCase()) {
+      hash = ((hash ^ ch.charCodeAt(0)) * 0x01000193) >>> 0;
+    }
+    return MOCK_MEMBER_ID_BASE + 1000 + (hash % 90_000);
+  }
 
   /** 이 프로세스가 아는 코드인가. 모르면 중복 판정을 하지 않는다(위 주석). */
   #known(orgCode: string): boolean {
@@ -93,11 +138,21 @@ export class MockBbiyongOrg implements BbiyongOrg {
     // ★ 코드에서 유도한다(위 주석). `Z01` → 9101. ERP 코드가 아니면 뒤 2자리를 그대로 쓴다.
     const orgId = MOCK_ORG_ID_BASE + (Number(req.orgCode.slice(1)) || 0);
     this.#byCode.set(req.orgCode, orgId);
+    /*
+     * ★★ 대표 회원번호도 같은 방식으로 **코드에서 유도한다**(`Z01` → 95101). 증가
+     *    카운터로 두면 재기동할 때마다 같은 번호가 다시 나오고, 그 번호는
+     *    `link_s020_member_id` 의 UNIQUE 에 걸려 저장이 조용히 실패한다 —
+     *    `MOCK_ORG_ID_BASE` 머리말에 적힌 2026-09-30 사고와 같은 모양이다.
+     */
+    const repMemberId = MOCK_MEMBER_ID_BASE + 100 + (Number(req.orgCode.slice(1)) || 0);
+    this.#repByCode.set(req.orgCode, repMemberId);
     // ★ 등록은 OFFICE 를 켠 상태로 만든다 — moduleCodes 에 OFFICE 를 보내기 때문이다.
     if (req.moduleCodes.includes('OFFICE')) this.#officeOn.add(req.orgCode);
     // ★ 평문 로그에 이메일·전화를 남기지 않는다. 남는 것은 코드와 번호뿐이다.
-    console.log(`[bbiyong] MOCK 회사 등록 — orgCode=${req.orgCode} orgId=${orgId}`);
-    return { kind: 'created', orgId, orgCode: req.orgCode };
+    console.log(
+      `[bbiyong] MOCK 회사 등록 — orgCode=${req.orgCode} orgId=${orgId} 대표회원=${repMemberId}`,
+    );
+    return { kind: 'created', orgId, orgCode: req.orgCode, memberId: repMemberId };
   }
 
   /** 퇴실 — 이미 꺼져 있으면 삐용처럼 거부한다. */
@@ -127,6 +182,76 @@ export class MockBbiyongOrg implements BbiyongOrg {
     }
     // ★ 회사명은 로그에 남겨도 되는 값이다(공개 정보). 이메일·전화는 여기 오지 않는다.
     console.log(`[bbiyong] MOCK 회사 수정 — orgCode=${patch.orgCode}`);
+    return { kind: 'ok' };
+  }
+
+  /**
+   * 직원정보 — 신규 · 수정 · 삭제 (규격 2026-10-05).
+   *
+   * ★★ 삐용이 거절하는 것을 mock 도 거절한다. 통과시키면 실연동에서 처음 터진다:
+   *    ① 칸이 비었다 ② 이메일이 겹친다 ③ **대표를 지우려 한다** ④ 번호 없는 수정·삭제
+   *
+   * ★ 대표 `I` 는 **여기서 막지 않는다.** ERP 는 대표에게 `I` 를 보내지 않으므로
+   *   (`memberSync.ts`) 그 경로로 오는 요청 자체가 버그이고, mock 이 조용히 받아 주면
+   *   그 버그가 묻힌다 — `repYn:'Y'` 로 오는 `I` 는 삐용처럼 거절한다.
+   */
+  async sendMember(req: BbiyongMemberRequest, _accessToken: string): Promise<MemberOpOutcome> {
+    if (!req.orgCode) {
+      return { kind: 'rejected', message: '단체코드가 없어 삐용에 보낼 수 없습니다', retryable: false };
+    }
+    for (const [key, value] of [
+      ['성명', req.memberName],
+      ['이메일', req.email],
+    ] as const) {
+      if (!value) {
+        return { kind: 'rejected', message: `${key}이(가) 없어 삐용에 보낼 수 없습니다`, retryable: false };
+      }
+    }
+
+    if (req.regTp === 'I') {
+      if (req.repYn === 'Y') {
+        return { kind: 'rejected', message: '대표는 회사 등록으로만 만들 수 있습니다', retryable: false };
+      }
+      // ★ 이메일 겹침 — 삐용은 이메일을 로그인 아이디로 쓴다. 이 프로세스가 아는 범위에서만 본다.
+      for (const [id, m] of this.#members) {
+        if (m.email.toLowerCase() === req.email.toLowerCase()) {
+          return {
+            kind: 'rejected',
+            message: `이미 사용중인 이메일입니다(회원번호 ${id}). 다른 이메일을 입력해 주세요`,
+            retryable: false,
+          };
+        }
+      }
+      const memberId = this.#memberIdFor(req.email);
+      this.#members.set(memberId, { orgCode: req.orgCode, email: req.email });
+      console.log(`[bbiyong] MOCK 직원 등록 — orgCode=${req.orgCode} memberId=${memberId}`);
+      return { kind: 'created', memberId };
+    }
+
+    if (req.memberId === undefined) {
+      return { kind: 'rejected', message: '회원번호가 없어 삐용에 보낼 수 없습니다', retryable: false };
+    }
+
+    if (req.regTp === 'D') {
+      // ★★ 대표는 지울 수 없다 — 삐용이 그렇게 받는다(규격). 회사 등록이 넣어 둔 번호로 본다.
+      for (const [code, repId] of this.#repByCode) {
+        if (repId === req.memberId) {
+          return {
+            kind: 'rejected',
+            message: `대표는 삭제할 수 없습니다(단체 ${code})`,
+            retryable: false,
+          };
+        }
+      }
+      this.#members.delete(req.memberId);
+      console.log(`[bbiyong] MOCK 직원 삭제 — orgCode=${req.orgCode} memberId=${req.memberId}`);
+      return { kind: 'ok' };
+    }
+
+    // U — 대표도 이것만은 된다. ★ 이메일을 바꿨으면 들고 있는 값도 맞춘다(겹침 판정의 근거).
+    const known = this.#members.get(req.memberId);
+    if (known) this.#members.set(req.memberId, { ...known, email: req.email });
+    console.log(`[bbiyong] MOCK 직원 수정 — orgCode=${req.orgCode} memberId=${req.memberId}`);
     return { kind: 'ok' };
   }
 }

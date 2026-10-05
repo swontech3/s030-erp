@@ -7,6 +7,7 @@
  * ★★ `updated_at` 을 매번 명시한다. 이 레거시 테이블들도 **NOT NULL 인데 DEFAULT 가 없다** —
  *    빼고 INSERT 하면 `23502` 로 죽는다(계약 테이블과 같은 사정, `db/contracts.ts` 머리말).
  */
+import { MEMBER_ROLE } from '@swonbiz/shared/domain/member-payload';
 import type { ScopedClient } from './withCompanyScope.ts';
 
 interface Rows<T> {
@@ -340,6 +341,10 @@ export interface MemberRow {
   email: string | null;
   is_representative: string;
   memo: string | null;
+  /** 삐용 회원번호(035). ★ 조회 전용 — 화면은 이 값으로 「연동됨」을 표시한다. */
+  link_s020_member_id: number | null;
+  /** 마지막 연동 실패 사유 — **운영자에게 그대로 보여주는 문구**다. 성공하면 비어 있다. */
+  link_failed_reason: string | null;
 }
 
 /**
@@ -349,7 +354,8 @@ export interface MemberRow {
 export async function listMembers(client: ScopedClient, companyId: string): Promise<MemberRow[]> {
   const { rows } = await q<MemberRow>(
     client,
-    `SELECT member_id, name, phone, email, is_representative, memo
+    `SELECT member_id, name, phone, email, is_representative, memo,
+            link_s020_member_id, link_failed_reason
        FROM public.tb_s080_members
       WHERE company_id = $1 AND status = 'active'
       ORDER BY sort_order, created_at, member_id`,
@@ -367,6 +373,22 @@ export interface MemberWrite {
   /** 코드 — `'C'` 대표 / `'M'` 직원. 여기 오기 전에 정규화된다. */
   isRepresentative: string;
   memo: string | null;
+}
+
+export interface ReplaceMembersResult {
+  inserted: number;
+  updated: number;
+  deactivated: number;
+  /**
+   * 삐용에 **보낼 것이 있는** 구성원들(ERP member_id).
+   *
+   * ★ 새로 만든 행과, **이름·연락처·이메일 중 하나가 실제로 바뀐** 행이다. 비고만
+   *   고친 저장은 여기 없다 — 삐용에 보내지 않는 값이다.
+   * ★★ 이 목록은 `syncMembers` 의 `changed` 로 그대로 들어간다. 「무엇이 바뀌었나」를
+   *    아는 자리는 저장을 한 이 함수뿐이다 — 삐용 쪽에 사본을 두지 않기 때문에
+   *    나중에는 알 길이 없다(`link_*` 는 상태이고 값의 사본이 아니다).
+   */
+  changed: string[];
 }
 
 /**
@@ -393,10 +415,76 @@ export async function replaceMembers(
     actor: string;
     newId: () => string;
   },
-): Promise<{ inserted: number; updated: number; deactivated: number }> {
+): Promise<ReplaceMembersResult> {
   const { companyId, buildId, members, actor, newId } = args;
 
+  /*
+   * ★★ 쓰기 **전에** 지금 값을 읽어 둔다. 삐용에 `U` 를 보낼지 가리려면 「무엇이
+   *    바뀌었나」를 알아야 하는데, UPDATE 의 `RETURNING` 은 **새 값**을 준다.
+   *    비활성 행까지 읽는다 — 되살아나는 행이 있다.
+   */
+  const before = new Map<string, { name: string; phone: string | null; email: string | null }>();
+  {
+    const { rows } = await q<{ member_id: string; name: string; phone: string | null; email: string | null }>(
+      client,
+      `SELECT member_id, name, phone, email FROM public.tb_s080_members WHERE company_id = $1`,
+      [companyId],
+    );
+    for (const r of rows) before.set(r.member_id, { name: r.name, phone: r.phone, email: r.email });
+  }
+
+  /*
+   * ═══════════════════════════════════════════════════════════════════════
+   * ★★★ 다른 활성 대표를 **먼저** 내린다 — 색인이 중간 상태도 본다
+   * ═══════════════════════════════════════════════════════════════════════
+   * 035 의 `ux_s080_members_one_active_rep` 는 부분 UNIQUE **색인**이라 지연시킬 수
+   * 없다. 대표가 한 행에서 다른 행으로 옮겨가는 저장은 아래 루프 중간에 「활성 대표
+   * 둘」을 지나가고, 그 순간 색인이 저장을 막는다.
+   *
+   * ★ 그래서 이번에 대표가 될 행만 남기고 나머지 활성 대표를 먼저 비킨다. 새 행이
+   *   대표면 들어올 id 가 없으므로 전부 비킨다.
+   * ★ `is_representative` 는 삐용에 보내는 칸이 아니다(`repYn` 은 `I` 에서만 쓴다) —
+   *   그래서 이 전처리는 「바뀐 것」으로 세지 않는다.
+   *
+   * ★★★ **비키는 방법이 둘이다. 이유가 있다.**
+   *   · 명부에 **남는** 행은 `'M'`(직원)으로 내린다 — 계속 활성이라 색인을 비켜야 한다.
+   *   · 명부에서 **빠지는** 행은 그 자리에서 `inactive` 로 내린다. ★★ 이때
+   *     `is_representative` 를 **`'C'` 그대로 둔다.** `'M'` 으로 내려 두면 그 행이
+   *     「삐용 번호를 든 **직원**」으로 보이고, `memberSync` 가 **대표에게 `D` 를
+   *     보낸다** — 삐용은 대표를 지울 수 없어 거절하고, 아무도 고칠 수 없는
+   *     「연동 대기」가 그 회사에 남는다. 대표인 채로 비활성이면 `memberSync` 가
+   *     건너뛴다(그쪽 `orphans` 판정).
+   */
+  const incomingRep = members.find((m) => m.isRepresentative === MEMBER_ROLE.REPRESENTATIVE)?.memberId ?? null;
+  /** 이번 페이로드가 들고 온 기존 행들. 이 안에 없는 행은 명부에서 빠지는 것이다. */
+  const payloadIds = members.map((m) => m.memberId).filter((v): v is string => v !== null);
+
+  // ① 명부에 남는 다른 대표 → 직원으로 내린다.
+  await q(
+    client,
+    `UPDATE public.tb_s080_members
+        SET is_representative = $3, updated_at = now(), updated_by = $2
+      WHERE company_id = $1 AND status = 'active'
+        AND is_representative = $4
+        AND member_id = ANY($5::text[])
+        AND ($6::text IS NULL OR member_id <> $6)`,
+    [companyId, actor, MEMBER_ROLE.STAFF, MEMBER_ROLE.REPRESENTATIVE, payloadIds, incomingRep],
+  );
+
+  // ② 명부에서 빠지는 대표 → 바로 비활성. ★ 'C' 는 그대로 둔다(위 머리말).
+  const steppedDown = await q(
+    client,
+    `UPDATE public.tb_s080_members
+        SET status = 'inactive', updated_at = now(), updated_by = $2
+      WHERE company_id = $1 AND status = 'active'
+        AND is_representative = $3
+        AND NOT (member_id = ANY($4::text[]))`,
+    [companyId, actor, MEMBER_ROLE.REPRESENTATIVE, payloadIds],
+  );
+
   const keep: string[] = [];
+  /** 삐용에 `U` 를 보내야 하는 행들 — 이름·연락처·이메일 중 하나가 **실제로** 바뀐 행. */
+  const changed: string[] = [];
   let inserted = 0;
   let updated = 0;
 
@@ -418,6 +506,17 @@ export async function replaceMembers(
       if ((res.rowCount ?? 0) > 0) {
         keep.push(m.memberId);
         updated += 1;
+        /*
+         * ★ 삐용에 보내는 칸(이름 · 연락처 · 이메일)만 본다. 비고·순서가 바뀐 저장으로
+         *   삐용을 부르지 않는다 — 보내지도 않는 값 때문에 호출이 나가는 모양이 된다.
+         * ★★ 앞 값을 못 찾은 경우(남의 회사 id 가 올라와 UPDATE 가 0행인 경우는 위에서
+         *    걸러지므로, 여기 오면 행은 있고 before 만 없다)도 바뀐 것으로 센다.
+         *    모를 때는 보내는 쪽으로 틀린다 — 안 보내면 어긋남이 남는다.
+         */
+        const was = before.get(m.memberId);
+        if (!was || was.name !== m.name || was.phone !== m.phone || was.email !== m.email) {
+          changed.push(m.memberId);
+        }
         continue;
       }
       // 없는 id 가 올라왔다 — 새로 만든다. 조용히 버리면 입력이 사라진다.
@@ -434,6 +533,8 @@ export async function replaceMembers(
     );
     keep.push(id);
     inserted += 1;
+    // ★ 새 행은 당연히 바뀐 것이다. 삐용 번호도 없으므로 `I` 로 나간다.
+    changed.push(id);
   }
 
   const res = await q(
@@ -444,7 +545,11 @@ export async function replaceMembers(
     [companyId, keep, actor],
   );
 
-  return { inserted, updated, deactivated: res.rowCount ?? 0 };
+  /*
+   * ★ 비활성으로 내린 수는 **둘을 합친다.** 전처리 ②가 이미 내린 대표 행은 아래
+   *   마지막 UPDATE 에 걸리지 않는다 — 합치지 않으면 응답의 수가 실제보다 적다.
+   */
+  return { inserted, updated, deactivated: (res.rowCount ?? 0) + (steppedDown.rowCount ?? 0), changed };
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -595,4 +700,156 @@ export async function readOrgLinkStatus(
     [companyId],
   );
   return rows[0] ?? null;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   삐용 직원정보 연동 (035) — 구성원 행의 `link_*` 3칸
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 판정은 `bbiyong/memberSync.ts` 가 한다. 여기는 그 함수가 쓰는 SQL 뿐이다.
+   ★★ 「무엇을 보낼까」의 근거는 `link_s020_member_id` 다 — 번호가 있으면 `U`, 없으면
+      `I` 다. 「ERP 에서 새 행인가」로 가르지 않는 이유는 그쪽 머리말에 있다.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export interface MemberLinkDbRow {
+  member_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  is_representative: string;
+  link_s020_member_id: number | null;
+}
+
+/**
+ * 삐용에 보낼 거리 — 단체코드 · 활성 구성원 · **지울 것**.
+ *
+ * ★ `orphans` 는 명부에서 빠졌는데(`status <> 'active'`) 삐용 번호를 아직 들고 있는
+ *   행이다. `replaceMembers` 가 지우지 않고 `inactive` 로 두므로(예약 이력) 이 모양으로
+ *   남고, 그것이 곧 「삐용에서 지울 것」이다.
+ * ★★ 삭제 대상을 **저장 때의 변경 내역이 아니라 지금 DB 상태**에서 읽는다. 그래서 이
+ *    함수를 몇 번 불러도 같은 삭제가 두 번 나가지 않는다 — 성공하면 번호가 비워지고
+ *    다음 조회에는 안 보인다.
+ */
+export async function readMemberSyncTargets(
+  client: ScopedClient,
+  companyId: string,
+): Promise<{ orgCode: string | null; active: MemberLinkDbRow[]; orphans: MemberLinkDbRow[] } | null> {
+  const { rows: company } = await q<{ link_org_code: string | null }>(
+    client,
+    `SELECT link_org_code FROM public.tb_s080_companies WHERE company_id = $1`,
+    [companyId],
+  );
+  if (company.length === 0) return null;
+
+  const { rows } = await q<MemberLinkDbRow & { status: string }>(
+    client,
+    `SELECT member_id, name, email, phone, is_representative, link_s020_member_id, status
+       FROM public.tb_s080_members
+      WHERE company_id = $1
+        AND (status = 'active' OR link_s020_member_id IS NOT NULL)
+      ORDER BY sort_order, created_at, member_id`,
+    [companyId],
+  );
+
+  return {
+    orgCode: company[0]?.link_org_code ?? null,
+    active: rows.filter((r) => r.status === 'active'),
+    orphans: rows.filter((r) => r.status !== 'active' && r.link_s020_member_id !== null),
+  };
+}
+
+/**
+ * 삐용 회원번호를 적고 **대기 사유를 지운다**.
+ *
+ * ★ `U` 성공에도 쓴다 — 같은 번호를 다시 적으면서 사유가 지워진다. 전용
+ *   `clearPending` 을 만들지 않는다(`saveOrgLinked` 와 같은 구조다).
+ * ★★ `link_s020_member_id` 는 UNIQUE 다. 위반은 **던진다** — 한 삐용 회원이 ERP 두 행에
+ *    붙으면 그 회원의 수정·삭제가 어느 행 기준인지 갈린다. 부르는 쪽이 「대기」로 돌린다.
+ */
+export async function saveMemberLinked(
+  client: ScopedClient,
+  args: { companyId: string; memberId: string; linkMemberId: number; actor: string },
+): Promise<void> {
+  await q(
+    client,
+    `UPDATE public.tb_s080_members
+        SET link_s020_member_id = $3,
+            link_failed_reason  = NULL,
+            link_failed_at      = NULL,
+            updated_at          = now(),
+            updated_by          = $4
+      WHERE member_id = $2 AND company_id = $1`,
+    [args.companyId, args.memberId, args.linkMemberId, args.actor],
+  );
+}
+
+/**
+ * 삐용에서 지웠다 — 번호와 사유를 **둘 다 비운다**.
+ *
+ * ★ 번호를 남겨 두면, 그 행이 다시 살아날 때 **지워진 번호로 `U`** 가 나가고 삐용이
+ *   「없는 회원」으로 거절한다. 비워 두면 새 사람으로 `I` 가 나간다.
+ */
+export async function saveMemberUnlinked(
+  client: ScopedClient,
+  args: { companyId: string; memberId: string; actor: string },
+): Promise<void> {
+  await q(
+    client,
+    `UPDATE public.tb_s080_members
+        SET link_s020_member_id = NULL,
+            link_failed_reason  = NULL,
+            link_failed_at      = NULL,
+            updated_at          = now(),
+            updated_by          = $3
+      WHERE member_id = $2 AND company_id = $1`,
+    [args.companyId, args.memberId, args.actor],
+  );
+}
+
+/** 「저장은 됐고 삐용 반영만 아직」을 그 구성원 행에 남긴다. ★ 번호는 건드리지 않는다. */
+export async function saveMemberPending(
+  client: ScopedClient,
+  args: { companyId: string; memberId: string; reason: string; actor: string },
+): Promise<void> {
+  await q(
+    client,
+    `UPDATE public.tb_s080_members
+        SET link_failed_reason = $3,
+            link_failed_at     = now(),
+            updated_at         = now(),
+            updated_by         = $4
+      WHERE member_id = $2 AND company_id = $1`,
+    [args.companyId, args.memberId, args.reason, args.actor],
+  );
+}
+
+/**
+ * 회사 등록 응답이 준 **대표 회원번호**를 활성 대표 행에 적는다.
+ *
+ * ★★ 대표는 삐용에서 지울 수도 새로 만들 수도 없다. 이 번호가 없으면 그 회사의 대표는
+ *    **영원히 ERP 에서 고칠 수 없다** — 그래서 회사 등록이 성공하는 순간 같이 적는다.
+ * ★ `link_s020_member_id IS NULL` 인 행만 쓴다. 이미 번호가 있으면 그것이 맞는 값이고,
+ *   덮어쓰면 남의 회원을 가리키게 될 수 있다.
+ * ★ 활성 대표 행이 없으면 **0행 갱신으로 조용히 지나간다**(돌려주는 값이 0이다). 대표
+ *   구성원 행이 없는 입주사(API 를 직접 불러 만든 경우)가 있을 수 있고, 그건 회사
+ *   등록을 실패로 돌릴 일이 아니다.
+ */
+export async function saveRepMemberLink(
+  client: ScopedClient,
+  args: { companyId: string; linkMemberId: number; actor: string },
+): Promise<number> {
+  const res = await q(
+    client,
+    `UPDATE public.tb_s080_members
+        SET link_s020_member_id = $2,
+            link_failed_reason  = NULL,
+            link_failed_at      = NULL,
+            updated_at          = now(),
+            updated_by          = $3
+      WHERE company_id = $1
+        AND status = 'active'
+        AND is_representative = $4
+        AND link_s020_member_id IS NULL`,
+    [args.companyId, args.linkMemberId, args.actor, MEMBER_ROLE.REPRESENTATIVE],
+  );
+  return res.rowCount ?? 0;
 }

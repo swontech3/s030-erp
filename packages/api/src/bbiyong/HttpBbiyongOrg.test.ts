@@ -11,7 +11,7 @@
  * 삐용 없이 돈다 — `fetchImpl` 을 갈아 끼운다.
  */
 import { describe, it, expect } from 'vitest';
-import { HttpBbiyongOrg, parseCreateOrg, parseOrgOp } from './HttpBbiyongOrg.ts';
+import { HttpBbiyongOrg, parseCreateOrg, parseMemberOp, parseOrgOp } from './HttpBbiyongOrg.ts';
 import { BbiyongTokenExpiredError, BbiyongUnavailableError, type BbiyongOrgRequest } from './types.ts';
 import { ORG_MODULE_CODES } from './orgLink.ts';
 
@@ -51,11 +51,12 @@ function adapterSeq(bodies: readonly unknown[]) {
   return { org: new HttpBbiyongOrg({ baseUrl: 'http://192.168.0.22:8082', fetchImpl: impl }), calls };
 }
 
-const OK = { result: 'success', status: 200, massage: null, data: { orgId: 1234 } };
+// ★ 실발 응답은 `data.memberId`(대표 회원번호)를 함긼 준다(규경 2026-10-05).
+const OK = { result: 'success', status: 200, massage: null, data: { orgId: 1234, memberId: 851 } };
 
 describe('parseCreateOrg — ① 성공 게이트', () => {
   it('★ 셋 다 맞으면 created', () => {
-    expect(parseCreateOrg(OK, 'Z01')).toEqual({ kind: 'created', orgId: 1234, orgCode: 'Z01' });
+    expect(parseCreateOrg(OK, 'Z01')).toEqual({ kind: 'created', orgId: 1234, orgCode: 'Z01', memberId: 851 });
   });
 
   it('★★ result 가 fail 이면 성공이 아니다 — HTTP 200 이어도', () => {
@@ -82,6 +83,9 @@ describe('parseCreateOrg — ① 성공 게이트', () => {
       kind: 'created',
       orgId: 1234,
       orgCode: 'Z01',
+      // ★★ 대표 회원번호가 없으면 `null` 이다 — **거정로 바꾸지 않는다.**
+      //   회사는 이미 만들어졌고, 거지로 돌리면 다시 시도가 다은 코드로 회사를 하나 더 만들다.
+      memberId: null,
     });
   });
 });
@@ -351,5 +355,114 @@ describe('HttpBbiyongOrg — ⑥ 퇴실 · 재입주 · 수정 (회신 2026-10-0
   it('★ 깨진 응답도 던지지 않는다 — rejected 다', async () => {
     expect(parseOrgOp(null, '퇴실').kind).toBe('rejected');
     expect(parseOrgOp({ result: 'success', status: '200' }, '퇴실').kind).toBe('rejected');
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   직원정보 (규격 2026-10-05)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('sendMember — 보내는 칸', () => {
+  const body = (calls: { init: RequestInit }[]) => JSON.parse(String(calls[0]!.init.body));
+
+  it('★ I 는 memberId 를 싣지 않고 repYn 을 싣는다', async () => {
+    const { org, calls } = adapter({ result: 'success', status: 200, data: { memberId: 851 } });
+    const out = await org.sendMember(
+      { regTp: 'I', orgCode: 'Z04', memberName: '이정희', email: 'a@x.com', hpNo: '01011112222', repYn: 'N' },
+      'tok',
+    );
+
+    expect(calls[0]!.url).toContain('/rest/v1/s021100010/erp-member');
+    expect(body(calls)).toEqual({
+      regTp: 'I',
+      orgCode: 'Z04',
+      memberName: '이정희',
+      email: 'a@x.com',
+      repYn: 'N',
+      hpNo: '01011112222',
+    });
+    expect(out).toEqual({ kind: 'created', memberId: 851 });
+  });
+
+  it('★★ U 는 memberId 를 싣고 repYn 을 **빼고** 보낸다 — repYn 은 I 에서만 쓴다', async () => {
+    const { org, calls } = adapter({ result: 'success', status: 200 });
+    await org.sendMember(
+      { regTp: 'U', orgCode: 'Z04', memberId: 851, memberName: '최현수', email: 'ceo@x.com' },
+      'tok',
+    );
+
+    expect(body(calls)).toEqual({
+      regTp: 'U',
+      orgCode: 'Z04',
+      memberId: 851,
+      memberName: '최현수',
+      email: 'ceo@x.com',
+    });
+  });
+
+  it('★★★ hpNo 가 비면 **칸 자체를 뺀다** — 빈 문자열은 삐용의 연락처를 지울 수 있다', async () => {
+    const { org, calls } = adapter({ result: 'success', status: 200 });
+    await org.sendMember(
+      { regTp: 'U', orgCode: 'Z04', memberId: 851, memberName: '최현수', email: 'ceo@x.com', hpNo: '' },
+      'tok',
+    );
+
+    expect('hpNo' in body(calls)).toBe(false);
+  });
+
+  it('D 는 번호로 지목하고 이름·이메일을 함께 싣는다', async () => {
+    const { org, calls } = adapter({ result: 'success', status: 200 });
+    const out = await org.sendMember(
+      { regTp: 'D', orgCode: 'Z04', memberId: 902, memberName: '이정희', email: 'a@x.com' },
+      'tok',
+    );
+
+    expect(body(calls)).toMatchObject({ regTp: 'D', memberId: 902 });
+    expect(out).toEqual({ kind: 'ok' });
+  });
+
+  it('★★ 401 은 토큰 만료다 — 장애로 뭉개지 않는다(재발급이 돌아야 한다)', async () => {
+    const { org } = adapter({ result: 'fail' }, 401);
+    await expect(
+      org.sendMember({ regTp: 'U', orgCode: 'Z04', memberId: 851, memberName: '최', email: 'a@x.com' }, 'tok'),
+    ).rejects.toBeInstanceOf(BbiyongTokenExpiredError);
+  });
+});
+
+describe('parseMemberOp — 성공 게이트', () => {
+  it('★★ I 가 success 인데 번호가 없으면 **실패다** — 영원히 대기로 남는 상태를 만들지 않는다', () => {
+    const out = parseMemberOp({ result: 'success', status: 200, data: {} }, 'I');
+    expect(out.kind).toBe('rejected');
+    if (out.kind === 'rejected') expect(out.message).toContain('회원번호');
+  });
+
+  it('U·D 는 번호를 돌려받지 않아도 성공이다', () => {
+    expect(parseMemberOp({ result: 'success', status: 200 }, 'U')).toEqual({ kind: 'ok' });
+    expect(parseMemberOp({ result: 'success', status: 200 }, 'D')).toEqual({ kind: 'ok' });
+  });
+
+  it('★ 실패도 HTTP 200 이다 — result/status 로 가른다', () => {
+    const out = parseMemberOp(
+      { result: 'fail', status: 400, massage: '이미 사용중인 이메일입니다.' },
+      'I',
+    );
+    expect(out.kind).toBe('rejected');
+    // ★ 이메일 겹침은 삐용 문구가 이미 사람 말이다 — 그대로 보인다.
+    if (out.kind === 'rejected') expect(out.message).toContain('이미 사용중인 이메일');
+  });
+
+  it('★ 대표 삭제 거절도 삐용 문구를 그대로 쓴다', () => {
+    const out = parseMemberOp({ result: 'fail', status: 400, massage: '대표는 삭제할 수 없습니다.' }, 'D');
+    if (out.kind === 'rejected') expect(out.message).toContain('대표는 삭제할 수 없습니다');
+  });
+
+  it('403 은 등록과 같은 안내로 바꾼다', () => {
+    const out = parseMemberOp({ result: 'fail', status: 403, error: ['AUTHZ_DENY'] }, 'U');
+    if (out.kind === 'rejected') expect(out.message).toContain('단체관리');
+  });
+
+  it('★ 깨진 응답도 던지지 않는다 — rejected 다', () => {
+    expect(parseMemberOp(null, 'I').kind).toBe('rejected');
+    expect(parseMemberOp({ result: 'success', status: '200', data: { memberId: 1 } }, 'I').kind).toBe('rejected');
   });
 });

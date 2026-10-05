@@ -63,6 +63,10 @@ function opAdapter(outcome: OrgOpOutcome = { kind: 'ok' }): BbiyongOrg & { seen:
     createOrg: async () => {
       throw new Error('★ 회사를 다시 만들면 안 된다 — createOrg 가 불렸다');
     },
+    // ★ 허시·재입주·수정은 직원정보를 부르지 않는다. 부르면 터진다.
+    sendMember: async () => {
+      throw new Error('★ 이 시험은 sendMember 를 부르지 않아야 한다');
+    },
     moduleOff: async (orgCode) => {
       seen.push({ op: 'off', orgCode });
       return outcome;

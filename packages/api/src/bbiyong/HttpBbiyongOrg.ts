@@ -29,8 +29,9 @@
  * 메시지를 날것으로 흘리지 않는다 — 권한 문제는 무엇을 해야 하는지까지 적어 준다.
  * 그 밖의 400 은 삐용 문구가 이미 사람 말이라 그대로 쓰되, 없으면 우리 문구로 대신한다.
  *
- * ★★ 퇴실·수정은 만들지 않았다 — 삐용 규격이 아직 없다(회신 대기). 이 어댑터에는
- *    `createOrg` 하나뿐이다.
+ * ★ 지금 이 어댑터가 가진 것은 다섯이다 — 회사 등록(`createOrg`) · 퇴실(`moduleOff`) ·
+ *   재입주(`moduleOn`) · 회사 수정(`patchOrg`) · 직원정보(`sendMember`). 뒤의 넷은
+ *   삐용 회신으로 규격이 온 순서대로 붙었다(2026-10-02 · 2026-10-05).
  */
 import { BBIYONG } from '@swonbiz/shared';
 import {
@@ -38,10 +39,12 @@ import {
   BbiyongUnavailableError,
   // ★ 등록·퇴실·재입주 셋이 같은 목록을 본다. 정의는 `types.ts` 한 곳이다.
   ORG_MODULE_CODES,
+  type BbiyongMemberRequest,
   type BbiyongOrg,
   type BbiyongOrgPatch,
   type BbiyongOrgRequest,
   type CreateOrgOutcome,
+  type MemberOpOutcome,
   type OrgOpOutcome,
 } from './types.ts';
 
@@ -155,7 +158,19 @@ export function parseCreateOrg(body: unknown, sentOrgCode: string): CreateOrgOut
         retryable: false,
       };
     }
-    return { kind: 'created', orgId, orgCode: sentOrgCode };
+    /*
+     * ★★ 대표 회원번호(규격 2026-10-05 에 추가됐다). **없으면 null 로 둔다** —
+     *    회사는 이미 만들어졌으므로 거절로 돌리지 않는다. 거절로 돌리면 다음 시도가
+     *    다음 단체코드로 **회사를 하나 더 만든다**(위 orgId === null 자리와 반대로
+     *    판단하는 이유: 거기서는 org_id 가 없으면 연결 자체를 할 수 없다).
+     */
+    const memberId = toInt(asRecord(root.data)?.memberId);
+    if (memberId === null) {
+      console.warn(
+        `[bbiyong] 회사 등록 — orgCode=${sentOrgCode} 응답에 대표 회원번호가 없다. 대표 정보 수정을 보낼 수 없다`,
+      );
+    }
+    return { kind: 'created', orgId, orgCode: sentOrgCode, memberId };
   }
 
   // 권한 — 토큰 주인에게 단체관리 화면이 없거나, 에스원테크 소속이 아니다.
@@ -226,6 +241,60 @@ export function parseOrgOp(body: unknown, label: string): OrgOpOutcome {
   return {
     kind: 'rejected',
     message: massage ?? `삐용이 ${label}을 거절했습니다. 삐용 담당자에게 확인이 필요합니다`,
+    retryable: false,
+  };
+}
+
+/**
+ * 직원정보(`erp-member`) 응답을 해석한다 (삐용 규격 2026-10-05).
+ *
+ * ★ 봉투는 회사 등록과 같다 — 성공·실패 **둘 다 HTTP 200** 이고 본문 `result`·`status`
+ *   로 가른다(함정 ①). 그래서 `parseOrgOp` 와 거의 같지만 **합치지 않았다**:
+ *   `I` 는 **회원번호를 받아야 성공**이고, 그 한 줄이 이 함수의 존재 이유다.
+ *
+ * ★★ `I` 가 `success` 인데 번호가 없으면 **실패로 본다.** 번호를 못 받으면 그 직원은
+ *    다음 저장에서 또 `I` 로 나가고, 그때는 이메일이 겹쳐 거절된다 — 즉 영원히 대기다.
+ *    「성공했다고 적고 번호는 비워 두는」 상태가 가장 나쁘다(회사 등록의 orgId 와 같은
+ *    판단이다). 대표 번호만 반대로 다룬다 — 그쪽은 대신 만들어진 것이 있다.
+ *
+ * ★ 어떤 입력이 와도 **던지지 않는다.** 깨진 응답은 `rejected` 다.
+ */
+export function parseMemberOp(body: unknown, regTp: 'I' | 'U' | 'D'): MemberOpOutcome {
+  const root = asRecord(body);
+  if (!root) {
+    return { kind: 'rejected', message: '삐용 응답을 읽을 수 없습니다. 잠시 후 다시 시도해 주세요', retryable: true };
+  }
+
+  const status = root.status;
+  const massage = readMassage(root);
+
+  if (root.result === 'success' && status === 200) {
+    if (regTp !== 'I') return { kind: 'ok' };
+
+    const memberId = toInt(asRecord(root.data)?.memberId);
+    if (memberId === null) {
+      return {
+        kind: 'rejected',
+        message: '삐용이 회원번호를 주지 않아 직원을 연결하지 못했습니다. 삐용 담당자에게 확인이 필요합니다',
+        retryable: false,
+      };
+    }
+    return { kind: 'created', memberId };
+  }
+
+  if (status === 403) return { kind: 'rejected', message: DENY_MESSAGE, retryable: false };
+  if (status === 409) return { kind: 'rejected', message: SEED_MESSAGE, retryable: false };
+
+  /*
+   * 그 밖의 거절은 **삐용 문구를 그대로 쓴다.** 여기 오는 것은 거의 「이메일이 이미
+   * 사용 중」·「대표는 삭제할 수 없습니다」 같은 값 문제이고, 그 문장이 이미 사람 말이다
+   * (`parseOrgOp` 와 같은 규칙). 번역하려 들면 삐용이 문구를 늘릴 때마다 뒤처진다.
+   */
+  const label = { I: '직원 등록', U: '직원 수정', D: '직원 삭제' }[regTp];
+  console.warn(`[bbiyong] ${label} 실패 status=${String(status)} massage=${massage ?? '-'}`);
+  return {
+    kind: 'rejected',
+    message: massage ?? `삐용이 ${label}을 거절했습니다. 입력값을 확인해 주세요`,
     retryable: false,
   };
 }
@@ -414,6 +483,52 @@ export class HttpBbiyongOrg implements BbiyongOrg {
     );
     const outcome = parseOrgOp(parsed, '회사 수정');
     console.log(`[bbiyong] 회사 수정 — orgCode=${patch.orgCode} → ${outcome.kind}`);
+    return outcome;
+  }
+
+  /**
+   * 직원정보 — 신규(`I`) · 수정(`U`) · 삭제(`D`). **엔드포인트는 하나다**(규격 2026-10-05).
+   *
+   * ══════════════════════════════════════════════════════════════════════
+   * ★★★ **보내는 칸을 `regTp` 마다 다르게 만든다**
+   * ══════════════════════════════════════════════════════════════════════
+   *   `I`  memberId 를 **보내지 않는다**(아직 없다) · `repYn` 을 보낸다
+   *   `U`  memberId 필수 · `repYn` 을 **보내지 않는다**(규격: `I` 에서만 쓴다)
+   *   `D`  memberId 필수 · `repYn` 을 보내지 않는다
+   *
+   * ★ `hpNo` 는 선택 항목이라 **값이 없으면 칸을 뺀다.** 빈 문자열로 보내면 삐용에 들어
+   *   있는 연락처를 지울 수 있다 — 회사 수정에서 주소 3칸을 뺀 것과 같은 이유다
+   *   (`patchOrg` 머리말). 되돌릴 수 없고, 지워진 것을 ERP 는 알지 못한다.
+   *
+   * ★ 이름·이메일은 `D` 에도 싣는다. 규격의 「보내는 칸」 표에서 선택이라고 적힌 것은
+   *   `hpNo` 뿐이고, 삭제가 그 둘을 어딘가에 쓸지(이력 등) 우리는 모른다. 빼서 400 을
+   *   받는 것보다 싣는 쪽이 안전하다 — 삭제는 지우는 일이라 **덮어쓸 값이 없다.**
+   *
+   * ★★ **대표에게 `I`·`D` 를 보내지 않는 판정은 여기 없다.** 그 판정은 `memberSync.ts`
+   *    가 한다 — 이 어댑터는 HTTP 왕복과 응답 해석만 한다(파일 머리말).
+   */
+  async sendMember(req: BbiyongMemberRequest, accessToken: string): Promise<MemberOpOutcome> {
+    const body: Record<string, unknown> = {
+      regTp: req.regTp,
+      orgCode: req.orgCode,
+      memberName: req.memberName,
+      email: req.email,
+    };
+    // ★ `I` 는 번호가 없고, `U`·`D` 는 필수다. 없는 값을 null 로 보내지 않는다.
+    if (req.regTp !== 'I') body.memberId = req.memberId;
+    if (req.regTp === 'I') body.repYn = req.repYn ?? 'N';
+    // ★ 빈 값이면 칸 자체를 뺀다(위 머리말).
+    if (req.hpNo) body.hpNo = req.hpNo;
+
+    const label = { I: '직원 등록', U: '직원 수정', D: '직원 삭제' }[req.regTp];
+    const parsed = await this.#post(BBIYONG.MEMBER_PATH, body, accessToken, label);
+
+    const outcome = parseMemberOp(parsed, req.regTp);
+    // ★ 평문 로그에 이름·이메일·전화를 남기지 않는다. 남는 것은 코드와 번호와 결과뿐이다.
+    console.log(
+      `[bbiyong] ${label} — orgCode=${req.orgCode} memberId=${req.memberId ?? '-'} → ${outcome.kind}` +
+        (outcome.kind === 'created' ? `(${outcome.memberId})` : ''),
+    );
     return outcome;
   }
 }

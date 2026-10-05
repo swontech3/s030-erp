@@ -30,7 +30,9 @@ import {
   readOrgLinkTarget,
   saveOrgLinked,
   saveOrgLinkPending,
+  saveRepMemberLink,
 } from '../db/companies.ts';
+import { syncMembersForCompany } from './syncMembers.ts';
 import {
   bbiyongOrg,
   linkOrg,
@@ -74,10 +76,42 @@ function dbStore(companyId: string, actor: string): OrgLinkStore {
         takenCodes: found.takenCodes,
       };
     },
-    saveLinked: async ({ orgId, orgCode }) => {
+    saveLinked: async ({ orgId, orgCode, repMemberId }) => {
       await withCompanyScope(OPERATOR_SCOPE, (client) =>
         saveOrgLinked(client, { companyId, orgId, orgCode, actor }),
       );
+
+      /*
+       * ═══════════════════════════════════════════════════════════════════
+       * ★★★ 대표 회원번호 — 회사 등록 응답만이 주는 값이다 (규격 2026-10-05)
+       * ═══════════════════════════════════════════════════════════════════
+       * 삐용에서 대표는 **회사 등록으로만 생기고 지울 수 없다.** 고치는 길은 `U`
+       * 하나뿐이고 `U` 는 이 번호가 필수다 — 지금 안 적어 두면 그 회사의 대표는
+       * 영원히 ERP 에서 못 고친다(삐용 회원 조회 규격이 없다).
+       *
+       * ★★ **실패해도 회사 연결은 되돌리지 않는다.** 여기서 던지면 `linkOrg` 가
+       *    「대기」로 돌리는데, 그 회사는 **삐용에 이미 만들어져 있다** — 다음 [다시
+       *    시도]는 다음 단체코드로 **회사를 하나 더 만든다.** 번호 한 칸을 못 적은
+       *    것보다 그게 훨씬 나쁘다. 그래서 삼키고 로그에 남긴다.
+       *
+       * ★ 번호가 `null` 인 경우(응답에 없었다)는 어댑터가 이미 경고를 찍었다.
+       *   여기서 또 적지 않는다 — 대표를 고치려는 순간 `memberSync` 가 사유를 남긴다.
+       */
+      if (repMemberId === undefined || repMemberId === null) return;
+      try {
+        const rows = await withCompanyScope(OPERATOR_SCOPE, (client) =>
+          saveRepMemberLink(client, { companyId, linkMemberId: repMemberId, actor }),
+        );
+        if (rows === 0) {
+          console.warn(
+            `[bbiyong] 대표 회원번호 ${repMemberId} 를 적을 활성 대표 행이 없다 company=${companyId}`,
+          );
+        }
+      } catch (err) {
+        console.error(
+          `[bbiyong] 대표 회원번호 저장 실패(회사 연결은 그대로 둔다) company=${companyId}: ${(err as Error).message}`,
+        );
+      }
     },
     savePending: async (reason) => {
       await withCompanyScope(OPERATOR_SCOPE, (client) =>
@@ -100,9 +134,35 @@ export async function registerOrgForCompany(args: {
 }): Promise<OrgLinkResult> {
   const { companyId, session, actor } = args;
   try {
-    return await callBbiyong(session.erpSid, (accessToken) =>
+    const result = await callBbiyong(session.erpSid, (accessToken) =>
       linkOrg(dbStore(companyId, actor), bbiyongOrg, accessToken),
     );
+
+    /*
+     * ═══════════════════════════════════════════════════════════════════════
+     * ★★★ 등록이 끝나면 **밀려 있던 직원들**을 삐용에 보낸다
+     * ═══════════════════════════════════════════════════════════════════════
+     * 계약 폼은 구성원을 **회사 등록보다 먼저** 저장한다(`saveTenant` → `saveContract`).
+     * 그때는 단체코드가 없어 보낼 곳이 없었고, 직원들은 회원번호 없이 남아 있다.
+     * 여기서 보내지 않으면 그들은 **다음 구성원 저장까지 삐용에 없다** — ERP 엔 있는데
+     * 삐용엔 없는 상태가 아무 표시 없이 유지된다.
+     *
+     * ★ `changed` 를 비워서 부른다 — 바뀐 것은 없고, 번호 없는 직원을 따라붙이는
+     *   일만 한다(`syncMembers` 의 판정표).
+     * ★★ 던지지 않는다. 실패는 그 구성원 행의 「연동 대기」로 남고, 회사 등록 결과
+     *    (`result`)는 **그대로** 돌려준다 — 회사는 멀쩡히 연결됐다. 구성원 때문에
+     *    계약 확정 화면에 「회사 연동 대기」가 뜨면 운영자가 엉뚱한 곳을 본다.
+     */
+    if (result.kind === 'linked') {
+      const members = await syncMembersForCompany({ companyId, session, actor });
+      if (members.pending.length > 0) {
+        console.warn(
+          `[bbiyong] 회사 등록 뒤 직원 ${members.pending.length}명이 대기로 남았다 company=${companyId}`,
+        );
+      }
+    }
+
+    return result;
   } catch (err) {
     /*
      * 여기까지 오는 것은 **DB 쓰기 실패**나 **재로그인 필요**(삐용 refresh 만료)다.

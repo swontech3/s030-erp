@@ -77,6 +77,20 @@ export const BBIYONG = {
   ORG_PATCH_PATH: "/rest/v1/s021100010/erp-patch-org",
 
   /**
+   * 직원정보 — 구성원 신규(`I`) · 수정(`U`) · 삭제(`D`) 를 **한 엔드포인트**로 받는다
+   * (삐용 규격 2026-10-05). 가르는 것은 본문의 `regTp` 다.
+   *
+   * ★★ **대표는 `I`·`D` 가 거부된다.** 대표는 회사 등록(`ORG_PATH`)으로만 생기고
+   *    삐용에서 지울 수 없다 — 고치는 길은 `U` 하나뿐이고, 그 `U` 에는 회사 등록
+   *    응답이 준 `data.memberId` 가 필요하다. 그 번호를 받아 두지 않으면 대표 정보를
+   *    영원히 못 고친다(`tb_s080_members.link_s020_member_id`).
+   *
+   * ★ 성공·실패가 **둘 다 HTTP 200** 이다. 본문 `result`·`status` 로 가른다
+   *   (회사 등록과 같은 함정 — `HttpBbiyongOrg` 머리말 ①).
+   */
+  MEMBER_PATH: "/rest/v1/s021100010/erp-member",
+
+  /**
    * 권한 조회(회신 ⑫ 대기) — 접근 가능 화면 목록을 한 번에 받는 엔드포인트.
    * 규격 미확정. 확정되는 대로 이 값과 BbiyongAcl.HttpBbiyongAcl 구현을 함께 채운다.
    */

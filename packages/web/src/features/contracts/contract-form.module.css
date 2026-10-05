@@ -1162,3 +1162,20 @@
   font-size: 13px;
   flex: 0 0 auto;
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   삐용 직원정보 연동 대기 (035) — 구성원 한 줄에 붙는 사유
+   ★ 표가 grid(.userRow) 라 행 안에 넣을 수 없어 행의 형제로 둔다. 그래서 들여쓰기를
+     성명 칸 앞(48+48=96px)에 맞춰 어느 줄의 이야기인지 보이게 한다.
+   ─────────────────────────────────────────────────────────────────────────── */
+.userRowNote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 10px 10px 96px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-warning-text);
+}
