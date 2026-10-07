@@ -20,3 +20,6 @@ next-env.d.ts
 design/SwonBiz Design System*.zip
 design/SwonBiz Design System_html시안/
 design/SwonBiz Design System_html시안_2/
+
+# 개인 PC 설정 — 저장소에 두지 않는다(백업 파일 포함)
+.claude/settings.local.json*
