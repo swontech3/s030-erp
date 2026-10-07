@@ -3,7 +3,7 @@
  *
  * 두 서버가 떠 있어야 한다:
  *   api  →  node_modules/.bin/tsx packages/api/src/index.ts   (127.0.0.1:3001)
- *   web  →  packages/web 에서 next dev                        (localhost:3000)
+ *   web  →  packages/web 에서 next dev                        (localhost:3100)
  * web 이 없으면 쿠키 관련 항목만 건너뛰고 나머지를 검사한다.
  *
  * 쓰기는 세션 테이블과 shadow 로그에만 일어난다. 업무 데이터는 건드리지 않는다.
@@ -14,7 +14,7 @@ const crypto = require('crypto');
 const { Client } = require('pg');
 
 const API = 'http://127.0.0.1:3001';
-const WEB = 'http://localhost:3000';
+const WEB = 'http://localhost:3100';
 const PASSWORD = 'erp1234!';
 
 const env = Object.fromEntries(
@@ -142,7 +142,7 @@ async function apiLogin(email) {
   let webUp = true;
   try { await fetch(`${WEB}/login`, { redirect: 'manual' }); } catch { webUp = false; }
   if (!webUp) {
-    console.log('--  A9·A10 건너뜀 — web(3000) 미기동');
+    console.log('--  A9·A10 건너뜀 — web(3100) 미기동');
   } else {
     // ★ 웹 라우트는 출처를 본다(CSRF). 브라우저처럼 Origin 을 실어 보낸다.
     const res = await fetch(`${WEB}/api/auth/login`, {

@@ -15,7 +15,7 @@
  * =============================================================================
  * 미리 켜 둘 것
  * =============================================================================
- *   웹 개발 서버 localhost:3000 · API 3001 · DB
+ *   웹 개발 서버 localhost:3100 · API 3001 · DB
  *   ★ `127.0.0.1` 이 아니라 **localhost** 다 (Next 16 하이드레이션).
  *
  * 쓰는 법:  node scripts/verify-print.js [계약ID]
@@ -39,7 +39,7 @@ const CHROME_CANDIDATES = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
 ];
 const PORT = 9366;
-const WEB = 'http://localhost:3000';
+const WEB = 'http://localhost:3100';
 const LOGIN = { email: 'operator@s-wontech.co.kr', password: 'erp1234!' };
 /** 맞닿았다고 볼 간격(px). 1px 선이 장치 픽셀 하나 안에서 흔들리는 폭이다. */
 const GAP = 0.6;

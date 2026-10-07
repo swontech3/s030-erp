@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3100",
     "build": "node ../../scripts/lint-no-green.js && next build",
-    "start": "next start",
+    "start": "next start -p 3100",
     "typecheck": "tsc --noEmit",
     "lint:green": "node ../../scripts/lint-no-green.js"
   },
