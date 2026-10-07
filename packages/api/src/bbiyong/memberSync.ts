@@ -87,8 +87,12 @@ export interface MemberSyncStore {
   linked(args: { memberId: string; linkMemberId: number }): Promise<void>;
   /** 삐용에서 지웠다 — 번호와 사유를 **둘 다 비운다**. */
   unlinked(args: { memberId: string }): Promise<void>;
-  /** ★ `reason` 은 **운영자에게 그대로 보여줄 문구**다. */
-  pending(args: { memberId: string; reason: string }): Promise<void>;
+  /**
+   * ★ `reason` 은 **운영자에게 그대로 보여줄 문구**다.
+   * @param retryable 다시 보내면 풀릴 종류인가 — 서버가 저절로 다시 보낼지를 이 값이
+   *   가른다(`retryPolicy`). 생략하면 「모른다」이고 막지 않는다.
+   */
+  pending(args: { memberId: string; reason: string; retryable?: boolean }): Promise<void>;
 }
 
 /** 운영자가 읽는 대기 한 줄. */
@@ -268,7 +272,9 @@ export async function syncMembers(
 
   // 보내기 전에 아는 실패를 먼저 적는다. 삐용이 죽어 있어도 이 사유는 남는다.
   for (const p of refused) {
-    await store.pending({ memberId: p.memberId, reason: p.reason });
+    // ★ 보내기 전에 아는 실패는 **전부 값 문제**다(대표 번호 없음 · 이메일 없음) —
+    //   다시 보내도 같으므로 `retryable: false` 로 적어 서버가 두드리지 않게 한다.
+    await store.pending({ memberId: p.memberId, reason: p.reason, retryable: false });
     result.pending.push(p);
   }
 
@@ -293,7 +299,7 @@ export async function syncMembers(
        */
       console.warn(`[bbiyong] 직원정보 실패(대기로 남긴다): ${(err as Error).message}`);
       for (const rest of plans.slice(index)) {
-        await store.pending({ memberId: rest.row.memberId, reason: UNAVAILABLE });
+        await store.pending({ memberId: rest.row.memberId, reason: UNAVAILABLE, retryable: true });
         result.pending.push({ memberId: rest.row.memberId, name: rest.row.name, reason: UNAVAILABLE });
       }
       return result;
@@ -324,7 +330,7 @@ export async function syncMembers(
     // 삐용이 업무 실패로 답했다 — 이메일 겹침·대표 삭제 같은 것들이다. 문구는 어댑터가
     // 사람 말로 만들어 준다. ★ 멈추지 않는다: 한 사람의 이메일이 겹친다고 나머지
     // 사람들의 저장까지 멈출 이유가 없다(장애와 다른 종류다).
-    await store.pending({ memberId: plan.row.memberId, reason: outcome.message });
+    await store.pending({ memberId: plan.row.memberId, reason: outcome.message, retryable: outcome.retryable });
     result.pending.push({ memberId: plan.row.memberId, name: plan.row.name, reason: outcome.message });
   }
 

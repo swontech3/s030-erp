@@ -246,7 +246,14 @@ describe('syncMembers — ④ 실패', () => {
     const out = await syncMembers(s, org, 'token');
 
     expect(org.seen).toHaveLength(2);
-    expect(s.wrotePending).toEqual([{ memberId: 'M-a', reason: '이미 사용중인 이메일입니다' }]);
+    /*
+     * ★ `retryable: false` 를 **함께 적는다**(036). 이메일 겹침은 다시 보내도 같은
+     *   답이 오므로, 서버가 저절로 다시 보내지 않게 그 사실을 그 행에 남긴다
+     *   (`retryPolicy.judgeLinkRetry` 가 이 값을 보고 한 번도 보내지 않는다).
+     */
+    expect(s.wrotePending).toEqual([
+      { memberId: 'M-a', reason: '이미 사용중인 이메일입니다', retryable: false },
+    ]);
     expect(s.wroteLinked).toEqual([{ memberId: 'M-b', linkMemberId: 905 }]);
     expect(out.pending).toHaveLength(1);
   });

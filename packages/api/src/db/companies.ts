@@ -648,6 +648,10 @@ export async function saveOrgLinked(
             link_linked_by     = $4,
             link_failed_reason = NULL,
             link_failed_at     = NULL,
+            -- ★ 성공하면 재시도 상태를 **0 으로 되돌린다**(036). 지우지 않으면 다음에
+            --   한 번 실패했을 때 옷 횟수가 엹혔 곧바로 상한에 닿는다.
+            link_attempt_count = 0,
+            link_retryable     = NULL,
             updated_at         = now(),
             updated_by         = $4
       WHERE company_id = $1`,
@@ -664,7 +668,12 @@ export async function saveOrgLinked(
  */
 export async function saveOrgLinkPending(
   client: ScopedClient,
-  args: { companyId: string; reason: string; actor: string },
+  /**
+   * @param retryable 다시 보내면 푸릴 종류인가(어댑터의 `outcome.retryable`).
+   *   ★ `undefined` 는 「모른다」로 NULL 이 들어가고 재시도를 **못 리지 않는다**
+   *     (`retryPolicy.judgeLinkRetry`). 막는 것은 `false` 뿐이다.
+   */
+  args: { companyId: string; reason: string; actor: string; retryable?: boolean },
 ): Promise<void> {
   await q(
     client,
@@ -672,10 +681,14 @@ export async function saveOrgLinkPending(
         SET link_status        = 'pending',
             link_failed_reason = $2,
             link_failed_at     = now(),
+            -- ★★ **세는 것이 여기 하나다**(036). 실패를 적는 자리가 곲 횟수를 올리는
+            --    자리다 — 둘로 갈라 두면 어느 날 하나만 부른다.
+            link_attempt_count = link_attempt_count + 1,
+            link_retryable     = $4,
             updated_at         = now(),
             updated_by         = $3
       WHERE company_id = $1`,
-    [args.companyId, args.reason, args.actor],
+    [args.companyId, args.reason, args.actor, args.retryable ?? null],
   );
 }
 
@@ -775,6 +788,9 @@ export async function saveMemberLinked(
         SET link_s020_member_id = $3,
             link_failed_reason  = NULL,
             link_failed_at      = NULL,
+            -- ★ 성공하면 재시도 상태를 되돌린다(036 · 회사 졽과 같은 이유).
+            link_attempt_count  = 0,
+            link_retryable      = NULL,
             updated_at          = now(),
             updated_by          = $4
       WHERE member_id = $2 AND company_id = $1`,
@@ -798,6 +814,8 @@ export async function saveMemberUnlinked(
         SET link_s020_member_id = NULL,
             link_failed_reason  = NULL,
             link_failed_at      = NULL,
+            link_attempt_count  = 0,
+            link_retryable      = NULL,
             updated_at          = now(),
             updated_by          = $3
       WHERE member_id = $2 AND company_id = $1`,
@@ -808,17 +826,20 @@ export async function saveMemberUnlinked(
 /** 「저장은 됐고 삐용 반영만 아직」을 그 구성원 행에 남긴다. ★ 번호는 건드리지 않는다. */
 export async function saveMemberPending(
   client: ScopedClient,
-  args: { companyId: string; memberId: string; reason: string; actor: string },
+  /** @param retryable `saveOrgLinkPending` 과 같은 뜼 — `false` 만 재시도를 만다. */
+  args: { companyId: string; memberId: string; reason: string; actor: string; retryable?: boolean },
 ): Promise<void> {
   await q(
     client,
     `UPDATE public.tb_s080_members
         SET link_failed_reason = $3,
             link_failed_at     = now(),
+            link_attempt_count = link_attempt_count + 1,
+            link_retryable     = $5,
             updated_at         = now(),
             updated_by         = $4
       WHERE member_id = $2 AND company_id = $1`,
-    [args.companyId, args.memberId, args.reason, args.actor],
+    [args.companyId, args.memberId, args.reason, args.actor, args.retryable ?? null],
   );
 }
 
@@ -852,4 +873,84 @@ export async function saveRepMemberLink(
     [args.companyId, args.linkMemberId, args.actor, MEMBER_ROLE.REPRESENTATIVE],
   );
   return res.rowCount ?? 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   저절로 다시 보낼 거리 (036) — 회사와 구성원을 한 번에 읽는다
+   ══════════════════════════════════════════════════════════════════════════
+   ★★ 「무엇을 다시 보낼까」의 판정은 여기 없다. 이 함수는 **상태를 그대로 읽어 오고**
+      거르는 것은 `bbiyong/retryPolicy.judgeLinkRetry` 가 한다 — 간격·횟수·종류가
+      SQL 과 TS 두 곳에 적히면 어느 날 하나만 고쳐진다.
+
+   ★ 같은 질의를 머리말 배지(건수)와 재시도 스윕이 **함께 쓴다.** 둘이 다른 질의를
+     보면 「배지에는 2건인데 스윕은 1건만 보낸다」가 된다.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export interface PendingLinkRow {
+  kind: 'org' | 'member';
+  company_id: string;
+  company_name: string;
+  /** 구성원 행일 때만. 회사 행은 `null`. */
+  member_id: string | null;
+  member_name: string | null;
+  link_attempt_count: number;
+  link_retryable: boolean | null;
+  link_failed_at: Date | null;
+  link_failed_reason: string | null;
+  /** 머리말의 [보기] 가 열 계약. 가장 최근 계약이고, 없으면 `null`. */
+  contract_id: string | null;
+}
+
+/**
+ * 삐용 반영이 아직 안 된 것 전부 — 회사 연동과 직원 연동 둘 다.
+ *
+ * ★ 회사: `link_s020_org_id` 가 비었고 `link_status='pending'` — 즉 **연결 자체가 아직**.
+ *   연결된 뒤의 퇴실·재입주·수정 실패도 `pending` 이 되지만 그쪽은 `link_s020_org_id` 가
+ *   있어 여기 안 들어온다. ★ 그것까지 저절로 다시 보내려면 「무엇을 보낼지」를 알아야
+ *   하는데 ERP 는 그걸 적지 않는다(결정 2026-10-03 — 사본을 두지 않는다). 그래서
+ *   **등록만** 저절로 다시 보낸다. 퇴실·재입주는 계약 폼의 [다시 시도] 가 그대로 담당한다.
+ *
+ * ★ 구성원: 사유가 적힌 **활성** 행. 비활성 행은 명부에서 빠진 사람이라 보낼 것이 없다.
+ */
+export async function listPendingLinks(client: ScopedClient): Promise<PendingLinkRow[]> {
+  const { rows } = await q<PendingLinkRow>(
+    client,
+    `WITH last_contract AS (
+       SELECT company_id, max(contract_id) FILTER (WHERE rn = 1) AS contract_id
+         FROM (
+           SELECT company_id, contract_id,
+                  row_number() OVER (PARTITION BY company_id ORDER BY created_at DESC) AS rn
+             FROM public.tb_s080_contracts
+         ) t
+        GROUP BY company_id
+     )
+     SELECT 'org'::text AS kind, c.company_id, c.company_name,
+            NULL::text AS member_id, NULL::text AS member_name,
+            c.link_attempt_count, c.link_retryable, c.link_failed_at, c.link_failed_reason,
+            lc.contract_id
+       FROM public.tb_s080_companies c
+       LEFT JOIN last_contract lc ON lc.company_id = c.company_id
+      WHERE c.link_s020_org_id IS NULL AND c.link_status = 'pending'
+     UNION ALL
+     SELECT 'member'::text AS kind, c.company_id, c.company_name,
+            m.member_id, m.name AS member_name,
+            m.link_attempt_count, m.link_retryable, m.link_failed_at, m.link_failed_reason,
+            lc.contract_id
+       FROM public.tb_s080_members m
+       JOIN public.tb_s080_companies c ON c.company_id = m.company_id
+       LEFT JOIN last_contract lc ON lc.company_id = c.company_id
+      WHERE m.status = 'active' AND m.link_failed_reason IS NOT NULL
+        /*
+         * ★★★ **회사가 연결된 뒤에만 구성원 대기가 의미가 있다.**
+         * 단체코드가 없으면 syncMembers 는 **보내지 않고 그냥 지나간다**(보낼 곳이
+         * 없다). 그러면 횟수도 오르지 않아 **이 행이 영원히 다시 골라진다** — 60초마다
+         * 로그 한 줄이 영구히 쌓이는 모양이다(2026-10-05 질의를 돌려 보고 찾았다).
+         * ★ 빠뜨려도 잃는 것이 없다: 회사가 연결되는 순간 registerOrgForCompany 가
+         *   그 자리에서 밀린 구성원을 전부 보낸다.
+         * ★ 백틱을 쓰지 않는다 — 이 주석은 템플릿 리터럴 **안**이라 백틱이 SQL 을 끊는다.
+         */
+        AND c.link_org_code IS NOT NULL
+      ORDER BY link_failed_at NULLS FIRST`,
+  );
+  return rows;
 }

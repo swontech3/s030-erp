@@ -89,3 +89,44 @@ export async function requireScreen(screenCode: ScreenId, route: string): Promis
 
   if (!me.screens.includes(screenCode)) redirect('/no-access');
 }
+
+/**
+ * 삐용 연동 대기 요약 — 머리말이 **모든 화면에서** 쓴다(036).
+ *
+ * ★★ **운영사일 때만 부른다**(레이아웃이 거른다). 입주사에게는 보이지 않는다
+ *    — 남의 회사 연동 상태를 보는 자리가 되어서는 안 된다(결정 2026-10-05).
+ *
+ * ★ 0건이면 `null` 을 돌려준다 — 화면이 「0건」을 그리지 않게 **여기서** 끝낸다.
+ *   늘 떠 있는 표시는 며칠 안에 배경이 되어 아무도 안 본다.
+ *
+ * ★★ **실패해도 던지지 않는다.** `getMe` 와 다르다 — 그쪽은 세션이 없으면 화면을
+ *    못 그리지만, 이 표시 하나 때문에 전 화면이 못 뜨면 그게 훨씬 나쁘다.
+ *    로그만 남기고 `null` 로 지나간다.
+ *
+ * ★ [보기] 가 갈 곳을 **여기서 정한다** — 대기가 1건이고 그 회사에 계약이 있으면 그
+ *   계약 폼(처리하는 화면)으로, 그 밖에는 입주사 목록(조회 + 링크)으로 보낸다.
+ *   목록은 「삐용 미연동」을 보여 주기만 하는 화면이다(`CLAUDE.md`).
+ */
+export async function getBbiyongPending(): Promise<{ total: number; needsHand: number; href: string } | null> {
+  const sid = await readSid();
+  if (!sid) return null;
+  try {
+    const res = await callApi<{
+      total: number;
+      needsHand: number;
+      items: { companyId: string; contractId: string | null }[];
+    }>('/companies/bbiyong-pending', { erpSid: sid });
+    if (!res.ok || res.body.total === 0) return null;
+
+    const only = res.body.items.length === 1 ? res.body.items[0] : null;
+    // ★ 여럿이면 입주사·계약 목록으로 보낸다 — 그 목록의 주소는 `/tenants/contracts` 다
+    //   (s030200030). `/tenants` 는 **없는 주소**라 404 가 난다(화면에서 눌러 확인 2026-10-05).
+    const href = only?.contractId
+      ? `/contracts/${encodeURIComponent(only.contractId)}`
+      : '/tenants/contracts';
+    return { total: res.body.total, needsHand: res.body.needsHand, href };
+  } catch (err) {
+    console.error('[bbiyong] 연동 대기 조회 실패 — 머리말 표시만 건너뛴다:', (err as Error).message);
+    return null;
+  }
+}

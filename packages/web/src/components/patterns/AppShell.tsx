@@ -39,6 +39,16 @@ export interface AppShellDisplay {
   orgName: string;
 }
 
+/** 머리말의 삐용 연동 대기 표시. 숫자와 갈 곳만 — 판정은 서버가 끝냈다. */
+export interface AppShellLinkAlert {
+  /** 대기 건수(회사 연동 + 직원 연동). */
+  total: number;
+  /** 그중 **저절로 풀리지 않는** 것. 1건이라도 있으면 문구가 「손봐야 합니다」로 바뀐다. */
+  needsHand: number;
+  /** [보기] 가 갈 곳. 계약이 있으면 그 계약 폼, 없으면 입주사 목록이다. */
+  href: string;
+}
+
 export interface AppShellProps {
   /** ★ 서버가 쿠키에서 읽어 넘긴 값. 클라이언트가 다시 읽지 않는다. */
   initialCollapsed: boolean;
@@ -57,13 +67,24 @@ export interface AppShellProps {
    * ★ 표시 전용이다. 이 문구로 무엇을 열고 닫지 않는다(지시문 1-6).
    */
   roleNote?: string | null;
+  /**
+   * 삐용 연동 대기 — **어느 화면에서든 보이게** 머리말에 띄운다(036 · 결정 2026-10-05).
+   *
+   * ★★ 전에는 운영자가 **그 계약 화면을 열어야만** 대기를 알았다. 다른 일 하다 보면
+   *    묻히고, 그동안 그 입주사는 삐용에 로그인할 수 없었다. 셸은 모든 화면이 함께
+   *    쓰므로 여기 한 줄이면 어디서든 보인다.
+   * ★ **조회 + 링크뿐이다.** [다시 시도] 는 계약 폼 하나다(`CLAUDE.md` 한 업무 한 화면).
+   * ★ `null` 이면 **아무것도 그리지 않는다** — 0건에도 늘 떠 있으면 아무도 안 본다.
+   * ★ 운영사에게만 내려온다(레이아웃이 거른다). 입주사에게는 보이지 않는다.
+   */
+  linkAlert?: AppShellLinkAlert | null;
   children: React.ReactNode;
 }
 
 /** 반응형으로 그리는 화면 — 여기 없는 경로는 1440px 고정 그대로다. */
 const RESPONSIVE_ROUTES = new Set(['/booking']);
 
-export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote, children }: AppShellProps) {
+export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote, linkAlert, children }: AppShellProps) {
   /*
    * ★★ 초기값이 서버가 준 prop 그대로다 — 이것이 깜빡임 없음의 전부다.
    *    useEffect 로 마운트 후에 고치거나, 여기서 document.cookie 를 다시 읽으면
@@ -247,6 +268,30 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
             <span className={styles.roleNote} data-role-note="1">
               {roleNote}
             </span>
+          ) : null}
+
+          {/*
+            ══════════════════════════════════════════════════════════════════
+            ★★ 삐용 연동 대기 — 어느 화면에서든 보인다 (036)
+            ══════════════════════════════════════════════════════════════════
+            ★ 0건이면 prop 이 `null` 이라 **이 줄 자체가 없다**. 늘 떠 있는 표시는
+              며칠 안에 배경이 되어 아무도 안 본다.
+            ★ 문구가 둘이다 — 저절로 다시 보내는 중(「연동 대기」)과 더 보내도 안 되는
+              것(「손봐야 합니다」). 판정은 서버가 했고 화면은 `needsHand` 만 본다.
+            ★ [보기] 는 **그 계약 폼으로 보낸다** — 처리는 거기서 한다(한 업무 한 화면).
+          */}
+          {linkAlert ? (
+            <Link
+              href={linkAlert.href}
+              className={styles.linkAlert}
+              data-bbiyong-alert={linkAlert.needsHand > 0 ? 'manual' : 'pending'}
+            >
+              <Icon name="circle-alert" size={14} />
+              <span>
+                삐용 {linkAlert.needsHand > 0 ? '연동 — 손봐야 합니다' : '연동 대기'} {linkAlert.total}건
+              </span>
+              <span className={styles.linkAlertGo}>보기</span>
+            </Link>
           ) : null}
           {/*
             ★ 도움말(circle-help)·알림(bell) 아이콘 버튼 2개를 **뺐다**(2026-09-30).

@@ -98,8 +98,13 @@ export interface OrgLinkStore {
    *     쓸 때는 **없다**(`undefined`) — 그때 번호를 덮어쓰면 안 된다.
    */
   saveLinked(args: { orgId: number; orgCode: string; repMemberId?: number | null }): Promise<void>;
-  /** ★ `reason` 은 **운영자에게 그대로 보여줄 문구**다. */
-  savePending(reason: string): Promise<void>;
+  /**
+   * ★ `reason` 은 **운영자에게 그대로 보여줄 문구**다.
+   * @param retryable 다시 보내면 풀릴 종류인가. ★ 서버가 저절로 다시 보낼지를 이 값이
+   *   가른다(`retryPolicy`) — **값·권한 문제(`false`)는 한 번도 다시 보내지 않는다.**
+   *   생략하면 「모른다」이고 막지 않는다.
+   */
+  savePending(reason: string, retryable?: boolean): Promise<void>;
 }
 
 export type OrgLinkResult =
@@ -190,7 +195,8 @@ export async function linkOrg(
 
   const missing = missingField(company);
   if (missing) {
-    await store.savePending(missing);
+    // ★ 값이 비어 있다 — 다시 보내도 같다. 사람이 입주사 정보를 채워야 한다.
+    await store.savePending(missing, false);
     return { kind: 'pending', reason: missing };
   }
 
@@ -198,7 +204,8 @@ export async function linkOrg(
   if (orgCode === null) {
     const reason =
       '발급할 단체코드가 없습니다(Z01~Z99 를 모두 사용했습니다). 삐용에 코드 대역 확장을 요청해야 합니다';
-    await store.savePending(reason);
+    // ★ 두드려서 풀릴 일이 아니다 — 삐용에 요청해야 한다.
+    await store.savePending(reason, false);
     return { kind: 'pending', reason };
   }
 
@@ -241,7 +248,7 @@ export async function linkOrg(
        */
       console.warn(`[bbiyong] 회사 등록 실패(대기로 남긴다): ${(err as Error).message}`);
       const reason = '삐용에 연결할 수 없어 회사 등록이 끝나지 않았습니다. 잠시 후 다시 시도해 주세요';
-      await store.savePending(reason);
+      await store.savePending(reason, true);
       return { kind: 'pending', reason };
     }
 
@@ -257,7 +264,8 @@ export async function linkOrg(
 
     if (outcome.kind === 'rejected') {
       // 삐용이 업무 실패로 답했다. 문구는 어댑터가 이미 사람 말로 바꿔서 준다.
-      await store.savePending(outcome.message);
+      // ★ 재시도 여부도 어댑터가 준 값을 그대로 쓴다 — ERP 가 다시 판정하지 않는다.
+      await store.savePending(outcome.message, outcome.retryable);
       return { kind: 'pending', reason: outcome.message };
     }
 
@@ -267,7 +275,7 @@ export async function linkOrg(
 
   const reason =
     '사용할 수 있는 단체코드를 찾지 못했습니다. 잠시 후 다시 시도해 주세요(계속되면 삐용에 문의해야 합니다)';
-  await store.savePending(reason);
+  await store.savePending(reason, true);
   return { kind: 'pending', reason };
 }
 
@@ -309,7 +317,7 @@ async function applyOp(
     // ★ 여기 남는 것은 삐용 장애다. 던지지 않는다 — ERP 업무(계약 종료·회사명 수정)는 이미 끝났다.
     console.warn(`[bbiyong] ${label} 실패(대기로 남긴다): ${(err as Error).message}`);
     const reason = `삐용에 연결할 수 없어 ${label}이 반영되지 않았습니다. 잠시 후 다시 시도해 주세요`;
-    await store.savePending(reason);
+    await store.savePending(reason, true);
     return { kind: 'pending', reason };
   }
 
@@ -326,7 +334,7 @@ async function applyOp(
     return { kind: 'synced', op };
   }
 
-  await store.savePending(outcome.message);
+  await store.savePending(outcome.message, outcome.retryable);
   return { kind: 'pending', reason: outcome.message };
 }
 
@@ -403,7 +411,7 @@ export async function patchOrgName(
     // ★ 회사명은 NOT NULL 이지만 빈 문자열이 들어갈 수 있다(가계약). 빈 이름을 보내면
     //   삐용의 단체명을 지우는 셈이라 보내지 않는다.
     const reason = '회사명이 비어 있어 삐용에 반영할 수 없습니다. 입주사 정보를 채운 뒤 다시 시도해 주세요';
-    await store.savePending(reason);
+    await store.savePending(reason, false);
     return { kind: 'pending', reason };
   }
 

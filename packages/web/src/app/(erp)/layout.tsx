@@ -14,7 +14,7 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { AppShell } from '@/components/patterns/AppShell';
-import { getMe } from '@/lib/session';
+import { getMe, getBbiyongPending } from '@/lib/session';
 import { buildNavItems, SIDEBAR_COOKIE } from '@/lib/sidebar';
 
 export default async function ErpLayout({ children }: { children: React.ReactNode }) {
@@ -26,6 +26,14 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   // 접근 가능 화면이 0건이면 셸을 그릴 것이 없다 — 안내 화면으로 보낸다(AUTH-13).
   if (me.screens.length === 0) redirect('/no-access');
 
+  /*
+   * ★★ 삐용 연동 대기 — **운영사에게만** 읽는다(결정 2026-10-05). 입주사 요청에서는
+   *    부르지도 않는다: 남의 회사 연동 상태를 보는 자리가 되어서는 안 된다.
+   * ★ 실패해도 셸은 그린다(`getBbiyongPending` 이 null 을 돌려준다) — 이 표시 하나
+   *   때문에 전 화면이 못 뜨면 그게 더 나쁘다.
+   */
+  const linkAlert = me.role === 'operator' ? await getBbiyongPending() : null;
+
   const store = await cookies();
   const initialCollapsed = store.get(SIDEBAR_COOKIE)?.value === '1';
 
@@ -34,6 +42,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       initialCollapsed={initialCollapsed}
       /* ★ 삐용이 준 목록만 넘긴다. 역할로 거르는 코드는 이 경로 어디에도 없다(ACL-07′). */
       items={buildNavItems(me.screens)}
+      linkAlert={linkAlert}
       homeRoute={me.home}
       display={me.display}
       /*

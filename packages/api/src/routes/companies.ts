@@ -38,6 +38,7 @@ import {
   listCompanyContracts,
   listContractFacts,
   listMembers,
+  listPendingLinks,
   insertCompany,
   listRoomSummaries,
   replaceMembers,
@@ -50,6 +51,7 @@ import {
   retryBbiyongForCompany,
 } from '../companies/registerOrg.ts';
 import { syncMembersForCompany } from '../companies/syncMembers.ts';
+import { needsHumanHand } from '../bbiyong/retryPolicy.ts';
 
 /** 입주사 화면은 운영사 업무다. 계약 라우트의 `WRITE_ROLE` 과 같은 값이다. */
 const OPERATOR = 'operator';
@@ -643,6 +645,60 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
       orgId: result.kind === 'linked' || result.kind === 'already' ? result.orgId : null,
       orgCode: result.kind === 'linked' ? result.orgCode : null,
       reason: result.kind === 'pending' ? result.reason : null,
+    });
+  });
+
+  // ── 삐용 연동 대기 요약 (036) ───────────────────────────────────────────
+  /**
+   * 머리말이 **모든 화면에서** 읽는 건수. ★ **조회 전용이다.**
+   *
+   * =============================================================================
+   * ★★ 「한 업무는 한 화면에서」 — 여기서 처리하지 않는다
+   * =============================================================================
+   * 이 라우트는 「몇 건이 대기 중인가」와 「어느 계약으로 가면 되는가」만 준다.
+   * [다시 시도] 는 계약 폼 하나뿐이다(`CLAUDE.md`). 머리말은 그쪽으로 **보내기만** 한다.
+   *
+   * ★ 운영사 전용이다 — 입주사에게는 보이지 않는다(결정 2026-10-05). 입주사가 남의
+   *   회사 연동 상태를 보는 자리가 되어서는 안 된다.
+   * ★ 0건이면 `total: 0` 이고 화면은 **아무것도 그리지 않는다** — 늘 떠 있으면 아무도
+   *   안 본다(같은 결정).
+   */
+  app.get('/companies/bbiyong-pending', async (req, reply) => {
+    const session = requireSession(req);
+    if (session.role !== OPERATOR) return forbidden(reply);
+
+    const rows = await withCompanyScope(scopeOf(session), (client) => listPendingLinks(client));
+
+    return reply.send({
+      total: rows.length,
+      /**
+       * 저절로 풀리지 않는 것 — 화면이 「손봐야 합니다」로 문구를 바꾸는 근거다.
+       * ★ 판정은 `retryPolicy` 한 곳이다. 화면이 횟수를 세거나 사유 문구를 읽고
+       *   짐작하지 않는다.
+       */
+      needsHand: rows.filter((r) =>
+        needsHumanHand({
+          attemptCount: r.link_attempt_count,
+          retryable: r.link_retryable,
+          failedAt: r.link_failed_at,
+        }),
+      ).length,
+      items: rows.map((r) => ({
+        kind: r.kind,
+        companyId: r.company_id,
+        companyName: r.company_name,
+        /** 구성원 행일 때만 이름이 있다. */
+        memberName: r.member_name,
+        /** ★ 운영자에게 그대로 보여주는 문구다. */
+        reason: r.link_failed_reason,
+        /** [보기] 가 열 계약. 없으면 화면이 입주사 목록으로 보낸다. */
+        contractId: r.contract_id,
+        needsHand: needsHumanHand({
+          attemptCount: r.link_attempt_count,
+          retryable: r.link_retryable,
+          failedAt: r.link_failed_at,
+        }),
+      })),
     });
   });
 }

@@ -12,6 +12,7 @@ import { bbiyongBanner } from './lib/bbiyongBanner.ts';
 import { BbiyongReloginRequiredError, BbiyongUnavailableError } from './bbiyong/index.ts';
 import { registerSessionHook } from './session/hook.ts';
 import { startSessionPurge } from './session/purgeTimer.ts';
+import { sweepPendingLinks } from './companies/retrySweep.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerAclRoutes } from './routes/acl.ts';
 import { registerContractRoutes } from './routes/contracts.ts';
@@ -152,6 +153,24 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 // ★ 죽은 세션 치우기 — 하루 한 번, 서버가 스스로 돈다(`session/purgeTimer.ts`).
 //   사람이 기억해야 도는 길로 두면 지금처럼 쌓인다(2026-10-04 에 441행).
 startSessionPurge(app.log);
+
+/*
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★★ 삐용 연동 실패를 저절로 다시 보낸다 — **응답 뒤에, 운영자 요청에 묻어서**
+ * ══════════════════════════════════════════════════════════════════════════
+ * 세션 정리처럼 타이머로 두고 싶지만 **삐용을 부를 토큰이 서버에 없다**(결정 Q1 —
+ * 서버끼리 쓰는 API 키는 만들지 않는다). 그래서 운영자의 토큰에 묻어서 돈다.
+ * 한계와 그 선택의 근거는 `companies/retrySweep.ts` 머리말에 적어 뒀다.
+ *
+ * ★ `onResponse` 다 — 응답을 **보낸 뒤**에 돌아 사람을 기다리게 하지 않는다.
+ * ★ 운영사만. 입주사 요청에 묻히면 그 사람 토큰으로 남의 회사를 삐용에 등록하게 된다.
+ * ★ 쿨다운 60초·한 번에 3건은 스윕 쪽에 있다. 여기서는 부르기만 한다.
+ */
+app.addHook('onResponse', async (req) => {
+  const session = req.session;
+  if (!session || session.role !== 'operator') return;
+  sweepPendingLinks(session, app.log);
+});
 
 app.listen({ port: env.port, host: '127.0.0.1' }).catch((err) => {
   app.log.error(err);
