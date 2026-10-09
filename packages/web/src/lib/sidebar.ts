@@ -43,6 +43,7 @@ const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
   s030600010: 'calendar-check',
   // ★ 법무 서비스(s04). 저울 — 법무를 가리키는 아이콘이 이것 하나다.
   s040200010: 'scale', // 법인변경
+  s040200011: null, // 법인변경 상세 — 목록에서 들어간다
 };
 
 export interface NavItem {

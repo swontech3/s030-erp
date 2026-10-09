@@ -60,7 +60,7 @@ export interface CodeUsageRef {
 }
 
 /**
- * 코드값이 실제로 저장되는 자리 — **12건** (2026-10-03 실측 9건 + 2026-10-07 표양식 1건 + 2026-10-10 법인변경 2건).
+ * 코드값이 실제로 저장되는 자리 — **13건** (2026-10-03 실측 9건 + 2026-10-07 표양식 1건 + 2026-10-10 법인변경 2건 + 법무 회사유형 1건).
  *
  * 각 줄은 「그 컬럼의 값이 이 (category, use_tp) 의 code 다」를 뜻한다. 앱 코드에서
  * 확인한 것만 적었다 — 값이 우연히 겹치는 컬럼은 넣지 않았다(머리말 ★).
@@ -120,6 +120,12 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
   // --- 법인변경 (s040200010) — 2026-10-10 추가. `domain/corp-change.ts` ---
   { category: 'LAW_CNG_TP', useTp: '000', table: 'tb_s080_corp_changes', column: 'change_type', label: '법인변경' },
   { category: 'LAW_PROG_ST', useTp: '000', table: 'tb_s080_corp_changes', column: 'status', label: '법인변경' },
+  /**
+   * 비입주사 회사유형(038, 2026-10-10) — 파티션 **002**(주식회사 · 유한회사). 입주사의 회원구분
+   * (`tb_s080_companies.member_type`, 000)과 칸 이름은 같지만 파티션이 다르다.
+   * `domain/corp-change-detail.ts` 의 `LEGAL_MEMBER_TYPE_USE_TP`.
+   */
+  { category: 'MEMBER_TYPE', useTp: '002', table: 'tb_s080_legal_orgs', column: 'member_type', label: '법무 회사유형' },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */

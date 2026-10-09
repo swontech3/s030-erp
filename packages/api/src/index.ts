@@ -141,7 +141,7 @@ registerFormTemplateRoutes(app);
 //   화면이 아니라 부품이라 화면 코드가 없다(`routes/orgLookup.ts` 머리말).
 registerOrgLookupRoutes(app);
 // ★ 법인변경(s040200010) — 운영사 · 회사가 함께 쓴다. 누가 무엇을 보는지는 RLS(037)가
-//   단체 ID 로 가른다(`routes/corpChanges.ts` 머리말). 2단계는 목록 조회만.
+//   단체 ID 로 가른다(`routes/corpChanges.ts` 머리말). 목록(2단계) · 새 건 · 상세 · 임원(3단계).
 registerCorpChangeRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({

@@ -19,8 +19,9 @@
  * ★ 조건은 주소에 적는다(`?from=&to=&changeType=&status=&tenancy=&includeCancelled=`) —
  *   API 와 같은 이름이다. 방식은 s030200070 과 같다(`history.replaceState`).
  *
- * ★★ 한 업무는 한 화면에서 — 처리 버튼(새 건 · 상태 전이 · 서류 출력)은 이 목록에 두지 않는다.
- *    상세(s040200011, 3단계)가 맡는다. 지금은 줄을 눌러도 열리는 것이 없다.
+ * ★★ 한 업무는 한 화면에서 — 처리 버튼(상태 전이 · 서류 출력)은 이 목록에 두지 않는다.
+ *    상세(s040200011)가 맡는다. 줄을 누르면 상세로 간다. 목록에 있는 처리는 [새 건] 하나다
+ *    (만든 뒤 바로 상세로 보낸다 — 3단계, 2026-10-10).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -35,7 +36,9 @@ import {
   type TenancyFilter,
 } from '@swonbiz/shared/domain/corp-change-list';
 import type { CorpChangeStatus, CorpChangeType } from '@swonbiz/shared/domain/corp-change';
+import Link from 'next/link';
 import { Icon } from '@/components/ds';
+import { NewCorpChangeDialog } from './NewCorpChangeDialog';
 import styles from './corp-changes.module.css';
 
 const EMPTY_FILTER: CorpChangeListFilter = {
@@ -54,8 +57,9 @@ type Load =
   | { state: 'error'; message: string }
   | { state: 'ok'; items: CorpChangeListItem[] };
 
-export function CorpChangesView() {
+export function CorpChangesView({ pickOrg }: { pickOrg: boolean }) {
   const params = useSearchParams();
+  const [creating, setCreating] = useState(false);
 
   /** ★ 첫 조건은 주소에서 온다. 틀린 조건이면 기본(취소 제외 전체)으로 연다. */
   const [filter, setFilter] = useState<CorpChangeListFilter>(() => {
@@ -137,6 +141,16 @@ export function CorpChangesView() {
               : `${items.length}건${filter.includeCancelled ? ' · 취소 포함' : ''}`}
           </p>
         </div>
+        {/* ★ 구분 선택지가 아직 없으면(목록을 못 받음) 누를 수 없다 — 고를 것이 없다. */}
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnPrimary}`}
+          disabled={changeTypes.length === 0}
+          onClick={() => setCreating(true)}
+        >
+          <Icon name="plus" size={16} />
+          새 건
+        </button>
       </div>
 
       <div className={styles.panel}>
@@ -246,7 +260,11 @@ export function CorpChangesView() {
           )
         ) : (
           items.map((item) => (
-            <div key={item.id} className={`${styles.tRow}${item.status === 'X' ? ` ${styles.tRowCanceled}` : ''}`}>
+            <Link
+              key={item.id}
+              href={`/legal/corp-changes/${encodeURIComponent(item.id)}`}
+              className={`${styles.tRow}${item.status === 'X' ? ` ${styles.tRowCanceled}` : ''}`}
+            >
               <span className={styles.company}>
                 <span className={styles.ellipsis} title={corpChangeCompanyLabel(item)}>
                   {corpChangeCompanyLabel(item)}
@@ -263,10 +281,14 @@ export function CorpChangesView() {
               </span>
               <span className={item.ceoName ? styles.ellipsis : styles.muted}>{item.ceoName ?? '—'}</span>
               <span className={styles.mono}>{item.createdOn}</span>
-            </div>
+            </Link>
           ))
         )}
       </div>
+
+      {creating ? (
+        <NewCorpChangeDialog changeTypes={changeTypes} pickOrg={pickOrg} onClose={() => setCreating(false)} />
+      ) : null}
     </div>
   );
 }
