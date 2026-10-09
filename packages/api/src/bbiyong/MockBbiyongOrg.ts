@@ -22,15 +22,41 @@
  * ★ 같은 프로세스 안에서는 두 번째 등록이 같은 코드를 쓰면 실제로 중복을 돌려준다
  *   (아래 `#byCode`). 재기동하면 비어 있다 — 진실원은 ERP DB 쪽 `link_org_code` 다.
  */
+import { isErpOrgCode } from '@swonbiz/shared/domain/org-code';
+import { MOCK_ACCOUNTS } from './MockBbiyongAuth.ts';
 import type {
   BbiyongMemberRequest,
   BbiyongOrg,
+  BbiyongOrgInfo,
+  BbiyongOrgKey,
   BbiyongOrgPatch,
   BbiyongOrgRequest,
+  BbiyongOrgSearch,
   CreateOrgOutcome,
   MemberOpOutcome,
+  OrgLookupOutcome,
   OrgOpOutcome,
 } from './types.ts';
+
+/**
+ * 모의 단체 상태. ★ 삐용 단체 조회 규격이 없어 **어휘가 정해지지 않았다**(`BbiyongOrgInfo.status`).
+ *   화면은 해석하지 않고 그대로 보여 준다.
+ */
+const MOCK_ORG_STATUS = '정상';
+
+/**
+ * 로그인 모의 계정 중 **회사 단체**(단체코드를 적은 것). 단체 조회가 이것을 돌려준다.
+ * ★ 여기 다시 적지 않는다 — `MockBbiyongAuth` 의 계정표 한 곳에서 끌어온다.
+ */
+function seededOrgs(): BbiyongOrgInfo[] {
+  return MOCK_ACCOUNTS.filter((a) => a.orgCode !== undefined).map((a) => ({
+    orgId: a.orgId,
+    orgCode: a.orgCode as string,
+    orgName: a.orgName,
+    repName: a.memberName,
+    status: MOCK_ORG_STATUS,
+  }));
+}
 
 /**
  * mock org_id 의 기준값. 실제 번호는 `기준값 + 단체코드의 숫자` 다 — `Z01` → 9101.
@@ -105,6 +131,17 @@ export class MockBbiyongOrg implements BbiyongOrg {
     return MOCK_MEMBER_ID_BASE + 1000 + (hash % 90_000);
   }
 
+  /**
+   * 이 프로세스가 만든 회사의 조회용 정보 — 코드 → 단체. 단체 조회가 모의 계정 단체와 함께 돌려준다.
+   * ★ 재기동하면 비어 있다(`#byCode` 와 같다). 진실원은 삐용이고, 여기는 대역이다.
+   */
+  readonly #createdInfo = new Map<string, BbiyongOrgInfo>();
+
+  /** 조회 대상 전부 — 모의 계정 단체 + 이 프로세스가 만든 회사. */
+  #directory(): BbiyongOrgInfo[] {
+    return [...seededOrgs(), ...this.#createdInfo.values()];
+  }
+
   /** 이 프로세스가 아는 코드인가. 모르면 중복 판정을 하지 않는다(위 주석). */
   #known(orgCode: string): boolean {
     return this.#byCode.has(orgCode);
@@ -130,7 +167,9 @@ export class MockBbiyongOrg implements BbiyongOrg {
     }
 
     const existing = this.#byCode.get(req.orgCode);
-    if (existing !== undefined) {
+    // ★ 모의 계정 단체(Z97~Z99)의 코드도 「이미 있음」이다 — 삐용이라면 그렇게 답한다.
+    //   ERP 채번이 다음 번호로 넘어간다.
+    if (existing !== undefined || seededOrgs().some((o) => o.orgCode === req.orgCode)) {
       // ★ orgId 를 결과에 담지 않는다 — 호출자가 그것을 쓰면 안 되는 값이다(types.ts).
       return { kind: 'duplicate_code', orgCode: req.orgCode };
     }
@@ -146,6 +185,13 @@ export class MockBbiyongOrg implements BbiyongOrg {
      */
     const repMemberId = MOCK_MEMBER_ID_BASE + 100 + (Number(req.orgCode.slice(1)) || 0);
     this.#repByCode.set(req.orgCode, repMemberId);
+    this.#createdInfo.set(req.orgCode, {
+      orgId,
+      orgCode: req.orgCode,
+      orgName: req.orgName,
+      repName: req.memberName,
+      status: MOCK_ORG_STATUS,
+    });
     // ★ 등록은 OFFICE 를 켠 상태로 만든다 — moduleCodes 에 OFFICE 를 보내기 때문이다.
     if (req.moduleCodes.includes('OFFICE')) this.#officeOn.add(req.orgCode);
     // ★ 평문 로그에 이메일·전화를 남기지 않는다. 남는 것은 코드와 번호뿐이다.
@@ -182,7 +228,31 @@ export class MockBbiyongOrg implements BbiyongOrg {
     }
     // ★ 회사명은 로그에 남겨도 되는 값이다(공개 정보). 이메일·전화는 여기 오지 않는다.
     console.log(`[bbiyong] MOCK 회사 수정 — orgCode=${patch.orgCode}`);
+    // 조회에 바뀐 이름이 보여야 한다 — 이 프로세스가 만든 회사만 들고 있다.
+    const info = this.#createdInfo.get(patch.orgCode);
+    if (info) this.#createdInfo.set(patch.orgCode, { ...info, orgName: patch.orgName });
     return { kind: 'ok' };
+  }
+
+  /**
+   * 단체 목록 — 회사명 일부로 찾는다. **Z 코드만**(규격 초안, 2026-10-09).
+   * ★ 대소문자·앞뒤 공백을 무시한다. 빈 검색어는 Z 대역 전부다. 코드 순으로 준다.
+   */
+  async listOrgs(search: BbiyongOrgSearch, _accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo[]>> {
+    const needle = search.name.trim().toLowerCase();
+    const value = this.#directory()
+      .filter((o) => isErpOrgCode(o.orgCode))
+      .filter((o) => needle === '' || o.orgName.toLowerCase().includes(needle))
+      .sort((a, b) => a.orgCode.localeCompare(b.orgCode));
+    return { kind: 'ok', value };
+  }
+
+  /** 단체 한 곳 — 단체 ID 또는 단체코드. 없으면 null. */
+  async getOrg(key: BbiyongOrgKey, _accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo | null>> {
+    const found = this.#directory().find((o) =>
+      'orgId' in key ? o.orgId === key.orgId : o.orgCode === key.orgCode.trim().toUpperCase(),
+    );
+    return { kind: 'ok', value: found ?? null };
   }
 
   /**

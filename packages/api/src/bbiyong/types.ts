@@ -361,8 +361,56 @@ export interface BbiyongOrgPatch {
   orgName: string;
 }
 
+// =============================================================================
+// 단체 조회 — 법무 서비스(S04)의 공용 회사 조회 팝업이 쓴다 (2026-10-09)
+// =============================================================================
+
+/**
+ * 삐용 단체 한 곳. **조회 결과로만 쓰고 ERP DB 에 복사하지 않는다** — 회사 정본은 삐용 단체다.
+ *
+ * ★★ 삐용 단체 조회 API **규격이 아직 없다.** 이 모양은 ERP 가 필요한 것을 먼저 적은 것이고,
+ *    규격이 오면 `HttpBbiyongOrg` 가 그 응답을 이 모양으로 옮긴다.
+ */
+export interface BbiyongOrgInfo {
+  orgId: number;
+  orgCode: string;
+  orgName: string;
+  /** 대표자명. 삐용이 안 주면 null. */
+  repName: string | null;
+  /**
+   * 단체 상태. ★ **어휘가 정해지지 않았다**(규격 없음) — 해석하지 않고 그대로 보여 준다.
+   *   규격이 오면 그때 코드로 묶는다.
+   */
+  status: string | null;
+}
+
+/** 목록 조건. ★ 결과는 **Z 코드(ERP 가 만든 회사 대역)만**이다 — 운영사 단체 등은 빠진다. */
+export interface BbiyongOrgSearch {
+  /** 회사명 일부. 빈 문자열이면 Z 대역 전부. */
+  name: string;
+}
+
+/** 단건 조건 — 단체 ID 또는 단체코드 하나. */
+export type BbiyongOrgKey = { orgId: number } | { orgCode: string };
+
+/**
+ * 조회 결과.
+ *
+ * ★ `unsupported` 는 **장애가 아니다** — 「삐용에 그 API 가 아직 없다」이다. 장애
+ *   (`BbiyongUnavailableError`)로 던지면 화면에 「인증 서버에 연결할 수 없습니다」가 떠서
+ *   삐용이 꺼진 것처럼 읽힌다.
+ */
+export type OrgLookupOutcome<T> =
+  | { kind: 'ok'; value: T }
+  /** `message` 는 운영자에게 그대로 보여줄 문구다. */
+  | { kind: 'unsupported'; message: string };
+
 export interface BbiyongOrg {
   createOrg(req: BbiyongOrgRequest, accessToken: string): Promise<CreateOrgOutcome>;
+  /** 단체 목록 — 회사명 검색, Z 코드만(`BbiyongOrgSearch`). */
+  listOrgs(search: BbiyongOrgSearch, accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo[]>>;
+  /** 단체 한 곳 — 없으면 `value: null`. */
+  getOrg(key: BbiyongOrgKey, accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo | null>>;
   /** 퇴실 — OFFICE 구독을 끈다. 계약이 종료될 때. */
   moduleOff(orgCode: string, accessToken: string): Promise<OrgOpOutcome>;
   /** 재입주 — OFFICE 구독을 다시 켠다. ★ 회사를 다시 만들지 않는다. */

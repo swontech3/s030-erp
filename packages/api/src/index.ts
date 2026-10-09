@@ -27,6 +27,8 @@ import { registerFileRoutes } from './routes/files.ts';
 import { registerOcrRoutes } from './routes/ocr.ts';
 import { registerFacilityRoutes } from './routes/facility.ts';
 import { registerCodeRoutes } from './routes/codes.ts';
+import { registerFormTemplateRoutes } from './routes/formTemplates.ts';
+import { registerOrgLookupRoutes } from './routes/orgLookup.ts';
 import { closePool } from './db/pool.ts';
 import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
 
@@ -131,6 +133,12 @@ registerFacilityRoutes(app);
 // ★★ 소비용 조회는 `registerLookupRoutes` 의 `GET /codes` 다 — 경로가 겹치지 않게 이쪽은
 //    `/codes-admin/**` 를 쓴다. 같은 접두사를 쓰면 `/codes/:category` 가 `/codes` 를 가린다.
 registerCodeRoutes(app);
+// ★ 표양식 관리(s030100020) — 양식 등록·수정·삭제. **운영사 전용**. 등기 설정이 가리키는
+//   양식은 FK 가 없어 핸들러가 세어서 막는다(`db/formTemplates.ts` 머리말).
+registerFormTemplateRoutes(app);
+// ★ 공용 회사 조회(삐용 단체) — 법무 서비스(S04)가 처음 쓰는 팝업의 서버 쪽. **운영사 전용**.
+//   화면이 아니라 부품이라 화면 코드가 없다(`routes/orgLookup.ts` 머리말).
+registerOrgLookupRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,

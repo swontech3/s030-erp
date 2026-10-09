@@ -60,7 +60,7 @@ export interface CodeUsageRef {
 }
 
 /**
- * 코드값이 실제로 저장되는 자리 — **9건** (2026-10-03 실측).
+ * 코드값이 실제로 저장되는 자리 — **10건** (2026-10-03 실측 9건 + 2026-10-07 표양식 1건).
  *
  * 각 줄은 「그 컬럼의 값이 이 (category, use_tp) 의 code 다」를 뜻한다. 앱 코드에서
  * 확인한 것만 적었다 — 값이 우연히 겹치는 컬럼은 넣지 않았다(머리말 ★).
@@ -112,6 +112,10 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
 
   // --- 문의상담 (s030500070 · s030200080) ---
   { category: 'QU_TP', useTp: '000', table: 'tb_s080_inquiries', column: 'type', label: '문의' },
+
+  // --- 표양식 (s030100020) — 2026-10-07 추가 ---
+  /** 양식 종류(표 · 일반서류). `domain/form-template.ts` 의 `FORM_KIND_CATEGORY`. */
+  { category: 'LAW_DOC_TP', useTp: '000', table: 'tb_s080_form_templates', column: 'kind', label: '표양식' },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */
@@ -126,7 +130,7 @@ export interface PinnedCodeRef {
 }
 
 /**
- * ★★ 자료가 **0행이어도** 코드값을 바꾸면 깨지는 자리 — **4건** (2026-10-03 실측).
+ * ★★ 자료가 **0행이어도** 코드값을 바꾸면 깨지는 자리 — **5건** (2026-10-03 실측 4건 + 2026-10-07 표양식 1건).
  *
  * 앱 코드가 코드값을 상수로 비교한다. 예컨대 `spaceStatus.ts` 가 `'E'`(공실)를 직접
  * 쓰므로, `ROOM_ST` 의 `E` 를 `V` 로 고치면 호실상태 자동화가 **조용히** 틀린다 —
@@ -163,6 +167,17 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     codes: ['R', 'A'],
     source: 'packages/shared/src/domain/inquiry.ts (InquiryStatus)',
     label: '문의 상태 판정',
+  },
+  /**
+   * 새 양식의 종류 — 앱과 DB 기본값(`kind DEFAULT 'T'`)이 둘 다 `T` 를 박아 두었다.
+   * ★ 2026-10-07 추가. `T` 를 바꾸면 새 양식이 코드에 없는 종류로 만들어진다.
+   */
+  {
+    category: 'LAW_DOC_TP',
+    useTp: '000',
+    codes: ['T'],
+    source: 'packages/shared/src/domain/form-template.ts (DEFAULT_FORM_KIND)',
+    label: '표양식 기본 종류',
   },
 ] as const;
 

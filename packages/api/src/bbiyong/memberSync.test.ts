@@ -85,6 +85,8 @@ function memberAdapter(
     moduleOff: nope('moduleOff') as BbiyongOrg['moduleOff'],
     moduleOn: nope('moduleOn') as BbiyongOrg['moduleOn'],
     patchOrg: nope('patchOrg') as BbiyongOrg['patchOrg'],
+    listOrgs: nope('listOrgs') as BbiyongOrg['listOrgs'],
+    getOrg: nope('getOrg') as BbiyongOrg['getOrg'],
     sendMember: async (req) => {
       seen.push({ ...req });
       return reply(req);

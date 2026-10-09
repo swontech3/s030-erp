@@ -41,10 +41,14 @@ import {
   ORG_MODULE_CODES,
   type BbiyongMemberRequest,
   type BbiyongOrg,
+  type BbiyongOrgInfo,
+  type BbiyongOrgKey,
   type BbiyongOrgPatch,
+  type BbiyongOrgSearch,
   type BbiyongOrgRequest,
   type CreateOrgOutcome,
   type MemberOpOutcome,
+  type OrgLookupOutcome,
   type OrgOpOutcome,
 } from './types.ts';
 
@@ -123,6 +127,10 @@ const DENY_MESSAGE =
 
 const SEED_MESSAGE =
   '삐용 권한 설정이 끝나지 않아 회사를 만들지 못했습니다. 삐용 담당자에게 전달해야 합니다';
+
+/** 단체 조회 규격이 없을 때 운영자에게 보여 줄 문구. */
+const ORG_LOOKUP_UNSUPPORTED_MESSAGE =
+  '삐용 단체 조회가 아직 연결되지 않았습니다(삐용 규격 대기). 개발계에서는 BBIYONG_MOCK=true 로 확인할 수 있습니다';
 
 const HALF_DONE_MESSAGE =
   '삐용에 회사는 만들어졌으나 권한 설정이 끝나지 않았습니다. **삐용 담당자에게 즉시 알려 주세요** — ERP 에서 다시 시도하지 마세요';
@@ -530,5 +538,21 @@ export class HttpBbiyongOrg implements BbiyongOrg {
         (outcome.kind === 'created' ? `(${outcome.memberId})` : ''),
     );
     return outcome;
+  }
+
+  /**
+   * 단체 목록 · 단건 — **삐용 규격이 아직 없다**(2026-10-09).
+   *
+   * ★★ 그래서 부르지 않고 `unsupported` 를 돌려준다. 지어낸 경로로 HTTP 를 보내면 404 를
+   *    「장애」로 읽게 되고, 삐용 쪽 로그에도 알 수 없는 호출이 남는다. 규격이 오면 이 두
+   *    메서드만 채운다 — 라우트(`routes/orgLookup.ts`)와 팝업은 그대로다.
+   * ★ `BBIYONG_MOCK=true` 면 `MockBbiyongOrg` 가 대신 답한다.
+   */
+  async listOrgs(_search: BbiyongOrgSearch, _accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo[]>> {
+    return { kind: 'unsupported', message: ORG_LOOKUP_UNSUPPORTED_MESSAGE };
+  }
+
+  async getOrg(_key: BbiyongOrgKey, _accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo | null>> {
+    return { kind: 'unsupported', message: ORG_LOOKUP_UNSUPPORTED_MESSAGE };
   }
 }

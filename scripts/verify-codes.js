@@ -36,7 +36,8 @@ import { CODE_USAGE, PINNED_CODES } from '../packages/shared/src/domain/code-usa
 /** ★ RLS 가 걸린 표는 `pool.query` 로 못 읽는다. 코드 3표에는 RLS 가 없지만 길을 맞춘다. */
 const asOperator = (fn) => withCompanyScope({ role: 'operator', companyId: null }, fn);
 
-const EXPECTED_ITEMS = 116;
+/** ★ 2026-10-07 116 → 118 — 선언표에 표양식(LAW_DOC_TP) 쓰임 1줄 + 고정 코드 1줄이 늘었다. */
+const EXPECTED_ITEMS = 118;
 let pass = 0;
 let fail = 0;
 const failures = [];

@@ -25,6 +25,7 @@ const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
   s030000070: 'settings',
   s030000080: null, // 접근 권한 없음 — 셸 밖
   s030100010: 'door-open',
+  s030100020: 'file-text', // 표양식 관리 — 서류 양식
   // ★ 코드 관리 — 기준자료라 톱니다. 설정(s030000070)과 같은 아이콘이지만 그쪽은
   //   운영사 설정이고 이쪽은 ERP 전체가 읽는 코드다. 아이콘 목록에 더 맞는 것이 없다.
   s030100030: 'settings',
@@ -40,6 +41,8 @@ const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
   s030500070p1: null, // 문의하기 — 공개 화면
   s030500070p2: null, // 문의 보기 — 공개 화면
   s030600010: 'calendar-check',
+  // ★ 법무 서비스(s04). 저울 — 법무를 가리키는 아이콘이 이것 하나다.
+  s040200010: 'scale', // 법인변경
 };
 
 export interface NavItem {

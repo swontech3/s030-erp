@@ -69,6 +69,13 @@ function opAdapter(outcome: OrgOpOutcome = { kind: 'ok' }): BbiyongOrg & { seen:
     sendMember: async () => {
       throw new Error('★ 이 시험은 sendMember 를 부르지 않아야 한다');
     },
+    // 단체 조회는 퇴실·재입주·수정과 무관하다. 부르면 터진다.
+    listOrgs: async () => {
+      throw new Error('★ 이 시험은 listOrgs 를 부르지 않아야 한다');
+    },
+    getOrg: async () => {
+      throw new Error('★ 이 시험은 getOrg 를 부르지 않아야 한다');
+    },
     moduleOff: async (orgCode) => {
       seen.push({ op: 'off', orgCode });
       return outcome;
@@ -315,6 +322,8 @@ describe('퇴실·재입주 — ⑥ 토큰 만료는 재발급으로 이어진�
       moduleOn: nope('moduleOn') as BbiyongOrg['moduleOn'],
       patchOrg: nope('patchOrg') as BbiyongOrg['patchOrg'],
       sendMember: nope('sendMember') as BbiyongOrg['sendMember'],
+      listOrgs: nope('listOrgs') as BbiyongOrg['listOrgs'],
+      getOrg: nope('getOrg') as BbiyongOrg['getOrg'],
       moduleOff: async (_orgCode, accessToken) => {
         tokens.push(accessToken);
         if (tokens.length === 1) throw new BbiyongTokenExpiredError('삐용 퇴실이 401');

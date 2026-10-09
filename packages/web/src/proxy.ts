@@ -40,5 +40,6 @@ export function proxy(request: NextRequest) {
  *   `@swonbiz/shared` 의 screens.ts 를 함께 고친다.
  */
 export const config = {
-  matcher: ['/dashboard/:path*', '/booking/:path*', '/tenants/:path*', '/contracts/:path*', '/billing/:path*', '/settings/:path*', '/facility/:path*', '/inquiry-admin/:path*'],
+  // ★ `/legal` — 법무 서비스(s04, 2026-10-09). `next.config.ts` 의 PROTECTED_PATHS 에도 있다.
+  matcher: ['/dashboard/:path*', '/booking/:path*', '/tenants/:path*', '/contracts/:path*', '/billing/:path*', '/settings/:path*', '/facility/:path*', '/inquiry-admin/:path*', '/forms/:path*', '/legal/:path*'],
 };
