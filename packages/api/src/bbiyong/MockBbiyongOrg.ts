@@ -22,7 +22,6 @@
  * ★ 같은 프로세스 안에서는 두 번째 등록이 같은 코드를 쓰면 실제로 중복을 돌려준다
  *   (아래 `#byCode`). 재기동하면 비어 있다 — 진실원은 ERP DB 쪽 `link_org_code` 다.
  */
-import { isErpOrgCode } from '@swonbiz/shared/domain/org-code';
 import { MOCK_ACCOUNTS } from './MockBbiyongAuth.ts';
 import type {
   BbiyongMemberRequest,
@@ -235,13 +234,14 @@ export class MockBbiyongOrg implements BbiyongOrg {
   }
 
   /**
-   * 단체 목록 — 회사명 일부로 찾는다. **Z 코드만**(규격 초안, 2026-10-09).
-   * ★ 대소문자·앞뒤 공백을 무시한다. 빈 검색어는 Z 대역 전부다. 코드 순으로 준다.
+   * 단체 목록 — 회사명 일부로 찾는다(삐용 회신 2026-10-09).
+   * ★ 실물은 「법무 서비스를 받은 회사」만 준다 — 거르는 것은 삐용 몫이다. mock 은 자기가
+   *   아는 단체(모의 계정 + 이 프로세스가 만든 회사)를 **거르지 않고** 준다.
+   * ★ 대소문자·앞뒤 공백을 무시한다. 빈 검색어는 전부다. 코드 순으로 준다.
    */
   async listOrgs(search: BbiyongOrgSearch, _accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo[]>> {
     const needle = search.name.trim().toLowerCase();
     const value = this.#directory()
-      .filter((o) => isErpOrgCode(o.orgCode))
       .filter((o) => needle === '' || o.orgName.toLowerCase().includes(needle))
       .sort((a, b) => a.orgCode.localeCompare(b.orgCode));
     return { kind: 'ok', value };

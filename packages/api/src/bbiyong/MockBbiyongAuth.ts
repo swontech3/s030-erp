@@ -41,7 +41,8 @@ interface MockAccount extends Omit<BbiyongLoginResult, 'accessToken' | 'refreshT
    *
    * ★ Z97~Z99 를 쓴다. ERP 채번은 Z01 부터 올라가므로 끝 번호대가 개발 중에 겹치지 않고,
    *   겹치더라도 `MockBbiyongOrg.createOrg` 가 이 코드를 「이미 있음」으로 돌려줘 다음 번호로 간다.
-   * ★ 운영사(orgId 1)에는 적지 않는다 — 조회는 Z 코드만 돌려준다.
+   * ★ 운영사(orgId 1)에는 적지 않는다 — 운영사 단체는 「법무 서비스를 받은 회사」가 아니라 조회 목록에
+   *   나오면 안 된다. 실물은 삐용이 거르고(회신 2026-10-09), mock 은 여기 적지 않는 것으로 맞춘다.
    */
   orgCode?: string;
 }

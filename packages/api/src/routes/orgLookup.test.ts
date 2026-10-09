@@ -96,7 +96,7 @@ describe('GET /org-lookup — 입주사 딱지', () => {
     expect(deps.calls).toEqual(['list:한빛']);
   });
 
-  it('★ Z 대역이 아닌 단체는 목록에서 뺀다 — 삐용이 섞어 보내도', async () => {
+  it('★ 받은 목록을 그대로 보여 준다 — Z 대역이 아니어도 거르지 않는다(삐용 몫)', async () => {
     const deps = fakeDeps({
       listOrgs: async () => ({
         kind: 'ok',
@@ -105,7 +105,7 @@ describe('GET /org-lookup — 입주사 딱지', () => {
     });
     const a = await build(session('operator', 1), deps);
     const res = await a.inject({ method: 'GET', url: '/org-lookup' });
-    expect(res.json().orgs.map((o: { orgCode: string }) => o.orgCode)).toEqual(['Z97', 'Z99']);
+    expect(res.json().orgs.map((o: { orgCode: string }) => o.orgCode)).toEqual(['Z97', 'Z99', 'S01']);
   });
 });
 
@@ -148,13 +148,14 @@ describe('GET /org-lookup/one — 단건', () => {
 });
 
 describe('MockBbiyongOrg — 단체 조회', () => {
-  it('★ 모의 계정 단체가 나오고 Z 코드만, 이름으로 찾는다', async () => {
+  it('★ 모의 계정 단체가 나오고, 이름으로 찾는다', async () => {
     const mock = new MockBbiyongOrg();
     const all = await mock.listOrgs({ name: '' }, 't');
     expect(all.kind).toBe('ok');
     if (all.kind !== 'ok') return;
     expect(all.value.map((o) => o.orgCode)).toEqual(['Z97', 'Z98', 'Z99']);
-    expect(all.value.every((o) => o.orgId !== 1)).toBe(true); // 운영사 단체는 빠진다
+    // 운영사 계정은 단체코드가 없어 모의 단체 목록에 없다(필터가 아니라 시드에 없는 것이다).
+    expect(all.value.every((o) => o.orgId !== 1)).toBe(true);
 
     const found = await mock.listOrgs({ name: ' 한빛 ' }, 't');
     expect(found.kind === 'ok' && found.value.map((o) => o.orgId)).toEqual([9003]);
@@ -182,5 +183,16 @@ describe('MockBbiyongOrg — 단체 조회', () => {
 
     const dup = await mock.createOrg({ ...req, orgCode: 'Z99' }, 't');
     expect(dup.kind).toBe('duplicate_code');
+  });
+
+  it('★ Z 대역이 아닌 단체도 거르지 않는다 — 거르는 것은 삐용 몫(회신 2026-10-09)', async () => {
+    const mock = new MockBbiyongOrg();
+    await mock.createOrg(
+      { orgCode: 'A05', orgName: '바깥회사', memberName: '박대표', hpNo: '01000000001', email: 'x@y.z',
+        countryCode: 'KR', moduleCodes: ['OFFICE'] },
+      't',
+    );
+    const listed = await mock.listOrgs({ name: '바깥' }, 't');
+    expect(listed.kind === 'ok' && listed.value.map((o) => o.orgCode)).toEqual(['A05']);
   });
 });

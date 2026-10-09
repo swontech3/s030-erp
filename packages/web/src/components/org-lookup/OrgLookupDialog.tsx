@@ -67,7 +67,7 @@ export function OrgLookupDialog({ title = '회사 조회', onClose, onPick }: Pr
     }
   }, []);
 
-  // 열 때 전부 띄운다 — Z 대역이라 많아야 99곳이다.
+  // 열 때 전부 띄운다 — 삐용이 「법무 서비스를 받은 회사」로 걸러 보낸다(회신 2026-10-09).
   useEffect(() => {
     void search('');
   }, [search]);

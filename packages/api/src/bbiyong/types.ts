@@ -384,9 +384,12 @@ export interface BbiyongOrgInfo {
   status: string | null;
 }
 
-/** 목록 조건. ★ 결과는 **Z 코드(ERP 가 만든 회사 대역)만**이다 — 운영사 단체 등은 빠진다. */
+/**
+ * 목록 조건. ★ 결과는 **「법무 서비스를 받은 회사」** 다(삐용 회신 2026-10-09) — 거르는 것은
+ * 삐용 몫이고 ERP 는 받은 목록을 그대로 보여 준다. 단체코드 대역(Z 등)으로 거르지 않는다.
+ */
 export interface BbiyongOrgSearch {
-  /** 회사명 일부. 빈 문자열이면 Z 대역 전부. */
+  /** 회사명 일부. 빈 문자열이면 받은 목록 전부. */
   name: string;
 }
 
@@ -407,7 +410,7 @@ export type OrgLookupOutcome<T> =
 
 export interface BbiyongOrg {
   createOrg(req: BbiyongOrgRequest, accessToken: string): Promise<CreateOrgOutcome>;
-  /** 단체 목록 — 회사명 검색, Z 코드만(`BbiyongOrgSearch`). */
+  /** 단체 목록 — 회사명 검색, 법무 서비스를 받은 회사(`BbiyongOrgSearch`). */
   listOrgs(search: BbiyongOrgSearch, accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo[]>>;
   /** 단체 한 곳 — 없으면 `value: null`. */
   getOrg(key: BbiyongOrgKey, accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo | null>>;

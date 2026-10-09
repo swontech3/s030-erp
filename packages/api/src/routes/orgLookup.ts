@@ -33,7 +33,6 @@ import {
   type OrgInfo,
   type OrgKey,
 } from '@swonbiz/shared/domain/org-lookup';
-import { isErpOrgCode } from '@swonbiz/shared/domain/org-code';
 import { requireSession } from '../session/hook.ts';
 import { callBbiyong } from '../session/bbiyongToken.ts';
 import { bbiyongOrg, type OrgLookupOutcome } from '../bbiyong/index.ts';
@@ -66,8 +65,9 @@ export function registerOrgLookupRoutes(app: FastifyInstance, deps: OrgLookupDep
     if (out.kind === 'unsupported') {
       return reply.code(503).send({ error: 'org_lookup_unsupported', message: out.message });
     }
-    // ★ 「Z 코드만」은 목록 규격이다. 삐용이 다른 대역을 섞어 보내도 여기서 거른다.
-    const orgs = out.value.filter((o) => isErpOrgCode(o.orgCode));
+    // ★ 받은 목록을 그대로 보여 준다 — 「법무 서비스를 받은 회사」로 거르는 것은 삐용 몫이다
+    //   (삐용 회신 2026-10-09). 단체코드 대역(Z 등)으로 거르지 않는다.
+    const orgs = out.value;
     const linked = await deps.linkedOrgIds(session, orgs.map((o) => o.orgId));
     return reply.send({ orgs: markTenants(orgs, linked) });
   });

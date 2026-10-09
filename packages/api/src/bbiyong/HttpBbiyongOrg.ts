@@ -547,6 +547,12 @@ export class HttpBbiyongOrg implements BbiyongOrg {
    *    「장애」로 읽게 되고, 삐용 쪽 로그에도 알 수 없는 호출이 남는다. 규격이 오면 이 두
    *    메서드만 채운다 — 라우트(`routes/orgLookup.ts`)와 팝업은 그대로다.
    * ★ `BBIYONG_MOCK=true` 면 `MockBbiyongOrg` 가 대신 답한다.
+   *
+   * ★★ 삐용 회신(2026-10-09) — 규격이 오면 지킬 것:
+   *    ① **호출 계정에 「법무 회사 보기」 권한이 있어야 한다.** 없으면 삐용이 거절한다 —
+   *       ERP 장애가 아니라 삐용 권한 설정 문제로 읽어야 한다(문구도 그렇게 낸다).
+   *    ② 목록은 **「법무 서비스를 받은 회사」** 기준이다. Z 코드 조건은 없다 — 거르는 것은
+   *       삐용 몫이고, ERP 는 받은 목록을 그대로 보여 준다.
    */
   async listOrgs(_search: BbiyongOrgSearch, _accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo[]>> {
     return { kind: 'unsupported', message: ORG_LOOKUP_UNSUPPORTED_MESSAGE };

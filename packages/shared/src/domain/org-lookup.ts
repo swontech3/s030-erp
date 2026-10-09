@@ -77,7 +77,7 @@ export function normalizeOrgQuery(raw: unknown): string {
  * 단건 조회 키를 읽는다. 둘 중 **하나만** 와야 한다 — 둘 다 오거나 둘 다 틀리면 null.
  *
  * ★ 단체 ID 는 양의 정수만. 단체코드는 삐용 규격대로 영문·숫자 3자리(대문자로 맞춘다).
- *   Z 대역만 받지는 않는다 — 단건은 「이 건의 회사가 누구인가」를 다시 읽는 데도 쓴다.
+ *   단체코드 대역(Z 등)으로 거르지 않는다 — 목록과 같다(삐용 회신 2026-10-09: 거르는 것은 삐용 몫).
  */
 export function parseOrgKey(query: { orgId?: unknown; orgCode?: unknown }): OrgKey | null {
   const hasId = query.orgId !== undefined && query.orgId !== '';
