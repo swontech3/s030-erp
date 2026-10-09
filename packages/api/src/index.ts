@@ -29,6 +29,7 @@ import { registerFacilityRoutes } from './routes/facility.ts';
 import { registerCodeRoutes } from './routes/codes.ts';
 import { registerFormTemplateRoutes } from './routes/formTemplates.ts';
 import { registerOrgLookupRoutes } from './routes/orgLookup.ts';
+import { registerCorpChangeRoutes } from './routes/corpChanges.ts';
 import { closePool } from './db/pool.ts';
 import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
 
@@ -139,6 +140,9 @@ registerFormTemplateRoutes(app);
 // ★ 공용 회사 조회(삐용 단체) — 법무 서비스(S04)가 처음 쓰는 팝업의 서버 쪽. **운영사 전용**.
 //   화면이 아니라 부품이라 화면 코드가 없다(`routes/orgLookup.ts` 머리말).
 registerOrgLookupRoutes(app);
+// ★ 법인변경(s040200010) — 운영사 · 회사가 함께 쓴다. 누가 무엇을 보는지는 RLS(037)가
+//   단체 ID 로 가른다(`routes/corpChanges.ts` 머리말). 2단계는 목록 조회만.
+registerCorpChangeRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,

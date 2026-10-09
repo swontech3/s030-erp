@@ -27,7 +27,8 @@
     "verify:3-2": "tsx scripts/verify-3-2.js",
     "verify:3-5": "tsx scripts/verify-3-5.js",
     "verify:facility": "tsx scripts/verify-facility.js",
-    "verify:codes": "tsx scripts/verify-codes.js"
+    "verify:codes": "tsx scripts/verify-codes.js",
+    "verify:corp-change-list": "tsx scripts/verify-corp-change-list.js"
   },
   "devDependencies": {
     "tsx": "^4.23.13",
