@@ -3,6 +3,7 @@ import {
   applyCompanyDefaults,
   guessMemberType,
   corpChangeCompanyName,
+  corpChangeDateLine,
   maskRrn,
   normalizeRrn,
   parseCompanyPart,
@@ -340,5 +341,30 @@ describe('parseLegalOrgBody — 숫자 칸 형식(서버 검사)', () => {
   it('빈 칸 · 대표번호(1588)는 막지 않는다', () => {
     const r = parseLegalOrgBody({ corpNumber: '', tel: '1588-1234' });
     expect(r.ok && [r.value.corpNumber, r.value.tel]).toEqual([null, '158-812-34']);
+  });
+});
+
+describe('corpChangeDateLine — 상태에 맞는 날짜만', () => {
+  const all: { createdOn: string; writtenOn: string | null; completedOn: string | null } = { createdOn: '2026-10-01', writtenOn: '2026-10-02', completedOn: '2026-10-03' };
+  const line = (status: string, statusBeforeCancel: 'P' | 'E' | 'C' | 'X' | null = null, d = all) =>
+    corpChangeDateLine({ status, statusBeforeCancel, ...d }).map((x) => `${x.label} ${x.day}`).join(' · ');
+
+  it('P 는 등록만 — 서류수정 뒤 남은 작성완료일은 안 보인다', () => {
+    expect(line('P')).toBe('등록 2026-10-01');
+  });
+  it('E 는 등록 · 작성완료 — 완료 취소 뒤의 완료일도 안 보인다', () => {
+    expect(line('E')).toBe('등록 2026-10-01 · 작성완료 2026-10-02');
+  });
+  it('C 는 셋 다', () => {
+    expect(line('C')).toBe('등록 2026-10-01 · 작성완료 2026-10-02 · 완료 2026-10-03');
+  });
+  it('취소는 취소 직전 상태 기준', () => {
+    expect(line('X', 'P')).toBe('등록 2026-10-01');
+    expect(line('X', 'E')).toBe('등록 2026-10-01 · 작성완료 2026-10-02');
+    expect(line('X', 'C')).toBe('등록 2026-10-01 · 작성완료 2026-10-02 · 완료 2026-10-03');
+    expect(line('X', null)).toBe('등록 2026-10-01');
+  });
+  it('값이 없는 날짜는 뺀다', () => {
+    expect(line('C', null, { ...all, writtenOn: null })).toBe('등록 2026-10-01 · 완료 2026-10-03');
   });
 });

@@ -62,6 +62,7 @@ import {
 } from '@swonbiz/shared/domain/corp-change';
 import { STALE_STATUS_MESSAGE } from '@swonbiz/shared/domain/corp-change-transition';
 import {
+  corpChangeDateLine,
   maskRrn,
   normalizeRrn,
   type CorpChangeAddressView,
@@ -602,12 +603,10 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
                 · <strong>{saved?.statusName ?? draft.statusName}</strong>
               </span>
             </div>
-            {/* 날짜 줄 — 저장된 건만. 임시 모드는 없다. */}
+            {/* 날짜 줄 — 저장된 건만, 상태에 맞는 날짜만(`corpChangeDateLine`). 임시 모드는 없다. */}
             {saved ? (
               <div className={styles.pageNote}>
-                등록 {saved.createdOn}
-                {saved.writtenOn ? ` · 작성완료 ${saved.writtenOn}` : ''}
-                {saved.completedOn ? ` · 완료 ${saved.completedOn}` : ''}
+                {corpChangeDateLine(saved).map((d) => `${d.label} ${d.day}`).join(' · ')}
               </div>
             ) : null}
           </div>

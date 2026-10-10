@@ -649,3 +649,26 @@ export function corpChangeCompanyName(
   if (code) return code;
   return `단체 ${org.orgId}`;
 }
+
+/**
+ * 상세 머리의 날짜 줄 — 상태에 맞는 날짜만(결정 2026-10-10). **표시만** 고른다. DB 값은 그대로 둔다.
+ * 서류수정(E→P) 뒤에도 written_at 이 남고, 완료 취소(C→E)는 completed_at 을 비우지만, 그 남은 값을
+ * 지금 상태가 쓰지 않으면 보이지 않는다.
+ *
+ *   P = 등록 / E = 등록 · 작성완료 / C = 등록 · 작성완료 · 완료 / X = 취소 직전 상태 기준
+ *
+ * 값이 없는 날짜는 뺀다(작성완료 전에 만든 옛 건 등).
+ */
+export function corpChangeDateLine(row: {
+  status: string;
+  statusBeforeCancel: CorpChangeStatus | null;
+  createdOn: string;
+  writtenOn: string | null;
+  completedOn: string | null;
+}): { label: string; day: string }[] {
+  const basis = row.status === 'X' ? row.statusBeforeCancel : row.status;
+  const line: { label: string; day: string | null }[] = [{ label: '등록', day: row.createdOn }];
+  if (basis === 'E' || basis === 'C') line.push({ label: '작성완료', day: row.writtenOn });
+  if (basis === 'C') line.push({ label: '완료', day: row.completedOn });
+  return line.filter((d): d is { label: string; day: string } => !!d.day);
+}
