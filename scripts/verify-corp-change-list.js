@@ -54,7 +54,7 @@ async function main() {
         ['a1', ORG_A, null, 'NAME', 'P', '2026-10-01 09:00'],
         ['a2', ORG_A, null, 'HQ', 'E', '2026-10-05 23:59:59.999'],
         ['ax', ORG_A, null, 'OFFICER', 'X', '2026-10-06 10:00'],
-        ['b1', ORG_B, 'Z96', 'CEO_ADDR', 'A', '2026-10-06 00:00'],
+        ['b1', ORG_B, 'Z96', 'CEO_ADDR', 'E', '2026-10-06 00:00'],
         ['b2', ORG_B, null, 'PURPOSE', 'C', '2026-10-09 12:00'],
       ];
       for (const [k, org, code, type, st, at] of rows) {
@@ -113,7 +113,7 @@ async function main() {
       const non = await listAs(op, { tenancy: 'nontenant' });
       check('F3', '입주 여부 — 비입주사', ids(non) === 'b1,b2', ids(non));
       const st = await listAs(op, { status: 'E' });
-      check('F4', '진행 상태 — E', ids(st) === 'a2', ids(st));
+      check('F4', '진행 상태 — E', ids(st) === 'a2,b1', ids(st));
       const ty = await listAs(op, { changeType: 'OFFICER', includeCancelled: true });
       check('F5', '변경 구분 — 임원(취소 건 포함)', ids(ty) === 'ax', ids(ty));
       const tyNoX = await listAs(op, { changeType: 'OFFICER' });
@@ -122,8 +122,8 @@ async function main() {
       check('F7', '★ 작업일자 하루 — 23:59:59.999 까지 들어온다', ids(day) === 'a2', ids(day));
       const range = await listAs(op, { from: '2026-10-06', to: '2026-10-09', includeCancelled: true });
       check('F8', '작업일자 범위 — 끝 날 포함', ids(range) === 'ax,b1,b2', ids(range));
-      const combo = await listAs(op, { from: '2026-10-01', to: '2026-10-31', tenancy: 'nontenant', status: 'A' });
-      check('F9', '조합 — 기간 · 비입주사 · 서류제출', ids(combo) === 'b1', ids(combo));
+      const combo = await listAs(op, { from: '2026-10-01', to: '2026-10-31', tenancy: 'nontenant', status: 'E' });
+      check('F9', '조합 — 기간 · 비입주사 · 작성완료', ids(combo) === 'b1', ids(combo));
       const aNon = await listAs(session('tenant', ORG_A, companyA), { tenancy: 'nontenant' });
       check('F10', '회사 A 세션 + 비입주사 필터 — 0건(RLS 와 필터가 함께 건다)', aNon.length === 0, ids(aNon));
 

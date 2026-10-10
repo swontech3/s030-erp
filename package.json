@@ -29,7 +29,8 @@
     "verify:facility": "tsx scripts/verify-facility.js",
     "verify:codes": "tsx scripts/verify-codes.js",
     "verify:corp-change-list": "tsx scripts/verify-corp-change-list.js",
-    "verify:corp-change-detail": "tsx scripts/verify-corp-change-detail.js"
+    "verify:corp-change-detail": "tsx scripts/verify-corp-change-detail.js",
+    "verify:corp-change-transition": "tsx scripts/verify-corp-change-transition.js"
   },
   "devDependencies": {
     "tsx": "^4.23.13",

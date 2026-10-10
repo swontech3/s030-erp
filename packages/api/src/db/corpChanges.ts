@@ -1,6 +1,6 @@
 /**
  * 법인변경(s040200010 · s040200011) 저장소 — 목록(2단계) · 새 건 · 상세 · 변경 내용 · 임원 ·
- * 비입주사 법무 회사 정보(3단계, 2026-10-10).
+ * 비입주사 법무 회사 정보(3단계) · 상태 전이 · 삭제(4단계, 2026-10-10).
  *
  * ★★★ 누가 무엇을 보는지는 **RLS 가 가른다**(037 `erp_org_scope`). 이 파일은 단체 조건을
  *    적지 않는다 — 운영사 세션은 전부, 회사 세션은 자기 단체 건만 돌아온다. 그래서 반드시
@@ -161,6 +161,11 @@ export interface CorpChangeRow {
   status: string;
   payload: Record<string, unknown>;
   createdOn: string;
+  /** 취소 직전 상태 — 취소(X)일 때만 있다(4단계). */
+  statusBeforeCancel: string | null;
+  cancelReason: string | null;
+  writtenOn: string | null;
+  completedOn: string | null;
 }
 
 /**
@@ -181,10 +186,17 @@ export async function getCorpChange(
     status: string;
     payload: Record<string, unknown> | null;
     created_on: string;
+    status_before_cancel?: string | null;
+    cancel_reason?: string | null;
+    written_on?: string | null;
+    completed_on?: string | null;
   }>(
     client,
     `SELECT id, org_id, org_code, change_type, status, payload,
-            to_char(created_at, 'YYYY-MM-DD') AS created_on
+            to_char(created_at, 'YYYY-MM-DD') AS created_on,
+            status_before_cancel, cancel_reason,
+            to_char(written_at, 'YYYY-MM-DD') AS written_on,
+            to_char(completed_at, 'YYYY-MM-DD') AS completed_on
        FROM public.tb_s080_corp_changes
       WHERE id = $1${opts.forUpdate ? ' FOR UPDATE' : ''}`,
     [id],
@@ -199,6 +211,10 @@ export async function getCorpChange(
     status: r.status,
     payload: r.payload ?? {},
     createdOn: r.created_on,
+    statusBeforeCancel: r.status_before_cancel ?? null,
+    cancelReason: r.cancel_reason ?? null,
+    writtenOn: r.written_on ?? null,
+    completedOn: r.completed_on ?? null,
   };
 }
 
@@ -335,6 +351,72 @@ export async function touchCorpChange(client: ScopedClient, id: string, actor: s
     id,
     actor,
   ]);
+}
+
+// =============================================================================
+// 상태 전이 · 삭제(4단계)
+// =============================================================================
+
+/**
+ * 상태 하나를 바꾼다 — 판정(`checkTransition`)과 잠금(`FOR UPDATE`)은 부르는 쪽이 **같은
+ * 트랜잭션에서 먼저** 한다. 이 함수는 전이에 딸린 칸을 함께 쓸 뿐이다(결정 2026-10-10):
+ *
+ *   · →X 취소   — `status_before_cancel` = 지금 상태, `cancelled_at` = now(), `cancel_reason`
+ *   · X→ 복원   — 위 셋을 비운다
+ *   · P→E 작성완료 — `written_at` = now(), `submit_snapshot` 을 **통째로 바꾼다**(다시 작성완료하면 새 것)
+ *   · E→C 완료     — `completed_at` = now()
+ *   · C→E 완료 취소 — `completed_at` 을 비운다
+ *
+ * ★ E→P(서류수정)는 `written_at` · `submit_snapshot` 을 지우지 않는다 — 다시 작성완료할 때 바뀐다.
+ * ★ 칸 이름 `written_at` 은 039 에서 `submitted_at` 을 바꾼 것이다(제출 단계 삭제, 2026-10-10).
+ * ★ `WHERE status = from` 을 한 번 더 건다 — 잠금을 빠뜨린 호출이 있어도 엉뚱한 상태를 덮지 않는다.
+ *   바뀐 줄이 없으면 false.
+ */
+export async function updateCorpChangeStatus(
+  client: ScopedClient,
+  args: {
+    id: string;
+    from: string;
+    to: string;
+    actor: string;
+    cancelReason?: string | null;
+    snapshot?: unknown;
+  },
+): Promise<boolean> {
+  const params: unknown[] = [args.id, args.from, args.to, args.actor];
+  const set = ['status = $3', 'updated_at = now()', 'updated_by = $4'];
+  if (args.to === 'X') {
+    params.push(args.cancelReason ?? null);
+    set.push('status_before_cancel = $2', 'cancelled_at = now()', `cancel_reason = $${params.length}`);
+  } else if (args.from === 'X') {
+    set.push('status_before_cancel = NULL', 'cancelled_at = NULL', 'cancel_reason = NULL');
+  } else if (args.from === 'P' && args.to === 'E') {
+    params.push(JSON.stringify(args.snapshot));
+    set.push('written_at = now()', `submit_snapshot = $${params.length}::jsonb`);
+  } else if (args.from === 'E' && args.to === 'C') {
+    set.push('completed_at = now()');
+  } else if (args.from === 'C' && args.to === 'E') {
+    set.push('completed_at = NULL');
+  }
+  const { rowCount } = await q(
+    client,
+    `UPDATE public.tb_s080_corp_changes SET ${set.join(', ')} WHERE id = $1 AND status = $2`,
+    params,
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+/**
+ * 건을 지운다 — **임원을 먼저** 지우고 건을 지운다(FK 의 ON DELETE CASCADE 에 기대지 않고
+ * 눈에 보이게). 판정(`checkDelete`)과 잠금은 부르는 쪽이 먼저 한다. 건이 지워졌으면 true.
+ */
+export async function deleteCorpChange(client: ScopedClient, args: { id: string; status: string }): Promise<boolean> {
+  await q(client, `DELETE FROM public.tb_s080_corp_change_officers WHERE corp_change_id = $1`, [args.id]);
+  const { rowCount } = await q(client, `DELETE FROM public.tb_s080_corp_changes WHERE id = $1 AND status = $2`, [
+    args.id,
+    args.status,
+  ]);
+  return (rowCount ?? 0) > 0;
 }
 
 // =============================================================================

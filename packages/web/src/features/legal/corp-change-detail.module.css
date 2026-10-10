@@ -5,6 +5,8 @@
  *   (제목 · 처리 버튼) · 최대 1120px 본문 · 카드(section) · 4열 그리드 · 주소 한 줄 — 에 맞췄다.
  *   값은 토큰만 쓴다.
  * ★ 녹색 금지(PLAT-05).
+ * ★ 간격은 계약 폼보다 촘촘하다 — 기본정보 · 변경 내용 · 임원이 1440×900 한 화면에 들어오게
+ *   줄였다(결정 2026-10-10). 칸 높이 38 · 카드 안쪽 16/20 · 카드 사이 12.
  */
 
 .page {
@@ -21,7 +23,7 @@
   top: -32px;
   z-index: 30;
   flex: 0 0 auto;
-  min-height: 72px;
+  min-height: 60px;
   margin: -32px -32px 0;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -33,24 +35,15 @@
   width: 100%;
   max-width: 1120px;
   margin: 0 auto;
-  padding: 10px 32px;
+  padding: 8px 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
 
-.back {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 13px;
-  color: var(--text-muted);
-  text-decoration: none;
-}
-
-.back:hover {
-  color: var(--color-primary);
+.headTitle {
+  min-width: 0;
 }
 
 .titleRow {
@@ -62,17 +55,29 @@
 
 .pageTitle {
   margin: 0;
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 700;
   line-height: 1.25;
   letter-spacing: -0.018em;
   color: var(--text-heading);
 }
 
+/* 제목 옆 — 회사명 · 상태명 */
+.titleMeta {
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+.titleMeta strong {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* 제목 아래 날짜 줄 — 저장된 건만 */
 .pageNote {
   margin-top: 2px;
-  font-size: 13px;
-  color: var(--text-muted);
+  font-size: 12px;
+  color: var(--text-caption);
 }
 
 .headActions {
@@ -82,7 +87,7 @@
 }
 
 .formScroll {
-  padding: 24px 0 0;
+  padding: 16px 0 0;
 }
 
 .formWrap {
@@ -90,7 +95,7 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 12px;
 }
 
 /* ── 알림 줄 ── */
@@ -98,9 +103,9 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 8px 14px;
   border-radius: var(--radius-md);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -183,8 +188,8 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 24px 28px;
-  scroll-margin-top: 88px;
+  padding: 16px 20px;
+  scroll-margin-top: 76px;
 }
 
 .sectionHeader {
@@ -196,7 +201,7 @@
 
 .sectionHeader h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 600;
   line-height: 1.4;
   color: var(--text-heading);
@@ -209,13 +214,13 @@
 }
 
 .sectionRule {
-  margin: 16px 0;
+  margin: 10px 0 12px;
   height: 1px;
   background: var(--border);
 }
 
 .sectionNote {
-  margin: 0 0 16px;
+  margin: 0 0 10px;
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-muted);
@@ -225,8 +230,19 @@
 .grid4 {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  column-gap: 20px;
-  row-gap: 18px;
+  column-gap: 16px;
+  row-gap: 12px;
+}
+
+/* 변경 내용 — 열 수는 칸 수에 맞춰 화면이 정한다(`payloadColumns`) */
+.payloadGrid {
+  display: grid;
+  column-gap: 16px;
+  row-gap: 12px;
+}
+
+.spanAll {
+  grid-column: 1 / -1;
 }
 
 .span2 {
@@ -240,14 +256,25 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 
 .label {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-heading);
+}
+
+/* 삐용 값으로 채워 보여 주는 칸 — 아직 저장 안 됨 */
+.preTag {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .req {
@@ -255,7 +282,7 @@
 }
 
 .hint {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -268,8 +295,8 @@
 .select,
 .textarea {
   width: 100%;
-  height: 44px;
-  padding: 0 14px;
+  height: 38px;
+  padding: 0 12px;
   font-family: inherit;
   font-size: 14px;
   color: var(--text-heading);
@@ -305,8 +332,8 @@
 
 .textarea {
   height: auto;
-  padding: 12px 14px;
-  line-height: 1.6;
+  padding: 8px 12px;
+  line-height: 1.5;
   resize: vertical;
 }
 
@@ -338,7 +365,7 @@
 
 /* ── 읽기 전용 값(입주사 기본정보) ── */
 .readValue {
-  min-height: 44px;
+  min-height: 38px;
   display: flex;
   align-items: center;
   padding: 0 14px;
@@ -402,7 +429,7 @@
 }
 
 .oHead {
-  height: 40px;
+  height: 34px;
   background: var(--surface-alt);
   border-bottom: 1px solid var(--border);
   font-size: 12px;
@@ -411,9 +438,9 @@
 }
 
 .oRow {
-  min-height: 52px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  min-height: 44px;
+  padding-top: 4px;
+  padding-bottom: 4px;
   border-bottom: 1px solid var(--border);
   font-size: 14px;
   color: var(--text-heading);
@@ -455,7 +482,7 @@
 }
 
 .empty {
-  padding: 28px 16px;
+  padding: 14px 16px;
   text-align: center;
   font-size: 14px;
   color: var(--text-muted);
@@ -463,22 +490,22 @@
 
 /* 임원 입력 칸 — 표 아래에 연다 */
 .editor {
-  margin-top: 16px;
-  padding: 20px;
+  margin-top: 12px;
+  padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
 }
 
 .editorHead {
-  margin: 0 0 14px;
+  margin: 0 0 10px;
   font-size: 15px;
   font-weight: 700;
   color: var(--text-heading);
 }
 
 .editorActions {
-  margin-top: 18px;
+  margin-top: 12px;
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -504,8 +531,9 @@
 }
 
 @media (max-width: 900px) {
-  .grid4 {
-    grid-template-columns: minmax(0, 1fr);
+  .grid4,
+  .payloadGrid {
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
   .span2,
@@ -526,4 +554,109 @@
   .pageHeadInner {
     flex-wrap: wrap;
   }
+}
+
+/* ── 처리 확인 창 (4단계) ── 상태 전이 확인 창(s030200040p2)과 같은 모양 ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(11, 17, 32, 0.45);
+}
+
+.modal {
+  width: 460px;
+  max-width: 100%;
+  padding: 32px 28px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  text-align: center;
+}
+
+.modalIcon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.modalIconPrimary {
+  background: var(--color-accent-bg);
+  color: var(--color-primary);
+}
+
+.modalIconDanger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.modalTitle {
+  margin: 16px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.modalDesc {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-body);
+}
+
+.modalField {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.modalFoot {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.modalFoot .btn {
+  width: 100%;
+  height: 48px;
+}
+
+.modalErr {
+  margin: 12px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+/* ── 머리 — 처리 버튼 · 진행 기록 (4단계) ── */
+.headActions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.headHint {
+  width: 100%;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* 반 줄 주소(기본정보의 본점 · 대표자 자택을 나란히) — 우편번호 · 상세주소를 좁힌다 */
+.addrCompact .addrZip {
+  width: 84px;
+}
+
+.addrCompact .addrDetail {
+  width: 140px;
 }

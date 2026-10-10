@@ -26,7 +26,7 @@ import {
   calcTotals,
   type ContractTotals,
 } from '@swonbiz/shared/domain/contract-amounts';
-import { caretForMasked } from '@swonbiz/shared/domain/masked-caret';
+import { caretForMasked, maskValue } from '@swonbiz/shared/domain/masked-caret';
 import { docRuleFor } from '@swonbiz/shared/domain/contract-files';
 
 /** 계약 항목 한 줄. 금액은 전부 원 단위 정수이고, 안 채운 칸은 0 이다. */
@@ -311,25 +311,10 @@ export function maskEmailId(raw: string): string {
 }
 
 /**
- * 마스크 3종 — 시안 `maskValue`(`05-logic.md` §5) 그대로다.
- * 계산이 아니라 **표시 형식**이라 서버와 갈릴 것이 없다.
+ * 마스크 3종 — shared `masked-caret.ts` 로 옮겼다(2026-10-10). 법무 상세 · 서버 검사가 같이 쓴다.
+ * 02(서울) 규칙이 그쪽에서 더해졌다 — 전에는 `021-234-5678` 로 끊겼다(결함 수정).
  */
-export function maskValue(kind: 'bizno' | 'corpno' | 'phone', raw: string): string {
-  const max = kind === 'corpno' ? 13 : kind === 'phone' ? 11 : 10;
-  const d = raw.replace(/\D/g, '').slice(0, max);
-
-  if (kind === 'bizno') {
-    if (d.length > 5) return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`;
-    return d.length > 3 ? `${d.slice(0, 3)}-${d.slice(3)}` : d;
-  }
-  if (kind === 'corpno') {
-    return d.length > 6 ? `${d.slice(0, 6)}-${d.slice(6)}` : d;
-  }
-  // 010 은 3-4-4, 그 외는 3-3-4
-  const mid = d.startsWith('010') || d.length > 10 ? 7 : 6;
-  if (d.length > mid) return `${d.slice(0, 3)}-${d.slice(3, mid)}-${d.slice(mid)}`;
-  return d.length > 3 ? `${d.slice(0, 3)}-${d.slice(3)}` : d;
-}
+export { maskValue };
 
 /**
  * 마스킹 칸의 `onChange` — **값을 바꾸면서 커서를 제자리에 둔다** (CONT-19).

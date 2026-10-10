@@ -11,6 +11,7 @@ import type { ErpSession, ScopeRole } from '@swonbiz/shared';
 import type { CorpChangeListFilter } from '@swonbiz/shared/domain/corp-change-list';
 import { registerCorpChangeRoutes, type CorpChangeDeps } from './corpChanges.ts';
 import { listCorpChanges } from '../db/corpChanges.ts';
+import type { BbiyongCompanyDefaults } from '@swonbiz/shared/domain/corp-change-detail';
 
 const session = (role: ScopeRole, s020OrgId: number): ErpSession => ({
   erpSid: 'sid-hash',
@@ -55,6 +56,7 @@ function fakeDeps(): CorpChangeDeps & { filters: CorpChangeListFilter[]; who: nu
     run: async () => {
       throw new Error('목록 시험은 run 을 부르지 않는다');
     },
+    companyDefaults: async () => null,
   };
 }
 
@@ -75,7 +77,7 @@ async function build(who: ErpSession, deps: CorpChangeDeps): Promise<FastifyInst
 }
 
 describe('GET /legal/corp-changes — 선택지', () => {
-  it('★★ CEO_CHG · S 는 선택지에 없다 · 이름은 코드표의 것', async () => {
+  it('★★ CEO_CHG · S · A(제출) 는 선택지에 없다 · 이름은 코드표의 것', async () => {
     const a = await build(session('operator', 1), fakeDeps());
     const body = (await a.inject({ method: 'GET', url: '/legal/corp-changes' })).json();
     expect(body.changeTypes).toEqual([
@@ -85,9 +87,9 @@ describe('GET /legal/corp-changes — 선택지', () => {
       { code: 'OFFICER', name: '임원변경' },
       { code: 'PURPOSE', name: '목적변경' },
     ]);
-    expect(body.statuses.map((s: { code: string }) => s.code)).toEqual(['A', 'C', 'E', 'P']);
+    expect(body.statuses.map((s: { code: string }) => s.code)).toEqual(['C', 'E', 'P']);
     // ★ 취소는 필터에 없지만 상태 열에 이름이 나와야 한다
-    expect(body.statusNames).toEqual({ P: '서류작성중', E: '서류작성완료', A: '서류제출', C: '완료', X: '취소' });
+    expect(body.statusNames).toEqual({ P: '서류작성중', E: '서류작성완료', C: '완료', X: '취소' });
   });
 });
 
@@ -177,14 +179,14 @@ describe('listCorpChanges — SQL 조립', () => {
 
   it('조합 — 자리표시 번호가 값 순서와 맞는다', async () => {
     const { where, params } = await capture({
-      from: '2026-10-01', to: '2026-10-31', changeType: 'OFFICER', status: 'A', tenancy: 'tenant',
+      from: '2026-10-01', to: '2026-10-31', changeType: 'OFFICER', status: 'C', tenancy: 'tenant',
     });
     expect(where).toContain('c.created_at >= $1::date');
     expect(where).toContain('c.created_at < ($2::date + 1)');
     expect(where).toContain('c.change_type = $3');
     expect(where).toContain('c.status = $4');
     expect(where).toContain('(co.company_id IS NOT NULL) = $5');
-    expect(params).toEqual(['2026-10-01', '2026-10-31', 'OFFICER', 'A', true]);
+    expect(params).toEqual(['2026-10-01', '2026-10-31', 'OFFICER', 'C', true]);
   });
 
   it('비입주사 필터는 false 로 넘긴다', async () => {
@@ -205,8 +207,12 @@ interface Seen {
 }
 
 /** SQL 로 답을 고르는 가짜 클라이언트. 답이 없으면 빈 줄. */
-function fakeDb(answers: { match: RegExp; rows: unknown[] }[] = []) {
+function fakeDb(
+  answers: { match: RegExp; rows: unknown[] }[] = [],
+  defaults: BbiyongCompanyDefaults | null = null,
+) {
   const seen: Seen[] = [];
+  const asked: { role: string; orgId: number }[] = [];
   let runs = 0;
   const client = {
     query: async (sql: string, params?: unknown[]) => {
@@ -222,8 +228,12 @@ function fakeDb(answers: { match: RegExp; rows: unknown[] }[] = []) {
       runs += 1;
       return fn(client);
     },
+    companyDefaults: async (s, orgId) => {
+      asked.push({ role: s.role, orgId });
+      return defaults;
+    },
   };
-  return { deps, seen, runs: () => runs };
+  return { deps, seen, asked, runs: () => runs };
 }
 
 const change = (over: Record<string, unknown> = {}) => ({
@@ -502,54 +512,584 @@ describe('임원 — /legal/corp-changes/:id/officers', () => {
   });
 });
 
-describe('PUT /legal/corp-changes/company-info — 비입주사 법무 회사 정보(단체 기준)', () => {
-  const body = { legalName: '주식회사 한빛', ceoName: '이대표', memberType: 'R' };
+describe('비입주사 회사 정보 — [저장] 하나로(첫 저장 · PATCH 의 company)', () => {
+  const company = { legalName: '주식회사 한빛', ceoName: '이대표', memberType: 'R' };
   const codes = {
     match: /FROM public\.tb_s080_codes_line/,
     rows: [{ category: 'MEMBER_TYPE', code: 'R', name: '주식회사' }],
   };
-  const URL = '/legal/corp-changes/company-info';
+  const TENANT = { match: /FROM public\.tb_s080_companies\s+WHERE link_s020_org_id/, rows: [{ company_id: 'c-1' }] };
+  const UPSERT_ORG = /INSERT INTO public\.tb_s080_legal_orgs/;
+  const UPD_PAYLOAD = /UPDATE public\.tb_s080_corp_changes\s+SET payload/;
 
-  it('★ 입주사 단체면 409 — 법무는 ERP 에 쓰지 않는다(판정은 link_s020_org_id)', async () => {
-    const db = fakeDb([{ match: /FROM public\.tb_s080_companies\s+WHERE link_s020_org_id/, rows: [{ company_id: 'c-1' }] }]);
+  it('★★ 단체 기준 옛 경로는 없다 — PUT /company-info 는 404(:id 로도 새지 않는다)', async () => {
+    const db = fakeDb();
     const a = await build(session('operator', 1), db.deps);
-    const res = await a.inject({ method: 'PUT', url: URL, payload: { ...body, orgId: 9001 } });
-    expect(res.statusCode).toBe(409);
-    expect(db.seen.some((s) => /INSERT INTO public\.tb_s080_legal_orgs/.test(s.sql))).toBe(false);
+    expect((await a.inject({ method: 'PUT', url: '/legal/corp-changes/company-info', payload: company })).statusCode).toBe(404);
+    expect((await a.inject({ method: 'PUT', url: '/legal/corp-changes/cc-1/company-info', payload: company })).statusCode).toBe(404);
+    expect(db.runs()).toBe(0);
   });
 
-  it('★★ 회사 세션 — 자기 단체로 저장 · 남의 단체는 403(DB 에 닿지 않는다)', async () => {
+  it('첫 저장 — 건과 회사 정보를 같은 트랜잭션(run 한 번)에서 · 회사 단체는 건의 단체', async () => {
+    const db = fakeDb([codes]);
+    const a = await build(session('operator', 1), db.deps);
+    const res = await a.inject({
+      method: 'POST',
+      url: '/legal/corp-changes',
+      payload: { changeType: 'NAME', orgId: 9003, orgCode: 'Z99', payload: {}, company },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(db.runs()).toBe(1);
+    const up = db.seen.find((s) => UPSERT_ORG.test(s.sql))!;
+    expect(up.params.slice(0, 2)).toEqual([9003, '주식회사 한빛']);
+  });
+
+  it('★★ 첫 저장 — 회사 정보가 틀리면 건을 만들지 않는다(판정이 쓰기보다 먼저)', async () => {
+    // 회사유형이 코드표에 없다 → 400 · 입주사 단체 → 409. 어느 쪽도 INSERT 가 없다.
+    const cases: [{ match: RegExp; rows: unknown[] }[], Record<string, unknown>, number][] = [
+      [[codes], { ...company, memberType: 'P' }, 400],
+      [[TENANT, codes], company, 409],
+    ];
+    for (const [answers, body, status] of cases) {
+      const db = fakeDb(answers);
+      const a = await build(session('operator', 1), db.deps);
+      const res = await a.inject({
+        method: 'POST',
+        url: '/legal/corp-changes',
+        payload: { changeType: 'NAME', orgId: 9003, payload: { newName: '새' }, company: body },
+      });
+      expect(res.statusCode).toBe(status);
+      if (status === 400) expect(res.json().errors[0].field).toBe('company.memberType');
+      expect(db.seen.some((s) => /^\s*(INSERT|UPDATE)/.test(s.sql))).toBe(false);
+      await a.close();
+      app = null;
+    }
+  });
+
+  it('첫 저장 — 회사 칸 모양 · 길이 오류는 변경 내용 오류와 함께 모은다 · DB 에 닿지 않는다', async () => {
+    const db = fakeDb();
+    const a = await build(session('operator', 1), db.deps);
+    const res = await a.inject({
+      method: 'POST',
+      url: '/legal/corp-changes',
+      payload: { changeType: 'NAME', orgId: 9003, payload: { newName: 3 }, company: { ceoName: 'x'.repeat(51), tel: 5 } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errors.map((e: { field: string }) => e.field)).toEqual(['newName', 'company.ceoName', 'company.tel']);
+    expect(db.runs()).toBe(0);
+  });
+
+  it('★★ 회사 세션 — 회사 정보는 세션 단체로 저장된다(본문에 단체를 적을 자리가 없다)', async () => {
     const db = fakeDb([codes]);
     const a = await build(session('tenant', 9003), db.deps);
-    const res = await a.inject({ method: 'PUT', url: URL, payload: body });
-    expect(res.statusCode).toBe(200);
-    const up = db.seen.find((s) => /INSERT INTO public\.tb_s080_legal_orgs/.test(s.sql))!;
-    expect(up.params.slice(0, 2)).toEqual([9003, '주식회사 한빛']);
-
-    const other = fakeDb([codes]);
-    const b = await build(session('tenant', 9003), other.deps);
-    expect((await b.inject({ method: 'PUT', url: URL, payload: { ...body, orgId: 9001 } })).statusCode).toBe(403);
-    expect(other.runs()).toBe(0);
+    const res = await a.inject({ method: 'POST', url: '/legal/corp-changes', payload: { changeType: 'NAME', payload: {}, company } });
+    expect(res.statusCode).toBe(201);
+    expect(db.seen.find((s) => UPSERT_ORG.test(s.sql))!.params[0]).toBe(9003);
   });
 
-  it('운영사 — 단체 필수', async () => {
-    const db = fakeDb([codes]);
+  it('PATCH — 변경 내용과 회사 정보를 같이 저장하고 새 상세를 돌려준다', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' }), codes]);
     const a = await build(session('operator', 1), db.deps);
-    expect((await a.inject({ method: 'PUT', url: URL, payload: body })).statusCode).toBe(400);
-    expect((await a.inject({ method: 'PUT', url: URL, payload: { ...body, orgId: 9003 } })).statusCode).toBe(200);
+    const res = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: { newName: '새' }, company } });
+    expect(res.statusCode).toBe(200);
+    expect(db.runs()).toBe(1);
+    expect(db.seen.find((s) => UPSERT_ORG.test(s.sql))!.params[0]).toBe(9003);
+    expect(res.json()).toMatchObject({ id: 'cc-1', status: 'P', company: { isTenant: false } });
   });
 
-  it('회사유형은 MEMBER_TYPE 002 에 있어야 한다 · 칸 길이가 DB 를 넘으면 400', async () => {
-    const a = await build(session('tenant', 9003), fakeDb([codes]).deps);
-    const bad = await a.inject({ method: 'PUT', url: URL, payload: { ...body, memberType: 'P' } });
-    expect(bad.statusCode).toBe(400);
-    const long = await a.inject({ method: 'PUT', url: URL, payload: { ceoName: 'x'.repeat(51) } });
-    expect(long.statusCode).toBe(400);
-    expect(long.json().errors[0].field).toBe('ceoName');
+  it('★★ PATCH — 회사 정보가 틀리면 변경 내용도 바꾸지 않는다', async () => {
+    const cases: [{ match: RegExp; rows: unknown[] }[], Record<string, unknown>, number][] = [
+      [[codes], { ...company, memberType: 'P' }, 400],
+      [[TENANT, codes], company, 409],
+      [[codes], { legalName: 7 }, 400],
+    ];
+    for (const [answers, body, status] of cases) {
+      const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' }), ...answers]);
+      const a = await build(session('operator', 1), db.deps);
+      const res = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: { newName: '새' }, company: body } });
+      expect(res.statusCode).toBe(status);
+      expect(db.seen.some((s) => UPD_PAYLOAD.test(s.sql) || UPSERT_ORG.test(s.sql))).toBe(false);
+      await a.close();
+      app = null;
+    }
   });
 
-  it('★ 건 기준 옛 경로(/:id/company-info)는 없다', async () => {
-    const a = await build(session('operator', 1), fakeDb().deps);
-    expect((await a.inject({ method: 'PUT', url: '/legal/corp-changes/cc-1/company-info', payload: body })).statusCode).toBe(404);
+  it('PATCH — company 를 안 실으면 회사 정보를 건드리지 않는다', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' })]);
+    const a = await build(session('operator', 1), db.deps);
+    const res = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: { newName: '새' } } });
+    expect(res.statusCode).toBe(200);
+    expect(db.seen.some((s) => UPSERT_ORG.test(s.sql))).toBe(false);
+    expect(db.seen.some((s) => UPD_PAYLOAD.test(s.sql))).toBe(true);
+  });
+});
+
+describe('비입주사 회사 정보의 기본값 — 삐용 값으로 빈 칸만 채워 보여 준다', () => {
+  const LEGAL_ROW = (over: Record<string, unknown>) => ({ match: /FROM public\.tb_s080_legal_orgs/, rows: [over] });
+  const draftUrl = '/legal/corp-changes/draft?changeType=NAME&orgId=9003&orgCode=Z99';
+
+  it('★ 법무 회사 정보가 없으면 회사명 · 대표자명을 채우고 「저장 전」 칸으로 알린다 · 쓰지 않는다', async () => {
+    const db = fakeDb([], { orgName: '주식회사 삐용', repName: '김대표' });
+    const a = await build(session('operator', 1), db.deps);
+    const body = (await a.inject({ method: 'GET', url: draftUrl })).json();
+    expect(body.company).toMatchObject({
+      displayName: '주식회사 삐용',
+      legalName: '주식회사 삐용',
+      ceoName: '김대표',
+      defaultedFields: ['legalName', 'ceoName'],
+      hasLegalOrg: false,
+    });
+    expect(db.asked).toEqual([{ role: 'operator', orgId: 9003 }]);
+    expect(db.seen.some((s) => /^\s*(INSERT|UPDATE)/.test(s.sql))).toBe(false);
+  });
+
+  it('★ 저장된 값이 우선 — 빈 칸만 채운다', async () => {
+    const db = fakeDb([LEGAL_ROW({ legal_name: '등기 상호', ceo_name: null })], { orgName: '삐용 이름', repName: '김대표' });
+    const a = await build(session('operator', 1), db.deps);
+    const body = (await a.inject({ method: 'GET', url: draftUrl })).json();
+    expect(body.company).toMatchObject({ legalName: '등기 상호', ceoName: '김대표', defaultedFields: ['ceoName'] });
+  });
+
+  it('조회 실패(null)면 칸을 비워 두고 회사명은 단체코드', async () => {
+    const db = fakeDb([], null);
+    const a = await build(session('operator', 1), db.deps);
+    const body = (await a.inject({ method: 'GET', url: draftUrl })).json();
+    expect(body.company).toMatchObject({ displayName: 'Z99', legalName: null, ceoName: null, defaultedFields: [] });
+  });
+
+  it('★ 입주사는 부르지도 채우지도 않는다 — ERP 값 그대로', async () => {
+    const db = fakeDb(
+      [{ match: /FROM public\.tb_s080_companies\s+WHERE link_s020_org_id/, rows: [{ company_id: 'c-1', company_name: null }] }],
+      { orgName: '삐용 이름' },
+    );
+    const a = await build(session('operator', 1), db.deps);
+    const body = (await a.inject({ method: 'GET', url: draftUrl })).json();
+    expect(body.company).toMatchObject({ isTenant: true, legalName: null, defaultedFields: [] });
+    expect(db.asked).toEqual([]);
+  });
+
+  it('상세 · 저장 응답에도 같은 규칙 — 건의 단체로 묻는다(회사 세션은 자기 단체)', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' })], { orgName: '내 회사' });
+    const a = await build(session('tenant', 9003), db.deps);
+    const detail = (await a.inject({ method: 'GET', url: '/legal/corp-changes/cc-1' })).json();
+    expect(detail.company).toMatchObject({ legalName: '내 회사', defaultedFields: ['legalName'] });
+    const saved = (await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: {} } })).json();
+    expect(saved.company.displayName).toBe('내 회사');
+    expect(db.asked.length).toBe(2);
+    expect(db.asked.every((q) => q.role === 'tenant' && q.orgId === 9003)).toBe(true);
+  });
+
+  it('★ 회사유형은 상호에서 추정한다 — 코드표(002) 이름으로 찾는다 · 「저장 전」', async () => {
+    const codes = {
+      match: /FROM public\.tb_s080_codes_line/,
+      rows: [
+        { category: 'MEMBER_TYPE', code: 'R', name: '주식회사' },
+        { category: 'MEMBER_TYPE', code: 'A', name: '유한회사' },
+      ],
+    };
+    const db = fakeDb([codes], { orgName: '(유)삐용' });
+    const a = await build(session('operator', 1), db.deps);
+    const body = (await a.inject({ method: 'GET', url: draftUrl })).json();
+    expect(body.company).toMatchObject({ memberType: 'A', memberTypeName: '유한회사', defaultedFields: ['legalName', 'memberType'] });
+  });
+
+  it('★ 숫자 칸 자릿수가 틀리면 400(company.tel) — 변경 내용도 안 바뀐다', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' })]);
+    const a = await build(session('operator', 1), db.deps);
+    const res = await a.inject({
+      method: 'PATCH',
+      url: '/legal/corp-changes/cc-1',
+      payload: { payload: { newName: '새' }, company: { tel: '010-123-4567' } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errors.map((e: { field: string }) => e.field)).toEqual(['company.tel']);
+    expect(db.seen.some((s) => /^\s*(INSERT|UPDATE)/.test(s.sql))).toBe(false);
+  });
+
+  it('실패 응답에는 부르지 않는다', async () => {
+    const db = fakeDb([], { orgName: 'x' });
+    const a = await build(session('operator', 1), db.deps);
+    expect((await a.inject({ method: 'GET', url: '/legal/corp-changes/nope' })).statusCode).toBe(404);
+    expect(db.asked).toEqual([]);
+  });
+});
+
+// =============================================================================
+// 4단계 — 상태 전이 · 삭제 · 제출 스냅샷 (가짜 클라이언트)
+// =============================================================================
+// ★ RLS · 동시 전이 · 원자성은 `scripts/verify-corp-change-transition.js`(erp_app 접속 · 롤백)가 본다.
+//   여기서는 라우트의 판정 순서 · 거절 상태 코드 · 쓰는 SQL 을 본다.
+
+describe('POST /legal/corp-changes/:id/transition — 상태 전이', () => {
+  const URL = '/legal/corp-changes/cc-1/transition';
+  const STATUS_UPDATE = { match: /UPDATE public\.tb_s080_corp_changes SET status/, rows: [{}] };
+  const NAME_OK = { newName: '주식회사 새이름', resolutionDate: '2026-10-01' };
+  /** 비입주사 법무 회사 정보 — 대표자 자택이 있다(대표주소 변경의 「변경 전 주소」). */
+  const CEO_HOME = {
+    match: /FROM public\.tb_s080_legal_orgs/,
+    rows: [{ ceo_zip_code: '06000', ceo_address: '서울 강남구 자택로 1', ceo_address_detail: null }],
+  };
+  const statusUpdate = (db: ReturnType<typeof fakeDb>) =>
+    db.seen.find((s) => /UPDATE public\.tb_s080_corp_changes SET status/.test(s.sql));
+
+  /** 그 상태의 건에서 그 역할로 to 를 누른다. */
+  async function press(
+    role: ScopeRole,
+    row: Record<string, unknown>,
+    to: string,
+    extra: Record<string, unknown> = {},
+    answers: { match: RegExp; rows: unknown[] }[] = [],
+  ) {
+    const db = fakeDb([CHANGE_ROW(row), STATUS_UPDATE, ...answers]);
+    const a = await build(session(role, role === 'operator' ? 1 : 9003), db.deps);
+    const res = await a.inject({ method: 'POST', url: URL, payload: { from: row.status, to, ...extra } });
+    await a.close();
+    app = null;
+    return { res, db };
+  }
+
+  it.each([
+    ['P', 'E'],
+    ['E', 'P'],
+    ['E', 'C'],
+  ])('★ 회사 — %s→%s 허용', async (from, to) => {
+    const { res, db } = await press('tenant', { change_type: 'NAME', status: from, payload: NAME_OK }, to);
+    expect(res.statusCode).toBe(200);
+    expect(statusUpdate(db)!.params.slice(0, 3)).toEqual(['cc-1', from, to]);
+  });
+
+  it.each([
+    ['C', 'E'],
+    ['P', 'X'],
+    ['E', 'X'],
+    ['C', 'X'],
+  ])('★★ 회사 — %s→%s 는 403 · 쓰지 않는다', async (from, to) => {
+    const { res, db } = await press('tenant', { change_type: 'NAME', status: from, payload: NAME_OK }, to);
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error).toBe('forbidden');
+    expect(statusUpdate(db)).toBeUndefined();
+  });
+
+  it('★★ 회사 — 복원(X→직전)도 403', async () => {
+    const { res, db } = await press('tenant', { change_type: 'NAME', status: 'X', status_before_cancel: 'E' }, 'E');
+    expect(res.statusCode).toBe(403);
+    expect(statusUpdate(db)).toBeUndefined();
+  });
+
+  it.each([
+    ['P', 'E'],
+    ['E', 'P'],
+    ['E', 'C'],
+    ['C', 'E'],
+    ['P', 'X'],
+    ['E', 'X'],
+    ['C', 'X'],
+  ])('운영사 — %s→%s 허용', async (from, to) => {
+    const { res } = await press('operator', { change_type: 'NAME', status: from, payload: NAME_OK }, to);
+    expect(res.statusCode).toBe(200);
+  });
+
+  it.each([
+    ['P', 'C'],
+    ['C', 'P'],
+    ['P', 'P'],
+  ])('★ 표에 없는 전이 %s→%s 는 409(운영사도)', async (from, to) => {
+    const { res, db } = await press('operator', { change_type: 'NAME', status: from, payload: NAME_OK }, to);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('not_allowed');
+    expect(statusUpdate(db)).toBeUndefined();
+  });
+
+  it('★★ 제출(A)은 없다 — A 로 가는 요청은 400(모르는 상태) · DB 에 닿지 않는다', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME', status: 'E' })]);
+    const a = await build(session('operator', 1), db.deps);
+    expect((await a.inject({ method: 'POST', url: URL, payload: { from: 'E', to: 'A' } })).statusCode).toBe(400);
+    expect(db.seen).toHaveLength(0);
+  });
+
+  it('★ 복원 — 취소 직전 상태로만(다르면 409) · 맞으면 취소 칸을 비운다', async () => {
+    const wrong = await press('operator', { change_type: 'NAME', status: 'X', status_before_cancel: 'E' }, 'P');
+    expect(wrong.res.statusCode).toBe(409);
+    expect(wrong.res.json().error).toBe('restore_target');
+    expect(statusUpdate(wrong.db)).toBeUndefined();
+
+    const right = await press('operator', { change_type: 'NAME', status: 'X', status_before_cancel: 'E' }, 'E');
+    expect(right.res.statusCode).toBe(200);
+    expect(statusUpdate(right.db)!.sql).toMatch(/status_before_cancel = NULL, cancelled_at = NULL, cancel_reason = NULL/);
+  });
+
+  it('★★ 화면이 본 상태가 낡았으면 409 — 잠가서 읽고 · 쓰지 않는다', async () => {
+    // 운영사가 C 를 보고 완료 취소(C→E)를 눌렀는데 그새 취소(X)됐다 — 덮지 않고 막혀야 한다
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME', status: 'X', status_before_cancel: 'C' }), STATUS_UPDATE]);
+    const a = await build(session('operator', 1), db.deps);
+    const res = await a.inject({ method: 'POST', url: URL, payload: { from: 'C', to: 'E' } });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('stale_status');
+    expect(db.seen[0]!.sql).toContain('FOR UPDATE');
+    expect(statusUpdate(db)).toBeUndefined();
+  });
+
+  it('본문 모양이 틀리면 400 — DB 에 닿지 않는다(from 없음 · 모르는 상태 · 취소 아닌데 사유)', async () => {
+    for (const payload of [{ to: 'E' }, { from: 'P', to: 'S' }, { from: 'E', to: 'C', cancelReason: '왜' }]) {
+      const db = fakeDb([CHANGE_ROW()]);
+      const a = await build(session('operator', 1), db.deps);
+      expect((await a.inject({ method: 'POST', url: URL, payload })).statusCode).toBe(400);
+      expect(db.seen).toHaveLength(0);
+      await a.close();
+      app = null;
+    }
+  });
+
+  it('없는(안 보이는) 건은 404', async () => {
+    const a = await build(session('tenant', 9003), fakeDb().deps);
+    expect((await a.inject({ method: 'POST', url: URL, payload: { from: 'P', to: 'E' } })).statusCode).toBe(404);
+  });
+
+  it('★★ P→E 검증 실패 — 400 + 칸별 오류 · 상태 불변(UPDATE 없음) · 저장된 값으로 검증', async () => {
+    const { res, db } = await press(
+      'tenant',
+      { change_type: 'HQ', status: 'P', payload: { newHqAddress: { zipCode: '06000' }, resolutionDate: '2026-10-01', relocationDate: '2026-10-02' } },
+      'E',
+    );
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errors).toEqual([{ field: 'newHqAddress.address', message: '신규 본점주소의 기본주소을(를) 입력하세요' }]);
+    expect(statusUpdate(db)).toBeUndefined();
+  });
+
+  it.each([
+    ['NAME', { newName: '새' }, ['resolutionDate']],
+    ['PURPOSE', { purposes: '소프트웨어 개발' }, ['resolutionDate']],
+    ['HQ', { newHqAddress: { zipCode: '06000', address: '서울' } }, ['resolutionDate', 'relocationDate']],
+    ['CEO_ADDR', { newCeoAddress: { zipCode: '04000', address: '서울' } }, ['moveInDate']],
+  ])('★ 작성완료 때 날짜 필수 — %s 은(는) 날짜가 없으면 400 · 칸별 오류 · 상태 불변', async (type, payload, missing) => {
+    const { res, db } = await press('tenant', { change_type: type, status: 'P', payload }, 'E', {}, [CEO_HOME]);
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errors.map((e: { field: string }) => e.field)).toEqual(missing);
+    expect(statusUpdate(db)).toBeUndefined();
+  });
+
+  describe('★ 대표주소 변경 — 「변경 전 주소」 = 기본정보의 대표자 자택', () => {
+    const CEO_PAYLOAD = { newCeoAddress: { zipCode: '04000', address: '서울' }, moveInDate: '2026-10-01' };
+
+    it('자택 주소가 있으면 통과 · 스냅샷의 변경 전 회사값에 자택이 들어간다', async () => {
+      const { res, db } = await press('tenant', { change_type: 'CEO_ADDR', status: 'P', payload: CEO_PAYLOAD }, 'E', {}, [CEO_HOME]);
+      expect(res.statusCode).toBe(200);
+      const snap = JSON.parse(statusUpdate(db)!.params[4] as string);
+      expect(snap.company.ceoHome).toEqual({ zipCode: '06000', address: '서울 강남구 자택로 1', addressDetail: null });
+    });
+
+    it('비입주사 — 자택 주소가 비면 400(company.ceo) · 상태 불변', async () => {
+      const { res, db } = await press('tenant', { change_type: 'CEO_ADDR', status: 'P', payload: CEO_PAYLOAD }, 'E');
+      expect(res.statusCode).toBe(400);
+      expect(res.json().errors).toEqual([
+        { field: 'company.ceo', message: '대표자 자택 주소(변경 전 주소)의 우편번호 · 기본주소를 입력하세요' },
+      ]);
+      expect(statusUpdate(db)).toBeUndefined();
+    });
+
+    it('입주사 — 문구가 입주사 화면으로 보낸다', async () => {
+      const tenant = { match: /FROM public\.tb_s080_companies\s+WHERE link_s020_org_id/, rows: [{ company_id: 'c-1', ceo_address: null }] };
+      const { res } = await press('operator', { change_type: 'CEO_ADDR', status: 'P', payload: CEO_PAYLOAD }, 'E', {}, [tenant]);
+      expect(res.statusCode).toBe(400);
+      expect(res.json().errors[0]).toEqual({
+        field: 'company.ceo',
+        message: '대표자 자택 주소(변경 전 주소)가 비어 있습니다 — 입주사 화면에서 입력하세요',
+      });
+    });
+
+    it('★ 옛 건 payload 의 oldCeoAddress 는 무시한다 — 검증을 막지 않는다', async () => {
+      const { res } = await press(
+        'tenant',
+        { change_type: 'CEO_ADDR', status: 'P', payload: { ...CEO_PAYLOAD, oldCeoAddress: { zipCode: '1', address: '옛' } } },
+        'E',
+        {},
+        [CEO_HOME],
+      );
+      expect(res.statusCode).toBe(200);
+    });
+  });
+
+  describe('임원 건 — 저장된 임원 목록을 함께 검증한다', () => {
+    const OFFICERS = /FROM public\.tb_s080_corp_change_officers\s+WHERE corp_change_id/;
+    const officer = (over: Record<string, unknown> = {}) => ({
+      id: 'o-1',
+      name: '김임원',
+      change_kind: 'APPOINT',
+      position: '이사',
+      effective_date: '2026-10-01',
+      zip_code: null,
+      address: null,
+      address_detail: null,
+      rrn_masked: '900101-1******',
+      sort_order: 1,
+      ...over,
+    });
+    const OFFICER_PAYLOAD = { resolutionDate: '2026-10-01' };
+
+    it('임원이 없으면 400(officers)', async () => {
+      const { res, db } = await press('tenant', { status: 'P', payload: OFFICER_PAYLOAD }, 'E');
+      expect(res.statusCode).toBe(400);
+      expect(res.json().errors).toEqual([{ field: 'officers', message: '임원을 1명 이상 등록하세요' }]);
+      expect(statusUpdate(db)).toBeUndefined();
+    });
+
+    it('★ 임원변경 — 결의일 · 임원별 효력일이 없으면 400(officers.{순번}.effectiveDate)', async () => {
+      const { res, db } = await press('tenant', { status: 'P', payload: {} }, 'E', {}, [
+        { match: OFFICERS, rows: [officer(), officer({ id: 'o-2', effective_date: null })] },
+      ]);
+      expect(res.statusCode).toBe(400);
+      expect(res.json().errors.map((e: { field: string }) => e.field)).toEqual(['resolutionDate', 'officers.1.effectiveDate']);
+      expect(statusUpdate(db)).toBeUndefined();
+    });
+
+    it('★ 줄 오류는 officers.{순번}.{칸} — 화면이 그 줄 옆에 붙인다', async () => {
+      const { res } = await press('tenant', { status: 'P', payload: OFFICER_PAYLOAD }, 'E', {}, [
+        { match: OFFICERS, rows: [officer(), officer({ id: 'o-2', position: null })] },
+      ]);
+      expect(res.statusCode).toBe(400);
+      expect(res.json().errors).toEqual([{ field: 'officers.1.position', message: '직위를 입력하세요' }]);
+    });
+
+    it('★★ P→E — 작성완료 시각 · 스냅샷을 같은 UPDATE 에 싣는다 · 주민번호(마스킹 포함) 없음 · 회사값은 변경 전 값', async () => {
+      const legal = {
+        match: /FROM public\.tb_s080_legal_orgs/,
+        rows: [
+          {
+            legal_name: '주식회사 시험',
+            corp_number: '110111-0000001',
+            ceo_name: '홍대표',
+            head_zip_code: '06000',
+            head_address: '서울 강남구',
+            head_address_detail: null,
+            ceo_zip_code: '04000',
+            ceo_address: '서울 마포구',
+            ceo_address_detail: '101호',
+          },
+        ],
+      };
+      const { res, db } = await press('tenant', { status: 'P', payload: OFFICER_PAYLOAD }, 'E', {}, [
+        { match: OFFICERS, rows: [officer()] },
+        legal,
+      ]);
+      expect(res.statusCode).toBe(200);
+      const upd = statusUpdate(db)!;
+      expect(upd.sql).toMatch(/written_at = now\(\), submit_snapshot = \$5::jsonb/);
+      const raw = upd.params[4] as string;
+      expect(raw).not.toContain('900101');
+      expect(raw).not.toMatch(/rrn/i);
+      const snap = JSON.parse(raw);
+      expect(snap.company).toEqual({
+        isTenant: false,
+        name: '주식회사 시험',
+        corpNumber: '110111-0000001',
+        ceoName: '홍대표',
+        head: { zipCode: '06000', address: '서울 강남구', addressDetail: null },
+        ceoHome: { zipCode: '04000', address: '서울 마포구', addressDetail: '101호' },
+      });
+      expect(snap.payload).toEqual(OFFICER_PAYLOAD);
+      expect(snap.officers).toEqual([
+        { name: '김임원', changeKind: 'APPOINT', position: '이사', effectiveDate: '2026-10-01', zipCode: null, address: null, addressDetail: null },
+      ]);
+    });
+  });
+
+  it('★ 취소 — 직전 상태 · 시각 · 사유를 같은 UPDATE 로', async () => {
+    const { res, db } = await press('operator', { change_type: 'NAME', status: 'C' }, 'X', { cancelReason: '고객 요청' });
+    expect(res.statusCode).toBe(200);
+    const upd = statusUpdate(db)!;
+    expect(upd.sql).toMatch(/status_before_cancel = \$2, cancelled_at = now\(\), cancel_reason = \$5/);
+    expect(upd.sql).toMatch(/WHERE id = \$1 AND status = \$2/);
+    expect(upd.params).toEqual(['cc-1', 'C', 'X', '1', '고객 요청']);
+  });
+
+  it('★ E→C 는 완료 시각 · C→E(완료 취소)는 완료 시각을 비운다 · E→P 는 작성완료 기록을 지우지 않는다', async () => {
+    const done = await press('operator', { change_type: 'NAME', status: 'E' }, 'C');
+    expect(statusUpdate(done.db)!.sql).toContain('completed_at = now()');
+    const undo = await press('operator', { change_type: 'NAME', status: 'C' }, 'E');
+    expect(statusUpdate(undo.db)!.sql).toContain('completed_at = NULL');
+    expect(statusUpdate(undo.db)!.sql).not.toMatch(/written_at|submit_snapshot/);
+    const back = await press('operator', { change_type: 'NAME', status: 'E' }, 'P');
+    expect(statusUpdate(back.db)!.sql).not.toMatch(/written_at|submit_snapshot|completed_at/);
+  });
+});
+
+describe('DELETE /legal/corp-changes/:id — 삭제', () => {
+  const dels = (db: ReturnType<typeof fakeDb>) => db.seen.filter((s) => /^DELETE/.test(s.sql.trim()));
+  async function remove(role: ScopeRole, status: string, from: string | null = status) {
+    const db = fakeDb([CHANGE_ROW({ status }), { match: /DELETE FROM public\.tb_s080_corp_changes /, rows: [{}] }]);
+    const a = await build(session(role, role === 'operator' ? 1 : 9003), db.deps);
+    const res = await a.inject({ method: 'DELETE', url: `/legal/corp-changes/cc-1${from === null ? '' : `?from=${from}`}` });
+    await a.close();
+    app = null;
+    return { res, db };
+  }
+
+  it.each([['P'], ['X']])('★ 운영사 · %s — 204 · 임원을 먼저 지우고 건을 지운다', async (status) => {
+    const { res, db } = await remove('operator', status);
+    expect(res.statusCode).toBe(204);
+    const sqls = dels(db).map((s) => s.sql);
+    expect(sqls[0]).toMatch(/DELETE FROM public\.tb_s080_corp_change_officers WHERE corp_change_id = \$1/);
+    expect(sqls[1]).toMatch(/DELETE FROM public\.tb_s080_corp_changes WHERE id = \$1 AND status = \$2/);
+    expect(db.seen[0]!.sql).toContain('FOR UPDATE');
+  });
+
+  it.each([['E'], ['C']])('★ 진행 중 · 완료 %s 는 409 — 지우지 않는다', async (status) => {
+    const { res, db } = await remove('operator', status);
+    expect(res.statusCode).toBe(409);
+    expect(dels(db)).toHaveLength(0);
+  });
+
+  it.each([['P'], ['X']])('★★ 회사 세션은 %s 라도 403', async (status) => {
+    const { res, db } = await remove('tenant', status);
+    expect(res.statusCode).toBe(403);
+    expect(dels(db)).toHaveLength(0);
+  });
+
+  it('★ 본 상태가 낡았으면 409 · 본 상태가 없으면 400', async () => {
+    const stale = await remove('operator', 'E', 'P');
+    expect(stale.res.statusCode).toBe(409);
+    expect(stale.res.json().error).toBe('stale_status');
+    expect(dels(stale.db)).toHaveLength(0);
+    const none = await remove('operator', 'P', null);
+    expect(none.res.statusCode).toBe(400);
+    expect(none.db.seen).toHaveLength(0);
+  });
+});
+
+describe('GET /legal/corp-changes/:id — 버튼 재료(4단계)', () => {
+  async function detail(role: ScopeRole, row: Record<string, unknown>) {
+    const a = await build(session(role, role === 'operator' ? 1 : 9003), fakeDb([CHANGE_ROW(row)]).deps);
+    const body = (await a.inject({ method: 'GET', url: '/legal/corp-changes/cc-1' })).json();
+    await a.close();
+    app = null;
+    return body;
+  }
+
+  it('★ 역할을 반영한 전이 · 삭제 가능 여부', async () => {
+    expect((await detail('tenant', { change_type: 'NAME', status: 'E' })).availableTransitions).toEqual(['P', 'C']);
+    expect((await detail('operator', { change_type: 'NAME', status: 'E' })).availableTransitions).toEqual(['P', 'C', 'X']);
+    expect((await detail('tenant', { change_type: 'NAME', status: 'C' })).availableTransitions).toEqual([]);
+    expect((await detail('operator', { change_type: 'NAME', status: 'C' })).availableTransitions).toEqual(['E', 'X']);
+    const tenantP = await detail('tenant', { change_type: 'NAME', status: 'P' });
+    const operatorP = await detail('operator', { change_type: 'NAME', status: 'P' });
+    expect([tenantP.canDelete, operatorP.canDelete]).toEqual([false, true]);
+  });
+
+  it('취소 건 — 직전 상태 · 사유를 싣고, 복원 버튼은 직전 상태 하나 · 회사도 사유를 본다', async () => {
+    const row = { change_type: 'NAME', status: 'X', status_before_cancel: 'C', cancel_reason: '중복' };
+    const x = await detail('operator', row);
+    expect([x.availableTransitions, x.statusBeforeCancel, x.cancelReason, x.canDelete]).toEqual([['C'], 'C', '중복', true]);
+    const t = await detail('tenant', row);
+    expect([t.availableTransitions, t.cancelReason, t.canDelete]).toEqual([[], '중복', false]);
+  });
+
+  it('취소가 아닌 건에 남은 취소 칸은 내려보내지 않는다', async () => {
+    const e = await detail('operator', { change_type: 'NAME', status: 'E', status_before_cancel: 'P', cancel_reason: '옛' });
+    expect([e.statusBeforeCancel, e.cancelReason]).toEqual([null, null]);
+  });
+
+  it('작성완료일 · 완료일을 싣는다', async () => {
+    const c = await detail('operator', { change_type: 'NAME', status: 'C', written_on: '2026-10-05', completed_on: '2026-10-09' });
+    expect([c.writtenOn, c.completedOn]).toEqual(['2026-10-05', '2026-10-09']);
   });
 });

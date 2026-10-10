@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyCompanyDefaults,
+  guessMemberType,
   corpChangeCompanyName,
   maskRrn,
   normalizeRrn,
+  parseCompanyPart,
   parseCreateBody,
   parseFirstSave,
   parseOrgTarget,
   parseLegalOrgBody,
   parseOfficerBody,
   parsePayload,
+  type CorpChangeCompanyInfo,
 } from './corp-change-detail.ts';
 
 const operator = { role: 'operator' as const, s020OrgId: 1 };
@@ -102,7 +106,7 @@ describe('parsePayload — 변경 내용(임시 저장)', () => {
     const r = parsePayload('HQ', { newHqAddress: { zipCode: '04524', address: '서울 중구', addressDetail: '' } });
     expect(r).toEqual({
       ok: true,
-      value: { newHqAddress: { zipCode: '04524', address: '서울 중구', addressDetail: null }, resolutionDate: null },
+      value: { newHqAddress: { zipCode: '04524', address: '서울 중구', addressDetail: null }, resolutionDate: null, relocationDate: null },
     });
     expect(parsePayload('HQ', { newHqAddress: { zipCode: '', address: '' } })).toMatchObject({
       ok: true,
@@ -192,5 +196,149 @@ describe('corpChangeCompanyName — 상호 → 단체코드 → 「단체 {ID}�
     [' ', null, '단체 9003'],
   ])('%s / %s → %s', (name, orgCode, label) => {
     expect(corpChangeCompanyName(name, { orgCode, orgId: 9003 })).toBe(label);
+  });
+});
+
+describe('parseCompanyPart — 저장 본문의 company', () => {
+  it('없거나 null 이면 「안 건드림」(null)', () => {
+    expect(parseCompanyPart(undefined)).toEqual({ ok: true, value: null });
+    expect(parseCompanyPart(null)).toEqual({ ok: true, value: null });
+  });
+
+  it('★ 오류 자리는 company.{칸} — 화면이 기본정보 칸 옆에 붙인다', () => {
+    const r = parseCompanyPart({ ceoName: 'x'.repeat(51), tel: 5 });
+    expect(!r.ok && r.errors?.map((e) => e.field)).toEqual(['company.ceoName', 'company.tel']);
+    expect(parseCompanyPart('글자').ok).toBe(false);
+  });
+
+  it('첫 저장 본문에 실린다 — 안 실으면 null', () => {
+    const op = { role: 'operator' as const, s020OrgId: 1 };
+    const base = { changeType: 'NAME', orgId: 9003, payload: {} };
+    expect(parseFirstSave(base, op).ok && (parseFirstSave(base, op) as { value: { company: unknown } }).value.company).toBeNull();
+    const r = parseFirstSave({ ...base, company: { legalName: ' 한빛 ' } }, op);
+    expect(r.ok && r.value.company?.legalName).toBe('한빛');
+  });
+});
+
+describe('applyCompanyDefaults — 삐용 값으로 빈 칸만', () => {
+  const blank: CorpChangeCompanyInfo = {
+    isTenant: false,
+    tenantCompanyId: null,
+    displayName: 'Z99',
+    legalName: null,
+    corpNumber: null,
+    bizNumber: null,
+    ceoName: null,
+    tel: null,
+    head: { zipCode: null, address: null, addressDetail: null },
+    ceo: { zipCode: null, address: null, addressDetail: null },
+    memberType: null,
+    memberTypeName: null,
+    hasLegalOrg: false,
+    defaultedFields: [],
+  };
+  const org = { orgId: 9003, orgCode: 'Z99' };
+
+  it('회사명 → 등기상 상호 · 대표자명 → 대표자, 채운 칸을 알린다 · 회사명 표시도 바뀐다', () => {
+    const r = applyCompanyDefaults(blank, { orgName: ' 주식회사 삐용 ', repName: '김대표' }, org, []);
+    expect(r).toMatchObject({ legalName: '주식회사 삐용', ceoName: '김대표', displayName: '주식회사 삐용' });
+    expect(r.defaultedFields).toEqual(['legalName', 'ceoName']);
+    expect(blank.defaultedFields).toEqual([]); // 받은 것을 고치지 않는다
+  });
+
+  it('★ 저장된 값이 우선 — 빈 칸만', () => {
+    const r = applyCompanyDefaults({ ...blank, legalName: '등기 상호' }, { orgName: '삐용', repName: '김대표' }, org, []);
+    expect(r).toMatchObject({ legalName: '등기 상호', ceoName: '김대표', defaultedFields: ['ceoName'] });
+  });
+
+  it('★ 입주사 · 값 없음 · 빈 글자는 그대로', () => {
+    const tenant = { ...blank, isTenant: true };
+    expect(applyCompanyDefaults(tenant, { orgName: '삐용' }, org, [])).toBe(tenant);
+    expect(applyCompanyDefaults(blank, null, org, [])).toEqual(blank);
+    expect(applyCompanyDefaults(blank, { orgName: '  ', repName: null }, org, [])).toMatchObject({ displayName: 'Z99', defaultedFields: [] });
+  });
+});
+
+describe('guessMemberType — 등기상 상호 → 회사유형(코드표 이름으로 찾는다)', () => {
+  // ★ 코드값은 코드표의 것 — 시험에서 일부러 다른 값을 줘서 「박지 않음」을 본다.
+  const types = [
+    { code: 'X1', name: '주식회사' },
+    { code: 'X2', name: '유한회사' },
+  ];
+  it.each([
+    ['주식회사 한빛', 'X1'],
+    ['한빛 주식회사', 'X1'],
+    ['(주)한빛', 'X1'],
+    ['유한회사 한빛', 'X2'],
+    ['(유)한빛', 'X2'],
+    ['한빛상사', null],
+    ['', null],
+    [null, null],
+  ])('%s → %s', (name, code) => {
+    expect(guessMemberType(name, types)?.code ?? null).toBe(code);
+  });
+
+  it('코드표에 그 이름이 없으면 추정하지 않는다', () => {
+    expect(guessMemberType('주식회사 한빛', [{ code: 'A', name: '유한회사' }])).toBeNull();
+  });
+});
+
+describe('applyCompanyDefaults — 회사유형 추정', () => {
+  const blank: CorpChangeCompanyInfo = {
+    isTenant: false,
+    tenantCompanyId: null,
+    displayName: 'Z99',
+    legalName: null,
+    corpNumber: null,
+    bizNumber: null,
+    ceoName: null,
+    tel: null,
+    head: { zipCode: null, address: null, addressDetail: null },
+    ceo: { zipCode: null, address: null, addressDetail: null },
+    memberType: null,
+    memberTypeName: null,
+    hasLegalOrg: false,
+    defaultedFields: [],
+  };
+  const org = { orgId: 9003, orgCode: 'Z99' };
+  const types = [
+    { code: 'R', name: '주식회사' },
+    { code: 'A', name: '유한회사' },
+  ];
+
+  it('삐용 회사명으로 채운 상호에서도 추정한다 — 「저장 전」 칸에 들어간다', () => {
+    const r = applyCompanyDefaults(blank, { orgName: '(주)삐용' }, org, types);
+    expect(r).toMatchObject({ memberType: 'R', memberTypeName: '주식회사', defaultedFields: ['legalName', 'memberType'] });
+  });
+
+  it('삐용 조회가 실패해도 저장된 상호로 추정한다', () => {
+    const r = applyCompanyDefaults({ ...blank, legalName: '유한회사 한빛', hasLegalOrg: true }, null, org, types);
+    expect(r).toMatchObject({ memberType: 'A', defaultedFields: ['memberType'] });
+  });
+
+  it('★ 저장된 회사유형이 우선 · 입주사는 그대로', () => {
+    const saved = applyCompanyDefaults({ ...blank, legalName: '주식회사 한빛', memberType: 'A', memberTypeName: '유한회사' }, null, org, types);
+    expect(saved).toMatchObject({ memberType: 'A', defaultedFields: [] });
+    const tenant = { ...blank, isTenant: true, legalName: '주식회사 입주' };
+    expect(applyCompanyDefaults(tenant, null, org, types)).toBe(tenant);
+  });
+});
+
+describe('parseLegalOrgBody — 숫자 칸 형식(서버 검사)', () => {
+  it('★ 자릿수가 맞으면 하이픈을 넣어 저장한다(ERP 입주사 칸과 같은 모양)', () => {
+    const r = parseLegalOrgBody({ corpNumber: '1101111234567', bizNumber: '111 22 85905', tel: '0212345678' });
+    expect(r.ok && [r.value.corpNumber, r.value.bizNumber, r.value.tel]).toEqual(['110111-1234567', '111-22-85905', '02-1234-5678']);
+  });
+
+  it('★ 자릿수가 틀리면 400 · 칸별 오류(저장 본문이면 company.{칸})', () => {
+    const r = parseCompanyPart({ corpNumber: '110111-123456', bizNumber: '111-22-8590', tel: '010-123-4567' });
+    expect(!r.ok && r.errors?.map((e) => e.field)).toEqual(['company.corpNumber', 'company.bizNumber', 'company.tel']);
+    expect(!r.ok && r.errors?.[0]?.message).toContain('숫자 13자리');
+    expect(parseLegalOrgBody({ tel: '010-1234-abcd' }).ok).toBe(false);
+  });
+
+  it('빈 칸 · 대표번호(1588)는 막지 않는다', () => {
+    const r = parseLegalOrgBody({ corpNumber: '', tel: '1588-1234' });
+    expect(r.ok && [r.value.corpNumber, r.value.tel]).toEqual([null, '158-812-34']);
   });
 });

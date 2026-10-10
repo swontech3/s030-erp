@@ -191,7 +191,7 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
   },
   /**
    * 법인변경 — 구분마다 입력 칸과 검증이, 상태마다 전이표와 역할이 박혀 있다. ★ 2026-10-10 추가.
-   * ★ `LAW_CNG_TP` 의 `CEO_CHG` · `LAW_PROG_ST` 의 `S` 는 앱이 쓰지 않아 여기 없다.
+   * ★ `LAW_CNG_TP` 의 `CEO_CHG` · `LAW_PROG_ST` 의 `S` · `A`(제출 — 2026-10-10 뺐다) 는 앱이 쓰지 않아 여기 없다.
    */
   {
     category: 'LAW_CNG_TP',
@@ -203,7 +203,7 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
   {
     category: 'LAW_PROG_ST',
     useTp: '000',
-    codes: ['P', 'E', 'A', 'C', 'X'],
+    codes: ['P', 'E', 'C', 'X'],
     source: 'packages/shared/src/domain/corp-change.ts (CORP_CHANGE_STATUSES)',
     label: '법인변경 상태 전이',
   },

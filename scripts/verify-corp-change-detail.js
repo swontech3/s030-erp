@@ -1,6 +1,8 @@
 /**
  * 법인변경 상세(s040200011, 3단계) 검증 — 첫 저장(새 건) · 임시 모드 · 상세 · 변경 내용 · 임원 · 회사
  * 정보를 **RLS 를 거쳐** 잰다. 첫 저장의 원자성(형식 오류 · DB 도중 실패)도 본다.
+ * ★ 회사 정보는 [저장] 본문의 `company` 로만 저장한다(2026-10-10) — 합친 저장의 원자성(K1~K4):
+ *   회사 정보가 틀리거나 쓰다 실패하면 건 · 변경 내용도 남지 않는다.
  *
  * 사용: npm run verify:corp-change-detail   (= npx tsx scripts/verify-corp-change-detail.js)
  *
@@ -18,7 +20,7 @@
  */
 import { pool, closePool } from '../packages/api/src/db/pool.ts';
 import { applyCompanyScope, scopeOfSession } from '../packages/api/src/db/withCompanyScope.ts';
-import { listCorpChanges, insertCorpChange } from '../packages/api/src/db/corpChanges.ts';
+import { listCorpChanges, insertCorpChange, upsertLegalOrg } from '../packages/api/src/db/corpChanges.ts';
 import { decrypt } from '../packages/api/src/lib/crypto.ts';
 import {
   addOfficer,
@@ -27,10 +29,9 @@ import {
   readCorpChangeDetail,
   readCorpChangeDraft,
   removeOfficer,
-  saveCompanyInfo,
   saveCorpChangePayload,
 } from '../packages/api/src/legal/corpChangeOps.ts';
-import { parseCreateBody, parseFirstSave, parseOrgTarget } from '../packages/shared/src/domain/corp-change-detail.ts';
+import { parseCompanyPart, parseCreateBody, parseFirstSave } from '../packages/shared/src/domain/corp-change-detail.ts';
 
 const ORG_A = 990001;
 const ORG_B = 990002;
@@ -199,14 +200,14 @@ async function main() {
 
       // ── 읽기 — 남의 건은 404 ───────────────────────────────────────────
       await as(TA);
-      const aReadsB = await readCorpChangeDetail(c, b1);
+      const aReadsB = await readCorpChangeDetail(c, TA, b1);
       check('R1', '★ 회사 A 는 B 의 건을 못 읽는다(404)', !aReadsB.ok && aReadsB.status === 404, aReadsB);
       await as(TB);
-      const bReadsA = await readCorpChangeDetail(c, a1);
+      const bReadsA = await readCorpChangeDetail(c, TB, a1);
       const bList = (await listCorpChanges(c, ALL)).filter((i) => i.id === a1 || i.id === a2);
       check('R2', '★ 회사 B 는 A 의 건을 못 읽는다(404 · 목록 0건)', !bReadsA.ok && bReadsA.status === 404 && bList.length === 0);
       await as(OP);
-      const opReads = [await readCorpChangeDetail(c, a1), await readCorpChangeDetail(c, b1)];
+      const opReads = [await readCorpChangeDetail(c, OP, a1), await readCorpChangeDetail(c, OP, b1)];
       check('R3', '운영사는 둘 다 읽는다', opReads.every((r) => r.ok));
 
       // ── 임원 · 주민번호 ─────────────────────────────────────────────────
@@ -221,7 +222,7 @@ async function main() {
         stored && /^v1\./.test(stored.rrn_cipher) && stored.rrn_iv === null && stored.rrn_masked === '900101-1******',
         { iv: stored?.rrn_iv, masked: stored?.rrn_masked });
       check('P2', '★ 저장된 칸 어디에도 평문이 없다 · ERP 키로 풀면 원래 번호', !JSON.stringify(stored).includes(RRN) && decrypt(stored.rrn_cipher) === RRN);
-      const detailA = await readCorpChangeDetail(c, a1);
+      const detailA = await readCorpChangeDetail(c, TA, a1);
       const detailJson = JSON.stringify(detailA.value);
       check('P3', '★ 응답(추가 · 상세)에 평문 · 암호문이 없다 — 마스킹만',
         !JSON.stringify(added.value).includes(RRN) && !detailJson.includes(RRN) && !detailJson.includes(stored.rrn_cipher) &&
@@ -257,7 +258,7 @@ async function main() {
       await as(TA);
       const savedP = await saveCorpChangePayload(c, TA, a1, { payload: { resolutionDate: '2026-10-01' } });
       check('S1', '서류작성중(P) — 변경 내용 저장', savedP.ok && savedP.value.payload.resolutionDate === '2026-10-01');
-      for (const [code, st] of [['S2', 'A'], ['S3', 'C']]) {
+      for (const [code, st] of [['S2', 'E'], ['S3', 'C']]) {
         await as(OP);
         await c.query(`UPDATE public.tb_s080_corp_changes SET status = $2 WHERE id = $1`, [a1, st]);
         await as(TA);
@@ -265,46 +266,105 @@ async function main() {
         const o = await addOfficer(c, TA, a1, { name: '늦은임원' });
         const e = await editOfficer(c, TA, a1, o1, { name: '늦은수정' });
         const d = await removeOfficer(c, TA, a1, o1);
-        check(code, `★ ${st === 'A' ? '제출(A)' : '완료(C)'} 건 — 변경 내용 · 임원 추가 · 수정 · 삭제 모두 409`,
+        check(code, `★ ${st === 'E' ? '작성완료(E)' : '완료(C)'} 건 — 변경 내용 · 임원 추가 · 수정 · 삭제 모두 409`,
           [p, o, e, d].every((r) => !r.ok && r.status === 409), [p, o, e, d].map((r) => r.status));
       }
 
-      // ── 기본정보 — 비입주사 법무 회사 정보는 단체 기준(건과 무관) ───────────────
-      const targetOf = (s, orgId) => {
-        const t = parseOrgTarget(orgId, undefined, s);
-        return t.ok ? t.value : t;
+      // ── 기본정보 — 비입주사 법무 회사 정보는 [저장] 본문의 company 로만(결정 2026-10-10) ──────
+      // 첫 저장(POST) · PATCH 가 건 · 변경 내용과 **같은 트랜잭션**에서 쓴다. 단체 기준 경로는 없다.
+      const payloadOf = async (id) => {
+        await as(OP);
+        return (await c.query(`SELECT payload FROM public.tb_s080_corp_changes WHERE id = $1`, [id])).rows[0]?.payload;
       };
-      const tenantInfo = await saveCompanyInfo(c, TA, targetOf(TA), { legalName: '덮어쓰기' });
-      check('C1', '★ 입주사 단체 — 법무 회사 정보 저장 거절(409, ERP 에 쓰지 않는다)', !tenantInfo.ok && tenantInfo.status === 409);
-      const d2 = await readCorpChangeDetail(c, a2);
+      const legalOf = async (org) => {
+        await as(OP);
+        return (await c.query(`SELECT legal_name, ceo_name, member_type FROM public.tb_s080_legal_orgs WHERE org_id = $1`, [org])).rows[0] ?? null;
+      };
+
+      await as(TA);
+      const a2Before = JSON.stringify(await payloadOf(a2));
+      await as(TA);
+      const tenantInfo = await saveCorpChangePayload(c, TA, a2, { payload: { moveInDate: '2026-12-31' }, company: { legalName: '덮어쓰기' } });
+      check('C1', '★ 입주사 건에 회사 정보를 실으면 409 — 변경 내용도 안 바뀐다(ERP 에 쓰지 않는다)',
+        !tenantInfo.ok && tenantInfo.status === 409 && JSON.stringify(await payloadOf(a2)) === a2Before && (await legalOf(ORG_A)) === null);
+      await as(TA);
+      const d2 = await readCorpChangeDetail(c, TA, a2);
       check('C2', '★ 입주사 기본정보 = ERP 읽기 · 대표주소 기본값 출처는 대표자 자택(사업장 주소 아님)',
         d2.ok && d2.value.company.isTenant && d2.value.company.displayName === '시험입주사A' &&
-          d2.value.company.ceo.address === '서울 중구 자택로 1' && d2.value.company.memberTypeName === '주식회사',
+          d2.value.company.ceo.address === '서울 중구 자택로 1' && d2.value.company.memberTypeName === '주식회사' &&
+          d2.value.company.defaultedFields.length === 0,
         d2.value?.company);
 
       await as(TB);
-      const bInfo = await saveCompanyInfo(c, TB, targetOf(TB), {
-        legalName: '주식회사 시험비입주', ceoName: '박비입주', memberType: 'A', headZipCode: '06000', headAddress: '서울 강남구',
+      const bInfo = await saveCorpChangePayload(c, TB, b1, {
+        payload: { newName: '바꾼상호' },
+        company: { legalName: '주식회사 시험비입주', ceoName: '박비입주', memberType: 'A', headZipCode: '06000', headAddress: '서울 강남구' },
       });
-      const badType = await saveCompanyInfo(c, TB, targetOf(TB), { memberType: 'P' });
-      const lo = (await c.query(`SELECT org_id, legal_name, member_type FROM public.tb_s080_legal_orgs WHERE org_id = $1`, [ORG_B])).rows[0];
-      check('C3', '비입주사 — 법무 회사 정보 만들기(회사당 1행, 건 없이 단체로) · 회사유형은 002 만', bInfo.ok && lo?.legal_name === '주식회사 시험비입주' && lo.member_type === 'A' && !badType.ok && badType.status === 400, lo);
-      const d1 = await readCorpChangeDetail(c, b1);
+      const lo = await legalOf(ORG_B);
+      check('C3', '비입주사 — [저장] 한 번에 변경 내용 + 법무 회사 정보(회사당 1행, 건의 단체) · 새 상세를 돌려준다',
+        bInfo.ok && bInfo.value.payload.newName === '바꾼상호' && lo?.legal_name === '주식회사 시험비입주' && lo.member_type === 'A',
+        lo);
+      await as(TB);
+      const badType = await saveCorpChangePayload(c, TB, b1, { payload: { newName: '틀린저장' }, company: { memberType: 'P' } });
+      check('C3b', '★ 회사유형이 002 에 없으면 400(company.memberType) — 변경 내용도 회사 정보도 그대로',
+        !badType.ok && badType.status === 400 && badType.errors?.[0]?.field === 'company.memberType' &&
+          (await payloadOf(b1))?.newName === '바꾼상호' && (await legalOf(ORG_B))?.member_type === 'A',
+        badType.errors);
+      await as(TB);
+      const d1 = await readCorpChangeDetail(c, TB, b1);
       const bListed = (await listCorpChanges(c, ALL)).find((i) => i.id === b1);
       check('C4', '회사명 = 등기상 상호(상세 · 목록) · 회사유형 이름은 코드표',
         d1.ok && d1.value.company.displayName === '주식회사 시험비입주' && d1.value.company.memberTypeName === '유한회사' &&
           bListed?.companyName === '주식회사 시험비입주',
         { detail: d1.value?.company.displayName, list: bListed?.companyName });
       await as(TA);
-      const aTargetsB = targetOf(TA, ORG_B);
-      const aBypass = await attempt(() => saveCompanyInfo(c, TA, { orgId: ORG_B, orgCode: null }, { legalName: '남의회사' }));
+      const aSavesB = await saveCorpChangePayload(c, TA, b1, { payload: {}, company: { legalName: '남의회사' } });
+      await as(TA);
+      const aBypass = await attempt(() =>
+        upsertLegalOrg(c, { orgId: ORG_B, input: { ...(parseCompanyPart({ legalName: '남의회사' }).value) }, actor: 'v' }),
+      );
       const aRawB = await c.query(`UPDATE public.tb_s080_legal_orgs SET legal_name = '직접' WHERE org_id = $1`, [ORG_B]);
-      await as(OP);
-      const stillB = (await c.query(`SELECT legal_name FROM public.tb_s080_legal_orgs WHERE org_id = $1`, [ORG_B])).rows[0];
-      check('C5', '★ 회사 A 는 B 의 회사 정보를 못 고친다(코드 403 · 건너뛰어도 RLS 거절 · SQL 직접 0건)',
-        aTargetsB.ok === false && aTargetsB.status === 403 && aBypass.threw !== null && /row-level security/i.test(aBypass.threw.message) &&
-          aRawB.rowCount === 0 && stillB?.legal_name === '주식회사 시험비입주',
-        { bypass: aBypass.threw?.message ?? '통과했다', legal: stillB?.legal_name });
+      check('C5', '★ 회사 A 는 B 의 회사 정보를 못 고친다(B 의 건은 404 · 건너뛰어도 RLS 거절 · SQL 직접 0건)',
+        !aSavesB.ok && aSavesB.status === 404 && aBypass.threw !== null && /row-level security/i.test(aBypass.threw.message) &&
+          aRawB.rowCount === 0 && (await legalOf(ORG_B))?.legal_name === '주식회사 시험비입주',
+        { bypass: aBypass.threw?.message ?? '통과했다' });
+
+      // ── 합친 저장의 원자성 — 회사 정보가 틀리거나 쓰다 실패하면 건 · 변경 내용도 남지 않는다 ─────
+      const beforeB2 = await countOf(ORG_B);
+      await as(TB);
+      const k1 = await firstSave(TB, { changeType: 'NAME', payload: { newName: '남으면안됨' }, company: { legalName: '새이름', memberType: 'P' } });
+      check('K1', '★ 첫 저장 — 회사유형이 틀리면 400 · 건이 생기지 않고 회사 정보도 그대로',
+        !k1.ok && k1.status === 400 && (await countOf(ORG_B)) === beforeB2 && (await legalOf(ORG_B))?.legal_name === '주식회사 시험비입주',
+        k1.errors ?? k1);
+      const beforeA2 = await countOf(ORG_A);
+      await as(TA);
+      const k2 = await firstSave(TA, { changeType: 'NAME', payload: {}, company: { legalName: '입주사에 쓰기' } });
+      check('K2', '★ 첫 저장 — 입주사에 회사 정보를 실으면 409 · 건이 생기지 않는다',
+        !k2.ok && k2.status === 409 && (await countOf(ORG_A)) === beforeA2 && (await legalOf(ORG_A)) === null, k2);
+
+      // DB 가 회사 정보를 쓰다 거절하는 경우 — 건 · 변경 내용은 이미 썼다. 라우트의 트랜잭션이 하는
+      // 것처럼 되돌린 뒤(여기서는 SAVEPOINT), 건도 변경 내용도 남지 않아야 한다.
+      const failOnOrg = {
+        query: (sql, params) =>
+          /INSERT INTO public\.tb_s080_legal_orgs/.test(sql)
+            ? Promise.reject(new Error('시험 — 회사 정보 쓰기에서 실패'))
+            : c.query(sql, params),
+      };
+      await as(TB);
+      const k3 = await attempt(async () => {
+        const parsed = parseFirstSave({ changeType: 'NAME', payload: { newName: '남으면안됨' }, company: { legalName: '새이름' } }, TB);
+        return createCorpChange(failOnOrg, TB, parsed.value);
+      });
+      check('K3', '★ 원자성(DB 도중 실패) — 첫 저장에서 회사 정보 쓰기가 실패하면 건도 남지 않는다',
+        k3.threw !== null && (await countOf(ORG_B)) === beforeB2 && (await legalOf(ORG_B))?.legal_name === '주식회사 시험비입주',
+        k3.threw?.message);
+      await as(TB);
+      const k4 = await attempt(() =>
+        saveCorpChangePayload(failOnOrg, TB, b1, { payload: { newName: '남으면안됨' }, company: { legalName: '새이름' } }),
+      );
+      check('K4', '★ 원자성(DB 도중 실패) — PATCH 에서 회사 정보 쓰기가 실패하면 변경 내용도 그대로',
+        k4.threw !== null && (await payloadOf(b1))?.newName === '바꾼상호' && (await legalOf(ORG_B))?.legal_name === '주식회사 시험비입주',
+        k4.threw?.message);
     } finally {
       await c.query('ROLLBACK');
     }

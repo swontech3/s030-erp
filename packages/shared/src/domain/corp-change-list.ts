@@ -13,7 +13,7 @@
  * 따로 적지 않는다 — 두 벌이면 한쪽만 고쳐진다.
  *
  * ★ 이름은 코드표의 것을 쓴다. 코드 관리에서 이름을 고치면 바로 반영된다.
- * ★ 상태 필터는 **P · E · A · C 넷**이다. 취소(X)는 「취소 포함」 체크로만 보인다 —
+ * ★ 상태 필터는 **P · E · C 셋**이다. 취소(X)는 「취소 포함」 체크로만 보인다 —
  *   그래도 목록의 상태 열에는 「취소」가 코드표 이름으로 나와야 하므로 이름은 다섯 개를 준다
  *   (결정 2026-10-10).
  *
@@ -51,7 +51,7 @@ export interface CorpChangeListFilter {
   /** 작업일자 끝 `YYYY-MM-DD` — 그날 끝까지. */
   to: string | null;
   changeType: CorpChangeType | null;
-  /** P · E · A · C 중 하나. */
+  /** P · E · C 중 하나. */
   status: CorpChangeStatus | null;
   tenancy: TenancyFilter | null;
   /** 취소(X) 건도 보인다. **기본은 뺀다.** */
@@ -122,7 +122,7 @@ export interface CodeOption {
 export interface CorpChangeOptions {
   /** 변경 구분 선택지 — 앱이 아는 5종만. 순서는 코드표 순서. */
   changeTypes: CodeOption[];
-  /** 상태 필터 선택지 — P · E · A · C. */
+  /** 상태 필터 선택지 — P · E · C. */
   statuses: CodeOption[];
   /** 상태 이름 — 취소(X)까지 다섯. 목록의 상태 열이 쓴다. */
   statusNames: Record<string, string>;

@@ -1,6 +1,6 @@
 /**
- * 법인변경 3단계 처리 — 첫 저장(새 건) · 임시 모드 · 상세 · 변경 내용 · 임원 · 비입주사 법무 회사
- * 정보(2026-10-10).
+ * 법인변경 처리 — 첫 저장(새 건) · 임시 모드 · 상세 · 변경 내용 · 임원 · 비입주사 법무 회사
+ * 정보(3단계) · 상태 전이 · 삭제 · 작성완료 스냅샷(4단계, 2026-10-10).
  *
  * 라우트(`routes/corpChanges.ts`)는 본문 읽기와 응답만 하고, **판정은 여기서** 한다. 검증
  * 스크립트(`scripts/verify-corp-change-detail.js`)가 erp_app 접속 · 롤백 트랜잭션 안에서 이
@@ -23,18 +23,30 @@ import {
   CORP_CHANGE_STATUS_CATEGORY,
   CORP_CHANGE_TYPE_CATEGORY,
   INITIAL_CORP_CHANGE_STATUS,
+  availableTransitions,
   canEditCorpChange,
+  checkDelete,
+  checkTransition,
+  isCorpChangeStatus,
   isCorpChangeType,
   type CorpChangeFieldError,
+  type CorpChangeOfficerInput,
   type CorpChangeType,
+  type TransitionRefusal,
 } from '@swonbiz/shared/domain/corp-change';
+import {
+  STALE_STATUS_MESSAGE,
+  buildSubmitSnapshot,
+  parseSeenStatus,
+  parseTransitionBody,
+} from '@swonbiz/shared/domain/corp-change-transition';
 import {
   LEGAL_MEMBER_TYPE_CATEGORY,
   LEGAL_MEMBER_TYPE_USE_TP,
   TENANT_MEMBER_TYPE_USE_TP,
   corpChangeCompanyName,
   maskRrn,
-  parseLegalOrgBody,
+  parseCompanyPart,
   parseOfficerBody,
   parsePayload,
   type CorpChangeCompanyInfo,
@@ -43,6 +55,7 @@ import {
   type CorpChangeDraftResponse,
   type CorpChangeOfficerView,
   type FirstSaveInput,
+  type LegalOrgInput,
   type OrgTarget,
 } from '@swonbiz/shared/domain/corp-change-detail';
 import type { CodeOption } from '@swonbiz/shared/domain/corp-change-list';
@@ -50,6 +63,7 @@ import { encrypt } from '../lib/crypto.ts';
 import type { ScopedClient } from '../db/withCompanyScope.ts';
 import { listCodes } from '../db/lookups.ts';
 import {
+  deleteCorpChange,
   deleteOfficer,
   getCorpChange,
   insertCorpChange,
@@ -58,6 +72,7 @@ import {
   readCompanySource,
   tenantOrgCode,
   touchCorpChange,
+  updateCorpChangeStatus,
   updateOfficer,
   updatePayload,
   upsertLegalOrg,
@@ -146,6 +161,8 @@ async function companyView(
       memberType: company.memberType,
       memberTypeName,
       hasLegalOrg: company.hasLegalOrg,
+      // 삐용 기본값은 라우트가 트랜잭션 밖에서 채운다(`applyCompanyDefaults`).
+      defaultedFields: [],
     },
     memberTypes: legalTypes.map((c) => ({ code: c.code, name: c.name })),
   };
@@ -167,6 +184,34 @@ async function codeNames(
     changeTypeName: nameOf(CORP_CHANGE_TYPE_CATEGORY, changeType),
     statusName: nameOf(CORP_CHANGE_STATUS_CATEGORY, status),
   };
+}
+
+// =============================================================================
+// 비입주사 법무 회사 정보 — 저장 본문의 `company` (결정 2026-10-10 — 저장 버튼 하나)
+// =============================================================================
+
+/**
+ * 회사 정보를 쓰기 **전에** 거절할 것을 다 본다 — 이 함수가 통과해야 건 · 변경 내용도 쓴다.
+ * 쓰는 쪽이 판정 뒤에 쓰므로, 회사 정보가 틀리면 건 · 변경 내용도 남지 않는다.
+ *
+ * ★★ 입주사 단체(`link_s020_org_id` 에 있다)면 **409** — 법무는 ERP 에 쓰지 않는다. 입주사
+ *    정보는 입주사 화면에서 고친다.
+ * ★ 회사유형은 `MEMBER_TYPE` 002 에 있어야 한다(400, 자리 `company.memberType`).
+ * ★ 단체는 RLS 를 통과한 건의 것이거나 `parseOrgTarget` 을 거친 것만 넣는다(db 머리말 ⚠).
+ */
+async function checkCompanyWrite(client: ScopedClient, orgId: number, company: LegalOrgInput): Promise<OpError | null> {
+  const source = await readCompanySource(client, orgId);
+  if (source.isTenant) return fail(409, 'tenant_company', '입주사 정보는 ERP 입주사 화면에서 고칩니다');
+
+  const memberType = company.memberType;
+  if (memberType !== null) {
+    const allowed = await listCodes(client, [{ category: LEGAL_MEMBER_TYPE_CATEGORY, useTp: LEGAL_MEMBER_TYPE_USE_TP }]);
+    if (!allowed.some((c) => c.code === memberType)) {
+      const message = '회사유형이 올바르지 않습니다';
+      return fail(400, 'invalid_request', message, [{ field: 'company.memberType', message }]);
+    }
+  }
+  return null;
 }
 
 // =============================================================================
@@ -210,6 +255,12 @@ export async function createCorpChange(
   session: ErpSession,
   input: FirstSaveInput,
 ): Promise<OpResult<{ id: string }>> {
+  // ★ 회사 정보 판정이 먼저다 — 틀리면 건도 만들지 않는다(쓰기 전에 돌려준다).
+  if (input.company) {
+    const refused = await checkCompanyWrite(client, input.orgId, input.company);
+    if (refused) return refused;
+  }
+
   const id = randomUUID();
   const actor = actorOf(session);
   await insertCorpChange(client, {
@@ -230,6 +281,7 @@ export async function createCorpChange(
       rrn: officer.rrn ? sealRrn(officer.rrn) : null,
     });
   }
+  if (input.company) await upsertLegalOrg(client, { orgId: input.orgId, input: input.company, actor });
   return { ok: true, value: { id } };
 }
 
@@ -239,6 +291,7 @@ export async function createCorpChange(
 
 export async function readCorpChangeDetail(
   client: ScopedClient,
+  session: ErpSession,
   id: string,
 ): Promise<OpResult<CorpChangeDetailResponse>> {
   const row = await getCorpChange(client, id);
@@ -252,6 +305,12 @@ export async function readCorpChangeDetail(
   const view = await companyView(client, row);
   const officers = CHANGE_TYPE_DEFS[changeType].usesOfficers ? await listOfficers(client, row.id) : [];
   const names = await codeNames(client, changeType, row.status);
+  // ★ 복원 대상은 취소(X)일 때만 뜻이 있다. 다른 상태에 남은 값은 내려보내지 않는다.
+  const statusBeforeCancel =
+    row.status === 'X' && isCorpChangeStatus(row.statusBeforeCancel) ? row.statusBeforeCancel : null;
+  const statusBeforeCancelName = statusBeforeCancel
+    ? (await codeNames(client, changeType, statusBeforeCancel)).statusName
+    : null;
 
   return {
     ok: true,
@@ -267,21 +326,159 @@ export async function readCorpChangeDetail(
       editable: canEditCorpChange(row.status),
       ...view,
       officers,
+      // ★ 버튼은 서버가 전이를 받을 때와 **같은 표**로 고른다(`corp-change.ts` 머리말 ★★★).
+      availableTransitions: availableTransitions(row.status, session.role, statusBeforeCancel),
+      canDelete: checkDelete(row.status, session.role).ok,
+      statusBeforeCancel,
+      statusBeforeCancelName,
+      cancelReason: row.status === 'X' ? row.cancelReason : null,
+      writtenOn: row.writtenOn,
+      completedOn: row.completedOn,
     },
   };
+}
+
+// =============================================================================
+// 상태 전이 · 삭제(4단계)
+// =============================================================================
+
+/** `checkTransition` · `checkDelete` 의 거절 사유 → 응답 상태(결정 2026-10-10). */
+const REFUSAL_STATUS: Readonly<Record<TransitionRefusal, OpError['status']>> = {
+  invalid: 400,
+  forbidden: 403,
+  not_allowed: 409,
+  restore_target: 409,
+  unknown_status: 409,
+};
+
+const STALE = fail(409, 'stale_status', STALE_STATUS_MESSAGE);
+
+/** 저장된 임원 → 검증에 넘기는 모양. ★ 주민번호는 넘기지 않는다 — 암호문이고, 형식은 입력 때 봤다. */
+const officerForValidation = (o: CorpChangeOfficerView): CorpChangeOfficerInput => ({
+  name: o.name,
+  changeKind: o.changeKind,
+  position: o.position,
+  effectiveDate: o.effectiveDate,
+});
+
+/**
+ * 상태 전이 `{ from, to, cancelReason? }` — 판정은 `checkTransition` 한 곳이다.
+ *
+ * 순서: 본문 모양(400) → 잠가서 읽기(404) → **화면이 본 상태와 대조(409)** → `checkTransition`
+ * (400 검증 · 403 역할 · 409 표에 없음/복원 대상) → 쓰기.
+ *
+ * ★★ P→E 검증은 **저장된 값**으로 돈다 — 변경 내용과, 임원 건이면 저장된 임원 목록. 실패하면
+ *    400 + 칸별 오류이고 아무것도 쓰지 않는다.
+ * ★★ P→E 는 작성완료 스냅샷(submit_snapshot)과 작성완료 시각(written_at)을 **같은 트랜잭션**에서 쓴다 —
+ *    상태만 바뀌고 스냅샷이 없는 건은 없다. 스냅샷의 용도는 shared `corp-change-transition.ts` 머리말.
+ *    회사값은 이 건의 org_id(RLS 를 통과한 값)로 읽는다.
+ * ★ 성공하면 새 상세를 돌려준다 — 화면이 그 값으로 버튼을 다시 그린다.
+ */
+export async function transitionCorpChange(
+  client: ScopedClient,
+  session: ErpSession,
+  id: string,
+  body: unknown,
+): Promise<OpResult<CorpChangeDetailResponse>> {
+  const parsed = parseTransitionBody(body);
+  if (!parsed.ok) return fail(400, 'invalid_request', parsed.message, parsed.errors);
+  const { from, to, cancelReason } = parsed.value;
+
+  const row = await getCorpChange(client, id, { forUpdate: true });
+  if (!row) return NOT_FOUND;
+  if (row.status !== from) return STALE;
+  if (!isCorpChangeType(row.changeType)) return fail(409, 'unknown_type', '앱이 모르는 변경 구분입니다');
+  const completing = row.status === 'P' && to === 'E';
+  const officers =
+    CHANGE_TYPE_DEFS[row.changeType].usesOfficers && completing ? await listOfficers(client, row.id) : [];
+  // 작성완료 때 회사값 — 대표주소 변경의 「변경 전 주소」(대표자 자택) 검증과 스냅샷이 같이 쓴다.
+  // ★ 이 건의 org_id(RLS 를 통과한 값)로 읽는다.
+  const company = completing ? await readCompanySource(client, row.orgId) : null;
+  const check = checkTransition({
+    from: row.status,
+    to,
+    role: session.role,
+    statusBeforeCancel: row.statusBeforeCancel,
+    content: completing
+      ? {
+          changeType: row.changeType,
+          payload: row.payload,
+          officers: officers.map(officerForValidation),
+          company: company ? { isTenant: company.isTenant, ceoZipCode: company.ceoZipCode, ceoAddress: company.ceoAddress } : undefined,
+        }
+      : undefined,
+  });
+  if (!check.ok) {
+    const status = REFUSAL_STATUS[check.code];
+    return fail(status, check.code, check.reason, status === 400 ? (check.errors ?? []) : undefined);
+  }
+
+  const snapshot =
+    completing && company
+    ? buildSubmitSnapshot({
+        changeType: row.changeType,
+        company,
+        payload: row.payload,
+        officers,
+      })
+    : undefined;
+
+  const changed = await updateCorpChangeStatus(client, {
+    id,
+    from: row.status,
+    to,
+    actor: actorOf(session),
+    cancelReason: to === 'X' ? cancelReason : null,
+    snapshot,
+  });
+  // 잠가 두었으므로 생기지 않는다. 생기면 판정 없이 쓴 것이 없도록 멈춘다.
+  if (!changed) return STALE;
+  return readCorpChangeDetail(client, session, id);
+}
+
+/**
+ * 삭제 `?from=` — 판정은 `checkDelete`(운영사 · P/X). 임원을 함께 지운다.
+ * 순서는 전이와 같다: 본 상태(400) → 잠가서 읽기(404) → 대조(409) → 판정(403 · 409).
+ */
+export async function deleteCorpChangeOp(
+  client: ScopedClient,
+  session: ErpSession,
+  id: string,
+  seen: unknown,
+): Promise<OpResult<null>> {
+  const parsed = parseSeenStatus(seen);
+  if (!parsed.ok) return fail(400, 'invalid_request', parsed.message, parsed.errors);
+
+  const row = await getCorpChange(client, id, { forUpdate: true });
+  if (!row) return NOT_FOUND;
+  if (row.status !== parsed.value) return STALE;
+  const check = checkDelete(row.status, session.role);
+  if (!check.ok) return fail(REFUSAL_STATUS[check.code], check.code, check.reason);
+
+  const gone = await deleteCorpChange(client, { id, status: row.status });
+  if (!gone) return STALE;
+  return { ok: true, value: null };
 }
 
 // =============================================================================
 // 변경 내용
 // =============================================================================
 
-/** 변경 내용 저장 — P 만. 내용 검증은 하지 않는다(임시 저장, `corp-change-detail.ts` 머리말). */
+/**
+ * [저장] — 변경 내용 `{ payload, company? }`. P 만. 내용 검증은 하지 않는다(임시 저장,
+ * `corp-change-detail.ts` 머리말).
+ *
+ * ★ `company` 가 실려 오면(비입주사 · 사람이 고쳤거나 삐용 기본값이 있다) **같은 트랜잭션**에서
+ *   법무 회사 정보도 저장한다. 판정(모양 · 입주사 · 회사유형)을 모두 먼저 하고 쓰므로, 회사 정보가
+ *   틀리면 변경 내용도 바뀌지 않는다. 회사 단체는 **이 건의 org_id**(RLS 를 통과한 값)다.
+ * ★ 성공하면 새 상세를 돌려준다 — 화면이 회사명 · 기본값 표시까지 그 값으로 다시 그린다.
+ */
 export async function saveCorpChangePayload(
   client: ScopedClient,
   session: ErpSession,
   id: string,
   body: unknown,
-): Promise<OpResult<{ payload: Record<string, unknown> }>> {
+): Promise<OpResult<CorpChangeDetailResponse>> {
   const locked = await lockEditable(client, id);
   if (!locked.ok) return locked;
   const row = locked.value;
@@ -293,10 +490,23 @@ export async function saveCorpChangePayload(
     return fail(400, 'invalid_request', '변경 구분은 바꿀 수 없습니다');
   }
   const parsed = parsePayload(row.changeType, raw.payload);
-  if (!parsed.ok) return fail(400, 'invalid_request', parsed.message, parsed.errors);
+  const company = parseCompanyPart(raw.company);
+  // 틀린 칸을 다 모은다 — 변경 내용과 회사 정보를 한 번에 알려 준다.
+  const errors = [
+    ...(parsed.ok ? [] : (parsed.errors ?? [{ field: 'payload', message: parsed.message }])),
+    ...(company.ok ? [] : (company.errors ?? [{ field: 'company', message: company.message }])),
+  ];
+  if (!parsed.ok || !company.ok) return fail(400, 'invalid_request', errors[0]!.message, errors);
 
-  await updatePayload(client, { id, payload: parsed.value, actor: actorOf(session) });
-  return { ok: true, value: { payload: parsed.value } };
+  if (company.value) {
+    const refused = await checkCompanyWrite(client, row.orgId, company.value);
+    if (refused) return refused;
+  }
+
+  const actor = actorOf(session);
+  await updatePayload(client, { id, payload: parsed.value, actor });
+  if (company.value) await upsertLegalOrg(client, { orgId: row.orgId, input: company.value, actor });
+  return readCorpChangeDetail(client, session, id);
 }
 
 // =============================================================================
@@ -375,41 +585,3 @@ export async function removeOfficer(
   return { ok: true, value: null };
 }
 
-// =============================================================================
-// 비입주사 법무 회사 정보 — 단체 기준(건과 무관)
-// =============================================================================
-
-/**
- * 비입주사 법무 회사 정보 저장 — 회사당 1행, 없으면 만든다. **건과 무관**하다(회사 단위) —
- * 임시 모드에서도 바로 저장된다(결정 2026-10-10).
- *
- * ★ 단체는 `parseOrgTarget` 을 거친 것이다 — 회사 세션은 자기 단체뿐(다르면 그 전에 403),
- *   운영사는 단체 ID 필수. RLS `WITH CHECK` 가 한 번 더 막는다.
- * ★★ 입주사 단체(`link_s020_org_id` 에 있다)면 **409** — 법무는 ERP 에 쓰지 않는다. 입주사 정보는
- *    입주사 화면에서 고친다.
- */
-export async function saveCompanyInfo(
-  client: ScopedClient,
-  session: ErpSession,
-  target: OrgTarget,
-  body: unknown,
-): Promise<OpResult<null>> {
-  const parsed = parseLegalOrgBody(body);
-  if (!parsed.ok) return fail(400, 'invalid_request', parsed.message, parsed.errors);
-
-  const source = await readCompanySource(client, target.orgId);
-  if (source.isTenant) {
-    return fail(409, 'tenant_company', '입주사 정보는 ERP 입주사 화면에서 고칩니다');
-  }
-
-  const memberType = parsed.value.memberType;
-  if (memberType !== null) {
-    const allowed = await listCodes(client, [{ category: LEGAL_MEMBER_TYPE_CATEGORY, useTp: LEGAL_MEMBER_TYPE_USE_TP }]);
-    if (!allowed.some((c) => c.code === memberType)) {
-      return fail(400, 'invalid_request', '회사유형이 올바르지 않습니다', [{ field: 'memberType', message: '회사유형이 올바르지 않습니다' }]);
-    }
-  }
-
-  await upsertLegalOrg(client, { orgId: target.orgId, input: parsed.value, actor: actorOf(session) });
-  return { ok: true, value: null };
-}

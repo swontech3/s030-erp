@@ -38,10 +38,12 @@ import {
   isRrnShape,
   validateRrn,
   type CorpChangeFieldError,
+  type CorpChangeStatus,
   type CorpChangeType,
   type OfficerChangeKind,
 } from './corp-change.ts';
 import type { CodeOption } from './corp-change-list.ts';
+import { DIGIT_MASK_RULE, isDigitMaskComplete, maskValue, type DigitMaskKind } from './masked-caret.ts';
 
 /**
  * 비입주사 회사유형 — 공통코드 `MEMBER_TYPE` 파티션 `002`(주식회사 · 유한회사, 결정 2026-10-10).
@@ -322,6 +324,17 @@ export interface FirstSaveInput extends CorpChangeCreateInput {
   payload: Record<string, unknown>;
   /** 임원변경(OFFICER)만. 다른 구분은 빈 배열. 주민번호 `undefined` = 없음. */
   officers: OfficerInput[];
+  /** 비입주사 법무 회사 정보 — 실려 오면 같은 트랜잭션에서 저장한다. 안 실으면 null(안 건드림). */
+  company: LegalOrgInput | null;
+}
+
+/**
+ * 저장 본문의 `company` — 없거나 null 이면 「안 건드림」(null). 오류 자리는 `company.{칸}`.
+ * 첫 저장(`parseFirstSave`)과 변경 내용 저장(PATCH)이 같이 쓴다(결정 2026-10-10 — 저장 버튼 하나).
+ */
+export function parseCompanyPart(raw: unknown): Parsed<LegalOrgInput | null> {
+  if (raw === undefined || raw === null) return { ok: true, value: null };
+  return parseLegalOrgBody(raw, 'company');
 }
 
 /**
@@ -357,8 +370,14 @@ export function parseFirstSave(
     });
   }
 
+  const company = parseCompanyPart(raw.company);
+  if (!company.ok) errors.push(...(company.errors ?? [{ field: 'company', message: company.message }]));
+
   if (errors.length > 0) return badAt(errors);
-  return { ok: true, value: { ...head.value, payload: payload.ok ? payload.value : {}, officers } };
+  return {
+    ok: true,
+    value: { ...head.value, payload: payload.ok ? payload.value : {}, officers, company: company.ok ? company.value : null },
+  };
 }
 
 // =============================================================================
@@ -398,19 +417,36 @@ const LEGAL_ORG_FIELDS: Readonly<Record<keyof LegalOrgInput, readonly [string, n
 };
 
 /**
- * 법무 회사 정보 본문 — 칸 전체를 보낸다(통째로 바꾼다). 단체(`orgId`)는 `parseOrgTarget` 이
- * 따로 읽는다 — 이 함수는 회사 칸만 본다.
+ * 숫자 칸의 형식(`masked-caret.ts` — 계약 폼과 같은 함수). 자릿수가 틀리면 400(칸별 오류),
+ * 맞으면 하이픈을 넣은 모양으로 저장한다(ERP 입주사 칸과 같다).
  */
-export function parseLegalOrgBody(raw: unknown): Parsed<LegalOrgInput> {
-  if (!isPlainObject(raw)) return bad('body', '요청 형식이 올바르지 않습니다');
+const LEGAL_ORG_DIGIT_KINDS: Readonly<Partial<Record<keyof LegalOrgInput, DigitMaskKind>>> = {
+  corpNumber: 'corpno',
+  bizNumber: 'bizno',
+  tel: 'phone',
+};
+
+/**
+ * 법무 회사 정보 본문 — 칸 전체를 보낸다(통째로 바꾼다). 이 함수는 회사 칸만 본다.
+ * 저장 본문 안에서는 `company` 로 실려 온다(`parseCompanyPart`).
+ *
+ * @param at 오류 자리의 앞머리 — 저장 본문의 `company` 면 `company.legalName` 처럼 붙는다.
+ */
+export function parseLegalOrgBody(raw: unknown, at?: string): Parsed<LegalOrgInput> {
+  const fieldOf = (key: string) => (at ? `${at}.${key}` : key);
+  if (!isPlainObject(raw)) return bad(at ?? 'body', '회사 정보 형식이 올바르지 않습니다');
   const out = {} as Record<keyof LegalOrgInput, string | null>;
   const errors: CorpChangeFieldError[] = [];
   for (const key of Object.keys(LEGAL_ORG_FIELDS) as (keyof LegalOrgInput)[]) {
     const [label, max] = LEGAL_ORG_FIELDS[key];
     const t = textOrNull(raw[key]);
-    if (t === undefined) errors.push({ field: key, message: `${label}은(는) 글자로 입력하세요` });
-    else if (t !== null && max !== null && t.length > max) errors.push({ field: key, message: `${label}은(는) ${max}자 이내로 입력하세요` });
-    else out[key] = t;
+    const digitKind = LEGAL_ORG_DIGIT_KINDS[key];
+    if (t === undefined) errors.push({ field: fieldOf(key), message: `${label}은(는) 글자로 입력하세요` });
+    else if (t !== null && digitKind && !isDigitMaskComplete(digitKind, t)) {
+      errors.push({ field: fieldOf(key), message: `${label}은(는) ${DIGIT_MASK_RULE[digitKind]}로 입력하세요` });
+    } else if (t !== null && max !== null && t.length > max) errors.push({ field: fieldOf(key), message: `${label}은(는) ${max}자 이내로 입력하세요` });
+    // ★ 숫자 칸은 하이픈을 넣어 저장한다 — ERP 입주사 칸(`tb_s080_companies`)과 같은 모양(2026-10-10 실측).
+    else out[key] = t !== null && digitKind ? maskValue(digitKind, t) : t;
   }
   return errors.length > 0 ? badAt(errors) : { ok: true, value: out };
 }
@@ -428,7 +464,8 @@ export interface CorpChangeAddressView {
 /**
  * 기본정보 카드 — **읽어서** 보여 준다(복사해 두지 않는다).
  *   · 입주사 = ERP 입주사 정보(`tb_s080_companies`). 고치지 않는다 — 「입주사 화면에서 입력」 링크
- *   · 비입주사 = 법무 회사 정보(`tb_s080_legal_orgs`). 이 화면에서 고친다
+ *   · 비입주사 = 법무 회사 정보(`tb_s080_legal_orgs`). 이 화면의 [저장] 이 변경 내용과 함께 저장한다.
+ *     빈 칸은 삐용 값으로 채워 보여 준다(`applyCompanyDefaults`)
  */
 export interface CorpChangeCompanyInfo {
   isTenant: boolean;
@@ -450,6 +487,93 @@ export interface CorpChangeCompanyInfo {
   memberTypeName: string | null;
   /** 비입주사 법무 회사 정보 줄이 있는가(없으면 첫 저장이 만든다). */
   hasLegalOrg: boolean;
+  /**
+   * 삐용 값으로 **채워 보여 준** 칸(`applyCompanyDefaults`) — 아직 저장되지 않았다. 입주사는 늘 빈 배열.
+   * 화면은 이 칸에 「저장 전」 표시를 붙이고, [저장] 하면 회사 정보로 남긴다.
+   */
+  defaultedFields: CompanyDefaultField[];
+}
+
+// =============================================================================
+// 비입주사 회사 정보의 기본값 — 삐용 단체 정보 (결정 2026-10-10)
+// =============================================================================
+
+/**
+ * 삐용이 주는 회사 정보 — 지금은 회사명 · 대표자명.
+ *   · 운영사: 단체 단건 조회(`getOrg`)의 `orgName` · `repName`
+ *   · 회사 사용자(비입주사): 로그인 프로필의 `orgName` 만(단체 조회 권한이 없다)
+ *     ★ 다음 단계 — 삐용이 로그인 응답에 대표자명을 더하면 `repName` 으로 붙인다
+ */
+export interface BbiyongCompanyDefaults {
+  orgName?: string | null;
+  repName?: string | null;
+}
+
+/** 기본값을 받을 수 있는 회사 칸. */
+export type CompanyDefaultField = 'legalName' | 'corpNumber' | 'bizNumber' | 'ceoName' | 'tel' | 'memberType';
+
+/**
+ * ★★ 삐용 칸 → 법무 회사 정보 칸의 짝 — **이 한 곳에서만** 정한다. 삐용이 칸을 더 주면
+ *    `BbiyongCompanyDefaults` 에 칸을 더하고 여기에 한 줄을 더한다(대응하는 칸이 있을 때만).
+ */
+export const COMPANY_DEFAULT_PAIRS: readonly { from: keyof BbiyongCompanyDefaults; to: Exclude<CompanyDefaultField, 'memberType'> }[] = [
+  { from: 'orgName', to: 'legalName' },
+  { from: 'repName', to: 'ceoName' },
+];
+
+/**
+ * ★★ 등기상 상호 → 회사유형 **이름** 추정(결정 2026-10-10). 이 표 한 곳에서만 정한다.
+ *    코드값을 박지 않는다 — 이름으로 `MEMBER_TYPE` 002 코드표에서 찾는다(`guessMemberType`).
+ *    앞의 것이 먼저다. 어느 표시도 없으면 추정하지 않는다(비운다).
+ */
+export const MEMBER_TYPE_NAME_HINTS: readonly { name: string; marks: readonly string[] }[] = [
+  { name: '주식회사', marks: ['주식회사', '(주)'] },
+  { name: '유한회사', marks: ['유한회사', '(유)'] },
+];
+
+/** 상호로 회사유형 코드를 추정한다 — 이름이 같은 코드표 줄의 코드값. 모르면 null. */
+export function guessMemberType(legalName: string | null, memberTypes: readonly CodeOption[]): CodeOption | null {
+  const name = legalName?.trim();
+  if (!name) return null;
+  const hint = MEMBER_TYPE_NAME_HINTS.find((h) => h.marks.some((m) => name.includes(m)));
+  return hint ? (memberTypes.find((t) => t.name === hint.name) ?? null) : null;
+}
+
+/**
+ * 비입주사 회사 정보의 **빈 칸만** 기본값으로 채워 보여 준다 — 저장된 값이 우선이다.
+ *   · 삐용 값(`COMPANY_DEFAULT_PAIRS`) — 회사명 · 대표자명
+ *   · 회사유형 — 등기상 상호(저장된 값이든 위에서 채운 값이든)에서 추정(`guessMemberType`)
+ *
+ * ★ 복사해 두지 않는다 — 응답에만 채운다. 사람이 [저장] 해야 법무 회사 정보에 남는다.
+ * ★ 입주사는 건드리지 않는다(ERP 값 그대로 · 읽기 전용). 삐용 값이 없으면(조회 실패 ·
+ *   unsupported) 그 칸은 그대로 둔다 — 회사명은 `corpChangeCompanyName` 이 단체코드로 보여 준다.
+ *
+ * @param memberTypes 비입주사 회사유형 선택지(`MEMBER_TYPE` 002) — 응답의 `memberTypes`.
+ */
+export function applyCompanyDefaults(
+  company: CorpChangeCompanyInfo,
+  source: BbiyongCompanyDefaults | null,
+  org: { orgCode: string | null; orgId: number },
+  memberTypes: readonly CodeOption[],
+): CorpChangeCompanyInfo {
+  if (company.isTenant) return company;
+  const next: CorpChangeCompanyInfo = { ...company, defaultedFields: [...company.defaultedFields] };
+  for (const { from, to } of COMPANY_DEFAULT_PAIRS) {
+    const value = source?.[from]?.trim();
+    if (!value || next[to]?.trim()) continue;
+    next[to] = value;
+    next.defaultedFields.push(to);
+  }
+  if (!next.memberType) {
+    const guessed = guessMemberType(next.legalName, memberTypes);
+    if (guessed) {
+      next.memberType = guessed.code;
+      next.memberTypeName = guessed.name;
+      next.defaultedFields.push('memberType');
+    }
+  }
+  next.displayName = corpChangeCompanyName(next.legalName, org);
+  return next;
 }
 
 export interface CorpChangeOfficerView {
@@ -490,6 +614,25 @@ export interface CorpChangeDetailResponse extends CorpChangeDraftResponse {
   editable: boolean;
   /** 임원변경(OFFICER)만 채운다. 다른 구분은 빈 배열. */
   officers: CorpChangeOfficerView[];
+
+  // ── 4단계 — 상태 전이 · 삭제(2026-10-10) ──────────────────────────────────
+  /**
+   * 이 세션의 역할로 지금 갈 수 있는 상태(`availableTransitions`). 화면은 **이 값으로만** 버튼을
+   * 그린다 — 서버가 전이를 받을 때 쓰는 `checkTransition` 과 같은 표다.
+   */
+  availableTransitions: CorpChangeStatus[];
+  /** 지금 지울 수 있는가(`checkDelete` — 운영사 · P/X). */
+  canDelete: boolean;
+  /** 취소 직전 상태 — 취소(X)일 때만. 복원은 이 상태로만 간다. */
+  statusBeforeCancel: CorpChangeStatus | null;
+  /** 그 상태의 코드표 이름. */
+  statusBeforeCancelName: string | null;
+  /** 취소 사유 — 취소(X)일 때만. 회사 사용자도 본다. */
+  cancelReason: string | null;
+  /** 작성완료일 `YYYY-MM-DD`(written_at) — 서류수정(E→P) 뒤에도 남는다(다시 작성완료하면 바뀐다). */
+  writtenOn: string | null;
+  /** 완료일 `YYYY-MM-DD`. */
+  completedOn: string | null;
 }
 
 /**

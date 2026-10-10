@@ -7,9 +7,9 @@ import {
   pickCorpChangeOptions,
 } from './corp-change-list.ts';
 
-describe('상태 필터 — P · E · A · C', () => {
-  it('취소(X) · 준비중(S)이 없다', () => {
-    expect([...CORP_CHANGE_FILTER_STATUSES]).toEqual(['P', 'E', 'A', 'C']);
+describe('상태 필터 — P · E · C', () => {
+  it('취소(X) · 준비중(S) · 제출(A)이 없다', () => {
+    expect([...CORP_CHANGE_FILTER_STATUSES]).toEqual(['P', 'E', 'C']);
   });
 });
 
@@ -64,6 +64,7 @@ describe('pickCorpChangeOptions', () => {
       ],
       [
         { code: 'S', name: '준비중' },
+        { code: 'A', name: '서류제출' },
         { code: 'X', name: '취소' },
         { code: 'P', name: '작성중' },
       ],
@@ -74,8 +75,9 @@ describe('pickCorpChangeOptions', () => {
     ]);
     expect(o.statuses).toEqual([{ code: 'P', name: '작성중' }]);
     // 코드표에 없는 상태는 코드값을 이름으로 — 상태 열이 비지 않는다
-    expect(o.statusNames).toEqual({ P: '작성중', E: 'E', A: 'A', C: 'C', X: '취소' });
+    expect(o.statusNames).toEqual({ P: '작성중', E: 'E', C: 'C', X: '취소' });
     expect(o.statusNames).not.toHaveProperty('S');
+    expect(o.statusNames).not.toHaveProperty('A'); // ★ 코드표의 A 는 지우지 않고 앱이 거른다
   });
 });
 

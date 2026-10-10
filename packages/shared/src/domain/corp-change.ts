@@ -60,13 +60,16 @@ export const CORP_CHANGE_TYPES = ['NAME', 'HQ', 'PURPOSE', 'OFFICER', 'CEO_ADDR'
 export type CorpChangeType = (typeof CORP_CHANGE_TYPES)[number];
 
 /**
- * 진행 상태 5종.
+ * 진행 상태 4종 — 서류작성중(P) → 작성완료(E) → 완료(C), 그리고 취소(X).
  *
- *   P 서류작성중 · E 서류작성완료 · A 서류제출 · C 완료 · X 취소
+ *   P 서류작성중 · E 서류작성완료 · C 완료 · X 취소
  *
  * ★ 코드표의 `S`(준비중)는 쓰지 않는다 — 새 건은 `P` 로 시작한다(레거시와 같다).
+ * ★★ 「제출(A)」은 뺐다(결정 2026-10-10) — 제출은 상대 회사 연락이 없으면 확정할 수 없다.
+ *    코드표 `LAW_PROG_ST` 의 `A` 는 지우지 않는다 — 앱이 이 목록으로 걸러낸다. 개발 DB 의 A 1건은
+ *    일회용 정리 파일로 지웠다(`scripts/oneoff/2026-10-10-drop-status-a-corp-change.sql`).
  */
-export const CORP_CHANGE_STATUSES = ['P', 'E', 'A', 'C', 'X'] as const;
+export const CORP_CHANGE_STATUSES = ['P', 'E', 'C', 'X'] as const;
 export type CorpChangeStatus = (typeof CORP_CHANGE_STATUSES)[number];
 
 /** 새 건의 상태. 운영사 · 회사 모두 새 건을 만들 수 있다. */
@@ -115,10 +118,22 @@ export interface CorpChangeTypeDef {
   fields: readonly CorpChangeFieldDef[];
   /** 임원 목록을 쓰는가(임원변경). */
   usesOfficers: boolean;
+  /** 임원별 효력일이 작성완료 때 필수인가(임원변경 — 결정 2026-10-10). 임원을 안 쓰는 구분은 false. */
+  officerEffectiveDateRequired: boolean;
+  /**
+   * 기본정보의 대표자 자택 주소(우편번호 · 기본주소)가 작성완료 때 필수인가 — 대표주소 변경의
+   * 「변경 전 주소」가 이 값이다(결정 2026-10-10 — 변경 내용에 따로 두지 않는다).
+   */
+  requiresCeoHome: boolean;
 }
 
 /**
- * 구분별 입력 칸. 필수 여부까지 레거시 레지스트리 그대로다(조사 보고 1번 표).
+ * 구분별 입력 칸. 필수 여부는 레거시 레지스트리에 **날짜 필수**를 더했다(결정 2026-10-10 —
+ * 등기 기준일이 없으면 신청기한을 셀 수 없다):
+ *   상호 · 목적 · 임원 · 본점 = 결의일 필수 · 본점 = 「이전일」 칸을 더했다(등기 기준일) ·
+ *   임원 = 임원별 효력일 필수(`officerEffectiveDateRequired`) · 대표주소 = 전입일 필수(전부터)
+ * ★ 필수 표시(`required`)는 **여기 한 곳**이다 — 검증(`validateCorpChange`)과 화면의 `*` 가 이 값을 읽는다.
+ *   저장 때는 검증하지 않는다(작성 중 임시 저장) — 작성완료(P→E) 때만.
  *
  * ★ 구분의 **이름**은 여기 두지 않는다 — 화면은 코드표(`LAW_CNG_TP`)의 이름을 읽는다.
  *   코드 관리에서 이름을 고치면 바로 반영돼야 한다(`code-usage.ts` 머리말 「허용한다」).
@@ -126,34 +141,46 @@ export interface CorpChangeTypeDef {
 export const CHANGE_TYPE_DEFS: Readonly<Record<CorpChangeType, CorpChangeTypeDef>> = {
   NAME: {
     usesOfficers: false,
+    officerEffectiveDateRequired: false,
+    requiresCeoHome: false,
     fields: [
       { name: 'newName', label: '신규 상호', type: 'text', required: true },
       { name: 'newNameEn', label: '신규 영문상호', type: 'text', required: false },
-      { name: 'resolutionDate', label: '결의일', type: 'date', required: false },
+      { name: 'resolutionDate', label: '결의일', type: 'date', required: true },
     ],
   },
   HQ: {
     usesOfficers: false,
+    officerEffectiveDateRequired: false,
+    requiresCeoHome: false,
     fields: [
       { name: 'newHqAddress', label: '신규 본점주소', type: 'address', required: true },
-      { name: 'resolutionDate', label: '결의일', type: 'date', required: false },
+      { name: 'resolutionDate', label: '결의일', type: 'date', required: true },
+      { name: 'relocationDate', label: '이전일', type: 'date', required: true },
     ],
   },
   PURPOSE: {
     usesOfficers: false,
+    officerEffectiveDateRequired: false,
+    requiresCeoHome: false,
     fields: [
       { name: 'purposes', label: '사업목적', type: 'textarea', required: true },
-      { name: 'resolutionDate', label: '결의일', type: 'date', required: false },
+      { name: 'resolutionDate', label: '결의일', type: 'date', required: true },
     ],
   },
   OFFICER: {
     usesOfficers: true,
-    fields: [{ name: 'resolutionDate', label: '결의일', type: 'date', required: false }],
+    officerEffectiveDateRequired: true,
+    requiresCeoHome: false,
+    fields: [{ name: 'resolutionDate', label: '결의일', type: 'date', required: true }],
   },
   CEO_ADDR: {
     usesOfficers: false,
+    officerEffectiveDateRequired: false,
+    // ★ 「변경 전 주소」 칸은 없다(2026-10-10) — 기본정보의 대표자 자택 주소를 쓴다(입주사 = ERP, 비입주사 =
+    //   법무 회사 정보). 옛 건 payload 에 남은 `oldCeoAddress` 는 읽지 않는다.
+    requiresCeoHome: true,
     fields: [
-      { name: 'oldCeoAddress', label: '변경 전 대표자 주소', type: 'address', required: false },
       { name: 'newCeoAddress', label: '변경 후 대표자 주소', type: 'address', required: true },
       { name: 'moveInDate', label: '전입일', type: 'date', required: true },
     ],
@@ -213,7 +240,15 @@ export interface CorpChangeContent {
   changeType: string;
   payload: unknown;
   officers: readonly CorpChangeOfficerInput[];
+  /**
+   * 기본정보의 대표자 자택 — 구분이 `requiresCeoHome` 일 때 본다. 없으면 「비어 있다」로 거절한다
+   * (검증 없이 통과시키지 않는다). 입주사면 문구가 입주사 화면으로 보낸다.
+   */
+  company?: { isTenant: boolean; ceoZipCode: string | null; ceoAddress: string | null };
 }
+
+/** 대표자 자택 주소가 비었을 때의 자리 — 기본정보 카드의 그 칸 옆에 붙는다. */
+export const CEO_HOME_ERROR_FIELD = 'company.ceo';
 
 function isBlank(v: unknown): boolean {
   return v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
@@ -295,9 +330,9 @@ function checkField(def: CorpChangeFieldDef, value: unknown): CorpChangeFieldErr
 
 /**
  * 임원 한 명 검증. `index` 는 오류 자리(`officers.{index}.name`)에 들어간다.
- * 임원을 저장할 때도, 서류작성완료 때도 같은 함수를 쓴다.
+ * @param effectiveDateRequired 효력일 필수 — 구분 정의의 `officerEffectiveDateRequired` 를 넘긴다.
  */
-export function validateOfficer(o: CorpChangeOfficerInput, index: number): CorpChangeFieldError[] {
+export function validateOfficer(o: CorpChangeOfficerInput, index: number, effectiveDateRequired = false): CorpChangeFieldError[] {
   const at = (key: string) => `officers.${index}.${key}`;
   const errors: CorpChangeFieldError[] = [];
   if (isBlank(o.name)) errors.push({ field: at('name'), message: '성명을 입력하세요' });
@@ -305,7 +340,7 @@ export function validateOfficer(o: CorpChangeOfficerInput, index: number): CorpC
     errors.push({ field: at('changeKind'), message: '구분은 취임 · 사임 · 중임 중에서 고르세요' });
   }
   if (isBlank(o.position)) errors.push({ field: at('position'), message: '직위를 입력하세요' });
-  const date = checkDate(o.effectiveDate, at('effectiveDate'), '효력일', false);
+  const date = checkDate(o.effectiveDate, at('effectiveDate'), '효력일', effectiveDateRequired);
   if (date) errors.push(date);
   const rrn = validateRrn(o.rrn, at('rrn'));
   if (rrn) errors.push(rrn);
@@ -331,7 +366,19 @@ export function validateCorpChange(content: CorpChangeContent): CorpChangeFieldE
     if (content.officers.length === 0) {
       errors.push({ field: 'officers', message: '임원을 1명 이상 등록하세요' });
     }
-    content.officers.forEach((o, i) => errors.push(...validateOfficer(o, i)));
+    content.officers.forEach((o, i) => errors.push(...validateOfficer(o, i, def.officerEffectiveDateRequired)));
+  }
+
+  if (def.requiresCeoHome) {
+    const c = content.company;
+    if (!c || isBlank(c.ceoZipCode) || isBlank(c.ceoAddress)) {
+      errors.push({
+        field: CEO_HOME_ERROR_FIELD,
+        message: c?.isTenant
+          ? '대표자 자택 주소(변경 전 주소)가 비어 있습니다 — 입주사 화면에서 입력하세요'
+          : '대표자 자택 주소(변경 전 주소)의 우편번호 · 기본주소를 입력하세요',
+      });
+    }
   }
   return errors;
 }
@@ -341,27 +388,27 @@ export function validateCorpChange(content: CorpChangeContent): CorpChangeFieldE
 // =============================================================================
 
 /**
- * 허용되는 전이와 **누를 수 있는 역할**. 이 표에 없으면 막힌다(화이트리스트).
+ * 허용되는 전이와 **누를 수 있는 역할**. 이 표에 없으면 막힌다(화이트리스트). 결정 2026-10-10.
  *
- *   회사(`tenant`) — P→E 작성완료 · E→A 제출 · E→P 제출 전 서류수정
- *   운영사          — 전부. A→P 제출 후 수정 · A→C 완료 · 취소 · 복원 포함
+ *   P→E 작성완료(검증) · E→P 서류수정 · E→C 완료   — 회사 · 운영사
+ *   C→E 완료 취소                                  — 운영사만
+ *   P/E/C→X 취소 · X→취소 직전 상태 복원           — 운영사만 (삭제는 `checkDelete`)
  *
  * ★ `tenant` 는 「회사 사용자」다 — 비입주사 회사도 세션 역할은 `tenant` 다.
- * ★ C(완료)는 종착이다. 나가는 전이가 없다.
- * ★ X→P/E/A 는 **복원**이고 취소 직전 상태로만 간다(`checkTransition`).
+ * ★ 완료(E→C)는 상대 회사 연락이 없어도 진행한다 — 제출(A) 단계는 없앴다.
+ * ★ X→P/E/C 는 **복원**이고 취소 직전 상태로만 간다(`checkTransition`).
  */
 const TRANSITIONS: readonly { from: CorpChangeStatus; to: CorpChangeStatus; roles: readonly ScopeRole[] }[] = [
   { from: 'P', to: 'E', roles: ['operator', 'tenant'] },
   { from: 'P', to: 'X', roles: ['operator'] },
   { from: 'E', to: 'P', roles: ['operator', 'tenant'] },
-  { from: 'E', to: 'A', roles: ['operator', 'tenant'] },
+  { from: 'E', to: 'C', roles: ['operator', 'tenant'] },
   { from: 'E', to: 'X', roles: ['operator'] },
-  { from: 'A', to: 'P', roles: ['operator'] },
-  { from: 'A', to: 'C', roles: ['operator'] },
-  { from: 'A', to: 'X', roles: ['operator'] },
+  { from: 'C', to: 'E', roles: ['operator'] },
+  { from: 'C', to: 'X', roles: ['operator'] },
   { from: 'X', to: 'P', roles: ['operator'] },
   { from: 'X', to: 'E', roles: ['operator'] },
-  { from: 'X', to: 'A', roles: ['operator'] },
+  { from: 'X', to: 'C', roles: ['operator'] },
 ];
 
 export interface TransitionRequest {
@@ -421,14 +468,13 @@ export function checkTransition(req: TransitionRequest): TransitionCheck {
 
 /** 회사가 누를 수 없는 전이의 문구 — 무엇을 해야 하는지까지 적는다. */
 const FORBIDDEN_REASON: Readonly<Record<string, string>> = {
-  AP: '제출한 서류는 운영사만 수정 상태로 되돌릴 수 있습니다',
-  AC: '완료 처리는 운영사만 할 수 있습니다',
+  CE: '완료 취소는 운영사만 할 수 있습니다',
   PX: '취소는 운영사만 할 수 있습니다',
   EX: '취소는 운영사만 할 수 있습니다',
-  AX: '취소는 운영사만 할 수 있습니다',
+  CX: '취소는 운영사만 할 수 있습니다',
   XP: '복원은 운영사만 할 수 있습니다',
   XE: '복원은 운영사만 할 수 있습니다',
-  XA: '복원은 운영사만 할 수 있습니다',
+  XC: '복원은 운영사만 할 수 있습니다',
 };
 
 /**
@@ -451,9 +497,9 @@ export function canEditCorpChange(status: string): boolean {
   return status === 'P';
 }
 
-/** 서류를 출력할 수 있는가 — E · A · C. 회사가 제출한 뒤에도 뽑아야 하므로 A 를 넣었다(레거시는 E · C). */
+/** 서류를 출력할 수 있는가 — E · C(레거시와 같다). 제출(A)은 없앴다(2026-10-10). */
 export function canPrintCorpChange(status: string): boolean {
-  return status === 'E' || status === 'A' || status === 'C';
+  return status === 'E' || status === 'C';
 }
 
 /**
@@ -469,36 +515,62 @@ export function checkDelete(status: string, role: ScopeRole): TransitionCheck {
 }
 
 // =============================================================================
-// 신청기한 — 대표주소 변경만
+// 신청기한 — 모든 구분 (결정 2026-10-10)
 // =============================================================================
 
-/** 변경등기 신청기한(일) — 원인일(전입일)로부터. */
+/**
+ * 변경등기 신청기한(일) — 등기 기준일로부터 2주. **구분별로 다르지 않다**(2026-10-10 확인):
+ * 상호 · 목적 · 임원 · 대표이사 주소 = 상법 제183조(제317조 제4항 준용) 「2주일 내」,
+ * 본점이전 = 상법 제182조 「2주일 내」.
+ */
 export const REGISTRATION_DEADLINE_DAYS = 14;
 
+/**
+ * 구분별 등기 기준일 — 이 표 한 곳에서 정한다.
+ *   상호 · 목적 = 결의일 · 본점 = 이전일 · 대표주소 = 전입일 · 임원 = 임원 효력일 중 **가장 이른 날**
+ */
+export const DEADLINE_BASIS: Readonly<Record<CorpChangeType, { label: string; field: string | null }>> = {
+  NAME: { label: '결의일', field: 'resolutionDate' },
+  PURPOSE: { label: '결의일', field: 'resolutionDate' },
+  HQ: { label: '이전일', field: 'relocationDate' },
+  CEO_ADDR: { label: '전입일', field: 'moveInDate' },
+  OFFICER: { label: '효력일', field: null }, // 임원별 효력일 중 가장 이른 날
+};
+
 export interface RegistrationDeadline {
-  /** 전입일부터 기준일까지 지난 날수. 전입일이 미래면 음수. */
+  /** 기준일 이름 — 「결의일」 · 「이전일」 · 「전입일」 · 「효력일」. 화면 문구에 쓴다. */
+  basisLabel: string;
+  /** 기준일 `YYYY-MM-DD`. */
+  basisDay: string;
+  /** 기준일부터 오늘(baseDay)까지 지난 날수. 기준일이 미래면 음수. */
   elapsedDays: number;
   /** 기한 초과 — 지난 날수가 14 **초과**. 14일째 되는 날까지는 기한 안이다. */
   overdue: boolean;
 }
 
 /**
- * 신청기한 경과 — **대표주소 변경(CEO_ADDR)만** 본다. 다른 구분 · 전입일이 없거나 틀리면 null.
+ * 신청기한 경과 — 구분별 기준일(`DEADLINE_BASIS`)로 센다. 기준일이 없거나 틀리면 null.
  *
  * ★ 기준일은 `YYYY-MM-DD` 로 받는다 — 「오늘」을 안에서 만들지 않는다. 시험할 수 있어야 하고,
  *   부르는 쪽이 로컬 날짜로 바꿔서 넘겨야 하루가 밀리지 않는다(`day.ts` 머리말 ★★).
+ * ★ 임원변경은 임원 목록의 효력일 중 가장 이른 날이다 — 틀린 날짜는 건너뛴다.
  */
 export function registrationDeadline(
   changeType: string,
   payload: unknown,
   baseDay: string,
+  officers: readonly { effectiveDate?: string | null }[] = [],
 ): RegistrationDeadline | null {
-  if (changeType !== 'CEO_ADDR' || !isPlainObject(payload)) return null;
-  const moveIn = payload.moveInDate;
-  if (typeof moveIn !== 'string') return null;
-  const from = parseDay(moveIn);
+  if (!isCorpChangeType(changeType) || !isPlainObject(payload)) return null;
+  const basis = DEADLINE_BASIS[changeType];
+  const candidates = basis.field === null ? officers.map((o) => o.effectiveDate) : [payload[basis.field]];
+  const days = candidates
+    .filter((v): v is string => typeof v === 'string' && parseDay(v) !== null)
+    .sort();
+  const basisDay = days[0];
   const base = parseDay(baseDay);
-  if (from === null || base === null) return null;
+  if (basisDay === undefined || base === null) return null;
+  const from = parseDay(basisDay)!;
   const elapsedDays = Math.round((base.getTime() - from.getTime()) / 86_400_000);
-  return { elapsedDays, overdue: elapsedDays > REGISTRATION_DEADLINE_DAYS };
+  return { basisLabel: basis.label, basisDay, elapsedDays, overdue: elapsedDays > REGISTRATION_DEADLINE_DAYS };
 }
