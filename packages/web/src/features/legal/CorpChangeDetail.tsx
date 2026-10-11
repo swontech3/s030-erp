@@ -47,7 +47,7 @@
  * ★ [서류 출력](5-4, 2026-10-11) — 작성완료(E) · 완료(C) 건에만 뜬다(`canPrintCorpChange`). 운영사 · 회사 모두.
  *   대화상자(`CorpChangePrintDialog`)가 서버에서 값을 받아 서류를 하나씩 인쇄한다.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -57,6 +57,7 @@ import {
   REGISTRATION_DEADLINE_DAYS,
   canPrintCorpChange,
   isRrnShape,
+  purposeLines,
   registrationDeadline,
   type CorpChangeFieldDef,
   type CorpChangeFieldError,
@@ -83,6 +84,8 @@ import { useKakaoPostcode } from '@/lib/useKakaoPostcode';
 import { CorpChangeConfirmDialog, type CorpChangeConfirmKind } from './CorpChangeConfirmDialog';
 import { CorpChangePrintDialog } from './CorpChangePrintDialog';
 import { CorpChangePrintHistory } from './CorpChangePrintHistory';
+import { BizPurposePickerDialog } from './BizPurposePickerDialog';
+import { appendPurposeLines } from '@swonbiz/shared/domain/biz-purpose';
 import styles from './corp-change-detail.module.css';
 
 interface Props {
@@ -739,6 +742,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
                   error={errorFor(f.name)}
                   onChange={(v) => setForm((prev) => ({ ...prev, [f.name]: v }))}
                   onError={notify}
+                  onNotice={notify}
                 />
               ))}
             </div>
@@ -871,6 +875,7 @@ function PayloadField({
   note,
   onChange,
   onError,
+  onNotice,
 }: {
   def: CorpChangeFieldDef;
   value: string | Address;
@@ -880,7 +885,11 @@ function PayloadField({
   note?: string;
   onChange: (v: string | Address) => void;
   onError: (message: string) => void;
+  /** 알림(토스트) — 사업목적 고르기 결과. */
+  onNotice?: (message: string) => void;
 }) {
+  const textareaId = useId();
+  const [picking, setPicking] = useState(false);
   const label = (
     <span className={styles.label}>
       {def.label} {def.required ? <span className={styles.req}>*</span> : null}
@@ -901,11 +910,29 @@ function PayloadField({
 
   const text = value as string;
   if (def.type === 'textarea') {
+    // ★ 사업목적(purposes)만 [목록에서 고르기] 가 붙는다(30-6, 결정 2026-10-11) — 고른 문구를 끝에 줄로
+    //   덧붙인다(이미 있는 줄은 건너뜀, shared `appendPurposeLines`). 저장은 텍스트 그대로이고 직접 입력도
+    //   그대로다. 카탈로그를 고치는 버튼은 두지 않는다 — 고치는 자리는 030 화면 하나다.
+    const pickable = def.name === 'purposes';
     return (
-      <label className={`${styles.field} ${styles.spanAll}`}>
-        {label}
-        <span className={styles.hint}>한 줄에 하나씩 적습니다</span>
+      <div className={`${styles.field} ${styles.spanAll}`}>
+        <div className={styles.fieldHead}>
+          <label htmlFor={textareaId}>{label}</label>
+          {pickable ? (
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+              disabled={disabled}
+              onClick={() => setPicking(true)}
+            >
+              <Icon name="search" size={14} />
+              목록에서 고르기
+            </button>
+          ) : null}
+        </div>
+        <span className={styles.hint}>{def.hint ?? '한 줄에 하나씩 적습니다'}</span>
         <textarea
+          id={textareaId}
           className={`${styles.textarea}${error ? ` ${styles.inputInvalid}` : ''}`}
           rows={4}
           value={text}
@@ -913,7 +940,23 @@ function PayloadField({
           onChange={(e) => onChange(e.target.value)}
         />
         {serverError}
-      </label>
+        {picking ? (
+          <BizPurposePickerDialog
+            existing={purposeLines(text)}
+            onClose={() => setPicking(false)}
+            onPick={(texts) => {
+              const r = appendPurposeLines(text, texts);
+              setPicking(false);
+              if (r.added.length > 0) onChange(r.text);
+              onNotice?.(
+                r.skipped.length > 0
+                  ? `${r.added.length}개를 넣었습니다 — 이미 있는 ${r.skipped.length}개는 건너뛰었습니다`
+                  : `${r.added.length}개를 넣었습니다`,
+              );
+            }}
+          />
+        ) : null}
+      </div>
     );
   }
 
