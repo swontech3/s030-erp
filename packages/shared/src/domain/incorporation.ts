@@ -43,6 +43,7 @@ export const INCORP_ENTITY_TYPE = 'R';
 /** 설립 구분 — 공통코드 `LAW_EST_TP` 의 「주식회사 발기설립」. 등기 설정(`tb_s080_doc_form_settings`)의 줄 키이기도 하다. */
 export const INCORP_METHOD = 'R_PROMOTER';
 export const INCORP_METHOD_CATEGORY = 'LAW_EST_TP';
+export const INCORP_METHOD_USE_TP = '000';
 
 /** 정관 고정 배치의 한도(결정 3). */
 export const INCORP_PURPOSE_MAX = 20;

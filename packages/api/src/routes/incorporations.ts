@@ -1,6 +1,6 @@
 /**
  * 법인설립(s040100010 · s040100020) — 목록 · 임시 모드 · 첫 저장 · 상세 · 설립 정보 · 사람 · 상태 전이 · 삭제
- * (10-3, 2026-10-11). 서류 출력 · 출력 이력(043)은 10-5 에서 붙는다.
+ * (10-3, 2026-10-11) · 서류 출력 · 출력 이력(10-5, 043 — `legal/incorporationPrint.ts`).
  *
  * ★ 법인변경(`routes/corpChanges.ts`)과 같은 모양이다 — 운영사 · 회사가 함께 쓰고, 누가 무엇을 보는지는
  *   RLS(042)가 단체 ID 로 가른다. 역할로 403 을 내지 않는다(취소 · 복원 · 삭제 · 완료 취소는 판정이 막는다).
@@ -26,6 +26,7 @@ import {
   saveIncorporationInfo,
   transitionIncorporation,
 } from '../legal/incorporationOps.ts';
+import { listIncorporationPrints, readIncorporationPrint, recordIncorporationPrint } from '../legal/incorporationPrint.ts';
 
 /** 바꿔 끼울 수 있는 바깥 — 시험이 DB 없이 스코프 · 본문 읽기를 본다. */
 export interface IncorporationDeps {
@@ -122,4 +123,41 @@ export function registerIncorporationRoutes(app: FastifyInstance, deps: Incorpor
     const result = await deps.run(session, (client) => removeIncorpPerson(client, session, req.params.id, req.params.pid));
     return result.ok ? reply.code(204).send() : send(reply, result);
   });
+
+  /**
+   * 서류 출력 `?applyDate=&writeDate=` — 이 건에 뜨는 양식(법인설립 표시)과 장마다의 값. 작성완료(E) · 완료(C)만.
+   * ★★ 주민번호 평문이 실린다 — 캐시 금지. 거절 응답에도 같은 머리를 단다(법인변경과 같다).
+   */
+  app.get<{ Params: { id: string }; Querystring: Record<string, unknown> }>('/legal/incorporations/:id/print', async (req, reply) => {
+    const session = requireSession(req);
+    reply.header('Cache-Control', 'no-store');
+    const result = await deps.run(session, (client) => readIncorporationPrint(client, session, req.params.id, req.query ?? {}));
+    return send(reply, result);
+  });
+
+  /**
+   * 출력 이력 한 줄(043) — [인쇄] 를 누를 때. 성공 201(본문 없음).
+   * ★ 화면은 결과를 기다리지 않는다 — 실패는 여기서 서버 로그에 남긴다. 본문은 로그에 싣지 않는다.
+   */
+  app.post<{ Params: { id: string }; Body: unknown }>('/legal/incorporations/:id/prints', async (req, reply) => {
+    const session = requireSession(req);
+    try {
+      const result = await deps.run(session, (client) => recordIncorporationPrint(client, session, req.params.id, req.body));
+      if (!result.ok) {
+        req.log.warn({ id: req.params.id, status: result.status, error: result.error }, '[incorporation-prints] 기록 거절');
+        return send(reply, result);
+      }
+      return reply.code(201).send();
+    } catch (err) {
+      req.log.error({ id: req.params.id, err: (err as Error).message }, '[incorporation-prints] 기록 실패');
+      return reply.code(500).send({ error: 'record_failed', message: '출력 이력을 남기지 못했습니다' });
+    }
+  });
+
+  app.get<{ Params: { id: string } }>('/legal/incorporations/:id/prints', async (req, reply) => {
+    const session = requireSession(req);
+    const result = await deps.run(session, (client) => listIncorporationPrints(client, req.params.id));
+    return send(reply, result);
+  });
+
 }

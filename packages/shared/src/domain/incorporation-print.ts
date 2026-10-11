@@ -136,9 +136,9 @@ export function koreanAmount(n: number | null): string {
     const d = [grp % 10, Math.floor(grp / 10) % 10, Math.floor(grp / 100) % 10, Math.floor(grp / 1000) % 10];
     for (let i = 3; i >= 0; i--) {
       if (d[i] === 0) continue;
-      s += (d[i] === 1 && i > 0 ? '' : DIGITS[d[i]!]) + SMALL[i];
+      s += (d[i] === 1 && i > 0 ? '' : (DIGITS[d[i]!] ?? '')) + (SMALL[i] ?? '');
     }
-    result += s + BIG[g];
+    result += s + (BIG[g] ?? '');
   }
   return `금 ${result}원정`;
 }

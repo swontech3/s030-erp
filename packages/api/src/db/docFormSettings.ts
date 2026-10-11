@@ -1,5 +1,5 @@
 /**
- * 등기 설정(`tb_s080_doc_form_settings`) 읽기 — 법인변경 서류 출력(5단계, 2026-10-11).
+ * 등기 설정(`tb_s080_doc_form_settings`) 읽기 — 법인변경 서류 출력(5단계, 2026-10-11) · 법인설립 서류 출력(10-5).
  *
  * ★ 표는 레거시가 만든 그대로다(019 가 `operator_id` 로 바꿨다). RLS 없음 · `erp_app` 읽기 가능
  *   (2026-10-11 실측). **쓰기는 없다** — 설정 화면은 법무 서비스 090 때 들어온다.
@@ -11,13 +11,22 @@ import type { ScopedClient } from './withCompanyScope.ts';
 const OPERATOR_ID = 1;
 
 /** 법인변경 설정 줄 전부(꺼진 줄 포함 — 고르는 것은 `pickDocFormSetting`). */
-export async function listCorpChangeSettings(client: ScopedClient): Promise<DocFormSettingRow[]> {
+export function listCorpChangeSettings(client: ScopedClient): Promise<DocFormSettingRow[]> {
+  return listSettings(client, 'corp-change');
+}
+
+/** 법인설립 설정 줄 전부(R_PROMOTER · R_SUBSCRIPTION — 고르는 것은 `pickDocFormSetting`). */
+export function listIncorporationSettings(client: ScopedClient): Promise<DocFormSettingRow[]> {
+  return listSettings(client, 'incorporation');
+}
+
+async function listSettings(client: ScopedClient, domain: 'corp-change' | 'incorporation'): Promise<DocFormSettingRow[]> {
   const { rows } = (await client.query(
     `SELECT reg_type_key, company_type, is_active, label, form_no, matter, tax_mode, taxes,
             attachments, reg_purpose, reg_reason, matter_body
        FROM public.tb_s080_doc_form_settings
-      WHERE operator_id = $1 AND domain = 'corp-change'`,
-    [OPERATOR_ID],
+      WHERE operator_id = $1 AND domain = $2`,
+    [OPERATOR_ID, domain],
   )) as {
     rows: {
       reg_type_key: string;

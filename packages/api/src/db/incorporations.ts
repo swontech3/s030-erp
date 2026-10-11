@@ -18,6 +18,7 @@ import type {
   IncorporationListFilter,
 } from '@swonbiz/shared/domain/incorporation-detail';
 import { INCORP_ENTITY_TYPE } from '@swonbiz/shared/domain/incorporation';
+import type { IncorpPrintLogItem } from '@swonbiz/shared/domain/incorporation-print';
 import type { ScopedClient } from './withCompanyScope.ts';
 import type { RrnStored } from './corpChanges.ts';
 
@@ -387,4 +388,88 @@ export async function deleteIncorpPerson(client: ScopedClient, args: { id: strin
     args.incorporationId,
   ]);
   return (rowCount ?? 0) > 0;
+}
+
+// =============================================================================
+// 서류 출력(10-5) — 사람 암호문 · 출력 이력(043, FK 없음 · 덧붙이기만)
+// =============================================================================
+
+/** 출력용 사람 — 짝 맞추기용 이름과 **암호문**. */
+export interface IncorpPersonSecretRow {
+  name: string;
+  /** `encrypt()` 덩어리. 없으면 null. ★ 복호화는 출력 응답을 만드는 순간에만(`legal/incorporationPrint.ts`). */
+  rrnCipher: string | null;
+}
+
+/**
+ * 출력용 사람 — `listIncorpPersons` 와 **같은 순서**다(스냅샷이 그 순서로 만들어졌다).
+ * ★ 암호문 칸을 고르는 곳은 여기 하나다 — 출력만 부른다.
+ */
+export async function listIncorpPersonSecrets(client: ScopedClient, incorporationId: string): Promise<IncorpPersonSecretRow[]> {
+  const { rows } = await q<{ name: string; rrn_cipher: string | null }>(
+    client,
+    `SELECT name, rrn_cipher FROM public.tb_s080_incorp_persons
+      WHERE incorporation_id = $1 ORDER BY sort_order, created_at, id`,
+    [incorporationId],
+  );
+  return rows.map((r) => ({ name: r.name, rrnCipher: r.rrn_cipher }));
+}
+
+/** 출력 이력 한 줄. ★ `orgId` 는 RLS 를 통과한 건의 것만(화면 값 아님). 주민번호 · 서류 값은 없다. */
+export async function insertIncorpPrintLog(
+  client: ScopedClient,
+  args: {
+    id: string;
+    incorporationId: string;
+    orgId: number;
+    formId: string;
+    formName: string;
+    personName: string | null;
+    applyDate: string | null;
+    writeDate: string | null;
+    printedBy: string;
+    printedRole: string;
+  },
+): Promise<void> {
+  await q(
+    client,
+    `INSERT INTO public.tb_s080_incorporation_prints
+       (id, incorporation_id, org_id, form_id, form_name, person_name, apply_date, write_date, printed_by, printed_role, printed_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8::date, $9, $10, now())`,
+    [
+      args.id, args.incorporationId, args.orgId, args.formId, args.formName, args.personName,
+      args.applyDate, args.writeDate, args.printedBy, args.printedRole,
+    ],
+  );
+}
+
+/** 그 건의 출력 이력 — 새것이 위. */
+export async function listIncorpPrintLogs(client: ScopedClient, incorporationId: string): Promise<IncorpPrintLogItem[]> {
+  const { rows } = await q<{
+    printed_at: string;
+    form_name: string;
+    person_name: string | null;
+    apply_date: string | null;
+    write_date: string | null;
+    printed_by: string;
+    printed_role: 'operator' | 'tenant';
+  }>(
+    client,
+    `SELECT to_char(printed_at, 'YYYY-MM-DD HH24:MI') AS printed_at, form_name, person_name,
+            to_char(apply_date, 'YYYY-MM-DD') AS apply_date, to_char(write_date, 'YYYY-MM-DD') AS write_date,
+            printed_by, printed_role
+       FROM public.tb_s080_incorporation_prints
+      WHERE incorporation_id = $1
+      ORDER BY printed_at DESC, id`,
+    [incorporationId],
+  );
+  return rows.map((r) => ({
+    printedAt: r.printed_at,
+    formName: r.form_name,
+    personName: r.person_name,
+    applyDate: r.apply_date,
+    writeDate: r.write_date,
+    printedBy: r.printed_by,
+    printedRole: r.printed_role,
+  }));
 }
