@@ -384,6 +384,18 @@ export interface IncorporationListItem {
   plannedDate: string | null;
 }
 
+/**
+ * 목록 응답 — 줄 + 상태 선택지 · 이름(법인변경 목록과 같은 모양, 코드표 `CORP_CHANGE_STATUS` 를 `pickCorpChangeOptions` 로 거른 것).
+ * ★ 화면은 상태 코드 · 이름을 적지 않는다(10-4, 2026-10-11).
+ */
+export interface IncorporationListResponse {
+  items: IncorporationListItem[];
+  /** 상태 필터 선택지 — P · E · C. */
+  statuses: CodeOption[];
+  /** 상태 이름 — 취소(X)까지. */
+  statusNames: Record<string, string>;
+}
+
 export interface IncorporationListFilter {
   /** P · E · C 중 하나. 취소(X)는 `includeCancelled` 로만. */
   status: 'P' | 'E' | 'C' | null;

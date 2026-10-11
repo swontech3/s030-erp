@@ -143,6 +143,12 @@
   padding: 0 20px;
 }
 
+/* 법인설립 목록(s040100010) — 상호 · 진행상태 · 설립예정일 · 등록일 4열 */
+.tHead.cols4,
+.tRow.cols4 {
+  grid-template-columns: minmax(240px, 2fr) 120px 120px 110px;
+}
+
 .tHead {
   height: 44px;
   background: var(--surface-alt);

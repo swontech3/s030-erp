@@ -51,13 +51,12 @@ const refuse = <T>(reply: FastifyReply, parsed: Extract<Parsed<T>, { ok: false }
   });
 
 export function registerIncorporationRoutes(app: FastifyInstance, deps: IncorporationDeps = defaultDeps): void {
-  /** 목록 `?status=P|E|C&includeCancelled=1` — 새 건이 위. 취소(X)는 기본 제외. */
+  /** 목록 `?status=P|E|C&includeCancelled=1` — 새 건이 위. 취소(X)는 기본 제외. 응답 `{ items, statuses, statusNames }`. */
   app.get<{ Querystring: Record<string, unknown> }>('/legal/incorporations', async (req, reply) => {
     const session = requireSession(req);
     const parsed = parseIncorporationListQuery(req.query ?? {});
     if (!parsed.ok) return refuse(reply, parsed);
-    const items = await deps.run(session, (client) => listIncorporationItems(client, parsed.value));
-    return reply.send({ items });
+    return reply.send(await deps.run(session, (client) => listIncorporationItems(client, parsed.value)));
   });
 
   /** 첫 [저장] = 새 건 `{ orgId?, orgCode?, info, persons[] }` — 하나라도 틀리면 아무것도 만들지 않는다. 201 `{ id }`. */

@@ -43,8 +43,9 @@ import {
   type IncorporationDraftResponse,
   type IncorporationListFilter,
   type IncorporationListItem,
+  type IncorporationListResponse,
 } from '@swonbiz/shared/domain/incorporation-detail';
-import type { CodeOption } from '@swonbiz/shared/domain/corp-change-list';
+import { pickCorpChangeOptions, type CodeOption } from '@swonbiz/shared/domain/corp-change-list';
 import { encrypt } from '../lib/crypto.ts';
 import type { ScopedClient } from '../db/withCompanyScope.ts';
 import { listCodes } from '../db/lookups.ts';
@@ -129,8 +130,11 @@ const personForValidation = (p: IncorpPersonView): IncorporationPersonInput => (
 // 목록
 // =============================================================================
 
-export async function listIncorporationItems(client: ScopedClient, f: IncorporationListFilter): Promise<IncorporationListItem[]> {
-  return (await listIncorporations(client, f)).map((r) => ({
+/** 목록 + 상태 선택지 · 이름(법인변경 목록과 같은 모양 — 구분 선택지는 없다). */
+export async function listIncorporationItems(client: ScopedClient, f: IncorporationListFilter): Promise<IncorporationListResponse> {
+  const statusRows = await listCodes(client, [{ category: CORP_CHANGE_STATUS_CATEGORY, useTp: CORP_CHANGE_CODE_USE_TP }]);
+  const { statuses, statusNames } = pickCorpChangeOptions([], statusRows.map(({ code, name }) => ({ code, name })));
+  const items: IncorporationListItem[] = (await listIncorporations(client, f)).map((r) => ({
     id: r.id,
     orgId: r.org_id,
     orgCode: r.org_code,
@@ -139,6 +143,7 @@ export async function listIncorporationItems(client: ScopedClient, f: Incorporat
     createdOn: r.created_on,
     plannedDate: r.planned_date,
   }));
+  return { items, statuses, statusNames };
 }
 
 // =============================================================================
