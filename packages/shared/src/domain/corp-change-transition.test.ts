@@ -68,7 +68,10 @@ describe('buildSubmitSnapshot', () => {
     isTenant: false,
     legalName: '주식회사 에이',
     corpNumber: '110111-1234567',
+    bizNumber: '123-45-67890',
     ceoName: '홍길동',
+    tel: '02-123-4567',
+    memberType: 'R',
     headZipCode: '06000',
     headAddress: '서울 강남구',
     headAddressDetail: '2층',
@@ -95,16 +98,19 @@ describe('buildSubmitSnapshot', () => {
     ]);
   });
 
-  it('변경 전 회사값(회사명 · 법인번호 · 대표 · 본점 · 대표 자택) + 변경 내용', () => {
+  it('v2 — 변경 전 회사값(회사명 · 법인번호 · 사업자번호 · 대표 · 전화 · 회사유형 · 본점 · 대표 자택) + 변경 내용', () => {
     const s = buildSubmitSnapshot({ changeType: 'NAME', company, payload: { newName: '주식회사 비' }, officers: [] });
     expect(s).toEqual({
-      version: 1,
+      version: 2,
       changeType: 'NAME',
       company: {
         isTenant: false,
         name: '주식회사 에이',
         corpNumber: '110111-1234567',
+        bizNumber: '123-45-67890',
         ceoName: '홍길동',
+        tel: '02-123-4567',
+        memberType: 'R',
         head: { zipCode: '06000', address: '서울 강남구', addressDetail: '2층' },
         ceoHome: { zipCode: '04000', address: '서울 마포구', addressDetail: null },
       },

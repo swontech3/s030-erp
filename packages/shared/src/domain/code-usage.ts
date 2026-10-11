@@ -207,6 +207,17 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     source: 'packages/shared/src/domain/corp-change.ts (CORP_CHANGE_STATUSES)',
     label: '법인변경 상태 전이',
   },
+  /**
+   * 양식의 법무 표시(정의 jsonb `legal.companyType`)가 주식회사 · 유한회사를 코드값으로 담는다 —
+   * 컬럼이 아니라 jsonb 안이라 `CODE_USAGE` 로 셀 수 없어 여기 박는다. ★ 2026-10-11 추가(서류 출력).
+   */
+  {
+    category: 'MEMBER_TYPE',
+    useTp: '002',
+    codes: ['R', 'A'],
+    source: 'packages/shared/src/domain/legal-form-mark.ts (LEGAL_FORM_COMPANY_TYPES)',
+    label: '법무 양식 회사유형',
+  },
 ] as const;
 
 /**

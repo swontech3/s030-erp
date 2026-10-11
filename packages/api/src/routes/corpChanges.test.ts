@@ -957,7 +957,10 @@ describe('POST /legal/corp-changes/:id/transition — 상태 전이', () => {
           {
             legal_name: '주식회사 시험',
             corp_number: '110111-0000001',
+            biz_number: '123-45-67890',
             ceo_name: '홍대표',
+            tel: '02-000-0000',
+            member_type: 'A',
             head_zip_code: '06000',
             head_address: '서울 강남구',
             head_address_detail: null,
@@ -978,11 +981,15 @@ describe('POST /legal/corp-changes/:id/transition — 상태 전이', () => {
       expect(raw).not.toContain('900101');
       expect(raw).not.toMatch(/rrn/i);
       const snap = JSON.parse(raw);
+      expect(snap.version).toBe(2);
       expect(snap.company).toEqual({
         isTenant: false,
         name: '주식회사 시험',
         corpNumber: '110111-0000001',
+        bizNumber: '123-45-67890',
         ceoName: '홍대표',
+        tel: '02-000-0000',
+        memberType: 'A',
         head: { zipCode: '06000', address: '서울 강남구', addressDetail: null },
         ceoHome: { zipCode: '04000', address: '서울 마포구', addressDetail: '101호' },
       });

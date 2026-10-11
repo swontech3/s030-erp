@@ -33,6 +33,8 @@
  *   있어도 입력칸은 생기지 않는다(입력칸은 칸의 글자에서만 나온다).
  */
 
+import { parseLegalMark, type LegalFormMark } from './legal-form-mark.ts';
+
 export type CellAlign = 'left' | 'center' | 'right';
 export type CellValign = 'top' | 'middle' | 'bottom';
 
@@ -98,6 +100,11 @@ export interface FormDefinition {
   dataSource?: string;
   /** 자리표시의 이름표. ★ 입력칸 목록이 아니다 — 머리말 참조. */
   manualFields?: FieldLabel[];
+  /**
+   * 법무 표시 — 붙어 있으면 법인변경 [서류 출력]에 뜨는 양식이다(`legal-form-mark.ts`, 2026-10-11).
+   * 표양식 화면에서 [인쇄] 를 막고, 떼야 지울 수 있다.
+   */
+  legal?: LegalFormMark;
   pages: Page[];
 }
 
@@ -133,12 +140,13 @@ export const LEGAL_DATA_SOURCES: readonly string[] = ['corp-change', 'incorporat
  * 법무 양식인가 — 그렇다면 **표양식 화면에서 [인쇄] 를 막는다.** 법무 서류는 회사가 직접
  * 로그인해 법무 서비스(S04)에서 뽑는다. 표양식 화면은 운영사 전용이라 회사가 못 들어온다.
  *
- * ★ 판정 근거는 `dataSource` 하나다. ★★ **한계 — 편집기로 새로 만든 양식은 `dataSource`
- *    가 없다**(편집기가 그 칸을 쓰지 않는다). 그래서 새 법무 양식은 이 판정에 걸리지 않고
- *    표양식 화면에서 뽑힌다. 법무 양식을 표시하는 방법(종류 코드 · 등기 설정 연결 등)은
- *    법인변경 화면을 만들 때 정한다.
+ * 판정 근거는 둘이다(2026-10-11):
+ *   · 법무 표시(`legal`) — 표양식 편집기에서 붙인다. 이것이 정본이다
+ *   · 레거시 `dataSource` — 기존 2건이 갖고 있다. 표시를 붙이기 전에 두 양식이 표양식 화면에서
+ *     뽑히는 틈이 생기지 않게 남겨 둔다
  */
-export function isLegalForm(def: Pick<FormDefinition, 'dataSource'>): boolean {
+export function isLegalForm(def: Pick<FormDefinition, 'dataSource' | 'legal'>): boolean {
+  if (def.legal !== undefined) return true;
   return def.dataSource !== undefined && LEGAL_DATA_SOURCES.includes(def.dataSource);
 }
 
@@ -292,6 +300,11 @@ export function parseDefinition(value: unknown): FormDefinition {
       return { name: m.name, label: m.label };
     });
   }
+  if (value.legal !== undefined) {
+    const mark = parseLegalMark(value.legal);
+    if (!mark.ok) fail('양식', mark.message);
+    else def.legal = mark.value;
+  }
   return def;
 }
 
@@ -309,6 +322,7 @@ export function migrateDefinition(input: unknown): FormDefinition {
     font: input.font,
     dataSource: input.dataSource,
     manualFields: input.manualFields,
+    legal: input.legal,
     pages: pages.map((p) => {
       if (!isObj(p)) return p;
       const cells = Array.isArray(p.cells) ? (p.cells as unknown[]) : [];
