@@ -776,3 +776,24 @@
   background: var(--surface-alt);
   border-radius: var(--radius-md);
 }
+
+/* ── 출력 이력 표 (040) ── */
+.historyTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.historyTable th,
+.historyTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  color: var(--text-body);
+}
+
+.historyTable th {
+  font-weight: 700;
+  color: var(--text-heading);
+  background: var(--surface-alt);
+}

@@ -3,6 +3,7 @@ import {
   CORP_CHANGE_PRINT_FIELDS,
   buildPrintDocuments,
   parsePrintInputs,
+  parsePrintLogBody,
   buildCasePrintValues,
   buildOfficerPrintValues,
   changeSummary,
@@ -367,5 +368,29 @@ describe('parsePrintInputs', () => {
     expect(parsePrintInputs({ applyDate: '2026-10-11', writeDate: '' })).toEqual({ ok: true, value: { applyDate: '2026-10-11', writeDate: null } });
     expect(parsePrintInputs({ writeDate: '2026-13-01' })).toMatchObject({ ok: false, field: 'writeDate' });
     expect(parsePrintInputs({ applyDate: ['2026-10-11'] })).toMatchObject({ ok: false, field: 'applyDate' });
+  });
+});
+
+describe('parsePrintLogBody — 출력 이력 기록 본문', () => {
+  it('formId · sheet(기본 0) · 날짜', () => {
+    expect(parsePrintLogBody({ formId: 'f-1' })).toEqual({ ok: true, value: { formId: 'f-1', sheet: 0, applyDate: null, writeDate: null } });
+    expect(parsePrintLogBody({ formId: 'f-1', sheet: 2, applyDate: '2026-10-11' })).toEqual({
+      ok: true,
+      value: { formId: 'f-1', sheet: 2, applyDate: '2026-10-11', writeDate: null },
+    });
+  });
+  it.each([
+    [null, 'body'],
+    [{}, 'formId'],
+    [{ formId: '' }, 'formId'],
+    [{ formId: 'f', sheet: -1 }, 'sheet'],
+    [{ formId: 'f', sheet: 1.5 }, 'sheet'],
+    [{ formId: 'f', writeDate: '2026-02-30' }, 'writeDate'],
+  ])('거절 %j', (raw, field) => {
+    expect(parsePrintLogBody(raw)).toMatchObject({ ok: false, field });
+  });
+  it('★ 임원 이름 · 주민번호를 실어 와도 버린다(아는 칸만)', () => {
+    const r = parsePrintLogBody({ formId: 'f', officerName: '가짜', officerRrn: '9001011234567' });
+    expect(r.ok && Object.keys(r.value).sort()).toEqual(['applyDate', 'formId', 'sheet', 'writeDate']);
   });
 });

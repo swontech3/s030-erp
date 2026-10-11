@@ -21,6 +21,9 @@
  * 어긋나면 출력하지 않는다**(409) — 남의 주민번호가 다른 사람 서류에 찍히는 것을 막는다.
  *
  * 누가 부르나 — 운영사 · 회사 모두(Q4). 건이 보이는지는 RLS(037)가 가른다. 안 보이면 404.
+ *
+ * 출력 이력(040) — `recordCorpChangePrint` · `listCorpChangePrints`. [인쇄] 를 누를 때 한 줄.
+ * 기록이 실패해도 인쇄는 막지 않는다(화면이 결과를 기다리지 않는다 — 실패는 서버 로그, 라우트).
  */
 import type { ErpSession } from '@swonbiz/shared';
 import {
@@ -28,9 +31,12 @@ import {
   CORP_CHANGE_TYPE_CATEGORY,
   canPrintCorpChange,
 } from '@swonbiz/shared/domain/corp-change';
+import { randomUUID } from 'node:crypto';
 import {
   buildPrintDocuments,
   parsePrintInputs,
+  parsePrintLogBody,
+  type PrintLogItem,
   pickDocFormSetting,
   readSubmitSnapshot,
   type CorpChangePrintResponse,
@@ -38,11 +44,17 @@ import {
   type PrintOfficer,
 } from '@swonbiz/shared/domain/corp-change-print';
 import { migrateDefinition, type FormDefinition } from '@swonbiz/shared/domain/form-template';
-import { officersForMark } from '@swonbiz/shared/domain/legal-form-mark';
+import { markAppliesTo, officersForMark } from '@swonbiz/shared/domain/legal-form-mark';
 import { decrypt } from '../lib/crypto.ts';
 import type { ScopedClient } from '../db/withCompanyScope.ts';
 import { listCodes } from '../db/lookups.ts';
-import { getCorpChange, listOfficerSecrets, readSubmitSnapshotRaw } from '../db/corpChanges.ts';
+import {
+  getCorpChange,
+  insertPrintLog,
+  listOfficerSecrets,
+  listPrintLogs,
+  readSubmitSnapshotRaw,
+} from '../db/corpChanges.ts';
 import { listMarkedFormTemplates } from '../db/formTemplates.ts';
 import { listCorpChangeSettings } from '../db/docFormSettings.ts';
 import type { OpResult } from './corpChangeOps.ts';
@@ -134,4 +146,65 @@ export async function readCorpChangePrint(
       documents: buildPrintDocuments(forms, src, officers),
     },
   };
+}
+
+/**
+ * 출력 이력 한 줄 — `{ formId, sheet, applyDate?, writeDate? }`. 성공이면 null.
+ * 거절: 400 본문 · 이 건에 뜨지 않는 서류 · 없는 장 / 404 안 보이는 건 / 409 출력 불가 상태 · 스냅샷 없음.
+ * ★ 서류 이름 · 임원 이름은 **서버가** 양식 · 스냅샷에서 찾는다(화면 값을 기록하지 않는다).
+ * ★ 주민번호는 복호화하지 않는다.
+ */
+export async function recordCorpChangePrint(
+  client: ScopedClient,
+  session: ErpSession,
+  id: string,
+  body: unknown,
+): Promise<OpResult<null>> {
+  const parsed = parsePrintLogBody(body);
+  if (!parsed.ok) return fail(400, 'invalid_request', parsed.message, parsed.field);
+  const input = parsed.value;
+
+  const row = await getCorpChange(client, id);
+  if (!row) return fail(404, 'not_found', '법인변경 건을 찾을 수 없습니다');
+  if (!canPrintCorpChange(row.status)) return fail(409, 'not_printable', '서류는 작성완료 · 완료 건만 출력할 수 있습니다');
+  const snapshot = readSubmitSnapshot(await readSubmitSnapshotRaw(client, row.id));
+  if (!snapshot || snapshot.changeType !== row.changeType) return fail(409, 'no_snapshot', '작성완료 기록이 없습니다');
+
+  const form = (await markedForms(client)).find(
+    (f) => f.id === input.formId && markAppliesTo(f.mark, snapshot.changeType, snapshot.company.memberType),
+  );
+  if (!form) return fail(400, 'invalid_request', '이 건에 뜨는 서류가 아닙니다', 'formId');
+
+  let officerName: string | null = null;
+  if (form.mark.unit === 'officer') {
+    const officer = officersForMark(form.mark, snapshot.officers)[input.sheet];
+    if (!officer) return fail(400, 'invalid_request', '없는 장입니다', 'sheet');
+    officerName = officer.name;
+  } else if (input.sheet !== 0) {
+    return fail(400, 'invalid_request', '없는 장입니다', 'sheet');
+  }
+
+  await insertPrintLog(client, {
+    id: randomUUID(),
+    corpChangeId: row.id,
+    orgId: row.orgId,
+    formId: form.id,
+    formName: form.name,
+    officerName,
+    applyDate: input.applyDate,
+    writeDate: input.writeDate,
+    printedBy: String(session.s020MemberId),
+    printedRole: session.role,
+  });
+  return { ok: true, value: null };
+}
+
+/** 그 건의 출력 이력 — 건이 보여야 한다(안 보이면 404). 줄은 RLS 가 한 번 더 가른다. */
+export async function listCorpChangePrints(
+  client: ScopedClient,
+  id: string,
+): Promise<OpResult<{ items: PrintLogItem[] }>> {
+  const row = await getCorpChange(client, id);
+  if (!row) return fail(404, 'not_found', '법인변경 건을 찾을 수 없습니다');
+  return { ok: true, value: { items: await listPrintLogs(client, row.id) } };
 }

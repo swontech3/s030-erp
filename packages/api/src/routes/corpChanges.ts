@@ -16,6 +16,8 @@
  *   PATCH  /legal/corp-changes/:id/officers/:oid     임원 수정
  *   DELETE /legal/corp-changes/:id/officers/:oid     임원 삭제
  *   GET    /legal/corp-changes/:id/print             서류 출력 ?applyDate=&writeDate= — E · C 만, no-store(5-2)
+ *   POST   /legal/corp-changes/:id/prints            출력 이력 한 줄 { formId, sheet, applyDate?, writeDate? } (040)
+ *   GET    /legal/corp-changes/:id/prints            출력 이력 목록
  *
  * ★★ 건은 첫 저장 때 생긴다(결정 2026-10-10) — [새 건] 대화상자는 아무것도 쓰지 않고 임시 모드로
  *    보낸다. 빈 건을 만드는 경로는 없다.
@@ -85,7 +87,7 @@ import {
   saveCorpChangePayload,
   type OpResult,
 } from '../legal/corpChangeOps.ts';
-import { readCorpChangePrint } from '../legal/corpChangePrint.ts';
+import { listCorpChangePrints, readCorpChangePrint, recordCorpChangePrint } from '../legal/corpChangePrint.ts';
 
 /** 바꿔 끼울 수 있는 바깥 — 시험이 DB 없이 필터 · 선택지 · 스코프를 본다. */
 export interface CorpChangeDeps {
@@ -264,6 +266,32 @@ export function registerCorpChangeRoutes(app: FastifyInstance, deps: CorpChangeD
     const session = requireSession(req);
     reply.header('Cache-Control', 'no-store');
     const result = await deps.run(session, (client) => readCorpChangePrint(client, session, req.params.id, req.query ?? {}));
+    return send(reply, result);
+  });
+
+  /**
+   * 출력 이력 한 줄 — [인쇄] 를 누를 때. 성공 201(본문 없음).
+   * ★ 화면은 결과를 기다리지 않는다(기록이 실패해도 인쇄는 한다, 결정 2026-10-11). 그래서 **실패는 여기서
+   *   서버 로그에 남긴다** — 사람이 볼 곳은 로그뿐이다. 본문은 로그에 싣지 않는다.
+   */
+  app.post<{ Params: { id: string }; Body: unknown }>('/legal/corp-changes/:id/prints', async (req, reply) => {
+    const session = requireSession(req);
+    try {
+      const result = await deps.run(session, (client) => recordCorpChangePrint(client, session, req.params.id, req.body));
+      if (!result.ok) {
+        req.log.warn({ id: req.params.id, status: result.status, error: result.error }, '[corp-change-prints] 기록 거절');
+        return send(reply, result);
+      }
+      return reply.code(201).send();
+    } catch (err) {
+      req.log.error({ id: req.params.id, err: (err as Error).message }, '[corp-change-prints] 기록 실패');
+      return reply.code(500).send({ error: 'record_failed', message: '출력 이력을 남기지 못했습니다' });
+    }
+  });
+
+  app.get<{ Params: { id: string } }>('/legal/corp-changes/:id/prints', async (req, reply) => {
+    const session = requireSession(req);
+    const result = await deps.run(session, (client) => listCorpChangePrints(client, req.params.id));
     return send(reply, result);
   });
 

@@ -1324,3 +1324,124 @@ describe('GET /legal/corp-changes/:id/print — 서류 출력', () => {
     expect(db.seen).toEqual([]);
   });
 });
+
+// =============================================================================
+// 출력 이력(040, 2026-10-11) — POST · GET /legal/corp-changes/:id/prints
+// =============================================================================
+// ★ RLS · FK 없음 · 권한은 `scripts/verify-040.js`(erp_app 접속 · 롤백)가 본다.
+
+describe('출력 이력 — /legal/corp-changes/:id/prints', () => {
+  const URL = '/legal/corp-changes/cc-1/prints';
+  const officer = (name: string, changeKind: string) => ({
+    name, changeKind, position: '사내이사', effectiveDate: '2026-10-01', zipCode: null, address: null, addressDetail: null,
+  });
+  const SNAPSHOT = {
+    version: 2,
+    changeType: 'OFFICER',
+    company: {
+      isTenant: true, name: '주식회사 시험', corpNumber: null, bizNumber: null, ceoName: '홍대표', tel: null, memberType: 'R',
+      head: { zipCode: null, address: null, addressDetail: null },
+      ceoHome: { zipCode: null, address: null, addressDetail: null },
+    },
+    payload: {},
+    officers: [officer('김갑', 'RESIGN'), officer('이을', 'APPOINT'), officer('박병', 'RESIGN')],
+  };
+  const def = (legal: unknown) => ({
+    version: 2,
+    font: { family: '바탕', size: 10 },
+    legal,
+    pages: [{ colWidths: [3], rowHeights: [1], cells: [] }],
+  });
+  const FORMS = {
+    match: /FROM public\.tb_s080_form_templates/,
+    rows: [
+      { id: 'f-app', name: '법인변경등록1', definition: def({ domain: 'corp-change', changeTypes: ['OFFICER'], companyType: 'ALL', unit: 'case' }) },
+      { id: 'f-resign', name: '사임서', definition: def({ domain: 'corp-change', changeTypes: ['OFFICER'], companyType: 'ALL', unit: 'officer', officerKinds: ['RESIGN'] }) },
+      { id: 'f-hq', name: '본점만', definition: def({ domain: 'corp-change', changeTypes: ['HQ'], companyType: 'ALL', unit: 'case' }) },
+    ],
+  };
+  const SNAP = { match: /SELECT submit_snapshot/, rows: [{ submit_snapshot: SNAPSHOT }] };
+  const INSERT = /INSERT INTO public\.tb_s080_corp_change_prints/;
+
+  async function record(payload: unknown, opts: { status?: string; role?: ScopeRole } = {}) {
+    const db = fakeDb([SNAP, FORMS, { match: INSERT, rows: [] }, CHANGE_ROW({ status: opts.status ?? 'E', change_type: 'OFFICER' })]);
+    const role = opts.role ?? 'tenant';
+    const a = await build(session(role, role === 'operator' ? 1 : 9003), db.deps);
+    const res = await a.inject({ method: 'POST', url: URL, payload: payload as Record<string, unknown> });
+    await a.close();
+    app = null;
+    return { res, insert: db.seen.find((s) => INSERT.test(s.sql)) };
+  }
+
+  it('★★ 건마다 서류 — 201 · 단체는 건의 것 · 이름은 양식에서 · 임원 없음', async () => {
+    const { res, insert } = await record({ formId: 'f-app', sheet: 0, applyDate: '2026-10-11', writeDate: null });
+    expect(res.statusCode).toBe(201);
+    const p = insert!.params;
+    expect(p.slice(1)).toEqual(['cc-1', 9003, 'f-app', '법인변경등록1', null, '2026-10-11', null, '1', 'tenant']);
+  });
+
+  it('★★ 임원마다 서류 — 임원 이름은 서버가 스냅샷에서 찾는다(장 번호만 받는다)', async () => {
+    const { res, insert } = await record({ formId: 'f-resign', sheet: 1, officerName: '가짜', officerRrn: '9001011234567' }, { role: 'operator' });
+    expect(res.statusCode).toBe(201);
+    expect(insert!.params[5]).toBe('박병');
+    expect(insert!.params[9]).toBe('operator');
+    expect(JSON.stringify(insert!.params)).not.toMatch(/가짜|900101/);
+  });
+
+  it.each([
+    [{ formId: 'f-hq' }, 'formId'],
+    [{ formId: 'f-none' }, 'formId'],
+    [{ formId: 'f-resign', sheet: 2 }, 'sheet'],
+    [{ formId: 'f-app', sheet: 1 }, 'sheet'],
+    [{ sheet: 0 }, 'formId'],
+  ])('400 — %j 는 기록하지 않는다', async (payload, field) => {
+    const { res, insert } = await record(payload);
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errors[0].field).toBe(field);
+    expect(insert).toBeUndefined();
+  });
+
+  it('작성완료 · 완료가 아니면 409 — 기록하지 않는다', async () => {
+    const { res, insert } = await record({ formId: 'f-app' }, { status: 'P' });
+    expect(res.statusCode).toBe(409);
+    expect(insert).toBeUndefined();
+  });
+
+  it('★ DB 가 던지면 500 — 서버는 죽지 않는다(화면은 인쇄를 계속한다)', async () => {
+    const db = fakeDb([SNAP, FORMS, CHANGE_ROW({ status: 'E', change_type: 'OFFICER' })]);
+    const deps = {
+      ...db.deps,
+      run: async <T,>(_s: ErpSession, fn: (c: never) => Promise<T>) =>
+        fn({
+          query: async (sql: string, params?: unknown[]) => {
+            if (INSERT.test(sql)) throw new Error('db down');
+            const hit = [SNAP, FORMS, CHANGE_ROW({ status: 'E', change_type: 'OFFICER' })].find((x) => x.match.test(sql));
+            return { rows: hit ? hit.rows : [], rowCount: 0, params };
+          },
+        } as never),
+    } as CorpChangeDeps;
+    const a = await build(session('tenant', 9003), deps);
+    const res = await a.inject({ method: 'POST', url: URL, payload: { formId: 'f-app' } });
+    expect(res.statusCode).toBe(500);
+    expect(res.json().error).toBe('record_failed');
+  });
+
+  it('GET — 목록 · 안 보이는 건은 404', async () => {
+    const row = {
+      printed_at: '2026-10-11 14:05', form_name: '사임서', officer_name: '김갑',
+      apply_date: null, write_date: '2026-10-11', printed_by: '7', printed_role: 'tenant',
+    };
+    const db = fakeDb([{ match: /FROM public\.tb_s080_corp_change_prints/, rows: [row] }, CHANGE_ROW({ status: 'C' })]);
+    const a = await build(session('tenant', 9003), db.deps);
+    const res = await a.inject({ method: 'GET', url: URL });
+    expect(res.json()).toEqual({
+      items: [{ printedAt: '2026-10-11 14:05', formName: '사임서', officerName: '김갑', applyDate: null, writeDate: '2026-10-11', printedBy: '7', printedRole: 'tenant' }],
+    });
+    await a.close();
+    app = null;
+
+    const none = fakeDb([]);
+    const b = await build(session('tenant', 9003), none.deps);
+    expect((await b.inject({ method: 'GET', url: URL })).statusCode).toBe(404);
+  });
+});

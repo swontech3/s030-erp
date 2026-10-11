@@ -618,3 +618,76 @@ export async function listOfficerSecrets(client: ScopedClient, corpChangeId: str
   );
   return rows.map((r) => ({ name: r.name, changeKind: r.change_kind, rrnCipher: r.rrn_cipher }));
 }
+
+// =============================================================================
+// 출력 이력(040, 2026-10-11) — FK 없음 · 덧붙이기만
+// =============================================================================
+
+/** 한 줄 넣기. ★ `orgId` 는 RLS 를 통과한 건의 것만 넣는다(화면 값 아님). 주민번호 · 서류 값은 없다. */
+export async function insertPrintLog(
+  client: ScopedClient,
+  args: {
+    id: string;
+    corpChangeId: string;
+    orgId: number;
+    formId: string;
+    formName: string;
+    officerName: string | null;
+    applyDate: string | null;
+    writeDate: string | null;
+    printedBy: string;
+    printedRole: string;
+  },
+): Promise<void> {
+  await q(
+    client,
+    `INSERT INTO public.tb_s080_corp_change_prints
+       (id, corp_change_id, org_id, form_id, form_name, officer_name, apply_date, write_date, printed_by, printed_role, printed_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8::date, $9, $10, now())`,
+    [
+      args.id, args.corpChangeId, args.orgId, args.formId, args.formName, args.officerName,
+      args.applyDate, args.writeDate, args.printedBy, args.printedRole,
+    ],
+  );
+}
+
+export interface PrintLogRow {
+  printedAt: string;
+  formName: string;
+  officerName: string | null;
+  applyDate: string | null;
+  writeDate: string | null;
+  printedBy: string;
+  printedRole: 'operator' | 'tenant';
+}
+
+/** 그 건의 이력 — 새것이 위. 무엇이 보이는지는 RLS(회사는 자기 단체 줄만). */
+export async function listPrintLogs(client: ScopedClient, corpChangeId: string): Promise<PrintLogRow[]> {
+  const { rows } = await q<{
+    printed_at: string;
+    form_name: string;
+    officer_name: string | null;
+    apply_date: string | null;
+    write_date: string | null;
+    printed_by: string;
+    printed_role: 'operator' | 'tenant';
+  }>(
+    client,
+    `SELECT to_char(printed_at, 'YYYY-MM-DD HH24:MI') AS printed_at, form_name, officer_name,
+            to_char(apply_date, 'YYYY-MM-DD') AS apply_date, to_char(write_date, 'YYYY-MM-DD') AS write_date,
+            printed_by, printed_role
+       FROM public.tb_s080_corp_change_prints
+      WHERE corp_change_id = $1
+      ORDER BY printed_at DESC, id`,
+    [corpChangeId],
+  );
+  return rows.map((r) => ({
+    printedAt: r.printed_at,
+    formName: r.form_name,
+    officerName: r.officer_name,
+    applyDate: r.apply_date,
+    writeDate: r.write_date,
+    printedBy: r.printed_by,
+    printedRole: r.printed_role,
+  }));
+}

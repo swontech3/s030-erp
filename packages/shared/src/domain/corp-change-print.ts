@@ -509,3 +509,52 @@ export interface CorpChangePrintResponse<D = unknown> {
   status: string;
   documents: PrintDocument<D>[];
 }
+
+// =============================================================================
+// 출력 이력(040) — [인쇄] 를 누를 때 한 줄
+// =============================================================================
+
+/**
+ * 기록 요청 본문 `{ formId, sheet, applyDate?, writeDate? }`.
+ *
+ * ★ 임원 이름은 받지 않는다 — 장 번호(`sheet`)만 받고 서버가 스냅샷에서 이름을 찾는다(화면이 준 이름을
+ *   기록하지 않는다). 건마다 서류는 `sheet` 가 0 이다.
+ * ★ 주민번호 · 서류 값은 받지도 남기지도 않는다(040 머리말).
+ */
+export interface PrintLogInput {
+  formId: string;
+  sheet: number;
+  applyDate: string | null;
+  writeDate: string | null;
+}
+
+export function parsePrintLogBody(raw: unknown): { ok: true; value: PrintLogInput } | { ok: false; field: string; message: string } {
+  if (!isObj(raw)) return { ok: false, field: 'body', message: '요청 형식이 올바르지 않습니다' };
+  if (typeof raw.formId !== 'string' || raw.formId.trim() === '' || raw.formId.length > 100) {
+    return { ok: false, field: 'formId', message: '서류(formId)가 올바르지 않습니다' };
+  }
+  const sheet = raw.sheet ?? 0;
+  if (typeof sheet !== 'number' || !Number.isInteger(sheet) || sheet < 0 || sheet > 999) {
+    return { ok: false, field: 'sheet', message: '장 번호(sheet)가 올바르지 않습니다' };
+  }
+  const dates = parsePrintInputs({ applyDate: raw.applyDate, writeDate: raw.writeDate });
+  if (!dates.ok) return dates;
+  return {
+    ok: true,
+    value: { formId: raw.formId, sheet, applyDate: dates.value.applyDate ?? null, writeDate: dates.value.writeDate ?? null },
+  };
+}
+
+/** 상세의 「출력 이력」 한 줄. */
+export interface PrintLogItem {
+  /** `YYYY-MM-DD HH:mm`(DB 시간대 그대로). */
+  printedAt: string;
+  formName: string;
+  /** 임원마다 서류의 장이면 그 임원, 아니면 null. */
+  officerName: string | null;
+  applyDate: string | null;
+  writeDate: string | null;
+  /** 삐용 회원 ID. */
+  printedBy: string;
+  printedRole: 'operator' | 'tenant';
+}
