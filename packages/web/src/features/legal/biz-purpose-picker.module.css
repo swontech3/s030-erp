@@ -1,0 +1,73 @@
+/*
+ * 사업목적 고르기 팝업 — 틀(덮개 · 상자 · 검색 · 표 · 아래 버튼)은 공용 회사 조회 팝업
+ * (`components/org-lookup/org-lookup.module.css`)을 그대로 쓰고, 여기에는 그 팝업에 없는 것만 둔다:
+ * 탭 줄 · 체크 칸 · 「추가됨」 딱지 · 고른 수.
+ * ★ 탭 모양은 청구 화면 탭(`billing.module.css` 의 `.tabs`/`.tab`/`.tabOn`)과 같은 숫자다.
+ * ★ 녹색 금지(lint-no-green) — 「추가됨」도 인디고 계열이다.
+ */
+
+.tabs {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  position: relative;
+  border: 0;
+  background: transparent;
+  padding: 10px 0 12px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tabOn {
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.tabOn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-primary);
+}
+
+.checkCell {
+  width: 40px;
+  text-align: center;
+}
+
+.checkCell input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.rowDone td {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.done {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: var(--color-primary);
+  background: var(--color-accent-bg);
+}
+
+.count {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
