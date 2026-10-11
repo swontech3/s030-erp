@@ -7,15 +7,14 @@
  *   그래도 다른 저장소와 같이 `ScopedClient` 로 받는다 — 경로가 둘이 되지 않게.
  *
  * =============================================================================
- * ★★★ 등기 설정이 가리키는 양식은 못 지운다 — **FK 가 없어서 여기서 센다**
+ * ★★★ 법무 표시가 붙은 양식은 못 지운다 — 표시를 떼야 지운다 (결정 E, 2026-10-11)
  * =============================================================================
- * 레거시 「등기 양식 토큰」(`tb_s080_doc_form_settings.form_template_id`)이 양식을
- * 가리킨다. 그 칸에 FK 가 **없다**(019 도 걸지 않았다). 지우면 등기 설정이 없는 양식을
- * 가리키게 되고 아무도 모른다. 그래서 지우기 전에 센다(`listLinks`) — 센터 관리·코드
- * 관리와 같은 이유다(결정 2026-10-07).
- * 2026-10-07 실측: 「법인변경등록1」을 등기 설정 2줄(대표이사 주소 변경 · 이사·감사 변경)이
- * 쓰고 있다. 「사내이사 중임승낙서」를 쓰는 곳은 없다.
- * ★ 등기 설정 화면은 **법무 서비스(s04) 090 설정**으로 들어온다. 그 전까지 연결을 바꿀 길은 없다.
+ * 법인변경 [서류 출력]은 양식의 법무 표시(`definition.legal`)로 서류를 고른다. 표시가 붙은
+ * 양식을 지우면 그 서류가 말없이 사라진다 — 그래서 표시를 먼저 떼게 한다(`legal` 칸).
+ *
+ * ★ 2026-10-07 의 「등기 설정(`form_template_id`)이 가리키는 양식은 못 지운다」는 **뺐다**
+ *   (결정 2026-10-11). 출력이 그 칸을 쓰지 않는다. 지운 양식의 id 는 설정 줄에 남는다 —
+ *   정리는 법무 서비스 090 설정 화면 때.
  *
  * ★ `updated_at` 은 레거시 행과 새 행의 기준이 다르다 — 레거시 Prisma 는 UTC 값을,
  *   여기서 쓰는 `now()` 는 DB 세션 시간대 값을 `timestamp without time zone` 에 넣는다.
@@ -44,8 +43,8 @@ export interface FormTemplateListRow {
   kind: string;
   /** `YYYY-MM-DD`. 머리말 ★ 참조. */
   updated_on: string;
-  /** 이 양식을 가리키는 등기 설정 수. */
-  link_count: number;
+  /** 법무 표시(`definition.legal`)가 붙어 있는가. ★ 붙어 있으면 삭제가 막힌다. */
+  legal: boolean;
 }
 
 export interface FormTemplateRow extends FormTemplateListRow {
@@ -56,8 +55,7 @@ export interface FormTemplateRow extends FormTemplateListRow {
 const SELECT_COLUMNS = `
   t.id, t.name, t.description, t.kind,
   to_char(t.updated_at, 'YYYY-MM-DD') AS updated_on,
-  (SELECT count(*)::int FROM public.tb_s080_doc_form_settings s
-    WHERE s.form_template_id = t.id) AS link_count`;
+  (t.definition ? 'legal') AS legal`;
 
 export async function listFormTemplates(client: ScopedClient): Promise<FormTemplateListRow[]> {
   const { rows } = await q<FormTemplateListRow>(
@@ -80,18 +78,6 @@ export async function findFormTemplate(client: ScopedClient, id: string): Promis
     [id, OPERATOR_ID],
   );
   return rows[0] ?? null;
-}
-
-/** 이 양식을 가리키는 등기 설정 — 409 문구에 이름을 담으려고 표시명까지 읽는다. */
-export async function listLinks(client: ScopedClient, id: string): Promise<string[]> {
-  const { rows } = await q<{ label: string }>(
-    client,
-    `SELECT label FROM public.tb_s080_doc_form_settings
-      WHERE form_template_id = $1
-      ORDER BY domain, sort_order, label`,
-    [id],
-  );
-  return rows.map((r) => r.label);
 }
 
 export interface FormTemplatePatch {
@@ -135,10 +121,11 @@ export async function updateFormTemplate(
   return (rowCount ?? 0) > 0;
 }
 
+/** ★ 법무 표시가 붙은 양식은 지우지 않는다 — 라우트가 먼저 409 를 내지만, 그 사이 표시가 붙어도 지워지지 않게 문장에도 건다. */
 export async function deleteFormTemplate(client: ScopedClient, id: string): Promise<boolean> {
   const { rowCount } = await q(
     client,
-    `DELETE FROM public.tb_s080_form_templates WHERE id = $1 AND operator_id = $2`,
+    `DELETE FROM public.tb_s080_form_templates WHERE id = $1 AND operator_id = $2 AND NOT (definition ? 'legal')`,
     [id, OPERATOR_ID],
   );
   return (rowCount ?? 0) > 0;

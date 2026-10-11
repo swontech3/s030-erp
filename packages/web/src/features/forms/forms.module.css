@@ -339,3 +339,35 @@
   padding: 0 2px;
   outline: none;
 }
+
+/* ── 양식 편집 · 법무 표시(5-3) ── 양식 정보 아래 한 줄 띠 ── */
+
+.legalBox {
+  flex: 0 0 auto;
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.legalNote {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-caption);
+}
+
+.legalGrid {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+
+.legalChecks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}

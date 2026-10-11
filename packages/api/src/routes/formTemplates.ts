@@ -15,12 +15,16 @@
  * 같다). 화면의 `requireScreen` 과 두 겹이다.
  *
  * =============================================================================
- * ★★★ 등기 설정이 쓰는 양식은 못 지운다 — 409
+ * ★★★ 법무 표시가 붙은 양식은 못 지운다 — 표시를 떼야 지운다, 409 (결정 E, 2026-10-11)
  * =============================================================================
- * `tb_s080_doc_form_settings.form_template_id` 에 FK 가 없다. 지우기 전에 세고, 쓰는
- * 곳이 있으면 409 + 「등기 설정 N건이 쓰는 중」이다(결정 2026-10-07). 근거는
- * `db/formTemplates.ts` 머리말. **수정·복사는 막지 않는다** — 고친 모양이 그대로
- * 등기 서류에 쓰이는 것이 맞다(레거시도 그랬다).
+ * 법인변경 [서류 출력]이 법무 표시로 서류를 고른다 — 근거는 `db/formTemplates.ts` 머리말.
+ * 옛 「등기 설정이 가리키는 양식은 못 지운다」(2026-10-07)는 뺐다. **수정·복사는 막지 않는다**
+ * — 고친 모양이 그대로 서류에 쓰이는 것이 맞다(레거시도 그랬다). 복사본은 표시까지 그대로 복사된다.
+ *
+ * ★ 편집기의 법무 표시 선택지(변경 구분 · 회사유형) 이름은 코드에서 읽어 함께 내려준다
+ *   (`legalOptions`) — 고를 수 있는 값 자체는 shared 의 `CORP_CHANGE_TYPES` ·
+ *   `LEGAL_FORM_COMPANY_TYPES` 다. 임원 구분(취임 · 사임 · 중임) 이름은 코드가 아니다
+ *   (`OFFICER_CHANGE_KIND_LABEL`).
  *
  * ★ 정의(JSON)는 **서버가 검사한다**(`parseDefinition`). 화면을 믿지 않는다 — 깨진
  *   정의가 저장되면 그 양식은 화면에서 열리지 않고 고칠 길도 없다.
@@ -36,7 +40,6 @@ import {
   findFormTemplate,
   insertFormTemplate,
   listFormTemplates,
-  listLinks,
   updateFormTemplate,
   type FormTemplateListRow,
   type FormTemplatePatch,
@@ -48,6 +51,13 @@ import {
   migrateDefinition,
   parseDefinition,
 } from '@swonbiz/shared/domain/form-template';
+import {
+  CORP_CHANGE_CODE_USE_TP,
+  CORP_CHANGE_TYPES,
+  CORP_CHANGE_TYPE_CATEGORY,
+} from '@swonbiz/shared/domain/corp-change';
+import { LEGAL_MEMBER_TYPE_CATEGORY, LEGAL_MEMBER_TYPE_USE_TP } from '@swonbiz/shared/domain/corp-change-detail';
+import { LEGAL_FORM_COMPANY_TYPES } from '@swonbiz/shared/domain/legal-form-mark';
 
 const OPERATOR = 'operator';
 const OPERATOR_SCOPE: CompanyScope = { role: 'operator', companyId: null };
@@ -65,7 +75,7 @@ const notFound = (reply: FastifyReply) =>
 const badRequest = (reply: FastifyReply, message: string) =>
   reply.code(400).send({ error: 'invalid_request', message });
 
-/** 쓰고 있어서 못 지운다. ★ `message` 는 화면이 **안내**로 그대로 보여 준다. */
+/** 지울 수 없다(법무 표시). ★ `message` 는 화면이 **안내**로 그대로 보여 준다. */
 const inUse = (reply: FastifyReply, message: string) =>
   reply.code(409).send({ error: 'in_use', message });
 
@@ -91,14 +101,31 @@ async function loadKinds(client: ScopedClient): Promise<KindOption[]> {
   return rows.map((r) => ({ code: r.code, name: r.name }));
 }
 
+/**
+ * 법무 표시 선택지의 이름 — 코드표 순서. 코드표에 없는(꺼진) 값은 빠진다 — 화면은 코드값을 그대로
+ * 보인다(저장된 표시가 지워지지 않게).
+ */
+async function loadLegalOptions(client: ScopedClient): Promise<{ changeTypes: KindOption[]; companyTypes: KindOption[] }> {
+  const rows = await listCodes(client, [
+    { category: CORP_CHANGE_TYPE_CATEGORY, useTp: CORP_CHANGE_CODE_USE_TP },
+    { category: LEGAL_MEMBER_TYPE_CATEGORY, useTp: LEGAL_MEMBER_TYPE_USE_TP },
+  ]);
+  const pick = (category: string, allowed: readonly string[]) =>
+    rows.filter((r) => r.category === category && allowed.includes(r.code)).map((r) => ({ code: r.code, name: r.name }));
+  return {
+    changeTypes: pick(CORP_CHANGE_TYPE_CATEGORY, CORP_CHANGE_TYPES),
+    companyTypes: pick(LEGAL_MEMBER_TYPE_CATEGORY, LEGAL_FORM_COMPANY_TYPES),
+  };
+}
+
 const toListItem = (t: FormTemplateListRow) => ({
   id: t.id,
   name: t.name,
   description: t.description,
   kind: t.kind,
   updatedOn: t.updated_on,
-  /** 이 양식을 쓰는 등기 설정 수. ★ 0 이 아니면 삭제가 막힌다. */
-  linkCount: t.link_count,
+  /** 법무 표시가 붙어 있는가. ★ 붙어 있으면 삭제가 막힌다. */
+  legal: t.legal,
 });
 
 type BodyResult = { ok: true; patch: FormTemplatePatch } | { ok: false; message: string };
@@ -142,8 +169,9 @@ export function registerFormTemplateRoutes(app: FastifyInstance): void {
     const data = await withCompanyScope(OPERATOR_SCOPE, async (client) => ({
       templates: await listFormTemplates(client),
       kinds: await loadKinds(client),
+      legalOptions: await loadLegalOptions(client),
     }));
-    return reply.send({ templates: data.templates.map(toListItem), kinds: data.kinds });
+    return reply.send({ templates: data.templates.map(toListItem), kinds: data.kinds, legalOptions: data.legalOptions });
   });
 
   /**
@@ -158,6 +186,7 @@ export function registerFormTemplateRoutes(app: FastifyInstance): void {
     const data = await withCompanyScope(OPERATOR_SCOPE, async (client) => ({
       row: await findFormTemplate(client, req.params.id),
       kinds: await loadKinds(client),
+      legalOptions: await loadLegalOptions(client),
     }));
     if (!data.row) return notFound(reply);
 
@@ -170,7 +199,7 @@ export function registerFormTemplateRoutes(app: FastifyInstance): void {
         .code(500)
         .send({ error: 'broken_definition', message: '이 양식의 모양을 읽지 못했습니다. 관리자에게 알려 주세요' });
     }
-    return reply.send({ template: { ...toListItem(data.row), definition }, kinds: data.kinds });
+    return reply.send({ template: { ...toListItem(data.row), definition }, kinds: data.kinds, legalOptions: data.legalOptions });
   });
 
   app.post('/form-templates', async (req, reply) => {
@@ -208,7 +237,8 @@ export function registerFormTemplateRoutes(app: FastifyInstance): void {
 
   /**
    * 복사 — 이름 뒤에 「(복사본)」을 붙인다(레거시와 같다).
-   * ★ 등기 설정 연결은 따라가지 않는다 — 연결은 원본 양식에 붙어 있다.
+   * ★ 법무 표시는 **따라간다**(정의의 일부다) — 복사본도 그 구분의 [서류 출력]에 뜬다. 원치 않으면
+   *   복사본 편집에서 표시를 뗀다.
    * ★ 정의는 **옮긴 뒤** 복사한다. version 1 이 그대로 복제되지 않게.
    */
   app.post<{ Params: { id: string } }>('/form-templates/:id/duplicate', async (req, reply) => {
@@ -238,23 +268,15 @@ export function registerFormTemplateRoutes(app: FastifyInstance): void {
     if (session.role !== OPERATOR) return forbidden(reply);
 
     const result = await withCompanyScope(OPERATOR_SCOPE, async (client) => {
-      const links = await listLinks(client, req.params.id);
-      if (links.length > 0) return { kind: 'in_use' as const, links };
+      const row = await findFormTemplate(client, req.params.id);
+      if (!row) return { kind: 'not_found' as const };
+      if (row.legal) return { kind: 'legal' as const };
       const found = await deleteFormTemplate(client, req.params.id);
       return { kind: found ? ('deleted' as const) : ('not_found' as const) };
     });
 
-    if (result.kind === 'in_use') {
-      const shown = result.links.slice(0, 2).join(' · ');
-      const more = result.links.length > 2 ? ` 외 ${result.links.length - 2}건` : '';
-      /*
-       * ★ 「연결을 먼저 바꿔 주세요」라고 적지 않는다 — 연결을 바꾸는 화면(등기 설정)이
-       *   새 ERP 에 아직 없다(법무 서비스 s04 의 090 설정으로 들어온다). 없는 길을 안내하지 않는다.
-       */
-      return inUse(
-        reply,
-        `등기 설정 ${result.links.length}건이 쓰는 중이라 지울 수 없습니다 (${shown}${more})`,
-      );
+    if (result.kind === 'legal') {
+      return inUse(reply, '법무 표시가 붙은 양식이라 지울 수 없습니다 — 양식 편집에서 법무 표시를 뗀 뒤 지워 주세요');
     }
     if (result.kind === 'not_found') return notFound(reply);
     return reply.send({ id: req.params.id });

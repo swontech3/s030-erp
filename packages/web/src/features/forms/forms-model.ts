@@ -2,7 +2,7 @@
  * 표양식 관리(s030100020) 모델 — 타입 · 호출.
  *
  * ★ 화면 컴포넌트에 `fetch` 를 두지 않는다(코드 관리 `codes-model.ts` 와 같은 구조).
- * ★★ 모든 호출이 **같은 모양으로 실패**한다 — `FormsError`. 409(등기 설정이 쓰는 중)는
+ * ★★ 모든 호출이 **같은 모양으로 실패**한다 — `FormsError`. 409(법무 표시가 붙어 못 지움)는
  *    `inUse` 로 갈라 화면이 오류가 아니라 **안내**로 그린다.
  * ★ 규칙(정의 검사 · 자리표시 · 칸 편집)은 shared 에 있다 — 여기는 부르기만 한다.
  */
@@ -17,8 +17,8 @@ export interface FormTemplateItem {
   kind: string;
   /** `YYYY-MM-DD` — 레거시 행과 새 행의 시각 기준이 달라 날짜만 받는다(`db/formTemplates.ts`). */
   updatedOn: string;
-  /** 이 양식을 쓰는 등기 설정 수. ★ 0 이 아니면 삭제가 막힌다. */
-  linkCount: number;
+  /** 법무 표시가 붙어 있는가. ★ 붙어 있으면 삭제가 막힌다(표시를 떼야 지운다, 결정 E). */
+  legal: boolean;
 }
 
 export interface FormTemplate extends FormTemplateItem {
@@ -31,11 +31,20 @@ export interface KindOption {
   name: string;
 }
 
+/**
+ * 법무 표시 선택지의 이름 — 코드에서 읽어 온다(변경 구분 `LAW_CNG_TP` · 회사유형 `MEMBER_TYPE`/002).
+ * 고를 수 있는 값 자체는 shared(`CORP_CHANGE_TYPES` · `LEGAL_FORM_COMPANY_TYPES`)다.
+ */
+export interface LegalOptions {
+  changeTypes: KindOption[];
+  companyTypes: KindOption[];
+}
+
 export class FormsError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    /** 409 — 쓰고 있어서 못 지운다. 오류가 아니라 **안내**다. */
+    /** 409 — 법무 표시가 붙어 못 지운다. 오류가 아니라 **안내**다. */
     readonly inUse: boolean,
   ) {
     super(message);
@@ -69,10 +78,10 @@ const json = (method: string, body: unknown): RequestInit => ({
 const seg = (s: string) => encodeURIComponent(s);
 
 export const loadTemplates = () =>
-  call<{ templates: FormTemplateItem[]; kinds: KindOption[] }>('/api/form-templates');
+  call<{ templates: FormTemplateItem[]; kinds: KindOption[]; legalOptions: LegalOptions }>('/api/form-templates');
 
 export const loadTemplate = (id: string) =>
-  call<{ template: FormTemplate; kinds: KindOption[] }>(`/api/form-templates/${seg(id)}`);
+  call<{ template: FormTemplate; kinds: KindOption[]; legalOptions: LegalOptions }>(`/api/form-templates/${seg(id)}`);
 
 export interface TemplateInput {
   name: string;

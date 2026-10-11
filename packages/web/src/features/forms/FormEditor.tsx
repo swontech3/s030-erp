@@ -23,6 +23,8 @@
  * · 글자는 **왼쪽 위 칸 하나에만** 쓴다. 레거시는 여러 칸을 고른 채 글자를 치면 고른 칸
  *   전부에 같은 글자가 들어갔다.
  * · 나갈 때 확인은 `window.confirm` 대신 ERP 확인 창이다(`ModalShell`).
+ * · 양식 정보 아래에 **법무 표시**가 있다(`LegalMarkPanel`, 2026-10-11) — 붙이면 법인변경 [서류 출력]에
+ *   뜬다. 레거시 「데이터 소스」 대신 이것이 「법무 양식」의 정본이다.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -61,7 +63,9 @@ import {
   loadTemplates,
   saveTemplate,
   type KindOption,
+  type LegalOptions,
 } from './forms-model';
+import { LegalMarkPanel, legalMarkProblem } from './LegalMarkPanel';
 import { GridEditor, normSel, type Selection } from './GridEditor';
 import { CellPanel } from './CellPanel';
 import styles from './forms.module.css';
@@ -79,6 +83,7 @@ const snapshotOf = (info: Info, def: FormDefinition) =>
 export function FormEditor({ id }: { id: string | null }) {
   const router = useRouter();
   const [kinds, setKinds] = useState<KindOption[]>([]);
+  const [legalOptions, setLegalOptions] = useState<LegalOptions>({ changeTypes: [], companyTypes: [] });
   const [info, setInfo] = useState<Info>({ name: '', kind: DEFAULT_FORM_KIND, description: '' });
   const [definition, setDefinition] = useState<FormDefinition>(() => createEmptyDefinition());
   const [loading, setLoading] = useState(true);
@@ -103,6 +108,7 @@ export function FormEditor({ id }: { id: string | null }) {
           if (!alive) return;
           const nextInfo = { name: r.template.name, kind: r.template.kind, description: r.template.description ?? '' };
           setKinds(r.kinds);
+          setLegalOptions(r.legalOptions);
           setInfo(nextInfo);
           setDefinition(r.template.definition);
           baseline.current = snapshotOf(nextInfo, r.template.definition);
@@ -110,6 +116,7 @@ export function FormEditor({ id }: { id: string | null }) {
           const r = await loadTemplates();
           if (!alive) return;
           setKinds(r.kinds);
+          setLegalOptions(r.legalOptions);
           // ★ 기본 종류가 코드에서 꺼져 있으면 첫 종류로 — 없는 코드값으로 시작하지 않게.
           const kind = r.kinds.some((k) => k.code === DEFAULT_FORM_KIND) ? DEFAULT_FORM_KIND : (r.kinds[0]?.code ?? '');
           const nextInfo = { name: '', kind, description: '' };
@@ -186,6 +193,12 @@ export function FormEditor({ id }: { id: string | null }) {
 
   async function onSave() {
     if (saving) return;
+    // ★ 표시가 덜 골라졌으면 보내지 않는다 — 사유는 표시 칸 아래에 이미 보인다. 서버도 같은 규칙으로 거절한다.
+    const problem = legalMarkProblem(definition.legal);
+    if (problem) {
+      setError(`법무 표시 — ${problem}`);
+      return;
+    }
     setError(null);
     setSaving(true);
     const input = { name: info.name, kind: info.kind, description: info.description, definition };
@@ -278,6 +291,17 @@ export function FormEditor({ id }: { id: string | null }) {
           />
         </Field>
       </div>
+
+      <LegalMarkPanel
+        mark={definition.legal}
+        options={legalOptions}
+        onChange={(legal) =>
+          setDefinition((d) => {
+            const { legal: _old, ...rest } = d;
+            return legal ? { ...rest, legal } : rest;
+          })
+        }
+      />
 
       <div className={styles.editBody}>
         <div className={styles.toolbar}>

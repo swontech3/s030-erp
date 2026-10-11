@@ -48,7 +48,7 @@ const EMPTY_FILTER = { name: '', kind: '' };
 
 /** 삭제가 막힌 이유 — 화면이 미리 잠근다. 판정은 서버(409)다. */
 const deleteBlockReason = (t: FormTemplateItem): string | null =>
-  t.linkCount > 0 ? `등기 설정 ${t.linkCount}건이 쓰는 중이라 지울 수 없습니다` : null;
+  t.legal ? '법무 표시가 붙은 양식입니다 — 양식 편집에서 표시를 뗀 뒤 지울 수 있습니다' : null;
 
 export function FormsView({ initialId }: { initialId: string | null }) {
   const router = useRouter();
@@ -282,9 +282,6 @@ export function FormsView({ initialId }: { initialId: string | null }) {
                     <span className={`${codes.tag} ${codes.tagOn}`}>{kindName(kinds, current.kind)}</span>
                     <span>{current.definition.pages.length}장</span>
                     <span>· 수정 {current.updatedOn}</span>
-                    {current.linkCount > 0 ? (
-                      <span className={`${codes.tag} ${codes.tagWarn}`}>등기 설정 {current.linkCount}건이 씀</span>
-                    ) : null}
                     {legal ? (
                       <span className={`${codes.tag} ${codes.tagWarn}`}>법무 양식 — 법무 화면에서 출력</span>
                     ) : null}
