@@ -660,3 +660,119 @@
 .addrCompact .addrDetail {
   width: 140px;
 }
+
+/* ── 서류 출력 대화상자 (5-4) ── 왼쪽 서류 목록 · 가운데 종이 미리보기 ── */
+.printPanel {
+  width: min(1180px, 100%);
+  height: min(92vh, 1000px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+}
+
+.printHead {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.printTitle {
+  margin: 0 auto 6px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.printDate {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 160px;
+}
+
+.printActions {
+  display: flex;
+  gap: 8px;
+}
+
+.printBody {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.printList {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+  border-right: 1px solid var(--border);
+}
+
+.printDoc {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.printDocName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.printItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.printItem:hover {
+  background: var(--color-accent-bg);
+}
+
+.printItemSub {
+  padding-left: 30px;
+}
+
+.printItemOn {
+  background: var(--color-accent-bg);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.printNone {
+  padding: 4px 10px 4px 30px;
+  font-size: 12px;
+  color: var(--text-caption);
+}
+
+.printPreview {
+  overflow: auto;
+  padding: 16px;
+  background: var(--surface-alt);
+  border-radius: var(--radius-md);
+}

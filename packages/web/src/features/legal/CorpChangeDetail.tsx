@@ -43,7 +43,8 @@
  *   · 다른 상태 버튼(서류수정 · 취소 · 삭제 등)은 저장 안 한 입력이 있으면 막는다
  *   · 완료 · 완료 취소 · 취소 · 복원 · 삭제는 확인 창(`CorpChangeConfirmDialog`)을 거친다
  *   · 흐름은 서류작성중(P) → 작성완료(E) → 완료(C), 그리고 취소(X). 제출(A)은 없앴다(2026-10-10)
- * ★ 서류 출력 버튼은 아직 없다(5단계).
+ * ★ [서류 출력](5-4, 2026-10-11) — 작성완료(E) · 완료(C) 건에만 뜬다(`canPrintCorpChange`). 운영사 · 회사 모두.
+ *   대화상자(`CorpChangePrintDialog`)가 서버에서 값을 받아 서류를 하나씩 인쇄한다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -53,6 +54,7 @@ import {
   OFFICER_CHANGE_KINDS,
   OFFICER_CHANGE_KIND_LABEL,
   REGISTRATION_DEADLINE_DAYS,
+  canPrintCorpChange,
   isRrnShape,
   registrationDeadline,
   type CorpChangeFieldDef,
@@ -78,6 +80,7 @@ import { maskInput } from '@/features/contracts/form-model';
 import { Icon } from '@/components/ds';
 import { useKakaoPostcode } from '@/lib/useKakaoPostcode';
 import { CorpChangeConfirmDialog, type CorpChangeConfirmKind } from './CorpChangeConfirmDialog';
+import { CorpChangePrintDialog } from './CorpChangePrintDialog';
 import styles from './corp-change-detail.module.css';
 
 interface Props {
@@ -487,6 +490,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
 
   // ── 상태 전이 · 삭제(4단계) — 처리는 이 화면 한 곳이다(목록에는 버튼이 없다) ──────────
   const [confirm, setConfirm] = useState<CorpChangeConfirmKind | null>(null);
+  const [printing, setPrinting] = useState(false);
 
   /** 새 상세로 다시 그린다 — 상태 · 버튼 · 변경 내용 · 임원 · 회사 정보 모두 서버 값으로. */
   function applyDetail(d: CorpChangeDetailResponse) {
@@ -611,6 +615,12 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
             ) : null}
           </div>
           <div className={styles.headActions}>
+            {saved && canPrintCorpChange(saved.status) ? (
+              <button type="button" className={`${styles.btn} ${styles.btnGhost}`} disabled={busy} onClick={() => setPrinting(true)}>
+                <Icon name="printer" size={16} />
+                서류 출력
+              </button>
+            ) : null}
             {saved ? (
               <StatusActions
                 saved={saved}
@@ -753,6 +763,8 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
           onConfirm={onConfirm}
         />
       ) : null}
+
+      {printing && saved ? <CorpChangePrintDialog id={saved.id} onClose={() => setPrinting(false)} /> : null}
 
       {toast ? (
         <div className={styles.toast} role="status">
