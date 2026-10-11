@@ -99,11 +99,10 @@ export async function readCorpChangePrint(
     return fail(409, 'no_snapshot', '작성완료 기록이 없습니다 — [서류수정] 뒤 다시 작성완료해 주세요');
   }
 
-  const [settings, codes, forms] = await Promise.all([
-    listCorpChangeSettings(client),
-    listCodes(client, [{ category: CORP_CHANGE_TYPE_CATEGORY, useTp: CORP_CHANGE_CODE_USE_TP }]),
-    markedForms(client),
-  ]);
+  // ★ 차례로 읽는다 — 한 트랜잭션의 클라이언트 하나에 동시에 보내지 않는다(pg 가 줄 세우지만 pg@9 에서 막힌다)
+  const settings = await listCorpChangeSettings(client);
+  const codes = await listCodes(client, [{ category: CORP_CHANGE_TYPE_CATEGORY, useTp: CORP_CHANGE_CODE_USE_TP }]);
+  const forms = await markedForms(client);
   const src = {
     snapshot,
     setting: pickDocFormSetting(settings, snapshot.changeType, snapshot.company.memberType),
