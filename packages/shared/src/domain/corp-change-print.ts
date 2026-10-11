@@ -8,7 +8,8 @@
  * =============================================================================
  * 영문 이름(`companyName` · `matterBody` …)은 레거시 「법인 변경등기」 데이터 소스와 07-02 「고정 토큰」
  * 그대로다. 개발 DB 의 법인변경등록1 이 이 이름들로 칸을 채운다. 사람이 보는 이름은 `label` 이다.
- * 새로 생긴 것은 신청일 · 작성일(`applyDate` · `writeDate`)과 임원 칸(`officer…`), 사업자번호다.
+ * 새로 생긴 것은 신청일 · 작성일(`applyDate` · `writeDate`)과 임원 칸(`officer…`), 사업자번호,
+ * 결의일(`resolutionDate`, 2026-10-11 — 의사록 · 서면결의서 · 취임승낙서의 회의 · 결의 날짜)이다.
  * ★ 별칭은 없다 — 옛 이름(`today` · `grade` · `day`)은 일회용 파일로 양식 쪽을 고친다(결정 D).
  *
  * =============================================================================
@@ -66,6 +67,7 @@ export const CORP_CHANGE_PRINT_FIELDS: readonly PrintField[] = [
   { name: 'regReason', label: '등기의사유', source: 'case' },
   { name: 'matter', label: '등기할사항(제목)', source: 'case' },
   { name: 'matterBody', label: '등기할사항(내용)', source: 'case' },
+  { name: 'resolutionDate', label: '결의일', source: 'case' },
   { name: 'regLicenseTax', label: '등록면허세', source: 'case' },
   { name: 'localEduTax', label: '지방교육세', source: 'case' },
   { name: 'taxTotal', label: '세액합계', source: 'case' },
@@ -401,6 +403,8 @@ export function buildCasePrintValues(src: CasePrintSource): Record<string, strin
     regReason: setting?.regReason ?? '',
     matter: setting?.matter ?? '',
     matterBody: [setting?.matterBody, summary].filter((v): v is string => !!v).join('\n'),
+    // 결의일 — 변경 내용의 `resolutionDate`(상호 · 목적 · 본점 · 임원). 대표주소 변경에는 없다 → 빈칸
+    resolutionDate: formatKoreanDate(typeof snapshot.payload.resolutionDate === 'string' ? snapshot.payload.resolutionDate : null),
     regLicenseTax: formatAmount(t.regLicense),
     localEduTax: formatAmount(t.localEdu),
     taxTotal: formatAmount(total),

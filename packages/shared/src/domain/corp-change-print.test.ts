@@ -238,6 +238,16 @@ describe('buildCasePrintValues', () => {
     });
   });
 
+  it('결의일 — 변경 내용의 resolutionDate 를 「2026년 10월 1일」로, 없거나 틀리면 빈칸', () => {
+    const at = (payload: Record<string, unknown>) =>
+      buildCasePrintValues(src({ snapshot: snap({ changeType: 'NAME', payload }) })).resolutionDate;
+    expect(at({ newName: '비', resolutionDate: '2026-10-01' })).toBe('2026년 10월 1일');
+    expect(at({ newName: '비' })).toBe('');
+    expect(at({ resolutionDate: '2026-02-30' })).toBe('');
+    // 대표주소 변경에는 결의일 칸이 없다
+    expect(buildCasePrintValues(src()).resolutionDate).toBe('');
+  });
+
   it('등기의 목적 — 설정이 비면 변경 구분 코드 이름(질문 2)', () => {
     const setting = { ...pickDocFormSetting(ROWS, 'CEO_ADDR', null)!, regPurpose: null };
     expect(buildCasePrintValues(src({ setting })).regPurpose).toBe('대표이사 주소변경(코드)');
