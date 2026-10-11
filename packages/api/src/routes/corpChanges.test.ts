@@ -29,7 +29,7 @@ const TYPE_ROWS = [
   { code: 'CEO_ADDR', name: '대표이사 주소변경' },
   { code: 'CEO_CHG', name: '대표이사변경' },
   { code: 'HQ', name: '동일관할내에서의본점이전' },
-  { code: 'NAME', name: '상호 목적 공고방법변경' },
+  { code: 'NAME', name: '상호변경' },
   { code: 'OFFICER', name: '임원변경' },
   { code: 'PURPOSE', name: '목적변경' },
 ];
@@ -84,7 +84,7 @@ describe('GET /legal/corp-changes — 선택지', () => {
     expect(body.changeTypes).toEqual([
       { code: 'CEO_ADDR', name: '대표이사 주소변경' },
       { code: 'HQ', name: '동일관할내에서의본점이전' },
-      { code: 'NAME', name: '상호 목적 공고방법변경' },
+      { code: 'NAME', name: '상호변경' },
       { code: 'OFFICER', name: '임원변경' },
       { code: 'PURPOSE', name: '목적변경' },
     ]);

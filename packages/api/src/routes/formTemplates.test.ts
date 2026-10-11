@@ -58,7 +58,7 @@ const CODES = {
   match: /FROM public\.tb_s080_codes_line/,
   rows: [
     { category: 'LAW_DOC_TP', code: 'T', name: '표' },
-    { category: 'LAW_CNG_TP', code: 'NAME', name: '상호 목적 공고방법변경' },
+    { category: 'LAW_CNG_TP', code: 'NAME', name: '상호변경' },
     { category: 'LAW_CNG_TP', code: 'CEO_CHG', name: '대표이사변경' },
     { category: 'LAW_CNG_TP', code: 'OFFICER', name: '임원변경' },
     { category: 'MEMBER_TYPE', code: 'R', name: '주식회사' },
@@ -118,7 +118,7 @@ describe('GET /form-templates — 목록의 legal · 법무 선택지', () => {
     expect(body.templates[0].linkCount).toBeUndefined();
     expect(body.legalOptions).toEqual({
       changeTypes: [
-        { code: 'NAME', name: '상호 목적 공고방법변경' },
+        { code: 'NAME', name: '상호변경' },
         { code: 'OFFICER', name: '임원변경' },
       ],
       companyTypes: [
