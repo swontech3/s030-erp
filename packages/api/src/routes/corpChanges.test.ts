@@ -11,6 +11,7 @@ import type { ErpSession, ScopeRole } from '@swonbiz/shared';
 import type { CorpChangeListFilter } from '@swonbiz/shared/domain/corp-change-list';
 import { registerCorpChangeRoutes, type CorpChangeDeps } from './corpChanges.ts';
 import { listCorpChanges } from '../db/corpChanges.ts';
+import { encrypt } from '../lib/crypto.ts';
 import type { BbiyongCompanyDefaults } from '@swonbiz/shared/domain/corp-change-detail';
 
 const session = (role: ScopeRole, s020OrgId: number): ErpSession => ({
@@ -1098,5 +1099,228 @@ describe('GET /legal/corp-changes/:id — 버튼 재료(4단계)', () => {
   it('작성완료일 · 완료일을 싣는다', async () => {
     const c = await detail('operator', { change_type: 'NAME', status: 'C', written_on: '2026-10-05', completed_on: '2026-10-09' });
     expect([c.writtenOn, c.completedOn]).toEqual(['2026-10-05', '2026-10-09']);
+  });
+});
+
+// =============================================================================
+// 서류 출력(5-2, 2026-10-11) — `GET /legal/corp-changes/:id/print`
+// =============================================================================
+// ★ RLS(남의 단체 건 404)는 `scripts/verify-corp-change-print.js`(erp_app 접속 · 롤백)가 본다.
+
+describe('GET /legal/corp-changes/:id/print — 서류 출력', () => {
+  const URL = '/legal/corp-changes/cc-1/print';
+  const officerSnap = (name: string, changeKind: string) => ({
+    name,
+    changeKind,
+    position: '사내이사',
+    effectiveDate: '2026-10-01',
+    zipCode: '04500',
+    address: '서울 중구 임원로 1',
+    addressDetail: null,
+  });
+  const SNAPSHOT = {
+    version: 2,
+    changeType: 'OFFICER',
+    company: {
+      isTenant: true,
+      name: '주식회사 시험',
+      corpNumber: '110111-0000001',
+      bizNumber: '123-45-67890',
+      ceoName: '홍대표',
+      tel: '02-000-0000',
+      memberType: 'R',
+      head: { zipCode: '06000', address: '서울 강남구 본점로 1', addressDetail: '3층' },
+      ceoHome: { zipCode: '04000', address: '서울 마포구', addressDetail: null },
+    },
+    payload: { resolutionDate: '2026-10-01' },
+    officers: [officerSnap('김갑', 'REELECT'), officerSnap('이을', 'APPOINT')],
+  };
+  const SNAP = (snap: unknown = SNAPSHOT) => ({ match: /SELECT submit_snapshot/, rows: [{ submit_snapshot: snap }] });
+  const CASE_FORM = {
+    id: 'f-app',
+    name: '법인변경등록1',
+    definition: {
+      version: 2,
+      font: { family: '굴림', size: 9 },
+      legal: { domain: 'corp-change', changeTypes: ['NAME', 'HQ', 'PURPOSE', 'OFFICER', 'CEO_ADDR'], companyType: 'ALL', unit: 'case' },
+      pages: [{ colWidths: [3], rowHeights: [1], cells: [{ row: 0, col: 0, text: '{{companyName}}' }] }],
+    },
+  };
+  const OFFICER_FORM = {
+    id: 'f-reelect',
+    name: '사내이사 중임승낙서',
+    definition: {
+      ...CASE_FORM.definition,
+      legal: { domain: 'corp-change', changeTypes: ['OFFICER'], companyType: 'ALL', unit: 'officer', officerKinds: ['REELECT'] },
+    },
+  };
+  const BROKEN_FORM = { id: 'f-bad', name: '깨진양식', definition: { version: 2, legal: { domain: 'corp-change' } } };
+  const FORMS = (rows: unknown[]) => ({ match: /FROM public\.tb_s080_form_templates/, rows });
+  const SETTINGS = {
+    match: /FROM public\.tb_s080_doc_form_settings/,
+    rows: [
+      {
+        reg_type_key: 'OFFICER',
+        company_type: '',
+        is_active: true,
+        label: '주식회사 변경 등기(이사ㆍ감사 등 변경)',
+        form_no: '[양식 제72-2호]',
+        matter: '대표이사⋅이사⋅감\n사 등의 퇴임⋅취임\n등과 그 연월일',
+        tax_mode: 'fixed',
+        taxes: null,
+        attachments: [{ name: '취임승낙서', copies: 1 }],
+        reg_purpose: null,
+        reg_reason: null,
+        matter_body: null,
+      },
+    ],
+  };
+  const CODES = { match: /FROM public\.tb_s080_codes_line/, rows: [{ category: 'LAW_CNG_TP', code: 'OFFICER', name: '임원변경' }] };
+  const SECRETS = /rrn_cipher\s+FROM public\.tb_s080_corp_change_officers/;
+  const secrets = (rows: { name: string; change_kind: string; rrn_cipher: string | null }[]) => ({ match: SECRETS, rows });
+
+  async function print(
+    answers: { match: RegExp; rows: unknown[] }[],
+    opts: { role?: ScopeRole; qs?: string; status?: string } = {},
+  ) {
+    const role = opts.role ?? 'operator';
+    // ★ 스냅샷 답을 건 답보다 앞에 둔다 — 건 읽기 정규식이 스냅샷 SELECT 에도 걸린다
+    const db = fakeDb([...answers, CHANGE_ROW({ status: opts.status ?? 'E', change_type: 'OFFICER' })]);
+    const a = await build(session(role, role === 'operator' ? 1 : 9003), db.deps);
+    const res = await a.inject({ method: 'GET', url: `${URL}${opts.qs ?? ''}` });
+    await a.close();
+    app = null;
+    return { res, db };
+  }
+
+  it('★★ 200 — 건마다 1장 · 임원마다 그 구분 임원만 · 주민번호 전체 · no-store', async () => {
+    const { res } = await print(
+      [
+        SNAP(),
+        FORMS([CASE_FORM, OFFICER_FORM]),
+        SETTINGS,
+        CODES,
+        secrets([
+          { name: '김갑', change_kind: 'REELECT', rrn_cipher: encrypt('9001011234567') },
+          { name: '이을', change_kind: 'APPOINT', rrn_cipher: encrypt('8001012345678') },
+        ]),
+      ],
+      { qs: '?applyDate=2026-10-11&writeDate=2026-10-12' },
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    const body = res.json();
+    expect(body.documents.map((d: { formId: string; unit: string }) => [d.formId, d.unit])).toEqual([
+      ['f-app', 'case'],
+      ['f-reelect', 'officer'],
+    ]);
+    expect(body.documents[0].sheets[0].values).toMatchObject({
+      companyName: '주식회사 시험',
+      hqAddress: '서울 강남구 본점로 1 3층',
+      ceoPhone: '02-000-0000',
+      formNo: '[양식 제72-2호]',
+      regPurpose: '임원변경',
+      matterBody: '사내이사 김갑 — 중임 (2026-10-01)\n사내이사 이을 — 취임 (2026-10-01)',
+      attachments: '1. 취임승낙서  1통',
+      applyDate: '2026년 10월 11일',
+      writeDate: '2026년 10월 12일',
+      officerRrn: '',
+    });
+    const sheets = body.documents[1].sheets;
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0].officerName).toBe('김갑');
+    expect(sheets[0].values).toMatchObject({ officerName: '김갑', officerKind: '중임', officerRrn: '900101-1234567' });
+    // ★ 장에 들지 않는 임원(이을)의 주민번호는 응답 어디에도 없다
+    expect(res.body).not.toContain('800101');
+  });
+
+  it('★ 임원마다 양식이 없으면 암호문을 읽지도 않는다', async () => {
+    const { res, db } = await print([SNAP(), FORMS([CASE_FORM]), SETTINGS, CODES]);
+    expect(res.statusCode).toBe(200);
+    expect(db.seen.some((s) => SECRETS.test(s.sql))).toBe(false);
+  });
+
+  it('회사 세션도 뽑는다(Q4) — 건이 보이는지는 RLS', async () => {
+    const { res } = await print([SNAP(), FORMS([CASE_FORM]), SETTINGS, CODES], { role: 'tenant' });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('정의를 못 읽는 양식은 건너뛴다 — 다른 서류는 나온다', async () => {
+    const { res } = await print([SNAP(), FORMS([BROKEN_FORM, CASE_FORM]), SETTINGS, CODES]);
+    expect(res.json().documents.map((d: { formId: string }) => d.formId)).toEqual(['f-app']);
+  });
+
+  it.each(['P', 'X'])('★ %s 는 409 — 작성완료 · 완료만 · 거절에도 no-store', async (status) => {
+    const { res, db } = await print([SNAP()], { status });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('not_printable');
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(db.seen.some((s) => /SELECT submit_snapshot/.test(s.sql))).toBe(false);
+  });
+
+  it('안 보이는 건은 404', async () => {
+    const db = fakeDb([]);
+    const a = await build(session('tenant', 9003), db.deps);
+    const res = await a.inject({ method: 'GET', url: URL });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('스냅샷이 없거나 구분이 다르면 409', async () => {
+    expect((await print([SNAP(null)])).res.json().error).toBe('no_snapshot');
+    expect((await print([SNAP({ ...SNAPSHOT, changeType: 'HQ' })])).res.json().error).toBe('no_snapshot');
+  });
+
+  it('★★ 임원 짝이 어긋나면 409 — 남의 주민번호가 찍히지 않게', async () => {
+    const { res } = await print([
+      SNAP(),
+      FORMS([OFFICER_FORM]),
+      SETTINGS,
+      CODES,
+      secrets([
+        { name: '이을', change_kind: 'APPOINT', rrn_cipher: encrypt('8001012345678') },
+        { name: '김갑', change_kind: 'REELECT', rrn_cipher: encrypt('9001011234567') },
+      ]),
+    ]);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('officer_mismatch');
+    expect(res.body).not.toMatch(/900101|800101/);
+  });
+
+  it('★ 복호화 실패는 409 — 빈 주민번호로 출력하지 않는다', async () => {
+    const { res } = await print([
+      SNAP(),
+      FORMS([OFFICER_FORM]),
+      SETTINGS,
+      CODES,
+      secrets([
+        { name: '김갑', change_kind: 'REELECT', rrn_cipher: 'v1.broken.x.y' },
+        { name: '이을', change_kind: 'APPOINT', rrn_cipher: null },
+      ]),
+    ]);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('rrn_unreadable');
+    expect(res.json().message).toContain('김갑');
+  });
+
+  it('주민번호가 비어 있으면 빈칸으로 나간다(선택 칸)', async () => {
+    const { res } = await print([
+      SNAP(),
+      FORMS([OFFICER_FORM]),
+      SETTINGS,
+      CODES,
+      secrets([
+        { name: '김갑', change_kind: 'REELECT', rrn_cipher: null },
+        { name: '이을', change_kind: 'APPOINT', rrn_cipher: null },
+      ]),
+    ]);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().documents[0].sheets[0].values.officerRrn).toBe('');
+  });
+
+  it('날짜가 틀리면 400 — DB 에 닿지 않는다', async () => {
+    const { res, db } = await print([SNAP()], { qs: '?applyDate=2026-02-30' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errors).toEqual([{ field: 'applyDate', message: '신청일은(는) 날짜(YYYY-MM-DD)로 입력하세요' }]);
+    expect(db.seen).toEqual([]);
   });
 });

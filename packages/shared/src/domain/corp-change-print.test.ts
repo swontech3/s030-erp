@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   CORP_CHANGE_PRINT_FIELDS,
+  buildPrintDocuments,
+  parsePrintInputs,
   buildCasePrintValues,
   buildOfficerPrintValues,
   changeSummary,
@@ -319,5 +321,51 @@ describe('readSubmitSnapshot — 결정 H', () => {
     expect(readSubmitSnapshot(null)).toBeNull();
     expect(readSubmitSnapshot({ version: 3, changeType: 'HQ', company: {} })).toBeNull();
     expect(readSubmitSnapshot({ version: 2, company: {} })).toBeNull();
+  });
+});
+
+describe('buildPrintDocuments — 양식 고르기 · 장', () => {
+  const caseMark = (over = {}) => ({ domain: 'corp-change' as const, changeTypes: ['OFFICER' as const], companyType: 'ALL' as const, unit: 'case' as const, ...over });
+  const forms = [
+    { id: 'f-reelect', name: '중임승낙서', definition: 'D3', mark: { ...caseMark(), unit: 'officer' as const, officerKinds: ['REELECT' as const] } },
+    { id: 'f-app', name: '법인변경등록1', definition: 'D1', mark: caseMark({ changeTypes: ['NAME', 'OFFICER'] }) },
+    { id: 'f-hq', name: '본점만', definition: 'D2', mark: caseMark({ changeTypes: ['HQ'] }) },
+    { id: 'f-a', name: '가유한회사만', definition: 'D4', mark: caseMark({ companyType: 'A' }) },
+    { id: 'f-none', name: '사임서', definition: 'D5', mark: { ...caseMark(), unit: 'officer' as const, officerKinds: ['RESIGN' as const] } },
+  ];
+  const officer = (name: string, changeKind: string) => ({
+    name, changeKind, position: '사내이사', effectiveDate: '2026-10-01', zipCode: null, address: null, addressDetail: null, rrn: '9001011234567',
+  });
+  const officers = [officer('김갑', 'REELECT'), officer('이을', 'APPOINT'), officer('박병', 'REELECT')];
+  const src: CasePrintSource = { snapshot: snap({ changeType: 'OFFICER', payload: {}, officers }), setting: null, changeTypeName: null, inputs: {} };
+
+  it('구분 · 회사유형이 맞는 양식만, 건마다 먼저 · 이름 순', () => {
+    const docs = buildPrintDocuments(forms, src, officers);
+    expect(docs.map((d) => d.formId)).toEqual(['f-app', 'f-none', 'f-reelect']);
+  });
+
+  it('건마다 = 1장 · 임원마다 = 그 구분의 임원마다 한 장(0장도 그대로)', () => {
+    const docs = buildPrintDocuments(forms, src, officers);
+    expect(docs[0]!.sheets).toHaveLength(1);
+    expect(docs[0]!.sheets[0]!.officerName).toBeNull();
+    expect(docs[1]!.sheets).toEqual([]);
+    expect(docs[2]!.sheets.map((s) => [s.officerName, s.values.officerName, s.values.officerRrn])).toEqual([
+      ['김갑', '김갑', '900101-1234567'],
+      ['박병', '박병', '900101-1234567'],
+    ]);
+  });
+
+  it('유한회사 건이면 유한회사 양식도 뜬다', () => {
+    const a = { ...src, snapshot: snap({ changeType: 'OFFICER', payload: {}, officers, company: { ...snap().company, memberType: 'A' } }) };
+    expect(buildPrintDocuments(forms, a, officers).map((d) => d.formId)).toContain('f-a');
+  });
+});
+
+describe('parsePrintInputs', () => {
+  it('비우면 null · 있는 날짜만', () => {
+    expect(parsePrintInputs({})).toEqual({ ok: true, value: { applyDate: null, writeDate: null } });
+    expect(parsePrintInputs({ applyDate: '2026-10-11', writeDate: '' })).toEqual({ ok: true, value: { applyDate: '2026-10-11', writeDate: null } });
+    expect(parsePrintInputs({ writeDate: '2026-13-01' })).toMatchObject({ ok: false, field: 'writeDate' });
+    expect(parsePrintInputs({ applyDate: ['2026-10-11'] })).toMatchObject({ ok: false, field: 'applyDate' });
   });
 });

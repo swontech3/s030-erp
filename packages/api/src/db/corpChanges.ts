@@ -580,3 +580,41 @@ export async function upsertLegalOrg(
     ],
   );
 }
+
+// =============================================================================
+// 서류 출력(5단계, 2026-10-11)
+// =============================================================================
+
+/** 작성완료 스냅샷 원본(jsonb) — 없으면 null. 읽는 쪽이 `readSubmitSnapshot` 을 거친다. */
+export async function readSubmitSnapshotRaw(client: ScopedClient, id: string): Promise<unknown> {
+  const { rows } = await q<{ submit_snapshot: unknown }>(
+    client,
+    `SELECT submit_snapshot FROM public.tb_s080_corp_changes WHERE id = $1`,
+    [id],
+  );
+  return rows[0]?.submit_snapshot ?? null;
+}
+
+/** 출력용 임원 — 짝 맞추기용 이름 · 구분과 **암호문**. */
+export interface OfficerSecretRow {
+  name: string;
+  changeKind: string;
+  /** `encrypt()` 덩어리. 없으면 null. ★ 복호화는 출력 응답을 만드는 순간에만(`legal/corpChangePrint.ts`). */
+  rrnCipher: string | null;
+}
+
+/**
+ * 출력용 임원 — `listOfficers` 와 **같은 순서**다(스냅샷이 그 순서로 만들어졌다).
+ * ★ 암호문 칸을 고르는 곳은 여기 하나다 — 출력만 부른다. 화면 응답(`listOfficers`)은 고르지 않는다.
+ */
+export async function listOfficerSecrets(client: ScopedClient, corpChangeId: string): Promise<OfficerSecretRow[]> {
+  const { rows } = await q<{ name: string; change_kind: string; rrn_cipher: string | null }>(
+    client,
+    `SELECT name, change_kind, rrn_cipher
+       FROM public.tb_s080_corp_change_officers
+      WHERE corp_change_id = $1
+      ORDER BY sort_order, created_at, id`,
+    [corpChangeId],
+  );
+  return rows.map((r) => ({ name: r.name, changeKind: r.change_kind, rrnCipher: r.rrn_cipher }));
+}

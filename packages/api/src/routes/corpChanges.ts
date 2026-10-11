@@ -2,7 +2,8 @@
  * 법인변경(s040200010 · s040200011) — 목록 + 선택지(2단계) · 새 건 · 상세 · 변경 내용 · 임원 ·
  * 비입주사 법무 회사 정보(3단계) · 상태 전이 · 삭제 · 작성완료 스냅샷(4단계, 2026-10-10).
  *
- * 서류 출력 · 자동 채움은 5단계다.
+ * 서류 출력(5-2, 2026-10-11) — 판정은 `legal/corpChangePrint.ts`. ★ 응답에 주민번호 평문이 있다 —
+ * 성공 · 거절 모두 `Cache-Control: no-store` 다.
  *
  *   GET    /legal/corp-changes                       목록
  *   POST   /legal/corp-changes                       첫 저장 = 새 건 { changeType, orgId?, orgCode?, payload, officers[], company? }
@@ -14,6 +15,7 @@
  *   POST   /legal/corp-changes/:id/officers          임원 추가 — P · 임원변경만
  *   PATCH  /legal/corp-changes/:id/officers/:oid     임원 수정
  *   DELETE /legal/corp-changes/:id/officers/:oid     임원 삭제
+ *   GET    /legal/corp-changes/:id/print             서류 출력 ?applyDate=&writeDate= — E · C 만, no-store(5-2)
  *
  * ★★ 건은 첫 저장 때 생긴다(결정 2026-10-10) — [새 건] 대화상자는 아무것도 쓰지 않고 임시 모드로
  *    보낸다. 빈 건을 만드는 경로는 없다.
@@ -83,6 +85,7 @@ import {
   saveCorpChangePayload,
   type OpResult,
 } from '../legal/corpChangeOps.ts';
+import { readCorpChangePrint } from '../legal/corpChangePrint.ts';
 
 /** 바꿔 끼울 수 있는 바깥 — 시험이 DB 없이 필터 · 선택지 · 스코프를 본다. */
 export interface CorpChangeDeps {
@@ -252,6 +255,17 @@ export function registerCorpChangeRoutes(app: FastifyInstance, deps: CorpChangeD
       return send(reply, result);
     },
   );
+
+  /**
+   * 서류 출력 — 이 건에 뜨는 양식(법무 표시)과 장마다의 값. 작성완료(E) · 완료(C)만.
+   * ★★ 주민번호 평문이 실린다(Q4) — 캐시 금지. 거절 응답에도 같은 머리를 단다(경로가 하나가 되게).
+   */
+  app.get<{ Params: { id: string }; Querystring: Record<string, unknown> }>('/legal/corp-changes/:id/print', async (req, reply) => {
+    const session = requireSession(req);
+    reply.header('Cache-Control', 'no-store');
+    const result = await deps.run(session, (client) => readCorpChangePrint(client, session, req.params.id, req.query ?? {}));
+    return send(reply, result);
+  });
 
   app.delete<{ Params: { id: string; oid: string } }>('/legal/corp-changes/:id/officers/:oid', async (req, reply) => {
     const session = requireSession(req);

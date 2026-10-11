@@ -143,3 +143,22 @@ export async function deleteFormTemplate(client: ScopedClient, id: string): Prom
   );
   return (rowCount ?? 0) > 0;
 }
+
+/**
+ * 법무 표시(`definition.legal`)가 붙은 양식 — 법인변경 [서류 출력]이 읽는다(5단계, 2026-10-11).
+ * ★ 표시 없이 레거시 `dataSource` 만 있는 양식은 고르지 않는다 — 표시가 정본이다.
+ * ★ 회사 세션도 부른다(출력). 이 표는 RLS 가 없다 — 고르는 양식은 표시로만 정한다.
+ */
+export async function listMarkedFormTemplates(
+  client: ScopedClient,
+): Promise<{ id: string; name: string; definition: unknown }[]> {
+  const { rows } = await q<{ id: string; name: string; definition: unknown }>(
+    client,
+    `SELECT id, name, definition
+       FROM public.tb_s080_form_templates
+      WHERE operator_id = $1 AND definition ? 'legal'
+      ORDER BY name, id`,
+    [OPERATOR_ID],
+  );
+  return rows;
+}

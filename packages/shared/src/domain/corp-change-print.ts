@@ -29,7 +29,7 @@
  */
 import { purposeLines, OFFICER_CHANGE_KIND_LABEL, isOfficerChangeKind } from './corp-change.ts';
 import type { CorpChangeSubmitSnapshot, SnapshotAddress, SnapshotOfficer } from './corp-change-transition.ts';
-import { isLegalFormCompanyType } from './legal-form-mark.ts';
+import { isLegalFormCompanyType, markAppliesTo, officersForMark, type LegalFormMark } from './legal-form-mark.ts';
 import { parseDay } from './day.ts';
 
 // =============================================================================
@@ -424,4 +424,88 @@ export function buildOfficerPrintValues(src: CasePrintSource, officer: PrintOffi
     officerAddress: formatAddress(officer),
     officerEffectiveDate: formatKoreanDate(officer.effectiveDate),
   };
+}
+
+// =============================================================================
+// 서류 묶음 — 이 건의 [서류 출력]에 뜨는 양식과 장(sheet)마다의 값
+// =============================================================================
+
+/** 법무 표시가 붙은 양식 하나 — 정의는 `migrateDefinition` 을 거친 것. */
+export interface MarkedForm<D = unknown> {
+  id: string;
+  name: string;
+  mark: LegalFormMark;
+  definition: D;
+}
+
+export interface PrintSheet {
+  /** 임원마다 양식이면 그 임원 이름, 건마다면 null. 화면이 장을 고를 때 쓴다. */
+  officerName: string | null;
+  values: Record<string, string>;
+}
+
+export interface PrintDocument<D = unknown> {
+  formId: string;
+  /** 서류 이름 = 양식 이름(결정 A). */
+  name: string;
+  unit: LegalFormMark['unit'];
+  definition: D;
+  /** 건마다 = 1장. 임원마다 = 표시의 임원 구분에 드는 임원 수(0장일 수 있다 — 화면이 「해당 임원 없음」). */
+  sheets: PrintSheet[];
+}
+
+/**
+ * 이 건에 뜨는 서류들 — 법무 표시가 이 구분 · 회사유형에 맞는 양식만(`markAppliesTo`).
+ * 순서: 건마다 양식 먼저, 그다음 임원마다 양식. 같은 단위 안에서는 양식 이름 순.
+ *
+ * @param officers 스냅샷 임원 + 출력 순간 복호화한 주민번호. 순서는 스냅샷 순서.
+ */
+export function buildPrintDocuments<D>(
+  forms: readonly MarkedForm<D>[],
+  src: CasePrintSource,
+  officers: readonly PrintOfficer[],
+): PrintDocument<D>[] {
+  const memberType = src.snapshot.company.memberType;
+  const picked = forms
+    .filter((f) => markAppliesTo(f.mark, src.snapshot.changeType, memberType))
+    .sort((a, b) => (a.mark.unit === b.mark.unit ? a.name.localeCompare(b.name, 'ko') : a.mark.unit === 'case' ? -1 : 1));
+  return picked.map((f) => ({
+    formId: f.id,
+    name: f.name,
+    unit: f.mark.unit,
+    definition: f.definition,
+    sheets:
+      f.mark.unit === 'case'
+        ? [{ officerName: null, values: buildCasePrintValues(src) }]
+        : officersForMark(f.mark, officers).map((o) => ({ officerName: o.name, values: buildOfficerPrintValues(src, o) })),
+  }));
+}
+
+/**
+ * 출력 주소의 날짜 `?applyDate=&writeDate=` — 비우면 빈칸으로 나간다. 있는 날짜(`YYYY-MM-DD`)가
+ * 아니면 거절(어느 칸인지와 함께).
+ */
+export function parsePrintInputs(raw: Record<string, unknown>): { ok: true; value: PrintInputs } | { ok: false; field: string; message: string } {
+  const out: PrintInputs = {};
+  for (const [key, label] of [
+    ['applyDate', '신청일'],
+    ['writeDate', '작성일'],
+  ] as const) {
+    const v = raw[key];
+    if (v === undefined || v === null || v === '') {
+      out[key] = null;
+      continue;
+    }
+    if (typeof v !== 'string' || parseDay(v) === null) return { ok: false, field: key, message: `${label}은(는) 날짜(YYYY-MM-DD)로 입력하세요` };
+    out[key] = v;
+  }
+  return { ok: true, value: out };
+}
+
+/** `GET /legal/corp-changes/:id/print` 응답. ★ 주민번호 평문이 들어 있다 — no-store, 저장 · 로그 금지. */
+export interface CorpChangePrintResponse<D = unknown> {
+  id: string;
+  changeType: string;
+  status: string;
+  documents: PrintDocument<D>[];
 }
