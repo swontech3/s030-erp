@@ -54,8 +54,10 @@ async function structure(q, p) {
     .map((r) => r.p).join(',');
   check(`${p}5`, '★ erp_app = 읽기 · 넣기 · 고치기 (DELETE 회수)', g === 'INSERT,SELECT,UPDATE', g);
 
-  const rows = (await q(`SELECT biz_code FROM public.${T} ORDER BY biz_code`)).map((r) => r.biz_code).join(',');
-  check(`${p}6`, '자료 그대로 — 레거시 샘플 4줄', rows === SAMPLE_CODES.join(','), rows);
+  // ★ 정확히 4줄을 기대하지 않는다 — 041 뒤에는 운영사가 화면에서 문구를 더한다(업종코드 NULL).
+  //   041 이 자료를 바꾸지 않았는지는 「샘플 4줄이 그 이름 그대로 남아 있는가」로 본다.
+  const rows = (await q(`SELECT biz_code FROM public.${T} WHERE biz_code = ANY($1) ORDER BY biz_code`, [SAMPLE_CODES])).map((r) => r.biz_code).join(',');
+  check(`${p}6`, '자료 그대로 — 레거시 샘플 4줄이 남아 있다', rows === SAMPLE_CODES.join(','), rows);
 
   const inc = await q(`SELECT relname, relrowsecurity r FROM pg_class WHERE relname IN ('tb_s080_incorporations','tb_s080_incorp_purposes') ORDER BY 1`);
   const incG = (await q(`SELECT table_name, string_agg(privilege_type, ',' ORDER BY privilege_type) p FROM information_schema.role_table_grants
@@ -115,9 +117,11 @@ async function rlsChecks(ec) {
     const b = await insert('v041-b', false);
     check('R1', '운영사 — 넣기(업종코드 NULL 둘)', a.code === null && b.code === null, `${a.code} ${b.code}`);
     check('R2', '운영사 — 사용 끈 줄까지 전부 본다', (await ids()) === 'v041-a,v041-b');
+    // 회사가 볼 줄 수 = 운영사가 보는 켜진 줄 수(화면에서 더한 줄이 있어도 맞는다)
+    const activeAll = (await q(`SELECT count(*)::int n FROM public.${T} WHERE active`))[0].n;
 
     await scope('tenant');
-    check('R3', '★ 회사 — 사용 중인 줄만(단체 ID 없어도 읽는다)', (await ids()) === 'v041-a' && (await all()) === SAMPLE_CODES.length + 1);
+    check('R3', '★ 회사 — 사용 중인 줄만(단체 ID 없어도 읽는다)', (await ids()) === 'v041-a' && (await all()) === activeAll, `켜진 줄 ${activeAll}`);
     const ti = await insert('v041-t', true);
     check('R4', '회사 — 넣기는 막힌다(42501)', ti.code === '42501', `code=${ti.code}`);
     const tu = await tryRun(`UPDATE public.${T} SET biz_name = '변조' WHERE id = 'v041-a'`);
