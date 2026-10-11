@@ -19,6 +19,15 @@
  * ★ 임원마다 한 장은 임원변경(OFFICER)에서만 뜻이 있다 — 다른 구분에는 임원이 없어 0장이 된다.
  *   그래서 unit=officer 면 changeTypes 는 `['OFFICER']` 여야 한다(정의 검사에서 거절).
  * ★ 표시가 붙은 양식은 표양식 관리에서 [인쇄] 를 막고, 표시를 떼야 지울 수 있다(409, 결정 E).
+ *
+ * =============================================================================
+ * ★★ 법인설립 표시 (10-5, 2026-10-11) — `domain: 'incorporation'`
+ * =============================================================================
+ * 설립은 주식회사 · 발기설립 하나라 변경 구분 · 회사유형이 없다. 고르는 것은 출력 단위뿐이다:
+ *   case     — 건마다 한 장(설립등기신청서 · 서면결의서 · 정관 등)
+ *   officer  — 임원마다 한 장 — 이사 · 감사 · 대표이사 중 하나라도 체크된 사람(취임승낙서, 레거시 `splitRoles.officers`)
+ *   founder  — 발기인마다 한 장(주식인수증)
+ * 사람을 고르는 규칙은 `personsForIncorpMark` 한 곳이다.
  */
 import {
   CORP_CHANGE_TYPES,
@@ -29,8 +38,8 @@ import {
   type OfficerChangeKind,
 } from './corp-change.ts';
 
-/** 표시의 업무 — 지금은 법인변경 하나. 법인설립을 붙일 때 늘린다. */
-export const LEGAL_MARK_DOMAINS = ['corp-change'] as const;
+/** 표시의 업무 — 법인변경 · 법인설립(10-5). */
+export const LEGAL_MARK_DOMAINS = ['corp-change', 'incorporation'] as const;
 export type LegalMarkDomain = (typeof LEGAL_MARK_DOMAINS)[number];
 
 /**
@@ -43,9 +52,22 @@ export type LegalFormCompanyType = (typeof LEGAL_FORM_COMPANY_TYPES)[number];
 export const LEGAL_FORM_ALL_COMPANIES = 'ALL';
 
 export type LegalMarkUnit = 'case' | 'officer';
+/** 법인설립 표시의 출력 단위 — 건마다 · 임원마다 · 발기인마다. */
+export const INCORP_MARK_UNITS = ['case', 'officer', 'founder'] as const;
+export type IncorpMarkUnit = (typeof INCORP_MARK_UNITS)[number];
 
-export interface LegalFormMark {
-  domain: LegalMarkDomain;
+/** 법인설립 표시 — 단위 하나뿐이다(머리말 ★★). */
+export interface IncorporationFormMark {
+  domain: 'incorporation';
+  unit: IncorpMarkUnit;
+}
+
+/** 법무 표시 — 업무(`domain`)로 모양이 갈린다. */
+export type LegalFormMark = CorpChangeFormMark | IncorporationFormMark;
+
+/** 법인변경 표시. */
+export interface CorpChangeFormMark {
+  domain: 'corp-change';
   /** 1개 이상 · 중복 없음 · `CORP_CHANGE_TYPES` 순서. */
   changeTypes: CorpChangeType[];
   companyType: typeof LEGAL_FORM_ALL_COMPANIES | LegalFormCompanyType;
@@ -73,7 +95,14 @@ function pickOrdered<T extends string>(raw: unknown, all: readonly T[], is: (v: 
 export function parseLegalMark(raw: unknown): { ok: true; value: LegalFormMark } | { ok: false; message: string } {
   const no = (message: string) => ({ ok: false as const, message });
   if (!isObj(raw)) return no('법무 표시가 객체가 아닙니다');
-  if (raw.domain !== 'corp-change') return no('법무 표시의 업무(domain)는 corp-change 여야 합니다');
+  if (raw.domain === 'incorporation') {
+    // ★ 단위만 본다 — 다른 키는 버린다(아는 칸만 담은 새 객체)
+    if (!(INCORP_MARK_UNITS as readonly unknown[]).includes(raw.unit)) {
+      return no('법인설립 표시의 출력 단위는 건마다 · 임원마다 · 발기인마다 중 하나입니다');
+    }
+    return { ok: true, value: { domain: 'incorporation', unit: raw.unit as IncorpMarkUnit } };
+  }
+  if (raw.domain !== 'corp-change') return no('법무 표시의 업무(domain)는 corp-change · incorporation 중 하나입니다');
 
   const changeTypes = pickOrdered(raw.changeTypes, CORP_CHANGE_TYPES, isCorpChangeType);
   if (!changeTypes || changeTypes.length === 0) return no('법무 표시의 변경 구분을 하나 이상 고르세요');
@@ -103,13 +132,27 @@ export function parseLegalMark(raw: unknown): { ok: true; value: LegalFormMark }
  * @param memberType 회사유형 코드(스냅샷). R · A 가 아니면(개인사업자 · 미입력 등) 「전체」 양식만 뜬다(결정 B).
  */
 export function markAppliesTo(mark: LegalFormMark, changeType: string, memberType: string | null): boolean {
+  if (mark.domain !== 'corp-change') return false;
   if (!isCorpChangeType(changeType) || !mark.changeTypes.includes(changeType)) return false;
   return mark.companyType === LEGAL_FORM_ALL_COMPANIES || mark.companyType === memberType;
 }
 
 /** 임원마다 한 장 양식이 몇 장 나오나 — 표시의 임원 구분에 드는 임원만, 목록 순서대로. */
 export function officersForMark<T extends { changeKind: string }>(mark: LegalFormMark, officers: readonly T[]): T[] {
-  if (mark.unit !== 'officer') return [];
+  if (mark.domain !== 'corp-change' || mark.unit !== 'officer') return [];
   const kinds: readonly string[] = mark.officerKinds ?? [];
   return officers.filter((o) => kinds.includes(o.changeKind));
+}
+
+/**
+ * 법인설립 표시의 장마다 사람 — 임원마다 = 이사 · 감사 · 대표이사 중 하나라도, 발기인마다 = 발기인.
+ * 건마다 · 법인변경 표시는 빈 목록. 순서는 사람 목록 순서 그대로.
+ */
+export function personsForIncorpMark<
+  T extends { isFounder: boolean; isDirector: boolean; isAuditor: boolean; isRepresentative: boolean },
+>(mark: LegalFormMark, persons: readonly T[]): T[] {
+  if (mark.domain !== 'incorporation') return [];
+  if (mark.unit === 'officer') return persons.filter((p) => p.isDirector || p.isAuditor || p.isRepresentative);
+  if (mark.unit === 'founder') return persons.filter((p) => p.isFounder);
+  return [];
 }

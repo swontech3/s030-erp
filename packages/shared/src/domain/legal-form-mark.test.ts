@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { markAppliesTo, officersForMark, parseLegalMark, type LegalFormMark } from './legal-form-mark.ts';
+import { markAppliesTo, officersForMark, parseLegalMark, personsForIncorpMark, type LegalFormMark } from './legal-form-mark.ts';
 import { isLegalForm, migrateDefinition, parseDefinition, createEmptyDefinition, FormDefinitionError } from './form-template.ts';
 
 describe('parseLegalMark', () => {
@@ -31,7 +31,7 @@ describe('parseLegalMark', () => {
 
   it.each([
     ['객체가 아님', null],
-    ['업무가 다름', { domain: 'incorporation', changeTypes: ['HQ'], companyType: 'ALL', unit: 'case' }],
+    ['모르는 업무', { domain: 'dissolution', changeTypes: ['HQ'], companyType: 'ALL', unit: 'case' }],
     ['변경 구분 없음', { domain: 'corp-change', changeTypes: [], companyType: 'ALL', unit: 'case' }],
     ['모르는 변경 구분', { domain: 'corp-change', changeTypes: ['CEO_CHG'], companyType: 'ALL', unit: 'case' }],
     ['2종 밖 회사유형', { domain: 'corp-change', changeTypes: ['HQ'], companyType: 'P', unit: 'case' }],
@@ -104,5 +104,34 @@ describe('표양식 정의의 legal 칸', () => {
     expect(isLegalForm({ dataSource: 'corp-change' })).toBe(true);
     expect(isLegalForm({})).toBe(false);
     expect(isLegalForm({ dataSource: 'employee' })).toBe(false);
+  });
+});
+
+describe('법인설립 표시(10-5)', () => {
+  it('단위 셋 — 다른 키는 버린다', () => {
+    for (const unit of ['case', 'officer', 'founder']) {
+      expect(parseLegalMark({ domain: 'incorporation', unit, changeTypes: ['NAME'], companyType: 'R' })).toEqual({
+        ok: true,
+        value: { domain: 'incorporation', unit },
+      });
+    }
+    expect(parseLegalMark({ domain: 'incorporation', unit: 'page' }).ok).toBe(false);
+    expect(parseLegalMark({ domain: 'incorporation' }).ok).toBe(false);
+  });
+
+  it('★ 법인변경 서류에는 뜨지 않는다 — 임원 고르기도 빈 목록', () => {
+    const m: LegalFormMark = { domain: 'incorporation', unit: 'officer' };
+    expect(markAppliesTo(m, 'OFFICER', 'R')).toBe(false);
+    expect(officersForMark(m, [{ changeKind: 'APPOINT' }])).toEqual([]);
+  });
+
+  it('장마다 사람 — 임원마다는 이사 · 감사 · 대표이사 중 하나, 발기인마다는 발기인, 순서 그대로', () => {
+    const p = (name: string, f: boolean, d: boolean, a: boolean, r: boolean) => ({ name, isFounder: f, isDirector: d, isAuditor: a, isRepresentative: r });
+    const people = [p('갑', true, false, false, false), p('을', false, false, true, false), p('병', true, true, false, true)];
+    const names = (unit: 'case' | 'officer' | 'founder') => personsForIncorpMark({ domain: 'incorporation', unit }, people).map((x) => x.name);
+    expect(names('officer')).toEqual(['을', '병']);
+    expect(names('founder')).toEqual(['갑', '병']);
+    expect(names('case')).toEqual([]);
+    expect(personsForIncorpMark({ domain: 'corp-change', changeTypes: ['OFFICER'], companyType: 'ALL', unit: 'officer', officerKinds: ['APPOINT'] }, people)).toEqual([]);
   });
 });
