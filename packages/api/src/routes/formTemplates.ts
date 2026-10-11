@@ -19,7 +19,9 @@
  * =============================================================================
  * 법인변경 [서류 출력]이 법무 표시로 서류를 고른다 — 근거는 `db/formTemplates.ts` 머리말.
  * 옛 「등기 설정이 가리키는 양식은 못 지운다」(2026-10-07)는 뺐다. **수정·복사는 막지 않는다**
- * — 고친 모양이 그대로 서류에 쓰이는 것이 맞다(레거시도 그랬다). 복사본은 표시까지 그대로 복사된다.
+ * — 고친 모양이 그대로 서류에 쓰이는 것이 맞다(레거시도 그랬다).
+ * ★ **복사본에는 법무 표시가 없다**(결정 2026-10-11) — 복사하는 순간 같은 서류가 [서류 출력]에 두 번
+ *   뜨지 않게. 쓰려면 복사본 편집에서 표시를 붙인다.
  *
  * ★ 편집기의 법무 표시 선택지(변경 구분 · 회사유형) 이름은 코드에서 읽어 함께 내려준다
  *   (`legalOptions`) — 고를 수 있는 값 자체는 shared 의 `CORP_CHANGE_TYPES` ·
@@ -237,8 +239,7 @@ export function registerFormTemplateRoutes(app: FastifyInstance): void {
 
   /**
    * 복사 — 이름 뒤에 「(복사본)」을 붙인다(레거시와 같다).
-   * ★ 법무 표시는 **따라간다**(정의의 일부다) — 복사본도 그 구분의 [서류 출력]에 뜬다. 원치 않으면
-   *   복사본 편집에서 표시를 뗀다.
+   * ★ 법무 표시는 **떼고** 복사한다(결정 2026-10-11) — 머리말 참조. 레거시 `dataSource` 는 그대로 간다.
    * ★ 정의는 **옮긴 뒤** 복사한다. version 1 이 그대로 복제되지 않게.
    */
   app.post<{ Params: { id: string } }>('/form-templates/:id/duplicate', async (req, reply) => {
@@ -249,12 +250,13 @@ export function registerFormTemplateRoutes(app: FastifyInstance): void {
       const src = await findFormTemplate(client, req.params.id);
       if (!src) return null;
       const name = `${src.name} (복사본)`.slice(0, NAME_MAX);
+      const { legal: _mark, ...definition } = migrateDefinition(src.definition);
       return insertFormTemplate(client, {
         patch: {
           name,
           description: src.description,
           kind: src.kind,
-          definition: migrateDefinition(src.definition),
+          definition,
         },
         actor: actorOf(session),
       });

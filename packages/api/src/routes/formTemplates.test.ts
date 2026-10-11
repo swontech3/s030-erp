@@ -153,3 +153,19 @@ describe('PATCH /form-templates/:id — 법무 표시 검사', () => {
     expect(res.json().message).toContain('임원마다 한 장인 양식은 임원변경에만 붙일 수 있습니다');
   });
 });
+
+describe('POST /form-templates/:id/duplicate — 복사본은 법무 표시 없음(결정 2026-10-11)', () => {
+  it('★ 표시를 떼고 넣는다 · 나머지 정의(레거시 dataSource 포함)는 그대로', async () => {
+    const legal = { domain: 'corp-change', changeTypes: ['OFFICER'], companyType: 'ALL', unit: 'officer', officerKinds: ['REELECT'] };
+    const definition = { ...row().definition, dataSource: 'corp-change', legal };
+    state.answers = [FIND(row({ legal: true, definition })), { match: /INSERT INTO public\.tb_s080_form_templates/, rows: [] }];
+    const res = await (await build()).inject({ method: 'POST', url: '/form-templates/f-1/duplicate' });
+    expect(res.statusCode).toBe(201);
+    const ins = state.seen.find((s) => /INSERT INTO public\.tb_s080_form_templates/.test(s.sql))!;
+    expect(ins.params[2]).toBe('법인변경등록1 (복사본)');
+    const saved = JSON.parse(ins.params[5] as string);
+    expect(saved.legal).toBeUndefined();
+    expect(saved.dataSource).toBe('corp-change');
+    expect(saved.pages).toEqual(definition.pages);
+  });
+});
