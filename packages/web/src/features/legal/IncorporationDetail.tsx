@@ -608,12 +608,15 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
                 · <strong>{saved?.statusName ?? draft.statusName}</strong>
               </span>
             </div>
-            {/* 날짜 줄 — 저장된 건만, 상태에 맞는 날짜만. 임시 모드는 없다. */}
-            {saved ? (
-              <div className={styles.pageNote}>
-                {corpChangeDateLine(saved).map((d) => `${d.label} ${d.day}`).join(' · ')}
-              </div>
-            ) : null}
+            {/*
+              날짜 줄 — 저장된 건만, 상태에 맞는 날짜만. 옆에 단체코드를 작게(결정 2026-10-11).
+              ★ 단체코드는 **읽어 보여 주기만** 한다 — 만들거나 검증하지 않고, 접두어로 유형을 가르지 않는다.
+                없으면 「단체 {ID}」. 임시 모드는 날짜가 없어 단체코드만 보인다.
+            */}
+            <div className={styles.pageNote}>
+              {saved ? corpChangeDateLine(saved).map((d) => `${d.label} ${d.day}`).join(' · ') : null}
+              <span className={saved ? styles.orgTag : undefined}>{draft.orgCode ?? `단체 ${draft.orgId}`}</span>
+            </div>
           </div>
           <div className={styles.headActions}>
             {saved ? (

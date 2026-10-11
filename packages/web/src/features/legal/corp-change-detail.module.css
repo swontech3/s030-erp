@@ -829,3 +829,10 @@
 .numInput {
   text-align: right;
 }
+
+/* 머리 날짜 줄 옆의 단체코드(읽기 표시만) */
+.orgTag {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
