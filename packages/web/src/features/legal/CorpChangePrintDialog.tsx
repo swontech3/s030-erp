@@ -150,7 +150,7 @@ export function CorpChangePrintDialog({ id, onClose }: { id: string; onClose: ()
           <nav className={styles.printList} aria-label="서류">
             {docs.length === 0 && !loading && !error ? (
               <p className={styles.hint}>
-                이 건에 뜨는 서류가 없습니다. 표양식 관리에서 양식에 「법인변경 서류로 쓴다」 표시를 붙여 주세요.
+                이 건에 뜨는 서류가 없습니다. 표양식 관리에서 양식에 「법무 서류로 쓴다」 표시(업무: 법인변경)를 붙여 주세요.
               </p>
             ) : null}
             {docs.map((d, di) => (

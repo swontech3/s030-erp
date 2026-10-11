@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * s040100020 법인설립 상세 — 회사 · 자본·주식 · 설립 정보 · 사람 · 사업목적 · 상태 전이 · 삭제(10-4, 2026-10-11).
- * 서류 출력은 10-5 다.
+ * s040100020 법인설립 상세 — 회사 · 자본·주식 · 설립 정보 · 사람 · 사업목적 · 상태 전이 · 삭제(10-4, 2026-10-11)
+ * · [서류 출력] · 「출력 이력」 카드(10-5, 043).
  *
  * ★ 시안이 없다. 법인변경 상세(`CorpChangeDetail`)와 같은 틀 · 같은 CSS · 같은 동작이다:
  *   · 건은 첫 [저장] 때 생긴다. 임시 모드(`saved === null`)는 설립 정보 · 사람을 **화면만** 들고 있다가
@@ -22,13 +22,21 @@
  * ★ 사업목적은 [목록에서 고르기] 팝업(`BizPurposePickerDialog`)을 그대로 쓴다 — 카탈로그를 고치는 버튼은 없다.
  * ★ 저장할 때 내용 검증은 하지 않는다(작성 중 임시 저장) — 검증은 작성완료 때 서버가. 경고(1주 100원 미만 ·
  *   자본금 10억 이상인데 감사 없음)는 막지 않고 지금 입력으로 보여 준다(shared `incorporationWarnings`).
+ * ★ [서류 출력](10-5) — 작성완료(E) · 완료(C) 건에만(`canPrintCorpChange`, 법인변경과 같다). 운영사 · 회사 모두.
+ *   대화상자(`IncorporationPrintDialog`)가 서버에서 값을 받아 서류를 하나씩 인쇄한다. 「출력 이력」 카드는 P 가 아닌 건에.
  * ★★ 서버는 주민번호 평문을 돌려주지 않는다(마스킹만). 임시 모드의 평문은 첫 저장 때까지 화면이 들고 있는
  *    것뿐이고, 표에는 마스킹해서 보인다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { isRrnShape, purposeLines, type CorpChangeFieldError, type CorpChangeStatus } from '@swonbiz/shared/domain/corp-change';
+import {
+  canPrintCorpChange,
+  isRrnShape,
+  purposeLines,
+  type CorpChangeFieldError,
+  type CorpChangeStatus,
+} from '@swonbiz/shared/domain/corp-change';
 import { STALE_STATUS_MESSAGE } from '@swonbiz/shared/domain/corp-change-transition';
 import { corpChangeDateLine, normalizeRrn } from '@swonbiz/shared/domain/corp-change-detail';
 import {
@@ -51,6 +59,8 @@ import { Icon } from '@/components/ds';
 import { AddressInput, StatusActions, type Address } from './CorpChangeDetail';
 import { CorpChangeConfirmDialog, type CorpChangeConfirmKind } from './CorpChangeConfirmDialog';
 import { BizPurposePickerDialog } from './BizPurposePickerDialog';
+import { IncorporationPrintDialog } from './IncorporationPrintDialog';
+import { IncorporationPrintHistory } from './IncorporationPrintHistory';
 import styles from './corp-change-detail.module.css';
 
 interface Props {
@@ -463,6 +473,9 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
 
   // ── 상태 전이 · 삭제 — 처리는 이 화면 한 곳이다(목록에는 버튼이 없다) ──────────
   const [confirm, setConfirm] = useState<CorpChangeConfirmKind | null>(null);
+  const [printing, setPrinting] = useState(false);
+  /** 출력 이력 다시 읽기 — 서류 출력 대화상자를 닫을 때 올린다. */
+  const [printLogKey, setPrintLogKey] = useState(0);
 
   /** 409 — 화면이 본 상태가 낡았다. 다시 읽어 최신 상태와 버튼으로 다시 그린다. */
   const reloadAfterConflict = async (message: string) => {
@@ -619,6 +632,12 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
             </div>
           </div>
           <div className={styles.headActions}>
+            {saved && canPrintCorpChange(saved.status) ? (
+              <button type="button" className={`${styles.btn} ${styles.btnGhost}`} disabled={busy} onClick={() => setPrinting(true)}>
+                <Icon name="printer" size={16} />
+                서류 출력
+              </button>
+            ) : null}
             {saved ? (
               <StatusActions
                 saved={saved}
@@ -771,6 +790,9 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
             onChange={(v) => setText('purposes', v)}
             onNotice={notify}
           />
+
+          {/* 출력 이력(043) — 출력할 수 있는 상태이거나 이미 출력한 적이 있을 수 있는 건(취소된 건 포함)에. */}
+          {saved && saved.status !== 'P' ? <IncorporationPrintHistory id={saved.id} reloadKey={printLogKey} /> : null}
         </div>
       </div>
 
@@ -781,6 +803,16 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
           peopleLabel="사람"
           onClose={() => setConfirm(null)}
           onConfirm={onConfirm}
+        />
+      ) : null}
+
+      {printing && saved ? (
+        <IncorporationPrintDialog
+          id={saved.id}
+          onClose={() => {
+            setPrinting(false);
+            setPrintLogKey((k) => k + 1);
+          }}
         />
       ) : null}
 
