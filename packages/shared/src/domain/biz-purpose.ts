@@ -95,7 +95,7 @@ export interface BizPurposeListFilter {
 /**
  * 목록 조건 — `?q=&includeInactive=1`.
  * ★ 회사 세션이 `includeInactive` 를 보내도 **조용히 끈다**(거절하지 않는다 — 고르기 팝업이 같은
- *   주소를 부르므로). DB 쪽도 읽기 정책만 있을 뿐 사용 여부는 거르지 않으니 여기가 그 자리다.
+ *   주소를 부르므로). DB 도 회사(tenant)에게는 사용 중인 줄만 보여 준다(041 읽기 정책) — 두 겹이다.
  */
 export function parseBizPurposeListQuery(
   query: Record<string, unknown>,
