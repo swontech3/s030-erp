@@ -454,6 +454,21 @@ export type TransitionCheck =
  * 누를 수 없는 사람에게 칸 오류를 보여 줄 이유가 없다.
  */
 export function checkTransition(req: TransitionRequest): TransitionCheck {
+  const { content, ...rest } = req;
+  return checkLegalTransition({ ...rest, validate: content ? () => validateCorpChange(content) : undefined });
+}
+
+/**
+ * 상태 전이 판정 — **법무 건 공용**(법인변경 · 법인설립, 2026-10-11). 전이표 · 역할 · 복원 규칙은 하나다.
+ * P→E 의 검증만 업무마다 다르다 — `validate` 로 받는다. 없으면 P→E 는 거절한다(검증 없이 통과시키지 않는다).
+ */
+export function checkLegalTransition(req: {
+  from: string;
+  to: string;
+  role: ScopeRole;
+  statusBeforeCancel?: string | null;
+  validate?: () => CorpChangeFieldError[];
+}): TransitionCheck {
   const { from, to, role } = req;
   if (!isCorpChangeStatus(from) || !isCorpChangeStatus(to)) {
     return { ok: false, code: 'unknown_status', reason: `알 수 없는 상태입니다 (${from}→${to})` };
@@ -467,10 +482,10 @@ export function checkTransition(req: TransitionRequest): TransitionCheck {
     return { ok: false, code: 'restore_target', reason: '취소 직전 상태로만 복원할 수 있습니다' };
   }
   if (from === 'P' && to === 'E') {
-    if (!req.content) {
+    if (!req.validate) {
       return { ok: false, code: 'invalid', reason: '검증할 내용이 없어 서류작성완료로 바꿀 수 없습니다', errors: [] };
     }
-    const errors = validateCorpChange(req.content);
+    const errors = req.validate();
     if (errors.length > 0) return { ok: false, code: 'invalid', reason: '입력 내용을 확인하세요', errors };
   }
   return { ok: true };
