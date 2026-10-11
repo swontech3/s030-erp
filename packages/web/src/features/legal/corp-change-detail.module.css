@@ -805,3 +805,27 @@
   color: var(--text-heading);
   background: var(--surface-alt);
 }
+
+/* ── 법인설립 상세(s040100020, 10-4) ── */
+/* 사람의 역할 체크(발기인 · 이사 · 감사 · 대표이사) — 겹쳐 체크할 수 있다 */
+.checkRow {
+  min-height: 38px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+}
+
+.checkItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-heading);
+  cursor: pointer;
+}
+
+/* 금액 · 주식 수 — 오른쪽 맞춤 */
+.numInput {
+  text-align: right;
+}

@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * 법인변경 처리 확인 창 — 완료 · 완료 취소 · 취소 · 복원 · 삭제 다섯이 **이 한 창**을 쓴다(4단계, 2026-10-10).
+ * 법무 처리 확인 창 — 완료 · 완료 취소 · 취소 · 복원 · 삭제 다섯이 **이 한 창**을 쓴다(4단계, 2026-10-10).
+ * 법인설립 상세(s040100020, 10-4)도 이 창을 그대로 쓴다 — 다른 것은 삭제 문구의 「사람」뿐이다(`peopleLabel`).
  * 제출(A)은 없앴다(2026-10-10) — 그 버튼과 문구도 지웠다.
  *
  * ★ 시안이 없다 — 상태 전이 확인 창(`s030200040p2`)과 **같은 모양**이다(가운데 원형 아이콘 56px ·
@@ -35,7 +36,7 @@ const DEFS: Record<CorpChangeConfirmKind, Def> = {
 };
 
 /** 본문 — 복원은 돌아갈 상태 이름이 들어간다. */
-function descOf(kind: CorpChangeConfirmKind, restoreToName: string | null): string {
+function descOf(kind: CorpChangeConfirmKind, restoreToName: string | null, peopleLabel: string): string {
   switch (kind) {
     case 'complete':
       return '완료한 건은 운영사만 완료 취소로 작성완료 상태로 되돌릴 수 있습니다.';
@@ -46,7 +47,7 @@ function descOf(kind: CorpChangeConfirmKind, restoreToName: string | null): stri
     case 'restore':
       return `취소 직전 상태${restoreToName ? `(${restoreToName})` : ''}로 돌아갑니다. 취소 사유는 지워집니다.`;
     case 'delete':
-      return '건과 임원이 모두 지워집니다. 되돌릴 수 없습니다.';
+      return `건과 ${peopleLabel}이 모두 지워집니다. 되돌릴 수 없습니다.`;
   }
 }
 
@@ -54,12 +55,14 @@ interface Props {
   kind: CorpChangeConfirmKind;
   /** 복원일 때 돌아갈 상태의 이름. */
   restoreToName?: string | null;
+  /** 삭제 문구의 사람 묶음 이름 — 법인변경 「임원」(기본) · 법인설립 「사람」(10-4, 2026-10-11). */
+  peopleLabel?: string;
   onClose: () => void;
   /** 처리. 실패면 문구를 돌려준다(창을 닫지 않는다), 성공이면 null. 취소면 사유가 온다. */
   onConfirm: (cancelReason: string | null) => Promise<string | null>;
 }
 
-export function CorpChangeConfirmDialog({ kind, restoreToName = null, onClose, onConfirm }: Props) {
+export function CorpChangeConfirmDialog({ kind, restoreToName = null, peopleLabel = '임원', onClose, onConfirm }: Props) {
   const def = DEFS[kind];
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -89,7 +92,7 @@ export function CorpChangeConfirmDialog({ kind, restoreToName = null, onClose, o
           <Icon name={def.icon} size={24} />
         </div>
         <h2 className={styles.modalTitle}>{def.title}</h2>
-        <p className={styles.modalDesc}>{descOf(kind, restoreToName)}</p>
+        <p className={styles.modalDesc}>{descOf(kind, restoreToName, peopleLabel)}</p>
 
         {kind === 'cancel' ? (
           <label className={styles.modalField}>

@@ -97,7 +97,7 @@ interface Props {
   canOpenTenantScreen: boolean;
 }
 
-type Address = { zipCode: string; address: string; addressDetail: string };
+export type Address = { zipCode: string; address: string; addressDetail: string };
 const EMPTY_ADDRESS: Address = { zipCode: '', address: '', addressDetail: '' };
 
 const toAddress = (v: unknown): Address => {
@@ -804,13 +804,14 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
  *   E→P 서류수정 — 바로 누른다. P→E 작성완료는 여기 없다 — 머리의 [작성완료] 가 저장까지 한다
  *   E→C 완료 · C→E 완료 취소(운영사) · →X 취소 · X→ 복원 · 삭제 — 확인 창을 거친다
  */
-function StatusActions({
+export function StatusActions({
   saved,
   disabled,
   onTransition,
   onConfirm,
 }: {
-  saved: CorpChangeDetailResponse;
+  /** ★ 법인설립 상세(10-4)도 쓴다 — 상태 · 전이 · 삭제 네 값만 본다. */
+  saved: Pick<CorpChangeDetailResponse, 'status' | 'availableTransitions' | 'canDelete' | 'statusBeforeCancel'>;
   disabled: boolean;
   onTransition: (to: CorpChangeStatus) => void;
   onConfirm: (kind: CorpChangeConfirmKind) => void;
@@ -997,7 +998,7 @@ function PayloadField({
  * 주소 한 줄 — 우편번호 · 기본주소는 카카오 주소 검색으로 채우고, 상세주소는 손으로 적는다.
  * ★ 계약 폼과 같은 부품(`useKakaoPostcode`)이다. 팝업은 상세주소를 건드리지 않는다.
  */
-function AddressInput({
+export function AddressInput({
   value,
   disabled,
   compact = false,

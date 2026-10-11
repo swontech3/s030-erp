@@ -92,7 +92,7 @@ export const INCORP_FIELD_DEFS: readonly IncorpFieldDef[] = [
     label: '사업목적',
     type: 'textarea',
     required: true,
-    hint: `한 줄에 하나씩 적습니다(최대 ${INCORP_PURPOSE_MAX}줄). 「위 각 호에 부대되는 일체의 사업」은 서류가 붙입니다`,
+    hint: `설립 때 목적 전체를 한 줄에 하나씩 적습니다(최대 ${INCORP_PURPOSE_MAX}줄). 「위 각 호에 부대되는 일체의 사업」은 서류가 붙입니다`,
   },
 ];
 
