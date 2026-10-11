@@ -113,8 +113,14 @@
   flex-wrap: wrap;
 }
 
+/* 제목 옆 저장 상태 — 같은 줄에 붙는다(2026-10-11). 글자가 바뀌어도 세로 자리는 그대로다. */
+.editTitleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
 .editNote {
-  margin-top: 4px;
   font-size: 12px;
   color: var(--text-caption);
 }
@@ -128,7 +134,7 @@
   display: grid;
   grid-template-columns: minmax(0, 2fr) 180px minmax(0, 3fr);
   gap: 12px;
-  margin-top: 16px;
+  margin-top: 8px;
 }
 
 .editBody {
@@ -136,7 +142,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  margin-top: 16px;
+  margin-top: 8px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -340,34 +346,48 @@
   outline: none;
 }
 
-/* ── 양식 편집 · 법무 표시(5-3) ── 양식 정보 아래 한 줄 띠 ── */
+/* ── 양식 편집 · 법무 표시(5-3) ── 한 줄 띠(2026-10-11). 도구 막대와 같은 꼴(12px 이름 · 30px 칸 · 가는 칸막이) ── */
 
 .legalBox {
   flex: 0 0 auto;
-  margin-top: 12px;
-  padding: 12px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 8px;
+  padding: 6px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
 
-.legalNote {
-  margin: 4px 0 0;
+.legalSep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+}
+
+.legalLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
-  color: var(--text-caption);
+  color: var(--text-muted);
 }
 
-.legalGrid {
-  display: grid;
-  grid-template-columns: 80px minmax(0, 1fr);
-  align-items: center;
-  gap: 8px 12px;
-  margin-top: 12px;
+.legalSelect {
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-heading);
 }
 
-.legalChecks {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
+.legalProblem {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-danger);
 }

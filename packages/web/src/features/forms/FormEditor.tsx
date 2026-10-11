@@ -3,7 +3,7 @@
 /**
  * 양식 편집 페이지(`/forms/[id]` · `/forms/new`) — 레거시 `FormDesigner` 를 옮겼다.
  *
- * 머리(제목 · [목록으로] · [저장]) → 양식 정보(이름 · 종류 · 설명) → 장 탭 · 도구 막대 →
+ * 머리(제목 · 저장 상태 · [목록으로] · [저장]) → 양식 정보(이름 · 종류 · 설명) → 법무 표시 한 줄 → 장 탭 · 도구 막대 →
  * 칸 편집기 + 칸 속성 패널.
  *
  * =============================================================================
@@ -237,11 +237,15 @@ export function FormEditor({ id }: { id: string | null }) {
   return (
     <div className={styles.editPage}>
       <div className={styles.editHead}>
-        <div>
+        {/*
+          ★ 저장 상태는 제목 **옆** 같은 줄이다(2026-10-11 — 제목 아래 줄을 없애 격자에 높이를 돌려줬다).
+            자리는 늘 있다(비어 있어도) — 글자가 생기고 사라져도 아무것도 움직이지 않는다.
+        */}
+        <div className={styles.editTitleRow}>
           <h1 className={codes.title}>{id ? '양식 편집' : '양식 추가'}</h1>
-          <p className={`${styles.editNote} ${dirty ? styles.editNoteDirty : ''}`}>
-            {dirty ? '저장하지 않은 변경이 있습니다' : savedNote ? '저장했습니다' : '칸을 끌어서 고르고, 두 번 눌러 글자를 씁니다'}
-          </p>
+          <span className={`${styles.editNote} ${dirty ? styles.editNoteDirty : ''}`} role="status">
+            {dirty ? '저장하지 않은 변경이 있습니다' : savedNote ? '저장했습니다' : ''}
+          </span>
         </div>
         <div className={codes.actions}>
           <Button size="sm" variant="ghost" onClick={() => (dirty ? setLeaving(true) : router.push(listHref))}>

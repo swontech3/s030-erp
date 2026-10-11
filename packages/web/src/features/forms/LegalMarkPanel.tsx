@@ -4,8 +4,10 @@
  * 양식 편집 — 법무 표시(5-3, 2026-10-11). 붙이면 이 양식이 법인변경 [서류 출력]에 뜬다.
  *
  * 규칙은 shared `legal-form-mark.ts` 다 — 여기는 고르는 칸만 그린다. 고른 값이 규칙에 맞지 않으면
- * (변경 구분을 하나도 안 고름 등) 사유를 칸 아래에 보이고, [저장] 은 편집기가 막는다. 서버도 같은
+ * (변경 구분을 하나도 안 고름 등) 사유를 띠 끝에 보이고, [저장] 은 편집기가 막는다. 서버도 같은
  * 함수로 한 번 더 거절한다.
+ *
+ * ★ **한 줄 띠**다(2026-10-11) — 격자에 세로 폭을 돌려주려고 3행 격자를 가로 한 줄로 접었다. 설명 문구는 뺐다.
  *
  *   출력 단위 — 건마다 한 장 · 임원마다 한 장. 임원마다는 임원변경에만 뜻이 있어 변경 구분을
  *              임원변경 하나로 고정한다(다른 구분 칸은 잠근다)
@@ -23,8 +25,6 @@ import {
   parseLegalMark,
   type LegalFormMark,
 } from '@swonbiz/shared/domain/legal-form-mark';
-import { cf } from '@/features/facility/ModalShell';
-import codes from '@/features/codes/codes.module.css';
 import type { LegalOptions } from './forms-model';
 import styles from './forms.module.css';
 
@@ -58,63 +58,59 @@ export function LegalMarkPanel({
   const perOfficer = mark?.unit === 'officer';
 
   return (
+    // ★ 한 줄 띠(2026-10-11) — 출력 단위 · 변경 구분 · 회사유형(· 임원 구분)을 가로로 나란히, 폭이 모자라면
+    //   줄바꿈. 표시를 끄면 체크 하나만 남는다. 덜 고른 사유도 같은 줄 끝에 붙는다(줄을 하나 더 쓰지 않게).
     <div className={styles.legalBox}>
       <label className={styles.check}>
         <input type="checkbox" checked={mark !== undefined} onChange={(e) => onChange(e.target.checked ? FRESH : undefined)} />
         <strong>법인변경 서류로 쓴다</strong>
       </label>
-      <p className={styles.legalNote}>
-        표시하면 법인변경 상세의 [서류 출력]에 이 양식 이름으로 뜹니다. 표양식 관리에서는 인쇄할 수 없고, 표시를 떼야 지울
-        수 있습니다.
-      </p>
 
       {mark ? (
-        <div className={styles.legalGrid}>
-          <span className={cf.label}>출력 단위</span>
-          <div className={styles.legalChecks}>
-            <label className={styles.check}>
-              <input
-                type="radio"
-                name="legal-unit"
-                checked={!perOfficer}
-                onChange={() => {
-                  const { officerKinds: _drop, ...rest } = mark;
-                  onChange({ ...rest, unit: 'case' });
-                }}
-              />
-              건마다 한 장
-            </label>
-            <label className={styles.check}>
-              <input
-                type="radio"
-                name="legal-unit"
-                checked={perOfficer}
-                onChange={() => onChange({ ...mark, unit: 'officer', changeTypes: ['OFFICER'], officerKinds: mark.officerKinds ?? [] })}
-              />
-              임원마다 한 장
-            </label>
-          </div>
+        <>
+          <span className={styles.legalSep} />
+          <span className={styles.legalLabel}>출력 단위</span>
+          <label className={styles.check}>
+            <input
+              type="radio"
+              name="legal-unit"
+              checked={!perOfficer}
+              onChange={() => {
+                const { officerKinds: _drop, ...rest } = mark;
+                onChange({ ...rest, unit: 'case' });
+              }}
+            />
+            건마다 한 장
+          </label>
+          <label className={styles.check}>
+            <input
+              type="radio"
+              name="legal-unit"
+              checked={perOfficer}
+              onChange={() => onChange({ ...mark, unit: 'officer', changeTypes: ['OFFICER'], officerKinds: mark.officerKinds ?? [] })}
+            />
+            임원마다 한 장
+          </label>
 
-          <span className={cf.label}>변경 구분</span>
-          <div className={styles.legalChecks}>
-            {CORP_CHANGE_TYPES.map((t) => (
-              <label key={t} className={styles.check}>
-                <input
-                  type="checkbox"
-                  disabled={perOfficer}
-                  checked={mark.changeTypes.includes(t)}
-                  onChange={(e) => onChange({ ...mark, changeTypes: toggle(mark.changeTypes, CORP_CHANGE_TYPES, t, e.target.checked) })}
-                />
-                {nameOf(options.changeTypes, t)}
-              </label>
-            ))}
-          </div>
+          <span className={styles.legalSep} />
+          <span className={styles.legalLabel}>변경 구분</span>
+          {CORP_CHANGE_TYPES.map((t) => (
+            <label key={t} className={styles.check}>
+              <input
+                type="checkbox"
+                disabled={perOfficer}
+                checked={mark.changeTypes.includes(t)}
+                onChange={(e) => onChange({ ...mark, changeTypes: toggle(mark.changeTypes, CORP_CHANGE_TYPES, t, e.target.checked) })}
+              />
+              {nameOf(options.changeTypes, t)}
+            </label>
+          ))}
 
-          <span className={cf.label}>회사유형</span>
-          <div className={styles.legalChecks}>
+          <span className={styles.legalSep} />
+          <label className={styles.legalLabel}>
+            회사유형
             <select
-              className={cf.input}
-              style={{ width: 160 }}
+              className={styles.legalSelect}
               value={mark.companyType}
               onChange={(e) => onChange({ ...mark, companyType: e.target.value as LegalFormMark['companyType'] })}
             >
@@ -125,31 +121,30 @@ export function LegalMarkPanel({
                 </option>
               ))}
             </select>
-          </div>
+          </label>
 
           {perOfficer ? (
             <>
-              <span className={cf.label}>임원 구분</span>
-              <div className={styles.legalChecks}>
-                {OFFICER_CHANGE_KINDS.map((k) => (
-                  <label key={k} className={styles.check}>
-                    <input
-                      type="checkbox"
-                      checked={(mark.officerKinds ?? []).includes(k)}
-                      onChange={(e) =>
-                        onChange({ ...mark, officerKinds: toggle(mark.officerKinds ?? [], OFFICER_CHANGE_KINDS, k, e.target.checked) })
-                      }
-                    />
-                    {OFFICER_CHANGE_KIND_LABEL[k]}
-                  </label>
-                ))}
-              </div>
+              <span className={styles.legalSep} />
+              <span className={styles.legalLabel}>임원 구분</span>
+              {OFFICER_CHANGE_KINDS.map((k) => (
+                <label key={k} className={styles.check}>
+                  <input
+                    type="checkbox"
+                    checked={(mark.officerKinds ?? []).includes(k)}
+                    onChange={(e) =>
+                      onChange({ ...mark, officerKinds: toggle(mark.officerKinds ?? [], OFFICER_CHANGE_KINDS, k, e.target.checked) })
+                    }
+                  />
+                  {OFFICER_CHANGE_KIND_LABEL[k]}
+                </label>
+              ))}
             </>
           ) : null}
-        </div>
-      ) : null}
 
-      {problem ? <p className={codes.error}>{problem}</p> : null}
+          {problem ? <span className={styles.legalProblem}>{problem}</span> : null}
+        </>
+      ) : null}
     </div>
   );
 }
