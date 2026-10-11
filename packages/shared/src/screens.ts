@@ -136,6 +136,15 @@ export const SCREENS = {
    *   목록(s040200010)과 **함께** 등록해야 한다(서비스 → 기능 → 화면 3단).
    */
   s040200011: { route: '/legal/corp-changes/[id]', name: '법인변경 상세', group: '020' },
+
+  // --- 030 사업목적 ---
+  /**
+   * 사업목적 — 공용 카탈로그(문구)의 추가 · 수정 · 사용 끄기(2026-10-11, 041).
+   * ★ **운영사 전용** 관리 화면이다(결정 2026-10-11). 회사 사용자는 이 화면을 열지 않고, 법인변경
+   *   (목적변경) · 설립 화면의 「사업목적 고르기」 팝업으로 **사용 중인 문구만** 읽어 고른다 —
+   *   카탈로그를 고치는 자리는 이 화면 하나다(한 업무는 한 화면).
+   */
+  s040300010: { route: '/legal/biz-purposes', name: '사업목적', group: '030' },
 } as const satisfies Record<string, ScreenMeta>;
 
 export type ScreenId = keyof typeof SCREENS;
