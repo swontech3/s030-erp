@@ -112,6 +112,8 @@ export interface CorpChangeFieldDef {
   label: string;
   type: CorpChangeFieldType;
   required: boolean;
+  /** 칸 아래 안내 문구. 없으면 안 그린다. */
+  hint?: string;
 }
 
 export interface CorpChangeTypeDef {
@@ -164,7 +166,15 @@ export const CHANGE_TYPE_DEFS: Readonly<Record<CorpChangeType, CorpChangeTypeDef
     officerEffectiveDateRequired: false,
     requiresCeoHome: false,
     fields: [
-      { name: 'purposes', label: '사업목적', type: 'textarea', required: true },
+      // ★ 변경 후 **전체** 목적이다 — 기존 목적 + 추가분을 사람이 함께 적는다(결정 2026-10-11).
+      //   기존 목적 불러오기는 없다. 카탈로그에서 고른 문구는 줄로 덧붙는다(`biz-purpose.ts`).
+      {
+        name: 'purposes',
+        label: '사업목적',
+        type: 'textarea',
+        required: true,
+        hint: '변경 후 전체 목적을 한 줄에 하나씩 적습니다(기존 목적 + 추가분)',
+      },
       { name: 'resolutionDate', label: '결의일', type: 'date', required: true },
     ],
   },
