@@ -52,7 +52,10 @@ describe('validateIncorporation', () => {
   it('숫자 칸 · 사업연도 · 설립예정일 형식', () => {
     expect(fields(withInfo({ parValue: 0 }))).toContain('parValue');
     expect(fields(withInfo({ unitsIssued: 1.5 }))).toContain('unitsIssued');
-    expect(fields(withInfo({ capitalAmount: 3_000_000_000 }))).toContain('capitalAmount');
+    expect(fields(withInfo({ capitalAmount: Number.MAX_SAFE_INTEGER + 1 }))).toContain('capitalAmount');
+    // ★ 21억을 넘는 금액도 받는다(042 bigint) — 30억 = 1,000원 × 3,000,000주
+    const big = withInfo({ capitalAmount: 3_000_000_000, unitsAuthorized: 3_000_000, unitsIssued: 3_000_000 });
+    expect(fields({ ...big, persons: [{ ...CEO, unitsSubscribed: 3_000_000 }] })).toEqual([]);
     expect(fields(withInfo({ fiscalStart: '1-1' }))).toContain('fiscalStart');
     expect(fields(withInfo({ fiscalEnd: '02-30' }))).toContain('fiscalEnd');
     expect(fields(withInfo({ plannedDate: '2026-02-30' }))).toContain('plannedDate');

@@ -31,6 +31,7 @@ import { registerFormTemplateRoutes } from './routes/formTemplates.ts';
 import { registerOrgLookupRoutes } from './routes/orgLookup.ts';
 import { registerCorpChangeRoutes } from './routes/corpChanges.ts';
 import { registerBizPurposeRoutes } from './routes/bizPurposes.ts';
+import { registerIncorporationRoutes } from './routes/incorporations.ts';
 import { closePool } from './db/pool.ts';
 import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
 
@@ -147,6 +148,9 @@ registerCorpChangeRoutes(app);
 // ★ 사업목적 카탈로그(s040300010, 041) — 목록은 로그인한 모든 사용자(법인변경 상세의 고르기 팝업이
 //   부른다), 추가 · 고치기는 운영사만. 지우기는 없다(`routes/bizPurposes.ts` 머리말).
 registerBizPurposeRoutes(app);
+// ★ 법인설립(s040100010 · s040100020, 042) — 법인변경과 같은 모양 · 같은 전이 규칙. 운영사 · 회사가 함께 쓰고
+//   RLS 가 단체 ID 로 가른다. ERP 회사표에 쓰지 않는다(`routes/incorporations.ts` 머리말).
+registerIncorporationRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,

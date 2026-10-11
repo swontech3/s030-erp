@@ -48,8 +48,11 @@ export const INCORP_METHOD_CATEGORY = 'LAW_EST_TP';
 export const INCORP_PURPOSE_MAX = 20;
 export const INCORP_FOUNDER_MAX = 5;
 
-/** DB 칸이 `integer` 다(레거시 그대로) — 이보다 큰 금액 · 수는 받지 않는다. */
-export const INCORP_INT_MAX = 2_147_483_647;
+/**
+ * 금액 · 주식 수의 상한. DB 칸은 bigint 다(042, 결정 2026-10-11) — 앱은 JS 가 정확히 셀 수 있는
+ * 정수까지만 받는다(그 위는 bigint 라도 숫자로 오가며 값이 바뀐다).
+ */
+export const INCORP_INT_MAX = Number.MAX_SAFE_INTEGER;
 
 // =============================================================================
 // 입력 칸
@@ -162,7 +165,7 @@ function checkInfoField(def: IncorpFieldDef, value: unknown): CorpChangeFieldErr
       return typeof value === 'string' ? [] : [{ field: name, message: `${label}은(는) 글자로 입력하세요` }];
     case 'amount':
     case 'count':
-      return isCount(value) && value > 0 ? [] : [{ field: name, message: `${label}은(는) 1 이상 ${INCORP_INT_MAX.toLocaleString('ko-KR')} 이하의 정수로 입력하세요` }];
+      return isCount(value) && value > 0 ? [] : [{ field: name, message: `${label}은(는) 1 이상의 정수로 입력하세요` }];
     case 'monthDay':
       return typeof value === 'string' && isMonthDay(value) ? [] : [{ field: name, message: `${label}은(는) MM-DD(예: 01-01)로 입력하세요` }];
     case 'date':
