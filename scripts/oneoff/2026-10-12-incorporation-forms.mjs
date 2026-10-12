@@ -24,6 +24,8 @@
  * ★ 1장에 넣기(결정 2026-10-12) — 넘칠 때만, 이 순서로: 1) 글자 행의 남는 높이 2) 빈 줄 3) 글자 크기(B4 원본인
  *   발기인총회의사록 · 조사보고서만, 10.5 → 10 → 9.5pt). 그래도 넘치면 **멈춘다**(2장 허용은 사용자 결정).
  * ★ 엔진은 칸이 없는 자리에 테두리를 그린다(`FormDocument` 의 `edge(undefined)`) — 빈 자리는 모두 테두리 없는 칸으로 채운다.
+ * ★ 2026-10-12 9종 모두 **등록함**(개발 DB, `registered`) — 기본 선택에서 빠진다. 다시 보려면 `--only=이름,…`.
+ *   ★ 원본 docx 는 git 에 없다(작성자 정보 · 표본 개인정보 — 결정 2026-10-12). 돌리려면 그 PC 의 `doc/forms-src/` 에 있어야 한다
  * ★ 기본은 **보기만** 한다. `--apply` 일 때만 한 트랜잭션으로 쓴다. 같은 이름의 양식이 하나라도 있으면
  *   아무것도 쓰지 않고 멈춘다(두 번 돌려도 안전). 정의는 shared `parseDefinition` 을 통과해야 한다.
  *
@@ -47,8 +49,9 @@ import { pickDocFormSetting } from '../../packages/shared/src/domain/corp-change
 
 const envPath = process.argv[2];
 const APPLY = process.argv.includes('--apply');
+const only = (process.argv.find((a) => a.startsWith('--only=')) ?? '').slice(7).split(',').filter(Boolean);
 if (!envPath) {
-  console.error('사용법: npx tsx scripts/oneoff/2026-10-12-incorporation-forms.mjs <.env> [--apply]');
+  console.error('사용법: npx tsx scripts/oneoff/2026-10-12-incorporation-forms.mjs <.env> [--apply] [--only=이름,…]');
   process.exit(2);
 }
 const env = Object.fromEntries(
@@ -489,20 +492,30 @@ articleBlocks.push([text('발기인', { bold: true, fontSize: pt(13), border: { 
 //   source — 원문 docx(대조) · added — 원본에 없는데 결정으로 넣은 글자 조각
 // =============================================================================
 const one = (cols, build) => (s) => [{ cols, rows: build(s) }];
-const DOCS = [
-  { name: '설립등기신청서', unit: 'case', sizes: [REG], pages: () => [{ cols: REG12_COLS, rows: REG_PAGE1 }, { cols: REG12_COLS, rows: REG_PAGE2 }, { cols: REG3_COLS, rows: REG_PAGE3 }], sourcePages: 3, source: '65-1(40-1).주식회사설립등기(발기설립).docx', added: ['발행주식의 총수', '보통주식'] },
-  { name: '발기인총회의사록', unit: 'case', sizes: [10.5, 10, 9.5], pages: one(MINUTES_COLS, MINUTES), sourcePages: 1, source: '발기인총회의사록.docx', added: [] },
-  { name: '조사보고서', unit: 'case', sizes: [10.5, 10, 9.5], pages: one(REPORT_COLS, REPORT), sourcePages: 1, source: '조사보고서.docx', added: [] },
-  { name: '주식발행사항동의서', unit: 'case', sizes: [13], pages: one(ISSUANCE_COLS, ISSUANCE), sourcePages: 1, source: '주식 발행사항 동의서.docx', added: ['보통주식'] },
-  { name: '인감대지', unit: 'case', sizes: [10], pages: one(SEAL_COLS, SEAL_SHEET), sourcePages: 1, source: '인감대지.docx', added: ['대표이사'] },
-  { name: '인감·개인신고서', unit: 'case', sizes: [10], pages: one(REPORT_SEAL_COLS, SEAL_REPORT), sourcePages: 1, source: '인감_개인신고서.docx', added: ['대표이사'] },
-  { name: '주식인수증', unit: 'founder', sizes: [10], pages: one(SUBSCRIPTION_COLS, SUBSCRIPTION), sourcePages: 1, source: '양식_첨부4_주식인수증.docx', added: [] },
-  { name: '정관', unit: 'case', sizes: [ART], cover, blocks: articleBlocks, cols: [px(20), W - px(20)], sourcePages: null, source: null },
+const ALL_DOCS = [
+  { name: '설립등기신청서', registered: '2026-10-12', unit: 'case', sizes: [REG], pages: () => [{ cols: REG12_COLS, rows: REG_PAGE1 }, { cols: REG12_COLS, rows: REG_PAGE2 }, { cols: REG3_COLS, rows: REG_PAGE3 }], sourcePages: 3, source: '65-1(40-1).주식회사설립등기(발기설립).docx', added: ['발행주식의 총수', '보통주식'] },
+  { name: '발기인총회의사록', registered: '2026-10-12', unit: 'case', sizes: [10.5, 10, 9.5], pages: one(MINUTES_COLS, MINUTES), sourcePages: 1, source: '발기인총회의사록.docx', added: [] },
+  { name: '조사보고서', registered: '2026-10-12', unit: 'case', sizes: [10.5, 10, 9.5], pages: one(REPORT_COLS, REPORT), sourcePages: 1, source: '조사보고서.docx', added: [] },
+  { name: '주식발행사항동의서', registered: '2026-10-12', unit: 'case', sizes: [13], pages: one(ISSUANCE_COLS, ISSUANCE), sourcePages: 1, source: '주식 발행사항 동의서.docx', added: ['보통주식'] },
+  { name: '인감대지', registered: '2026-10-12', unit: 'case', sizes: [10], pages: one(SEAL_COLS, SEAL_SHEET), sourcePages: 1, source: '인감대지.docx', added: ['대표이사'] },
+  { name: '인감·개인신고서', registered: '2026-10-12', unit: 'case', sizes: [10], pages: one(REPORT_SEAL_COLS, SEAL_REPORT), sourcePages: 1, source: '인감_개인신고서.docx', added: ['대표이사'] },
+  { name: '주식인수증', registered: '2026-10-12', unit: 'founder', sizes: [10], pages: one(SUBSCRIPTION_COLS, SUBSCRIPTION), sourcePages: 1, source: '양식_첨부4_주식인수증.docx', added: [] },
+  { name: '정관', registered: '2026-10-12', unit: 'case', sizes: [ART], cover, blocks: articleBlocks, cols: [px(20), W - px(20)], sourcePages: null, source: null },
 ];
 /** 취임승낙서(설립) — 법인변경 「취임승낙서」를 복사한다. 자리표시 이름만 설립 것으로(결정 2026-10-12). */
 const ACCEPT_FROM = '취임승낙서';
 const ACCEPT_NAME = '취임승낙서(설립)';
 const ACCEPT_RENAME = { officerName: 'personName', officerRrn: 'personRrn', officerAddress: 'personAddress', officerPosition: 'personRole', resolutionDate: 'appointedDate' };
+const ACCEPT_REGISTERED = '2026-10-12';
+
+/** 고른 서류 — `--only=` 가 있으면 그 이름만, 없으면 아직 등록하지 않은 것만(등록한 것은 기본 선택에서 빠진다). */
+const picked = (name, registered) => (only.length > 0 ? only.includes(name) : !registered);
+const DOCS = ALL_DOCS.filter((d) => picked(d.name, d.registered));
+const ACCEPT_ON = picked(ACCEPT_NAME, ACCEPT_REGISTERED);
+if (DOCS.length === 0 && !ACCEPT_ON) {
+  console.log(`고른 서류가 없습니다 — ${[...ALL_DOCS.map((d) => d.name), ACCEPT_NAME].join(' · ')} 는 ${ACCEPT_REGISTERED} 에 등록함. 다시 보려면 --only=이름,…`);
+  process.exit(0);
+}
 
 // =============================================================================
 // 최대 인원 값 — 이 값으로 높이를 잰다(shared 출력값 함수 그대로)
@@ -711,20 +724,23 @@ function checkAgainstSource(d, pages) {
     const problems = [];
 
     // 취임승낙서(설립) — 법인변경 양식을 읽어 복사
-    const from = (await c.query(`SELECT definition FROM public.tb_s080_form_templates WHERE operator_id = 1 AND name = $1`, [ACCEPT_FROM])).rows;
-    if (from.length !== 1) throw new Error(`「${ACCEPT_FROM}」 양식이 ${from.length}개다(1개여야 한다)`);
-    const accept = JSON.parse(JSON.stringify(from[0].definition));
-    if (accept.legal?.domain !== 'corp-change') throw new Error(`「${ACCEPT_FROM}」 이 법인변경 양식이 아니다`);
-    let meetingWords = 0;
-    for (const p of accept.pages) for (const cell of p.cells) {
-      if (!cell.text) continue;
-      cell.text = cell.text.replace(/\{\{([^}]+)\}\}/g, (all, k) => (ACCEPT_RENAME[k] ? `{{${ACCEPT_RENAME[k]}}}` : all));
-      meetingWords += cell.text.split('주주총회').length - 1;
-      cell.text = cell.text.split('주주총회').join('발기인총회');
+    let accept = null;
+    if (ACCEPT_ON) {
+      const from = (await c.query(`SELECT definition FROM public.tb_s080_form_templates WHERE operator_id = 1 AND name = $1`, [ACCEPT_FROM])).rows;
+      if (from.length !== 1) throw new Error(`「${ACCEPT_FROM}」 양식이 ${from.length}개다(1개여야 한다)`);
+      accept = JSON.parse(JSON.stringify(from[0].definition));
+      if (accept.legal?.domain !== 'corp-change') throw new Error(`「${ACCEPT_FROM}」 이 법인변경 양식이 아니다`);
+      let meetingWords = 0;
+      for (const p of accept.pages) for (const cell of p.cells) {
+        if (!cell.text) continue;
+        cell.text = cell.text.replace(/\{\{([^}]+)\}\}/g, (all, k) => (ACCEPT_RENAME[k] ? `{{${ACCEPT_RENAME[k]}}}` : all));
+        meetingWords += cell.text.split('주주총회').length - 1;
+        cell.text = cell.text.split('주주총회').join('발기인총회');
+      }
+      if (meetingWords !== 1) problems.push(`${ACCEPT_NAME}: 「주주총회」가 ${meetingWords}곳(1곳이어야 한다)`);
+      delete accept.manualFields;
+      accept.legal = { domain: 'incorporation', unit: 'officer' };
     }
-    if (meetingWords !== 1) problems.push(`${ACCEPT_NAME}: 「주주총회」가 ${meetingWords}곳(1곳이어야 한다)`);
-    delete accept.manualFields;
-    accept.legal = { domain: 'incorporation', unit: 'officer' };
 
     // 재기 — 서류마다 크기마다 장마다 표 하나, 정관 본문은 블록마다 표 하나
     const tables = [];
@@ -742,7 +758,7 @@ function checkAgainstSource(d, pages) {
         pages.forEach((p, i) => tables.push({ id: `${d.name}#${s}#${i}`, cols: p.cols, rows: p.rows, values, fontSize: s }));
       }
     }
-    accept.pages.forEach((p, i) => tables.push({ id: `${ACCEPT_NAME}#${i}`, cols: p.colWidths, rows: defPageRows(p), values: personValues, fontSize: accept.font.size }));
+    if (accept) accept.pages.forEach((p, i) => tables.push({ id: `${ACCEPT_NAME}#${i}`, cols: p.colWidths, rows: defPageRows(p), values: personValues, fontSize: accept.font.size }));
     const measured = measureAll(tables);
 
     const ready = [];
@@ -806,7 +822,7 @@ function checkAgainstSource(d, pages) {
     }
 
     // 취임승낙서(설립) — 칸 배치 그대로, 최대 값이 넘치는 행만 높인다
-    {
+    if (accept) {
       const notes = [`원문: 표양식 「${ACCEPT_FROM}」(법인변경) 복사 — 자리표시 ${Object.entries(ACCEPT_RENAME).map(([a, b]) => `${a}→${b}`).join(' · ')} · 「주주총회」→「발기인총회」`];
       accept.pages = accept.pages.map((p, i) => {
         const content = measured[`${ACCEPT_NAME}#${i}`];
