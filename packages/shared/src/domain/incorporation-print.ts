@@ -69,6 +69,7 @@ export const INCORP_PRINT_FIELDS: readonly IncorpPrintField[] = [
   { name: 'rosterClosure', label: '주주명부 폐쇄기간', source: 'case' },
   { name: 'recordDate', label: '기준일', source: 'case' },
   { name: 'plannedDate', label: '설립예정일', source: 'case' },
+  { name: 'meetingDate', label: '발기인총회 개최일', source: 'case' },
   { name: 'purposeList', label: '목적(번호 목록)', source: 'case' },
   { name: 'articlesPurposeList', label: '정관 목적(번호 목록 + 부대사업)', source: 'case' },
   // 사람 목록
@@ -82,6 +83,9 @@ export const INCORP_PRINT_FIELDS: readonly IncorpPrintField[] = [
   { name: 'shareholderSignList', label: '주주 기명날인(서면결의)', source: 'case' },
   { name: 'founderSignList', label: '발기인 기명날인(주식발행사항동의서)', source: 'case' },
   { name: 'reporterList', label: '조사보고인', source: 'case' },
+  { name: 'officerNameList', label: '이사·감사 직위와 성명(의사록)', source: 'case' },
+  { name: 'reporterNameList', label: '검사인 직위와 성명(의사록)', source: 'case' },
+  { name: 'reporterSignList', label: '검사인 기명날인(조사보고서)', source: 'case' },
   { name: 'articlesFounderList', label: '정관 발기인', source: 'case' },
   // 등기 설정
   { name: 'formLabel', label: '표시명', source: 'case' },
@@ -192,6 +196,11 @@ export function personRoleLabel(p: Pick<IncorpSnapshotPerson, 'isDirector' | 'is
   if (p.isDirector) r.push('이사');
   if (p.isAuditor) r.push('감사');
   return r.join('·');
+}
+
+/** 의사록 · 조사보고서의 직위 — 감사만 맡으면 「감　　사」, 그 밖은 「사내이사」(결정 2026-10-12). */
+export function minutesRole(p: Pick<IncorpSnapshotPerson, 'isDirector' | 'isAuditor'>): string {
+  return p.isAuditor && !p.isDirector ? '감　　사' : '사내이사';
 }
 
 /** 조사보고인 — 발기인이 아닌 이사 · 감사(레거시 `InvestigationReportDoc`, 상법 제298조). */
@@ -307,6 +316,8 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
     rosterClosure: record.closure,
     recordDate: record.base,
     plannedDate: formatKoreanDate(info.plannedDate),
+    // 발기인총회 개최일 — 설립예정일 값을 쓴다(결정 2026-10-12)
+    meetingDate: formatKoreanDate(info.plannedDate),
     purposeList: lines(purposes.map((l, i) => `${i + 1}. ${l}`)),
     articlesPurposeList: lines([...purposes, ARTICLES_INCIDENTAL_PURPOSE].map((l, i) => `${i + 1}. ${l}`)),
 
@@ -345,6 +356,12 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
         `주소 : ${formatIncorpAddress(p)}`,
       ]),
     ),
+
+    // 발기인총회의사록 · 조사보고서(새 docx, 결정 2026-10-12) — 주민번호 없이 직위 + 성명.
+    // 직위는 `minutesRole`(대표이사 선임은 `representativeList` 몫)
+    officerNameList: lines(persons.filter((p) => p.isDirector || p.isAuditor).map((p) => `${minutesRole(p)}　${p.name}`)),
+    reporterNameList: lines(investigationReporters(persons).map((p) => `${minutesRole(p)}　${p.name}`)),
+    reporterSignList: lines(investigationReporters(persons).map((p) => `${minutesRole(p)}　${p.name}　　(인)`)),
 
     // 정관 말미 — 레거시 `ArticlesDoc`
     articlesFounderList: lines(founders.flatMap((p) => [`발기인　성명 : ${p.name} (${rrnOf(p)})　(인)`, `주소 : ${formatIncorpAddress(p)}`])),
@@ -419,12 +436,15 @@ export interface IncorpPrintDocument<D = unknown> {
 /** 조사보고인이 없을 때의 안내(결정 4). */
 export const NO_REPORTER_NOTICE = '해당 사람 없음 — 조사보고인(발기인이 아닌 이사 · 감사)이 없어 보고인 칸이 비어 있습니다';
 
+/** 조사보고인 칸 — 이 중 하나라도 쓰는 양식에 「해당 사람 없음」 안내가 붙는다. */
+const REPORTER_FIELDS = ['reporterList', 'reporterNameList', 'reporterSignList'];
+
 const UNIT_ORDER: Record<IncorpMarkUnit, number> = { case: 0, officer: 1, founder: 2 };
 
 /**
  * 이 건에 뜨는 서류들 — 법인설립 표시가 붙은 양식만. 순서: 건마다 → 임원마다 → 발기인마다, 같은 단위 안에서는
  * 양식 이름 순.
- * ★ 「해당 사람 없음」 안내는 양식이 조사보고인 칸(`reporterList`)을 쓰는데 보고인이 없을 때만 붙는다.
+ * ★ 「해당 사람 없음」 안내는 양식이 조사보고인 칸(`REPORTER_FIELDS`)을 쓰는데 보고인이 없을 때만 붙는다.
  */
 export function buildIncorpPrintDocuments<D>(
   forms: readonly IncorpMarkedForm<D>[],
@@ -443,7 +463,7 @@ export function buildIncorpPrintDocuments<D>(
       f.mark.unit === 'case'
         ? [{ personName: null, values: buildIncorpCasePrintValues(src) }]
         : personsForIncorpMark(f.mark, src.persons).map((p) => ({ personName: p.name, values: buildIncorpPersonPrintValues(src, p) })),
-    notice: noReporter && f.tokens.includes('reporterList') ? NO_REPORTER_NOTICE : null,
+    notice: noReporter && REPORTER_FIELDS.some((t) => f.tokens.includes(t)) ? NO_REPORTER_NOTICE : null,
   }));
 }
 

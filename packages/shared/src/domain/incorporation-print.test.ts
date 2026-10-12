@@ -133,6 +133,24 @@ describe('buildIncorpCasePrintValues', () => {
     expect(v.reporterList).toBe('조사보고인 감사 : 이감사 (인)\n주민등록번호 : 880303-1234567\n주소 : 경기 성남시 3');
   });
 
+  it('★ 의사록 · 조사보고서 — 직위 + 성명(주민번호 없음), 감사만 맡으면 감사 · 그 밖은 사내이사', () => {
+    const ps = [
+      ...persons,
+      person({ name: '박이사', isDirector: true, isRepresentative: true }),
+      person({ name: '최겸직', isDirector: true, isAuditor: true }),
+    ];
+    const w = buildIncorpCasePrintValues(src(ps));
+    expect(w.officerNameList).toBe('사내이사　홍길동\n감　　사　이감사\n사내이사　박이사\n사내이사　최겸직');
+    // 검사인 = 발기인이 아닌 이사 · 감사(홍길동은 발기인)
+    expect(w.reporterNameList).toBe('감　　사　이감사\n사내이사　박이사\n사내이사　최겸직');
+    expect(w.reporterSignList).toBe('감　　사　이감사　　(인)\n사내이사　박이사　　(인)\n사내이사　최겸직　　(인)');
+    expect(w.officerNameList + w.reporterNameList + w.reporterSignList).not.toMatch(/\d{6}/);
+  });
+
+  it('★ 발기인총회 개최일 = 설립예정일', () => {
+    expect(v.meetingDate).toBe('2026년 11월 2일');
+  });
+
   it('★ 등기 설정 — 목적만 비면 코드 이름, 사유 · 세금은 빈칸, 첨부서면은 설정 값', () => {
     expect(v.regPurpose).toBe('주식회사 발기설립');
     expect([v.regReason, v.regLicenseTax, v.taxTotal, v.regFee]).toEqual(['', '', '', '']);
@@ -196,6 +214,13 @@ describe('buildIncorpPrintDocuments', () => {
     expect(report.notice).toBe(NO_REPORTER_NOTICE);
     expect(report.sheets[0]!.values.reporterList).toBe('');
     expect(docs.find((d) => d.name === '정관')!.notice).toBeNull();
+  });
+
+  it('★ 검사인 칸(reporterNameList · reporterSignList)만 쓰는 양식에도 안내', () => {
+    const minutes = [form('m1', '발기인총회의사록', 'case', ['reporterNameList']), form('m2', '조사보고서', 'case', ['reporterSignList'])];
+    const docs = buildIncorpPrintDocuments(minutes, src(persons.slice(0, 2)));
+    expect(docs.map((d) => d.notice)).toEqual([NO_REPORTER_NOTICE, NO_REPORTER_NOTICE]);
+    expect(docs[0]!.sheets[0]!.values.reporterNameList).toBe('');
   });
 });
 
