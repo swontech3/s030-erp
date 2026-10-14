@@ -100,7 +100,7 @@ const INC_COLUMNS = `id, org_id, org_code, status,
        capital_amount, par_value, units_authorized, units_issued,
        public_notice_method, fiscal_start, fiscal_end,
        to_char(planned_date, 'YYYY-MM-DD') AS planned_date, purposes,
-       meeting_time, payment_bank,
+       meeting_time, payment_bank, ceo_phone,
        to_char(created_at, 'YYYY-MM-DD') AS created_on,
        status_before_cancel, cancel_reason,
        to_char(written_at, 'YYYY-MM-DD') AS written_on,
@@ -128,6 +128,7 @@ interface IncRow {
   purposes: string | null;
   meeting_time: string | null;
   payment_bank: string | null;
+  ceo_phone: string | null;
   created_on: string;
   status_before_cancel: string | null;
   cancel_reason: string | null;
@@ -157,6 +158,7 @@ const toRow = (r: IncRow): IncorporationRow => ({
     plannedDate: r.planned_date,
     meetingTime: r.meeting_time,
     paymentBank: r.payment_bank,
+    ceoPhone: r.ceo_phone,
     purposes: r.purposes,
     companyTypePosition: r.company_type_position,
   },
@@ -187,7 +189,7 @@ const infoParams = (i: IncorpInfoInput): unknown[] => [
   i.hq?.zipCode ?? null, i.hq?.address ?? null, i.hq?.addressDetail ?? null,
   i.capitalAmount, i.parValue, i.unitsAuthorized, i.unitsIssued,
   i.publicNoticeMethod, i.fiscalStart, i.fiscalEnd, i.plannedDate, i.purposes,
-  i.meetingTime, i.paymentBank,
+  i.meetingTime, i.paymentBank, i.ceoPhone,
 ];
 
 /** 새 건 — 첫 [저장] 때만(법인변경과 같다). 회사유형 R · 발기설립 고정. */
@@ -202,12 +204,12 @@ export async function insertIncorporation(
         name_ko, name_en, company_type_position, head_zip_code, head_address, head_address_detail,
         capital_amount, par_value, units_authorized, units_issued,
         public_notice_method, fiscal_start, fiscal_end, planned_date, purposes,
-        meeting_time, payment_bank,
+        meeting_time, payment_bank, ceo_phone,
         created_at, updated_at, created_by, updated_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7,
              $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21::date, $22,
-             $23, $24,
-             now(), now(), $25, $25)`,
+             $23, $24, $25,
+             now(), now(), $26, $26)`,
     [args.id, args.status, OPERATOR_ID, args.orgId, args.orgCode, INCORP_ENTITY_TYPE, ESTABLISHMENT_METHOD, ...infoParams(args.info), args.actor],
   );
 }
@@ -224,8 +226,8 @@ export async function updateIncorporationInfo(
             head_zip_code = $5, head_address = $6, head_address_detail = $7,
             capital_amount = $8, par_value = $9, units_authorized = $10, units_issued = $11,
             public_notice_method = $12, fiscal_start = $13, fiscal_end = $14, planned_date = $15::date, purposes = $16,
-            meeting_time = $17, payment_bank = $18,
-            updated_at = now(), updated_by = $19
+            meeting_time = $17, payment_bank = $18, ceo_phone = $19,
+            updated_at = now(), updated_by = $20
       WHERE id = $1`,
     [args.id, ...infoParams(args.info), args.actor],
   );

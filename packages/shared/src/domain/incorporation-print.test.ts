@@ -186,6 +186,23 @@ describe('buildIncorpCasePrintValues', () => {
     expect(buildIncorpCasePrintValues(src(persons, null)).formNo).toBe('');
   });
 
+  it('★ 첨부서면 2단 — 앞 절반 · 뒤 절반, 홀수면 앞쪽이 하나 더', () => {
+    expect([v.attachments1, v.attachments2]).toEqual(['1. 정관  1통', '1. 주식인수증  1통']);
+    const three = { ...setting, attachments: [...setting.attachments, { name: '조사보고서', copies: 1 }] };
+    const w = buildIncorpCasePrintValues(src(persons, three));
+    expect([w.attachments1, w.attachments2]).toEqual(['1. 정관  1통\n1. 주식인수증  1통', '1. 조사보고서  1통']);
+    expect(w.attachments).toBe(`${w.attachments1}\n${w.attachments2}`);
+    const none = buildIncorpCasePrintValues(src(persons, null));
+    expect([none.attachments1, none.attachments2]).toEqual(['', '']);
+  });
+
+  it('대표이사 전화 — 설립 정보 값, 비우면 빈칸', () => {
+    expect(v.ceoPhone).toBe('');
+    const s = src();
+    const w = buildIncorpCasePrintValues({ ...s, snapshot: { ...s.snapshot, info: { ...s.snapshot.info, ceoPhone: '010-1234-5678' } } });
+    expect(w.ceoPhone).toBe('010-1234-5678');
+  });
+
   it('모든 자리표시에 값이 있다 — 사람 칸은 빈칸', () => {
     for (const f of INCORP_PRINT_FIELDS) expect(typeof v[f.name]).toBe('string');
     expect(v.personName).toBe('');
@@ -262,10 +279,12 @@ describe('readIncorporationSnapshot', () => {
     const raw = JSON.parse(JSON.stringify(snapshotOf(persons)));
     raw.info.meetingTime = '10:00';
     raw.info.paymentBank = '국민은행';
-    expect(readIncorporationSnapshot(raw)?.info).toMatchObject({ meetingTime: '10:00', paymentBank: '국민은행' });
+    raw.info.ceoPhone = '02-000-0000';
+    expect(readIncorporationSnapshot(raw)?.info).toMatchObject({ meetingTime: '10:00', paymentBank: '국민은행', ceoPhone: '02-000-0000' });
     delete raw.info.meetingTime;
     delete raw.info.paymentBank;
-    expect(readIncorporationSnapshot(raw)?.info).toMatchObject({ meetingTime: null, paymentBank: null });
+    delete raw.info.ceoPhone;
+    expect(readIncorporationSnapshot(raw)?.info).toMatchObject({ meetingTime: null, paymentBank: null, ceoPhone: null });
   });
   it('v1 이 아니면 null', () => {
     expect(readIncorporationSnapshot({ version: 2, info: {} })).toBeNull();

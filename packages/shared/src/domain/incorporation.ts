@@ -101,6 +101,7 @@ export const INCORP_FIELD_DEFS: readonly IncorpFieldDef[] = [
     hint: `발기인총회 의사록의 시각입니다. 폐회시간은 ${CLOSING_AFTER_MINUTES}분 뒤로 찍힙니다`,
   },
   { name: 'paymentBank', label: '납입은행(지점)', type: 'text', required: false, hint: '조사보고서 · 주식인수증의 납입기관입니다' },
+  { name: 'ceoPhone', label: '대표이사 전화', type: 'text', required: false, hint: '설립등기신청서 서명란의 전화입니다' },
   {
     name: 'purposes',
     label: '사업목적',
@@ -127,6 +128,8 @@ export interface IncorporationInfo {
   meetingTime?: string | null;
   /** 납입은행(지점). 선택. */
   paymentBank?: string | null;
+  /** 대표이사 전화 — 설립등기신청서 서명란. 선택. */
+  ceoPhone?: string | null;
   purposes?: string | null;
 }
 

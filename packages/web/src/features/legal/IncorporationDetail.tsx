@@ -93,7 +93,7 @@ const DEF: Record<InfoName, IncorpFieldDef> = Object.fromEntries(INCORP_FIELD_DE
 
 /** 묶음 — 배치만 정한다(칸 정의는 shared). 상호(국문) · 본점은 회사 묶음이 따로 그린다. */
 const CAPITAL_FIELDS: InfoName[] = ['capitalAmount', 'parValue', 'unitsAuthorized', 'unitsIssued'];
-const SETUP_FIELDS: InfoName[] = ['publicNoticeMethod', 'fiscalStart', 'fiscalEnd', 'plannedDate', 'meetingTime', 'paymentBank'];
+const SETUP_FIELDS: InfoName[] = ['publicNoticeMethod', 'fiscalStart', 'fiscalEnd', 'plannedDate', 'meetingTime', 'paymentBank', 'ceoPhone'];
 
 /** 화면이 들고 있는 설립 정보 — 글자 칸은 문자열(숫자 칸은 콤마 붙은 문자열), 본점은 세 칸. */
 interface InfoForm {

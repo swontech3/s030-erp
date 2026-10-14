@@ -81,6 +81,7 @@ export const INCORP_PRINT_FIELDS: readonly IncorpPrintField[] = [
   { name: 'representativeList', label: '대표이사 성명과 주소', source: 'case' },
   { name: 'ceoName', label: '대표이사 성명', source: 'case' },
   { name: 'ceoAddress', label: '대표이사 주소', source: 'case' },
+  { name: 'ceoPhone', label: '대표이사 전화', source: 'case' },
   { name: 'founderUnitsTotal', label: '주주 전원의 주식수', source: 'case' },
   { name: 'founderCount', label: '발기인 수', source: 'case' },
   { name: 'officerComposition', label: '이사 구성(사내이사 n명, 감사 n명)', source: 'case' },
@@ -103,6 +104,8 @@ export const INCORP_PRINT_FIELDS: readonly IncorpPrintField[] = [
   { name: 'taxTotal', label: '세액합계', source: 'case' },
   { name: 'regFee', label: '등기신청수수료', source: 'case' },
   { name: 'attachments', label: '첨부서면', source: 'case' },
+  { name: 'attachments1', label: '첨부서면(앞 절반)', source: 'case' },
+  { name: 'attachments2', label: '첨부서면(뒤 절반)', source: 'case' },
   // 출력 직전 입력
   { name: 'applyDate', label: '신청일', source: 'input' },
   { name: 'writeDate', label: '작성일', source: 'input' },
@@ -259,6 +262,7 @@ export function readIncorporationSnapshot(raw: unknown): IncorporationSnapshot |
     plannedDate: str(i.plannedDate),
     meetingTime: str(i.meetingTime),
     paymentBank: str(i.paymentBank),
+    ceoPhone: str(i.ceoPhone),
     purposes: str(i.purposes),
     companyTypePosition: str(i.companyTypePosition),
   };
@@ -326,6 +330,8 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
   const record = rosterRecordText(info.fiscalStart, info.fiscalEnd);
   const t = setting?.taxes ?? { regLicense: null, localEdu: null, regFee: null };
   const total = t.regLicense === null && t.localEdu === null ? null : (t.regLicense ?? 0) + (t.localEdu ?? 0);
+  const attachmentList = setting?.attachments ?? [];
+  const attachmentHalf = Math.ceil(attachmentList.length / 2);
 
   const values: Record<string, string> = {
     companyName: name,
@@ -358,6 +364,7 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
     representativeList: lines(representatives.flatMap((p) => [`대표이사 ${p.name}`, formatIncorpAddress(p)])),
     ceoName: rep?.name ?? '',
     ceoAddress: rep ? formatIncorpAddress(rep) : '',
+    ceoPhone: info.ceoPhone ?? '',
 
     // 주주전원서면결의서 — 레거시 `ShareholderResolutionDoc`
     founderUnitsTotal: count(totalUnits),
@@ -407,7 +414,10 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
     localEduTax: formatAmount(t.localEdu),
     taxTotal: formatAmount(total),
     regFee: formatAmount(t.regFee),
-    attachments: formatAttachments(setting?.attachments ?? []),
+    attachments: formatAttachments(attachmentList),
+    // 첨부서면 2단 — 앞 절반 · 뒤 절반, 홀수면 앞쪽이 하나 더(2026-10-14)
+    attachments1: formatAttachments(attachmentList.slice(0, attachmentHalf)),
+    attachments2: formatAttachments(attachmentList.slice(attachmentHalf)),
 
     applyDate: formatKoreanDate(inputs.applyDate),
     writeDate: formatKoreanDate(inputs.writeDate),
