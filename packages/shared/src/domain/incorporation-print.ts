@@ -6,7 +6,8 @@
  *     정관)은 **레거시 화면**(`S-WonERP/src/components/incorporation/documents/*`)의 값 계산을 그대로 옮겼다.
  *     문구는 양식(표양식)에 있고, 여기는 자리표시에 들어갈 **값**만 만든다
  *   · 등기 설정은 법인변경과 같은 규칙(결정 1 (가)) — 설정 값을 쓰고 빈 칸은 빈칸. 등기의 목적만 비면 코드 이름
- *     (`LAW_EST_TP` 의 「주식회사 발기설립」). 사유 · 세금은 빈칸(세금 `tax_mode` 가 fixed 가 아니다), 첨부서면은 설정 값
+ *     (`LAW_EST_TP` 의 「주식회사 발기설립」). 사유는 설정 값, 첨부서면은 설정 값
+ *   · 세금 · 등기신청수수료는 자본금으로 계산한다(2026-10-14, `incorporation-tax.ts`) — 등기 설정의 세금 칸은 읽지 않는다
  *   · 날짜(결정 2) — 출력 직전 입력은 신청일 · 작성일(기본 오늘, 화면 몫). 정관 끝 날짜 = 설립예정일,
  *     취임승낙서 선임일 = 취임일 → 비면 작성일
  *   · 정관 「서울특별시」(제3조① · 제4조②) = 본점 시·도 정식 이름(결정 3, `korea-sido.ts`)
@@ -32,6 +33,7 @@ import {
 import { personsForIncorpMark, type IncorpMarkUnit, type LegalFormMark } from './legal-form-mark.ts';
 import { sidoOf } from './korea-sido.ts';
 import { closingTimeOf, isTimeOfDay } from './incorporation.ts';
+import { incorporationTax, metroSurchargeOf } from './incorporation-tax.ts';
 import type { IncorpInfoInput, IncorpSnapshotPerson, IncorporationSnapshot } from './incorporation-detail.ts';
 
 // =============================================================================
@@ -263,6 +265,7 @@ export function readIncorporationSnapshot(raw: unknown): IncorporationSnapshot |
     meetingTime: str(i.meetingTime),
     paymentBank: str(i.paymentBank),
     ceoPhone: str(i.ceoPhone),
+    metroSurcharge: typeof i.metroSurcharge === 'boolean' ? i.metroSurcharge : null,
     purposes: str(i.purposes),
     companyTypePosition: str(i.companyTypePosition),
   };
@@ -328,8 +331,8 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
   const totalUnits = founders.reduce((s, p) => s + (p.unitsSubscribed || 0), 0);
   const purposes = purposeLines(info.purposes ?? '');
   const record = rosterRecordText(info.fiscalStart, info.fiscalEnd);
-  const t = setting?.taxes ?? { regLicense: null, localEdu: null, regFee: null };
-  const total = t.regLicense === null && t.localEdu === null ? null : (t.regLicense ?? 0) + (t.localEdu ?? 0);
+  // 세금 · 수수료 — 자본금으로 계산한다(2026-10-14, `incorporation-tax.ts`). 자본금이 없으면 빈칸
+  const tax = incorporationTax(info.capitalAmount, metroSurchargeOf(info.metroSurcharge, info.hq?.address));
   const attachmentList = setting?.attachments ?? [];
   const attachmentHalf = Math.ceil(attachmentList.length / 2);
 
@@ -410,10 +413,10 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
     formNo: setting?.formNo ?? '',
     regPurpose: setting?.regPurpose ?? methodName ?? '',
     regReason: setting?.regReason ?? '',
-    regLicenseTax: formatAmount(t.regLicense),
-    localEduTax: formatAmount(t.localEdu),
-    taxTotal: formatAmount(total),
-    regFee: formatAmount(t.regFee),
+    regLicenseTax: formatAmount(tax?.regLicense ?? null),
+    localEduTax: formatAmount(tax?.localEdu ?? null),
+    taxTotal: formatAmount(tax?.total ?? null),
+    regFee: formatAmount(tax?.regFee ?? null),
     attachments: formatAttachments(attachmentList),
     // 첨부서면 2단 — 앞 절반 · 뒤 절반, 홀수면 앞쪽이 하나 더(2026-10-14)
     attachments1: formatAttachments(attachmentList.slice(0, attachmentHalf)),

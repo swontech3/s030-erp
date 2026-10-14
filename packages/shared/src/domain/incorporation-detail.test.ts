@@ -55,6 +55,17 @@ describe('parseIncorpInfo — 모양만 본다(임시 저장)', () => {
   });
 });
 
+describe('parseIncorpInfo — 대도시 중과 체크', () => {
+  it('없으면 null(사람이 안 고침) · true/false 는 그대로 · 그 밖은 거절', () => {
+    const at = (v: unknown) => parseIncorpInfo({ metroSurcharge: v });
+    const r0 = at(undefined);
+    expect(r0.ok && r0.value.metroSurcharge).toBeNull();
+    const r1 = at(false);
+    expect(r1.ok && r1.value.metroSurcharge).toBe(false);
+    expect(at('Y').ok).toBe(false);
+  });
+});
+
 describe('parseIncorpPersonBody', () => {
   it('체크 · 인수수량 · 취임일 · 주민번호', () => {
     const r = parseIncorpPersonBody({ name: '홍길동', isFounder: true, isRepresentative: true, unitsSubscribed: 10_000, appointmentDate: '2026-11-02', rrn: '900101-1234567' });

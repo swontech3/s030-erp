@@ -135,6 +135,13 @@ export function parseIncorpInfo(raw: unknown, at = 'info'): Parsed<IncorpInfoInp
         else out[def.name] = n;
         break;
       }
+      case 'check': {
+        // 체크 — 없으면 null(사람이 안 고침), 아니면 true · false 만
+        if (v === undefined || v === null) out[def.name] = null;
+        else if (typeof v === 'boolean') out[def.name] = v;
+        else errors.push({ field: def.name, message: `${def.label}은(는) 체크로 고르세요` });
+        break;
+      }
       case 'date': {
         const t = textOrNull(v);
         // ★ DB 칸이 timestamp 다 — 날짜가 아니면 넣을 수 없으니 저장 때 거절한다(머리말 예외)

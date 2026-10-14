@@ -178,9 +178,9 @@ describe('buildIncorpCasePrintValues', () => {
     expect(timed(null, '국민은행 삼성동지점').paymentBank).toBe('국민은행 삼성동지점');
   });
 
-  it('★ 등기 설정 — 목적만 비면 코드 이름, 사유 · 세금은 빈칸, 첨부서면은 설정 값', () => {
+  it('★ 등기 설정 — 목적만 비면 코드 이름, 사유는 설정 값(비면 빈칸), 첨부서면은 설정 값', () => {
     expect(v.regPurpose).toBe('주식회사 발기설립');
-    expect([v.regReason, v.regLicenseTax, v.taxTotal, v.regFee]).toEqual(['', '', '', '']);
+    expect(v.regReason).toBe('');
     expect(v.attachments).toBe('1. 정관  1통\n1. 주식인수증  1통');
     expect(v.formNo).toBe('[양식 제65-1호]');
     expect(buildIncorpCasePrintValues(src(persons, null)).formNo).toBe('');
@@ -201,6 +201,16 @@ describe('buildIncorpCasePrintValues', () => {
     const s = src();
     const w = buildIncorpCasePrintValues({ ...s, snapshot: { ...s.snapshot, info: { ...s.snapshot.info, ceoPhone: '010-1234-5678' } } });
     expect(w.ceoPhone).toBe('010-1234-5678');
+  });
+
+  it('★ 세금 · 수수료는 자본금으로 계산 — 본점이 서울이면 기본 중과, 체크를 끄면 중과 없음', () => {
+    // 자본금 1억 · 본점 서울 → 중과: 400,000 × 3
+    expect([v.regLicenseTax, v.localEduTax, v.taxTotal, v.regFee]).toEqual(['1,200,000', '240,000', '1,440,000', '35,000']);
+    const s = src();
+    const off = buildIncorpCasePrintValues({ ...s, snapshot: { ...s.snapshot, info: { ...s.snapshot.info, metroSurcharge: false } } });
+    expect([off.regLicenseTax, off.localEduTax, off.taxTotal]).toEqual(['400,000', '80,000', '480,000']);
+    const noCap = buildIncorpCasePrintValues({ ...s, snapshot: { ...s.snapshot, info: { ...s.snapshot.info, capitalAmount: null } } });
+    expect([noCap.regLicenseTax, noCap.localEduTax, noCap.taxTotal, noCap.regFee]).toEqual(['', '', '', '']);
   });
 
   it('모든 자리표시에 값이 있다 — 사람 칸은 빈칸', () => {

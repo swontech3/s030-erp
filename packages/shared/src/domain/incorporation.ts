@@ -59,7 +59,7 @@ export const INCORP_INT_MAX = Number.MAX_SAFE_INTEGER;
 // 입력 칸
 // =============================================================================
 
-export type IncorpFieldType = 'text' | 'textarea' | 'address' | 'amount' | 'count' | 'monthDay' | 'date' | 'time';
+export type IncorpFieldType = 'text' | 'textarea' | 'address' | 'amount' | 'count' | 'monthDay' | 'date' | 'time' | 'check';
 
 /** 개회시간 기본값 — 새 건의 화면이 채워 둔다(2026-10-14). 비우면 서류 시각은 빈칸이다. */
 export const DEFAULT_MEETING_TIME = '10:00';
@@ -103,6 +103,13 @@ export const INCORP_FIELD_DEFS: readonly IncorpFieldDef[] = [
   { name: 'paymentBank', label: '납입은행(지점)', type: 'text', required: false, hint: '조사보고서 · 주식인수증의 납입기관입니다' },
   { name: 'ceoPhone', label: '대표이사 전화', type: 'text', required: false, hint: '설립등기신청서 서명란의 전화입니다' },
   {
+    name: 'metroSurcharge',
+    label: '대도시 중과',
+    type: 'check',
+    required: false,
+    hint: '등록면허세를 3배로 계산합니다. 본점이 서울이면 기본으로 체크됩니다',
+  },
+  {
     name: 'purposes',
     label: '사업목적',
     type: 'textarea',
@@ -130,6 +137,10 @@ export interface IncorporationInfo {
   paymentBank?: string | null;
   /** 대표이사 전화 — 설립등기신청서 서명란. 선택. */
   ceoPhone?: string | null;
+  /**
+   * 대도시 중과 — 사람이 고친 값. null 이면 본점 시·도로 정한다(서울이면 중과, `metroSurchargeOf`).
+   */
+  metroSurcharge?: boolean | null;
   purposes?: string | null;
 }
 
@@ -205,6 +216,8 @@ function checkInfoField(def: IncorpFieldDef, value: unknown): CorpChangeFieldErr
       return typeof value === 'string' && isMonthDay(value) ? [] : [{ field: name, message: `${label}은(는) MM-DD(예: 01-01)로 입력하세요` }];
     case 'date':
       return typeof value === 'string' && parseDay(value) !== null ? [] : [{ field: name, message: `${label}은(는) 날짜(YYYY-MM-DD)로 입력하세요` }];
+    case 'check':
+      return typeof value === 'boolean' ? [] : [{ field: name, message: `${label}은(는) 체크로 고르세요` }];
     case 'time':
       return typeof value === 'string' && isTimeOfDay(value) ? [] : [{ field: name, message: `${label}은(는) 시각(HH:MM)으로 입력하세요` }];
     case 'address': {

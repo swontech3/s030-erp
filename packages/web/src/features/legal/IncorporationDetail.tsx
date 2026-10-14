@@ -39,6 +39,7 @@ import {
 } from '@swonbiz/shared/domain/corp-change';
 import { STALE_STATUS_MESSAGE } from '@swonbiz/shared/domain/corp-change-transition';
 import { corpChangeDateLine, normalizeRrn } from '@swonbiz/shared/domain/corp-change-detail';
+import { metroSurchargeOf } from '@swonbiz/shared/domain/incorporation-tax';
 import {
   DEFAULT_MEETING_TIME,
   INCORP_FIELD_DEFS,
@@ -93,7 +94,7 @@ const DEF: Record<InfoName, IncorpFieldDef> = Object.fromEntries(INCORP_FIELD_DE
 
 /** 묶음 — 배치만 정한다(칸 정의는 shared). 상호(국문) · 본점은 회사 묶음이 따로 그린다. */
 const CAPITAL_FIELDS: InfoName[] = ['capitalAmount', 'parValue', 'unitsAuthorized', 'unitsIssued'];
-const SETUP_FIELDS: InfoName[] = ['publicNoticeMethod', 'fiscalStart', 'fiscalEnd', 'plannedDate', 'meetingTime', 'paymentBank', 'ceoPhone'];
+const SETUP_FIELDS: InfoName[] = ['publicNoticeMethod', 'fiscalStart', 'fiscalEnd', 'plannedDate', 'meetingTime', 'paymentBank', 'ceoPhone', 'metroSurcharge'];
 
 /** 화면이 들고 있는 설립 정보 — 글자 칸은 문자열(숫자 칸은 콤마 붙은 문자열), 본점은 세 칸. */
 interface InfoForm {
@@ -107,7 +108,12 @@ function toInfoForm(info: Partial<Record<InfoName, unknown>> & { companyTypePosi
   for (const d of INCORP_FIELD_DEFS) {
     if (d.name === 'hq') continue;
     const v = info[d.name];
-    text[d.name] = d.type === 'amount' || d.type === 'count' ? showCount(v as number | null) : typeof v === 'string' ? v : '';
+    text[d.name] =
+      d.type === 'amount' || d.type === 'count'
+        ? showCount(v as number | null)
+        : d.type === 'check'
+          ? v === true ? 'Y' : v === false ? 'N' : ''
+          : typeof v === 'string' ? v : '';
   }
   const hq = info.hq as { zipCode?: string | null; address?: string | null; addressDetail?: string | null } | null | undefined;
   return {
@@ -126,7 +132,8 @@ function toWire(form: InfoForm): Record<string, unknown> {
       continue;
     }
     const v = form.text[d.name];
-    out[d.name] = d.type === 'amount' || d.type === 'count' ? toCount(v) : blankToNull(v);
+    out[d.name] =
+      d.type === 'amount' || d.type === 'count' ? toCount(v) : d.type === 'check' ? (v === 'Y' ? true : v === 'N' ? false : null) : blankToNull(v);
   }
   out.companyTypePosition = form.companyTypePosition || null;
   return out;
@@ -577,6 +584,22 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
     const error = errorFor(name);
     const numeric = d.type === 'amount' || d.type === 'count';
     const badDate = d.type === 'date' && value !== '' && parseDay(value) === null;
+    if (d.type === 'check') {
+      // 체크 — 사람이 고치지 않았으면(빈 값) 본점 시·도로 기본값을 보인다(서울이면 체크, `metroSurchargeOf`)
+      const checked = metroSurchargeOf(value === 'Y' ? true : value === 'N' ? false : null, form.hq.address);
+      return (
+        <div key={name} className={`${styles.field}${wide ? ` ${styles.span2}` : ''}`}>
+          <span className={styles.label}>{d.label}</span>
+          <div className={styles.checkRow}>
+            <label className={styles.checkItem}>
+              <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => setText(name, e.target.checked ? 'Y' : 'N')} />
+              중과
+            </label>
+          </div>
+          {error ? <span className={styles.fieldError}>{error}</span> : d.hint ? <span className={styles.hint}>{d.hint}</span> : null}
+        </div>
+      );
+    }
     return (
       <label key={name} className={`${styles.field}${wide ? ` ${styles.span2}` : ''}`}>
         <span className={styles.label}>
