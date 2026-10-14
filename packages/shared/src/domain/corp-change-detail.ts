@@ -233,7 +233,7 @@ export interface OfficerInput {
   zipCode: string | null;
   address: string | null;
   addressDetail: string | null;
-  /** 사임사유 — 구분이 사임일 때 화면이 보여 준다. 선택. */
+  /** 사임사유 — 구분이 사임일 때 화면이 보여 준다. 선택. ★ 사임이 아니면 늘 null 이다(받아도 버린다). */
   resignReason: string | null;
   /**
    * 주민번호 숫자 13자리(하이픈 없음).
@@ -314,7 +314,8 @@ export function parseOfficerBody(raw: unknown, at?: string): Parsed<OfficerInput
       zipCode,
       address,
       addressDetail,
-      resignReason,
+      // 사임이 아니면 비워 저장한다(2026-10-14)
+      resignReason: kind === 'RESIGN' ? resignReason : null,
       rrn,
     },
   };

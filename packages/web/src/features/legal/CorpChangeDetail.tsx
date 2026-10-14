@@ -447,7 +447,8 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
         zipCode: blankToNull(d.address.zipCode),
         address: blankToNull(d.address.address),
         addressDetail: blankToNull(d.address.addressDetail),
-        resignReason: blankToNull(d.resignReason),
+        // 사임이 아니면 사임사유는 비운다(서버도 같은 규칙)
+        resignReason: d.changeKind === 'RESIGN' ? blankToNull(d.resignReason) : null,
         rrnMasked: rrn ? maskRrn(rrn) : null,
         sortOrder: prev?.sortOrder ?? officers.length + 1,
         rrn,
@@ -464,7 +465,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
       zipCode: d.address.zipCode,
       address: d.address.address,
       addressDetail: d.address.addressDetail,
-      resignReason: d.resignReason,
+      resignReason: d.changeKind === 'RESIGN' ? d.resignReason : null,
       // ★ 비우면 「안 바꿈」이다(수정). 새로 넣을 때 비우면 주민번호 없음.
       rrn: d.rrn,
     };

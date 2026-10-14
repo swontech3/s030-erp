@@ -171,6 +171,13 @@ describe('parseOfficerBody — 임원', () => {
     expect(parseOfficerBody({ resignReason: 1 }).ok).toBe(false);
   });
 
+  it('★ 사임이 아니면 사임사유는 null 로 저장한다', () => {
+    for (const changeKind of ['APPOINT', 'REELECT', undefined]) {
+      const r = parseOfficerBody({ changeKind, resignReason: '건강상의 이유' });
+      expect(r.ok && r.value.resignReason).toBeNull();
+    }
+  });
+
   it('구분 · 효력일 모양이 틀리면 거절(효력일은 DB 날짜 칸)', () => {
     expect(parseOfficerBody({ changeKind: 'FIRE' }).ok).toBe(false);
     expect(parseOfficerBody({ effectiveDate: '2026-02-30' }).ok).toBe(false);
