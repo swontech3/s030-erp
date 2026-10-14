@@ -31,6 +31,7 @@ import {
 } from './corp-change-print.ts';
 import { personsForIncorpMark, type IncorpMarkUnit, type LegalFormMark } from './legal-form-mark.ts';
 import { sidoOf } from './korea-sido.ts';
+import { closingTimeOf, isTimeOfDay } from './incorporation.ts';
 import type { IncorpInfoInput, IncorpSnapshotPerson, IncorporationSnapshot } from './incorporation-detail.ts';
 
 // =============================================================================
@@ -70,6 +71,9 @@ export const INCORP_PRINT_FIELDS: readonly IncorpPrintField[] = [
   { name: 'recordDate', label: '기준일', source: 'case' },
   { name: 'plannedDate', label: '설립예정일', source: 'case' },
   { name: 'meetingDate', label: '발기인총회 개최일', source: 'case' },
+  { name: 'meetingTime', label: '개회시간', source: 'case' },
+  { name: 'closingTime', label: '폐회시간(개회 + 30분)', source: 'case' },
+  { name: 'paymentBank', label: '납입은행(지점)', source: 'case' },
   { name: 'purposeList', label: '목적(번호 목록)', source: 'case' },
   { name: 'articlesPurposeList', label: '정관 목적(번호 목록 + 부대사업)', source: 'case' },
   // 사람 목록
@@ -78,6 +82,8 @@ export const INCORP_PRINT_FIELDS: readonly IncorpPrintField[] = [
   { name: 'ceoName', label: '대표이사 성명', source: 'case' },
   { name: 'ceoAddress', label: '대표이사 주소', source: 'case' },
   { name: 'founderUnitsTotal', label: '주주 전원의 주식수', source: 'case' },
+  { name: 'founderCount', label: '발기인 수', source: 'case' },
+  { name: 'officerComposition', label: '이사 구성(사내이사 n명, 감사 n명)', source: 'case' },
   { name: 'resolutionOfficerList', label: '이사·감사 선임(서면결의)', source: 'case' },
   { name: 'resolutionRepresentativeList', label: '대표이사 선임(서면결의)', source: 'case' },
   { name: 'shareholderSignList', label: '주주 기명날인(서면결의)', source: 'case' },
@@ -203,6 +209,24 @@ export function minutesRole(p: Pick<IncorpSnapshotPerson, 'isDirector' | 'isAudi
   return p.isAuditor && !p.isDirector ? '감　　사' : '사내이사';
 }
 
+/** 시각 — `10:00` → 「10시」 · `10:30` → 「10시 30분」(결정 2026-10-14). 비었거나 시각이 아니면 ''. */
+export function koreanTime(hhmm: string | null | undefined): string {
+  if (!hhmm || !isTimeOfDay(hhmm)) return '';
+  const [h, m] = hhmm.trim().split(':').map(Number) as [number, number];
+  return m === 0 ? `${h}시` : `${h}시 ${m}분`;
+}
+
+/**
+ * 의사록의 이사 구성 — 「사내이사 2명, 감사 1명」. 사람은 `officerNameList` 와 같은 기준(`minutesRole`)으로 센다.
+ * 0명인 쪽은 뺀다(결정 2026-10-14). 둘 다 0명이면 ''.
+ */
+export function officerCompositionText(persons: readonly Pick<IncorpSnapshotPerson, 'isDirector' | 'isAuditor'>[]): string {
+  const officers = persons.filter((p) => p.isDirector || p.isAuditor);
+  const auditors = officers.filter((p) => minutesRole(p) !== '사내이사').length;
+  const directors = officers.length - auditors;
+  return [directors ? `사내이사 ${directors}명` : '', auditors ? `감사 ${auditors}명` : ''].filter(Boolean).join(', ');
+}
+
 /** 조사보고인 — 발기인이 아닌 이사 · 감사(레거시 `InvestigationReportDoc`, 상법 제298조). */
 export function investigationReporters<T extends Pick<IncorpSnapshotPerson, 'isFounder' | 'isDirector' | 'isAuditor'>>(persons: readonly T[]): T[] {
   return persons.filter((p) => (p.isDirector || p.isAuditor) && !p.isFounder);
@@ -233,6 +257,8 @@ export function readIncorporationSnapshot(raw: unknown): IncorporationSnapshot |
     fiscalStart: str(i.fiscalStart),
     fiscalEnd: str(i.fiscalEnd),
     plannedDate: str(i.plannedDate),
+    meetingTime: str(i.meetingTime),
+    paymentBank: str(i.paymentBank),
     purposes: str(i.purposes),
     companyTypePosition: str(i.companyTypePosition),
   };
@@ -318,6 +344,10 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
     plannedDate: formatKoreanDate(info.plannedDate),
     // 발기인총회 개최일 — 설립예정일 값을 쓴다(결정 2026-10-12)
     meetingDate: formatKoreanDate(info.plannedDate),
+    // 개회 · 폐회시간 — 폐회는 개회 + 30분. 개회시간이 비면 둘 다 빈칸(2026-10-14)
+    meetingTime: koreanTime(info.meetingTime),
+    closingTime: koreanTime(closingTimeOf(info.meetingTime)),
+    paymentBank: info.paymentBank ?? '',
     purposeList: lines(purposes.map((l, i) => `${i + 1}. ${l}`)),
     articlesPurposeList: lines([...purposes, ARTICLES_INCIDENTAL_PURPOSE].map((l, i) => `${i + 1}. ${l}`)),
 
@@ -331,6 +361,8 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
 
     // 주주전원서면결의서 — 레거시 `ShareholderResolutionDoc`
     founderUnitsTotal: count(totalUnits),
+    founderCount: count(founders.length),
+    officerComposition: officerCompositionText(persons),
     resolutionOfficerList: lines([
       ...directors.map((p) => `- 사내이사 : ${p.name} (주민등록번호 ${rrnOf(p)})`),
       ...auditors.map((p) => `- 감　　사 : ${p.name} (주민등록번호 ${rrnOf(p)})`),

@@ -432,6 +432,7 @@ interface OfficerRow {
   zip_code: string | null;
   address: string | null;
   address_detail: string | null;
+  resign_reason: string | null;
   rrn_masked: string | null;
   sort_order: number;
 }
@@ -439,7 +440,7 @@ interface OfficerRow {
 /** ★ 암호문 칸(`rrn_cipher`)은 **고르지 않는다** — 응답에 실릴 길을 처음부터 막는다. */
 const OFFICER_COLUMNS = `id, name, change_kind, position,
        to_char(effective_date, 'YYYY-MM-DD') AS effective_date,
-       zip_code, address, address_detail, rrn_masked, sort_order`;
+       zip_code, address, address_detail, resign_reason, rrn_masked, sort_order`;
 
 const toOfficerView = (r: OfficerRow): CorpChangeOfficerView => ({
   id: r.id,
@@ -450,6 +451,7 @@ const toOfficerView = (r: OfficerRow): CorpChangeOfficerView => ({
   zipCode: r.zip_code,
   address: r.address,
   addressDetail: r.address_detail,
+  resignReason: r.resign_reason,
   rrnMasked: r.rrn_masked,
   sortOrder: r.sort_order,
 });
@@ -490,15 +492,15 @@ export async function insertOfficer(
     client,
     `INSERT INTO public.tb_s080_corp_change_officers
        (id, corp_change_id, org_id, name, change_kind, position, effective_date,
-        zip_code, address, address_detail, rrn_cipher, rrn_iv, rrn_masked,
+        zip_code, address, address_detail, rrn_cipher, rrn_iv, rrn_masked, resign_reason,
         sort_order, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8, $9, $10, $11, NULL, $12,
+     VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8, $9, $10, $11, NULL, $12, $13,
              (SELECT coalesce(max(sort_order), 0) + 1 FROM public.tb_s080_corp_change_officers WHERE corp_change_id = $2),
              now(), now())
      RETURNING ${OFFICER_COLUMNS}`,
     [
       args.id, args.corpChangeId, args.orgId, o.name, o.changeKind, o.position, o.effectiveDate,
-      o.zipCode, o.address, o.addressDetail, args.rrn?.cipher ?? null, args.rrn?.masked ?? null,
+      o.zipCode, o.address, o.addressDetail, args.rrn?.cipher ?? null, args.rrn?.masked ?? null, o.resignReason,
     ],
   );
   return toOfficerView(rows[0]!);
@@ -515,18 +517,18 @@ export async function updateOfficer(
   const o = args.input;
   const params: unknown[] = [
     args.id, args.corpChangeId, o.name, o.changeKind, o.position, o.effectiveDate,
-    o.zipCode, o.address, o.addressDetail,
+    o.zipCode, o.address, o.addressDetail, o.resignReason,
   ];
   let rrnSet = '';
   if (args.rrn) {
     params.push(args.rrn.cipher, args.rrn.masked);
-    rrnSet = `, rrn_cipher = $10, rrn_iv = NULL, rrn_masked = $11`;
+    rrnSet = `, rrn_cipher = $11, rrn_iv = NULL, rrn_masked = $12`;
   }
   const { rows } = await q<OfficerRow>(
     client,
     `UPDATE public.tb_s080_corp_change_officers
         SET name = $3, change_kind = $4, position = $5, effective_date = $6::date,
-            zip_code = $7, address = $8, address_detail = $9, updated_at = now()${rrnSet}
+            zip_code = $7, address = $8, address_detail = $9, resign_reason = $10, updated_at = now()${rrnSet}
       WHERE id = $1 AND corp_change_id = $2
       RETURNING ${OFFICER_COLUMNS}`,
     params,

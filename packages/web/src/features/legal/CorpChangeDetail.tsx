@@ -52,6 +52,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   CHANGE_TYPE_DEFS,
+  DEFAULT_RESIGN_REASON,
   OFFICER_CHANGE_KINDS,
   OFFICER_CHANGE_KIND_LABEL,
   REGISTRATION_DEADLINE_DAYS,
@@ -223,6 +224,8 @@ interface OfficerDraft {
   position: string;
   effectiveDate: string;
   address: Address;
+  /** 사임사유 — 구분이 사임일 때만 보인다. */
+  resignReason: string;
   /** ★ 새로 적을 때만 채운다. 비우면 「안 바꿈」이다. */
   rrn: string;
   rrnMasked: string | null;
@@ -353,6 +356,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
           zipCode: o.zipCode,
           address: o.address,
           addressDetail: o.addressDetail,
+          resignReason: o.resignReason,
           rrn: o.rrn,
         })),
       });
@@ -443,6 +447,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
         zipCode: blankToNull(d.address.zipCode),
         address: blankToNull(d.address.address),
         addressDetail: blankToNull(d.address.addressDetail),
+        resignReason: blankToNull(d.resignReason),
         rrnMasked: rrn ? maskRrn(rrn) : null,
         sortOrder: prev?.sortOrder ?? officers.length + 1,
         rrn,
@@ -459,6 +464,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
       zipCode: d.address.zipCode,
       address: d.address.address,
       addressDetail: d.address.addressDetail,
+      resignReason: d.resignReason,
       // ★ 비우면 「안 바꿈」이다(수정). 새로 넣을 때 비우면 주민번호 없음.
       rrn: d.rrn,
     };
@@ -1276,6 +1282,7 @@ const blankDraft = (): OfficerDraft => ({
   position: '',
   effectiveDate: '',
   address: EMPTY_ADDRESS,
+  resignReason: '',
   rrn: '',
   rrnMasked: null,
 });
@@ -1289,6 +1296,7 @@ const draftOf = (o: CorpChangeOfficerView): OfficerDraft => ({
   position: o.position ?? '',
   effectiveDate: o.effectiveDate ?? '',
   address: { zipCode: o.zipCode ?? '', address: o.address ?? '', addressDetail: o.addressDetail ?? '' },
+  resignReason: o.resignReason ?? '',
   rrn: '',
   rrnMasked: o.rrnMasked,
 });
@@ -1493,7 +1501,13 @@ function OfficersSection({
                 className={styles.select}
                 value={draft.changeKind}
                 disabled={busy}
-                onChange={(e) => setDraft({ ...draft, changeKind: e.target.value as OfficerChangeKind })}
+                onChange={(e) => {
+                  const changeKind = e.target.value as OfficerChangeKind;
+                  // 사임으로 고르면 사임사유가 비었을 때 기본 문구를 채워 둔다(고칠 수 있다, 2026-10-14)
+                  const resignReason =
+                    changeKind === 'RESIGN' && draft.resignReason.trim() === '' ? DEFAULT_RESIGN_REASON : draft.resignReason;
+                  setDraft({ ...draft, changeKind, resignReason });
+                }}
               >
                 {OFFICER_CHANGE_KINDS.map((k) => (
                   <option key={k} value={k}>
@@ -1525,6 +1539,18 @@ function OfficersSection({
                 onChange={(e) => setDraft({ ...draft, effectiveDate: e.target.value })}
               />
             </label>
+            {draft.changeKind === 'RESIGN' ? (
+              <label className={`${styles.field} ${styles.span4}`}>
+                <span className={styles.label}>사임사유</span>
+                <input
+                  className={styles.input}
+                  value={draft.resignReason}
+                  disabled={busy}
+                  onChange={(e) => setDraft({ ...draft, resignReason: e.target.value })}
+                />
+                <span className={styles.hint}>사임서에 들어갑니다. 비우면 「{DEFAULT_RESIGN_REASON}」</span>
+              </label>
+            ) : null}
             <label className={`${styles.field} ${styles.span2}`}>
               <span className={styles.label}>주민등록번호</span>
               <input

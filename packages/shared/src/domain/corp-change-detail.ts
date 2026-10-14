@@ -233,6 +233,8 @@ export interface OfficerInput {
   zipCode: string | null;
   address: string | null;
   addressDetail: string | null;
+  /** 사임사유 — 구분이 사임일 때 화면이 보여 준다. 선택. */
+  resignReason: string | null;
   /**
    * 주민번호 숫자 13자리(하이픈 없음).
    *   · `undefined` — **안 바꾼다**(수정 때 칸을 비워 보냈다). 새로 만들 때는 「없음」이다
@@ -279,6 +281,7 @@ export function parseOfficerBody(raw: unknown, at?: string): Parsed<OfficerInput
   const zipCode = text('zipCode', '우편번호');
   const address = text('address', '주소');
   const addressDetail = text('addressDetail', '상세주소');
+  const resignReason = text('resignReason', '사임사유');
 
   const kind = raw.changeKind ?? 'APPOINT';
   if (!isOfficerChangeKind(kind)) {
@@ -311,6 +314,7 @@ export function parseOfficerBody(raw: unknown, at?: string): Parsed<OfficerInput
       zipCode,
       address,
       addressDetail,
+      resignReason,
       rrn,
     },
   };
@@ -585,6 +589,7 @@ export interface CorpChangeOfficerView {
   zipCode: string | null;
   address: string | null;
   addressDetail: string | null;
+  resignReason: string | null;
   /** ★ 마스킹된 것뿐이다. 평문 · 암호문은 내려가지 않는다. */
   rrnMasked: string | null;
   sortOrder: number;

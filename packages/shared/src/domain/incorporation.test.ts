@@ -4,8 +4,10 @@ import {
   INCORP_FOUNDER_MAX,
   INCORP_PURPOSE_MAX,
   checkIncorporationTransition,
+  closingTimeOf,
   incorporationWarnings,
   isMonthDay,
+  isTimeOfDay,
   validateIncorporation,
   type IncorporationContent,
   type IncorporationPersonInput,
@@ -108,6 +110,23 @@ describe('validateIncorporation', () => {
       persons: [CEO, { name: ' ', unitsSubscribed: -1, appointmentDate: '2026-13-01', rrn: '12345' }],
     });
     expect(e).toEqual(['persons.1.name', 'persons.1.roles', 'persons.1.unitsSubscribed', 'persons.1.appointmentDate', 'persons.1.rrn']);
+  });
+});
+
+describe('개회시간 · 납입은행 — 선택 입력(2026-10-14)', () => {
+  it('★ 비어도 작성완료를 막지 않는다 · 개회시간은 HH:MM 이어야 한다', () => {
+    expect(fields(withInfo({ meetingTime: null, paymentBank: null }))).toEqual([]);
+    expect(fields(withInfo({ meetingTime: '10:00', paymentBank: '국민은행 삼성동지점' }))).toEqual([]);
+    expect(fields(withInfo({ meetingTime: '10시' }))).toEqual(['meetingTime']);
+  });
+
+  it('시각 판정 · 폐회시간 = 개회 + 30분(자정을 넘으면 다음 날 시각)', () => {
+    expect([isTimeOfDay('00:00'), isTimeOfDay('23:59'), isTimeOfDay('24:00'), isTimeOfDay('9:00')]).toEqual([true, true, false, false]);
+    expect(closingTimeOf('10:00')).toBe('10:30');
+    expect(closingTimeOf('10:45')).toBe('11:15');
+    expect(closingTimeOf('23:45')).toBe('00:15');
+    expect(closingTimeOf(null)).toBeNull();
+    expect(closingTimeOf('')).toBeNull();
   });
 });
 

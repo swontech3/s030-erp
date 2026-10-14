@@ -87,6 +87,12 @@ export const OFFICER_CHANGE_KIND_LABEL: Readonly<Record<OfficerChangeKind, strin
   REELECT: '중임',
 };
 
+/**
+ * 사임사유 기본 문구(2026-10-14). 구분을 사임으로 고르면 화면이 이 문구를 채워 두고(고칠 수 있다),
+ * 사임서 출력은 저장된 사유가 비었을 때 이 문구를 쓴다.
+ */
+export const DEFAULT_RESIGN_REASON = '일신상의 사유';
+
 export function isCorpChangeType(value: unknown): value is CorpChangeType {
   return typeof value === 'string' && (CORP_CHANGE_TYPES as readonly string[]).includes(value);
 }

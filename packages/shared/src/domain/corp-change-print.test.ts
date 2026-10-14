@@ -16,6 +16,7 @@ import {
   type DocFormSettingRow,
 } from './corp-change-print.ts';
 import type { CorpChangeSubmitSnapshot } from './corp-change-transition.ts';
+import { DEFAULT_RESIGN_REASON } from './corp-change.ts';
 
 /** 개발 DB 의 등기 설정 줄에서 옮긴 값(2026-10-11 실측) — 두 첨부 모양 · `\n` 글자가 섞여 있다. */
 const row = (r: Partial<DocFormSettingRow> & Pick<DocFormSettingRow, 'regTypeKey'>): DocFormSettingRow => ({
@@ -150,7 +151,7 @@ describe('모양 바꾸기', () => {
 });
 
 const snap = (over: Partial<CorpChangeSubmitSnapshot> = {}): CorpChangeSubmitSnapshot => ({
-  version: 2,
+  version: 3,
   changeType: 'CEO_ADDR',
   company: {
     isTenant: true,
@@ -189,8 +190,8 @@ describe('changeSummary — 레거시 문장 그대로(결정 I)', () => {
   });
   it('임원 — 직위 성명 — 구분 (효력일)', () => {
     const officers = [
-      { name: '김갑', changeKind: 'APPOINT', position: '사내이사', effectiveDate: '2026-10-01', zipCode: null, address: null, addressDetail: null },
-      { name: '이을', changeKind: 'RESIGN', position: '감사', effectiveDate: null, zipCode: null, address: null, addressDetail: null },
+      { name: '김갑', changeKind: 'APPOINT', position: '사내이사', effectiveDate: '2026-10-01', zipCode: null, address: null, addressDetail: null, resignReason: null },
+      { name: '이을', changeKind: 'RESIGN', position: '감사', effectiveDate: null, zipCode: null, address: null, addressDetail: null, resignReason: null },
     ];
     expect(changeSummary(snap({ changeType: 'OFFICER', payload: {}, officers }))).toBe('사내이사 김갑 — 취임 (2026-10-01)\n감사 이을 — 사임');
   });
@@ -275,6 +276,15 @@ describe('buildCasePrintValues', () => {
 });
 
 describe('buildOfficerPrintValues', () => {
+  it('★ 사임사유 — 사임 임원만 · 저장된 사유, 비면 기본 문구', () => {
+    const base = { name: '이을', position: '감사', effectiveDate: null, zipCode: null, address: null, addressDetail: null, rrn: null };
+    const s = { snapshot: snap({ changeType: 'OFFICER' }), setting: null, changeTypeName: null, inputs: {} };
+    expect(buildOfficerPrintValues(s, { ...base, changeKind: 'RESIGN', resignReason: '건강상의 이유' }).officerResignReason).toBe('건강상의 이유');
+    expect(buildOfficerPrintValues(s, { ...base, changeKind: 'RESIGN', resignReason: null }).officerResignReason).toBe(DEFAULT_RESIGN_REASON);
+    expect(buildOfficerPrintValues(s, { ...base, changeKind: 'RESIGN', resignReason: '  ' }).officerResignReason).toBe('일신상의 사유');
+    expect(buildOfficerPrintValues(s, { ...base, changeKind: 'APPOINT', resignReason: '건강상의 이유' }).officerResignReason).toBe('');
+  });
+
   it('건 값 위에 그 임원 칸 — 주민번호는 하이픈 모양', () => {
     const v = buildOfficerPrintValues(
       { snapshot: snap({ changeType: 'OFFICER' }), setting: null, changeTypeName: null, inputs: { writeDate: '2026-10-11' } },
@@ -286,6 +296,7 @@ describe('buildOfficerPrintValues', () => {
         zipCode: '04500',
         address: '서울 중구 임원로 1',
         addressDetail: '2층',
+        resignReason: null,
         rrn: '9001011234567',
       },
     );
@@ -319,18 +330,19 @@ describe('readSubmitSnapshot — 결정 H', () => {
       officers: [],
     };
     const s = readSubmitSnapshot(v1)!;
-    expect(s.version).toBe(2);
+    expect(s.version).toBe(3);
+    expect(readSubmitSnapshot({ ...v1, officers: [{ name: '이을', changeKind: 'RESIGN' }] })!.officers[0]!.resignReason).toBeNull();
     expect(s.company).toMatchObject({ name: '에이', tel: null, bizNumber: null, memberType: null });
     expect(s.payload).toEqual({ relocationDate: '2026-10-01' });
   });
 
-  it('v2 는 그대로', () => {
+  it('v3 는 그대로', () => {
     expect(readSubmitSnapshot(snap())).toEqual(snap());
   });
 
   it('스냅샷이 아니면 null', () => {
     expect(readSubmitSnapshot(null)).toBeNull();
-    expect(readSubmitSnapshot({ version: 3, changeType: 'HQ', company: {} })).toBeNull();
+    expect(readSubmitSnapshot({ version: 4, changeType: 'HQ', company: {} })).toBeNull();
     expect(readSubmitSnapshot({ version: 2, company: {} })).toBeNull();
   });
 });
@@ -345,7 +357,7 @@ describe('buildPrintDocuments — 양식 고르기 · 장', () => {
     { id: 'f-none', name: '사임서', definition: 'D5', mark: { ...caseMark(), unit: 'officer' as const, officerKinds: ['RESIGN' as const] } },
   ];
   const officer = (name: string, changeKind: string) => ({
-    name, changeKind, position: '사내이사', effectiveDate: '2026-10-01', zipCode: null, address: null, addressDetail: null, rrn: '9001011234567',
+    name, changeKind, position: '사내이사', effectiveDate: '2026-10-01', zipCode: null, address: null, addressDetail: null, resignReason: null, rrn: '9001011234567',
   });
   const officers = [officer('김갑', 'REELECT'), officer('이을', 'APPOINT'), officer('박병', 'REELECT')];
   const src: CasePrintSource = { snapshot: snap({ changeType: 'OFFICER', payload: {}, officers }), setting: null, changeTypeName: null, inputs: {} };

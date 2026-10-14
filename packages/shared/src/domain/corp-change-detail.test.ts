@@ -159,9 +159,16 @@ describe('parseOfficerBody — 임원', () => {
         zipCode: null,
         address: null,
         addressDetail: null,
+        resignReason: null,
         rrn: undefined,
       },
     });
+  });
+
+  it('사임사유 — 글자만 받는다(앞뒤 공백을 뗀다)', () => {
+    const r = parseOfficerBody({ changeKind: 'RESIGN', resignReason: ' 건강상의 이유 ' });
+    expect(r.ok && r.value.resignReason).toBe('건강상의 이유');
+    expect(parseOfficerBody({ resignReason: 1 }).ok).toBe(false);
   });
 
   it('구분 · 효력일 모양이 틀리면 거절(효력일은 DB 날짜 칸)', () => {

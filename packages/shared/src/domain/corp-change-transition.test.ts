@@ -61,6 +61,7 @@ describe('buildSubmitSnapshot', () => {
     zipCode: '04500',
     address: '서울 중구',
     addressDetail: '1층',
+    resignReason: null,
     rrnMasked: '900101-1******',
     sortOrder: 1,
   };
@@ -94,14 +95,15 @@ describe('buildSubmitSnapshot', () => {
         zipCode: '04500',
         address: '서울 중구',
         addressDetail: '1층',
+        resignReason: null,
       },
     ]);
   });
 
-  it('v2 — 변경 전 회사값(회사명 · 법인번호 · 사업자번호 · 대표 · 전화 · 회사유형 · 본점 · 대표 자택) + 변경 내용', () => {
+  it('v3 — 변경 전 회사값(회사명 · 법인번호 · 사업자번호 · 대표 · 전화 · 회사유형 · 본점 · 대표 자택) + 변경 내용', () => {
     const s = buildSubmitSnapshot({ changeType: 'NAME', company, payload: { newName: '주식회사 비' }, officers: [] });
     expect(s).toEqual({
-      version: 2,
+      version: 3,
       changeType: 'NAME',
       company: {
         isTenant: false,

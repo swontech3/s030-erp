@@ -8,6 +8,8 @@ import {
   englishNameClause,
   fiscalYearText,
   koreanAmount,
+  koreanTime,
+  officerCompositionText,
   readIncorporationSnapshot,
   rosterRecordText,
   type IncorpPrintPerson,
@@ -151,6 +153,31 @@ describe('buildIncorpCasePrintValues', () => {
     expect(v.meetingDate).toBe('2026년 11월 2일');
   });
 
+  it('★ 발기인 수 · 이사 구성(의사록 명단과 같은 기준, 0명인 쪽은 뺀다)', () => {
+    expect(v.founderCount).toBe('2');
+    expect(v.officerComposition).toBe('사내이사 1명, 감사 1명');
+    expect(officerCompositionText([{ isDirector: true, isAuditor: false }, { isDirector: true, isAuditor: true }])).toBe('사내이사 2명');
+    expect(officerCompositionText([{ isDirector: false, isAuditor: true }])).toBe('감사 1명');
+    expect(officerCompositionText([{ isDirector: false, isAuditor: false }])).toBe('');
+  });
+
+  it('★ 개회 · 폐회시간 — 정각은 「10시」, 폐회는 개회 + 30분 · 비우면 둘 다 빈칸', () => {
+    expect(koreanTime('10:00')).toBe('10시');
+    expect(koreanTime('09:05')).toBe('9시 5분');
+    expect(koreanTime('')).toBe('');
+    expect(koreanTime('25:00')).toBe('');
+    const timed = (meetingTime: string | null, paymentBank: string | null = null) => {
+      const s = src();
+      return buildIncorpCasePrintValues({ ...s, snapshot: { ...s.snapshot, info: { ...s.snapshot.info, meetingTime, paymentBank } } });
+    };
+    expect([timed('10:00').meetingTime, timed('10:00').closingTime]).toEqual(['10시', '10시 30분']);
+    expect([timed('10:30').meetingTime, timed('10:30').closingTime]).toEqual(['10시 30분', '11시']);
+    expect(timed('23:45').closingTime).toBe('0시 15분');
+    expect([timed(null).meetingTime, timed(null).closingTime]).toEqual(['', '']);
+    expect([v.meetingTime, v.closingTime, v.paymentBank]).toEqual(['', '', '']);
+    expect(timed(null, '국민은행 삼성동지점').paymentBank).toBe('국민은행 삼성동지점');
+  });
+
   it('★ 등기 설정 — 목적만 비면 코드 이름, 사유 · 세금은 빈칸, 첨부서면은 설정 값', () => {
     expect(v.regPurpose).toBe('주식회사 발기설립');
     expect([v.regReason, v.regLicenseTax, v.taxTotal, v.regFee]).toEqual(['', '', '', '']);
@@ -230,6 +257,15 @@ describe('readIncorporationSnapshot', () => {
     expect(snap?.composedName).toBe('한가람 주식회사');
     expect(snap?.persons.map((p) => p.name)).toEqual(['홍길동', '김철수', '이감사']);
     expect(JSON.stringify(snap)).not.toContain('900101');
+  });
+  it('개회시간 · 납입은행을 읽는다 — 옛 스냅샷(칸 없음)은 null', () => {
+    const raw = JSON.parse(JSON.stringify(snapshotOf(persons)));
+    raw.info.meetingTime = '10:00';
+    raw.info.paymentBank = '국민은행';
+    expect(readIncorporationSnapshot(raw)?.info).toMatchObject({ meetingTime: '10:00', paymentBank: '국민은행' });
+    delete raw.info.meetingTime;
+    delete raw.info.paymentBank;
+    expect(readIncorporationSnapshot(raw)?.info).toMatchObject({ meetingTime: null, paymentBank: null });
   });
   it('v1 이 아니면 null', () => {
     expect(readIncorporationSnapshot({ version: 2, info: {} })).toBeNull();

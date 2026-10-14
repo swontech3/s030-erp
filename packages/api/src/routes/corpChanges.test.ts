@@ -982,7 +982,7 @@ describe('POST /legal/corp-changes/:id/transition — 상태 전이', () => {
       expect(raw).not.toContain('900101');
       expect(raw).not.toMatch(/rrn/i);
       const snap = JSON.parse(raw);
-      expect(snap.version).toBe(2);
+      expect(snap.version).toBe(3);
       expect(snap.company).toEqual({
         isTenant: false,
         name: '주식회사 시험',

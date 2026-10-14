@@ -106,6 +106,8 @@ export interface SnapshotOfficer {
   zipCode: string | null;
   address: string | null;
   addressDetail: string | null;
+  /** 사임사유 — v3 부터. 옛 스냅샷은 null. */
+  resignReason: string | null;
 }
 
 const SNAPSHOT_OFFICER_KEYS = [
@@ -116,6 +118,7 @@ const SNAPSHOT_OFFICER_KEYS = [
   'zipCode',
   'address',
   'addressDetail',
+  'resignReason',
 ] as const satisfies readonly (keyof SnapshotOfficer)[];
 
 /**
@@ -131,8 +134,9 @@ export interface CorpChangeSubmitSnapshot {
    *   1 — 10-10 첫 모양
    *   2 — 10-11 회사에 전화(`tel`) · 사업자번호(`bizNumber`) · 회사유형(`memberType`)을 더했다(서류 출력 Q5).
    *       ★ 옛 v1 은 고치지 않는다(결정 H) — 읽는 쪽(`readSubmitSnapshot`)이 빈 칸을 null 로 채운다
+   *   3 — 10-14 임원에 사임사유(`resignReason`)를 더했다. 옛 v1 · v2 의 사유는 null 이다
    */
-  version: 2;
+  version: 3;
   changeType: string;
   company: {
     isTenant: boolean;
@@ -183,7 +187,7 @@ export function buildSubmitSnapshot(args: {
 }): CorpChangeSubmitSnapshot {
   const c = args.company;
   return {
-    version: 2,
+    version: 3,
     changeType: args.changeType,
     company: {
       isTenant: c.isTenant,

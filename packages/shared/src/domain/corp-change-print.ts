@@ -28,7 +28,7 @@
  * 복호화는 API 가 출력 응답을 만드는 순간에 한다. 여기서는 모양만 바꾼다(`######-#######`).
  * 저장 · 로그 · 스냅샷에 남기지 않는 것은 부르는 쪽의 일이다 — 응답은 no-store.
  */
-import { purposeLines, OFFICER_CHANGE_KIND_LABEL, isOfficerChangeKind } from './corp-change.ts';
+import { purposeLines, DEFAULT_RESIGN_REASON, OFFICER_CHANGE_KIND_LABEL, isOfficerChangeKind } from './corp-change.ts';
 import type { CorpChangeSubmitSnapshot, SnapshotAddress, SnapshotOfficer } from './corp-change-transition.ts';
 import { isLegalFormCompanyType, markAppliesTo, officersForMark, type LegalFormMark } from './legal-form-mark.ts';
 import { parseDay } from './day.ts';
@@ -81,6 +81,7 @@ export const CORP_CHANGE_PRINT_FIELDS: readonly PrintField[] = [
   { name: 'officerRrn', label: '임원주민등록번호', source: 'officer' },
   { name: 'officerAddress', label: '임원주소', source: 'officer' },
   { name: 'officerEffectiveDate', label: '임원효력일', source: 'officer' },
+  { name: 'officerResignReason', label: '사임사유', source: 'officer' },
 ];
 
 /** 출력 직전 입력 — 신청일 · 작성일. */
@@ -104,16 +105,16 @@ function readAddress(v: unknown): SnapshotAddress {
 }
 
 /**
- * 저장된 `submit_snapshot` 을 v2 모양으로 읽는다. 스냅샷이 아니면 null(출력 거절 — 부르는 쪽).
- * ★ v1 에 없는 칸(전화 · 사업자번호 · 회사유형)은 null 이다 — 지어 넣지 않는다.
+ * 저장된 `submit_snapshot` 을 v3 모양으로 읽는다. 스냅샷이 아니면 null(출력 거절 — 부르는 쪽).
+ * ★ v1 에 없는 칸(전화 · 사업자번호 · 회사유형) · v3 전의 사임사유는 null 이다 — 지어 넣지 않는다.
  */
 export function readSubmitSnapshot(raw: unknown): CorpChangeSubmitSnapshot | null {
-  if (!isObj(raw) || (raw.version !== 1 && raw.version !== 2)) return null;
+  if (!isObj(raw) || (raw.version !== 1 && raw.version !== 2 && raw.version !== 3)) return null;
   if (typeof raw.changeType !== 'string' || !isObj(raw.company)) return null;
   const c = raw.company;
   const officers = Array.isArray(raw.officers) ? raw.officers : [];
   return {
-    version: 2,
+    version: 3,
     changeType: raw.changeType,
     company: {
       isTenant: c.isTenant === true,
@@ -135,6 +136,7 @@ export function readSubmitSnapshot(raw: unknown): CorpChangeSubmitSnapshot | nul
       zipCode: str(o.zipCode),
       address: str(o.address),
       addressDetail: str(o.addressDetail),
+      resignReason: str(o.resignReason),
     })),
   };
 }
@@ -427,6 +429,8 @@ export function buildOfficerPrintValues(src: CasePrintSource, officer: PrintOffi
     officerRrn: formatRrn(officer.rrn),
     officerAddress: formatAddress(officer),
     officerEffectiveDate: formatKoreanDate(officer.effectiveDate),
+    // 사임사유 — 사임 임원만. 비어 있으면 기본 문구(2026-10-14)
+    officerResignReason: officer.changeKind === 'RESIGN' ? officer.resignReason?.trim() || DEFAULT_RESIGN_REASON : '',
   };
 }
 

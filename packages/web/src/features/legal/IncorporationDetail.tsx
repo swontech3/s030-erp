@@ -40,6 +40,7 @@ import {
 import { STALE_STATUS_MESSAGE } from '@swonbiz/shared/domain/corp-change-transition';
 import { corpChangeDateLine, normalizeRrn } from '@swonbiz/shared/domain/corp-change-detail';
 import {
+  DEFAULT_MEETING_TIME,
   INCORP_FIELD_DEFS,
   incorporationWarnings,
   type IncorpFieldDef,
@@ -92,7 +93,7 @@ const DEF: Record<InfoName, IncorpFieldDef> = Object.fromEntries(INCORP_FIELD_DE
 
 /** 묶음 — 배치만 정한다(칸 정의는 shared). 상호(국문) · 본점은 회사 묶음이 따로 그린다. */
 const CAPITAL_FIELDS: InfoName[] = ['capitalAmount', 'parValue', 'unitsAuthorized', 'unitsIssued'];
-const SETUP_FIELDS: InfoName[] = ['publicNoticeMethod', 'fiscalStart', 'fiscalEnd', 'plannedDate'];
+const SETUP_FIELDS: InfoName[] = ['publicNoticeMethod', 'fiscalStart', 'fiscalEnd', 'plannedDate', 'meetingTime', 'paymentBank'];
 
 /** 화면이 들고 있는 설립 정보 — 글자 칸은 문자열(숫자 칸은 콤마 붙은 문자열), 본점은 세 칸. */
 interface InfoForm {
@@ -272,7 +273,8 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
 
   // ── 설립 정보 ────────────────────────────────────────────────────────────
   const initialForm = useMemo(
-    () => toInfoForm(initialSaved?.info ?? {}, draft.defaultNamePosition),
+    // 새 건은 개회시간을 기본값(10:00)으로 채워 둔다 — 지우면 빈칸으로 저장된다
+    () => toInfoForm(initialSaved?.info ?? { meetingTime: DEFAULT_MEETING_TIME }, draft.defaultNamePosition),
     [initialSaved, draft.defaultNamePosition],
   );
   const [form, setForm] = useState<InfoForm>(initialForm);
@@ -580,9 +582,9 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
         <span className={styles.label}>
           {d.label} {d.required ? <span className={styles.req}>*</span> : null}
         </span>
-        {d.type === 'date' ? (
+        {d.type === 'date' || d.type === 'time' ? (
           <input
-            type="date"
+            type={d.type}
             className={`${styles.input} ${styles.tabular}${badDate || error ? ` ${styles.inputInvalid}` : ''}`}
             value={badDate ? '' : value}
             disabled={disabled}

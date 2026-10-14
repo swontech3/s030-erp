@@ -59,7 +59,12 @@ export const INCORP_INT_MAX = Number.MAX_SAFE_INTEGER;
 // 입력 칸
 // =============================================================================
 
-export type IncorpFieldType = 'text' | 'textarea' | 'address' | 'amount' | 'count' | 'monthDay' | 'date';
+export type IncorpFieldType = 'text' | 'textarea' | 'address' | 'amount' | 'count' | 'monthDay' | 'date' | 'time';
+
+/** 개회시간 기본값 — 새 건의 화면이 채워 둔다(2026-10-14). 비우면 서류 시각은 빈칸이다. */
+export const DEFAULT_MEETING_TIME = '10:00';
+/** 폐회시간 = 개회시간 + 이 분(2026-10-14). */
+export const CLOSING_AFTER_MINUTES = 30;
 
 export interface IncorpFieldDef {
   /** 내용(`IncorporationInfo`)의 키. */
@@ -89,6 +94,14 @@ export const INCORP_FIELD_DEFS: readonly IncorpFieldDef[] = [
   { name: 'fiscalEnd', label: '사업연도 끝', type: 'monthDay', required: true, hint: 'MM-DD (예: 12-31)' },
   { name: 'plannedDate', label: '설립예정일', type: 'date', required: true },
   {
+    name: 'meetingTime',
+    label: '개회시간',
+    type: 'time',
+    required: false,
+    hint: `발기인총회 의사록의 시각입니다. 폐회시간은 ${CLOSING_AFTER_MINUTES}분 뒤로 찍힙니다`,
+  },
+  { name: 'paymentBank', label: '납입은행(지점)', type: 'text', required: false, hint: '조사보고서 · 주식인수증의 납입기관입니다' },
+  {
     name: 'purposes',
     label: '사업목적',
     type: 'textarea',
@@ -110,6 +123,10 @@ export interface IncorporationInfo {
   fiscalStart?: string | null;
   fiscalEnd?: string | null;
   plannedDate?: string | null;
+  /** 개회시간 `HH:MM`. 선택. */
+  meetingTime?: string | null;
+  /** 납입은행(지점). 선택. */
+  paymentBank?: string | null;
   purposes?: string | null;
 }
 
@@ -152,6 +169,20 @@ export function isMonthDay(raw: string): boolean {
   return dd <= new Date(Date.UTC(2000, mm, 0)).getUTCDate(); // 2000 은 윤년
 }
 
+/** `HH:MM`(00:00 ~ 23:59)인가. */
+export function isTimeOfDay(raw: string): boolean {
+  const m = /^(\d{2}):(\d{2})$/.exec(raw.trim());
+  return m !== null && Number(m[1]) <= 23 && Number(m[2]) <= 59;
+}
+
+/** 폐회시간 — 개회시간 + 30분(자정을 넘으면 다음 날 시각). 개회시간이 비었거나 시각이 아니면 null. */
+export function closingTimeOf(meetingTime: string | null | undefined): string | null {
+  if (!meetingTime || !isTimeOfDay(meetingTime)) return null;
+  const [h, m] = meetingTime.trim().split(':').map(Number) as [number, number];
+  const total = (h * 60 + m + CLOSING_AFTER_MINUTES) % (24 * 60);
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
 function checkInfoField(def: IncorpFieldDef, value: unknown): CorpChangeFieldError[] {
   const { name, label, type, required } = def;
   const blank =
@@ -171,6 +202,8 @@ function checkInfoField(def: IncorpFieldDef, value: unknown): CorpChangeFieldErr
       return typeof value === 'string' && isMonthDay(value) ? [] : [{ field: name, message: `${label}은(는) MM-DD(예: 01-01)로 입력하세요` }];
     case 'date':
       return typeof value === 'string' && parseDay(value) !== null ? [] : [{ field: name, message: `${label}은(는) 날짜(YYYY-MM-DD)로 입력하세요` }];
+    case 'time':
+      return typeof value === 'string' && isTimeOfDay(value) ? [] : [{ field: name, message: `${label}은(는) 시각(HH:MM)으로 입력하세요` }];
     case 'address': {
       const a = value as CorpChangeAddress;
       const errors: CorpChangeFieldError[] = [];
