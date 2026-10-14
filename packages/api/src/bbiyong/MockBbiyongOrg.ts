@@ -154,6 +154,11 @@ export class MockBbiyongOrg implements BbiyongOrg {
     if (!/^[A-Za-z0-9]{3}$/.test(req.orgCode)) {
       return { kind: 'rejected', message: '단체코드가 규격에 맞지 않습니다', retryable: false };
     }
+    // ★ ERP 등록 주소(erp-register-org)는 Z 코드만 받는다(삐용 회신 2026-10-14).
+    //   거절 문구는 회신에 적힌 문장 그대로 둔다.
+    if (!req.orgCode.startsWith('Z')) {
+      return { kind: 'rejected', message: 'Z 로 시작하는 단체코드는 시스템 예약 코드입니다', retryable: false };
+    }
     for (const [key, value] of [
       ['회사명', req.orgName],
       ['대표자명', req.memberName],
@@ -173,7 +178,7 @@ export class MockBbiyongOrg implements BbiyongOrg {
       return { kind: 'duplicate_code', orgCode: req.orgCode };
     }
 
-    // ★ 코드에서 유도한다(위 주석). `Z01` → 9101. ERP 코드가 아니면 뒤 2자리를 그대로 쓴다.
+    // ★ 코드에서 유도한다(위 주석). `Z01` → 9101. 숫자가 아니면 기준값 그대로다.
     const orgId = MOCK_ORG_ID_BASE + (Number(req.orgCode.slice(1)) || 0);
     this.#byCode.set(req.orgCode, orgId);
     /*

@@ -155,7 +155,7 @@ describe('HttpBbiyongOrg — ④ 보내는 것', () => {
     const { org, calls } = adapter(OK);
     await org.createOrg(REQ, 'tok-abc');
 
-    expect(calls[0]!.url).toBe('http://192.168.0.22:8082/rest/v1/s021100020/org');
+    expect(calls[0]!.url).toBe('http://192.168.0.22:8082/rest/v1/s021100010/erp-register-org');
     expect(calls[0]!.init.method).toBe('POST');
     const headers = calls[0]!.init.headers as Record<string, string>;
     expect(headers.authorization).toBe('Bearer tok-abc');
@@ -203,7 +203,7 @@ describe('HttpBbiyongOrg — ⑤ 전송 실패', () => {
 
   it('★ 연결 실패 메시지에 URL·토큰을 남기지 않는다', async () => {
     const impl = (async () => {
-      throw new Error('connect ECONNREFUSED http://192.168.0.22:8082/rest/v1/s021100020/org');
+      throw new Error('connect ECONNREFUSED http://192.168.0.22:8082/rest/v1/s021100010/erp-register-org');
     }) as unknown as typeof fetch;
     const org = new HttpBbiyongOrg({ baseUrl: 'http://192.168.0.22:8082', fetchImpl: impl });
 

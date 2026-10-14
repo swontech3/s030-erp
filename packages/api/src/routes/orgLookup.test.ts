@@ -185,14 +185,24 @@ describe('MockBbiyongOrg — 단체 조회', () => {
     expect(dup.kind).toBe('duplicate_code');
   });
 
-  it('★ Z 대역이 아닌 단체도 거르지 않는다 — 거르는 것은 삐용 몫(회신 2026-10-09)', async () => {
+  /*
+   * ★ Z 아닌 단체는 삐용 화면에서 등록된다 — ERP 등록 주소는 Z 만 받는다(회신 2026-10-14).
+   *   그래서 mock 등록도 Z 아닌 코드를 거부한다. 「목록이 Z 아닌 단체를 거르지 않는다」는
+   *   위 `받은 목록을 그대로 보여 준다` 시험(가짜 어댑터) 몫이다.
+   */
+  it('★ Z 아닌 단체는 삐용 화면에서 등록된다 — ERP 등록 주소는 Z 만(회신 2026-10-14)', async () => {
     const mock = new MockBbiyongOrg();
-    await mock.createOrg(
+    const out = await mock.createOrg(
       { orgCode: 'A05', orgName: '바깥회사', memberName: '박대표', hpNo: '01000000001', email: 'x@y.z',
         countryCode: 'KR', moduleCodes: ['OFFICE'] },
       't',
     );
+    expect(out).toEqual({
+      kind: 'rejected',
+      message: 'Z 로 시작하는 단체코드는 시스템 예약 코드입니다',
+      retryable: false,
+    });
     const listed = await mock.listOrgs({ name: '바깥' }, 't');
-    expect(listed.kind === 'ok' && listed.value.map((o) => o.orgCode)).toEqual(['A05']);
+    expect(listed.kind === 'ok' && listed.value).toEqual([]);
   });
 });

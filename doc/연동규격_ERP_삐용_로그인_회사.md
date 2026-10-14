@@ -12,7 +12,7 @@
 ① 주소 앞부분 : http://192.168.0.22:8082/rest/v1        (개발계 백엔드. 가동계 주소는 이 문서 범위 밖)
 ② 인증 : 로그인해서 받은 accessToken 을  Authorization: Bearer <토큰>  로 싣는다. 서버끼리 쓰는 별도 키는 없다
 ③ 업무 실패도 HTTP 200 이다. 본문의 result("success"/"fail") 와 status 로 가른다. 메시지 칸 이름은 massage(오타 그대로)
-④ 회사 등록(POST /s021100020/org)은 운영사(에스원테크) 계정 중에서도 「단체관리」 화면 권한이 있는 계정만 된다 — 2026-09-26 부터
+④ 회사 등록(POST /s021100020/org)은 운영사(에스원테크) 계정 중에서도 「단체관리」 화면 권한이 있는 계정만 된다 — 2026-09-26 부터  → 회신 2026-10-14: POST /rest/v1/s021100010/erp-register-org
 ⑤ 로그인한 사람이 쓸 수 있는 삐용 화면 목록 : GET /s021000000/my-menus (같은 토큰으로 부른다)
 ```
 
@@ -121,7 +121,7 @@
 
 | 회신에서 약속한 것 | 지금 | |
 |---|---|---|
-| `POST /rest/v1/s021100020/org` 한 번에 회사+대표+구독+역할 | 같다(한 SQL 문장) | ✅ |
+| `POST /rest/v1/s021100020/org` 한 번에 회사+대표+구독+역할 (→ 회신 2026-10-14: POST /rest/v1/s021100010/erp-register-org) | 같다(한 SQL 문장) | ✅ |
 | 필수 `orgName`·`orgCode`·`memberName`·`hpNo`·`email` / 선택 `countryCode`·`pwd`·`zipCode`·`address`·`detailAddress`·`telNo`·`moduleCodes` | 같다 | ✅ |
 | 성공 `data:{orgId, orgCode}` | 같다 | ✅ |
 | 코드 중복 → 본문 400 + `data:{orgId, orgCode, orgName, deletedYn}` | 같다(삭제 표시면 문구가 달라진다) | ✅ |
@@ -139,7 +139,7 @@
 회신(09-12) : 에스원테크(org_tp='S') 소속 회원의 토큰이면 된다
 지금        : 그에 더해, 그 회원의 역할에 「단체관리」(S021100010) 화면이 있어야 한다
               입구(서버 인가)가 이 네 주소를 S021100010 으로 판정한다  [코드 — authz_routes.tsv]
-                POST /s021100020/org · GET /s021100020/dup-check-org-code
+                POST /s021100020/org · GET /s021100020/dup-check-org-code   → 회신 2026-10-14: POST /rest/v1/s021100010/erp-register-org
                 GET  /s021100010/org-list · POST /s021100010/org-list(삭제)
 ```
 - 개발계 에스원테크 회원 7명 중 **그 화면이 있는 사람은 관리자 역할 1명뿐**이다 `[실측]`. 나머지 6명(사원 역할)의 토큰으로 부르면 거부된다
@@ -157,7 +157,7 @@ HTTP 200  { "status": 403, "result": "fail", "massage": "권한이 없습니다.
 ### 2-3. 요청 예 — 회신과 같다
 
 ```json
-POST /rest/v1/s021100020/org
+POST /rest/v1/s021100020/org   → 회신 2026-10-14: POST /rest/v1/s021100010/erp-register-org
 Authorization: Bearer <단체관리 권한이 있는 운영사 회원의 accessToken>
 
 { "orgName": "한성무역", "orgCode": "HAN", "memberName": "김대표",
