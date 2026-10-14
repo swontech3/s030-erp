@@ -34,6 +34,11 @@ function localToday(): string {
 
 /** 자리표시 이름표 — 미리보기에서 빈 칸을 흐리게 보일 때 쓴다. */
 const LABELS: Readonly<Record<string, string>> = Object.fromEntries(CORP_CHANGE_PRINT_FIELDS.map((f) => [f.name, f.label]));
+/**
+ * 미리보기에서도 비어 있으면 빈칸 — 임원 주소(사임서 · 취임승낙서, 2026-10-14). 입력하지 않은 주소에
+ * 흐린 이름표를 보이지 않는다. 다른 칸은 흐린 이름표 그대로다. 종이는 원래 빈칸이다.
+ */
+const BLANK_WHEN_EMPTY: readonly string[] = ['officerAddress'];
 
 /** 화면 안내 — 종이에는 나가지 않는다. */
 export const PRINT_NOTICE = '기본 양식입니다. 제출 전 등기소 또는 법무사에게 확인하세요.';
@@ -190,7 +195,7 @@ export function CorpChangePrintDialog({ id, onClose }: { id: string; onClose: ()
           <div className={styles.printPreview} aria-label={title}>
             {error ? <p className={styles.modalErr}>{error}</p> : null}
             {loading && !data ? <p className={styles.hint}>불러오는 중…</p> : null}
-            {doc && sheet ? <FormDocument definition={doc.definition} values={sheet.values} labels={LABELS} showEmpty /> : null}
+            {doc && sheet ? <FormDocument definition={doc.definition} values={sheet.values} labels={LABELS} showEmpty blankWhenEmpty={BLANK_WHEN_EMPTY} /> : null}
           </div>
         </div>
       </div>

@@ -25,8 +25,12 @@ interface Props {
   labels?: Readonly<Record<string, string>>;
   /** ★ 화면 미리보기면 true, 종이면 false. */
   showEmpty: boolean;
+  /** 미리보기에서도 비어 있으면 이름표 없이 빈칸으로 둘 자리표시 이름. */
+  blankWhenEmpty?: readonly string[];
   rootRef?: Ref<HTMLDivElement>;
 }
+
+const NONE: readonly string[] = [];
 
 const edge = (on?: boolean) => (on === false ? 'none' : '1px solid #000');
 
@@ -43,11 +47,13 @@ function CellText({
   values,
   labels,
   showEmpty,
+  blankWhenEmpty,
 }: {
   text: string;
   values: Readonly<Record<string, string>>;
   labels: Readonly<Record<string, string>>;
   showEmpty: boolean;
+  blankWhenEmpty: readonly string[];
 }) {
   return (
     <>
@@ -56,7 +62,7 @@ function CellText({
         const v = values[p.name] ?? '';
         if (v !== '') return <span key={i}>{v}</span>;
         // ★ 종이에는 아무것도 내보내지 않는다 — 지어낸 글자를 넣지 않는다.
-        if (!showEmpty) return null;
+        if (!showEmpty || blankWhenEmpty.includes(p.name)) return null;
         return (
           <span key={i} className={styles.empty}>
             {labels[p.name] ?? p.name}
@@ -73,12 +79,14 @@ function PageTable({
   values,
   labels,
   showEmpty,
+  blankWhenEmpty,
 }: {
   page: Page;
   fontSize: number;
   values: Readonly<Record<string, string>>;
   labels: Readonly<Record<string, string>>;
   showEmpty: boolean;
+  blankWhenEmpty: readonly string[];
 }) {
   const covered = coveredPositions(page);
   const tableWidth = page.colWidths.reduce((a, b) => a + b, 0);
@@ -115,7 +123,7 @@ function PageTable({
                   }}
                 >
                   {cell?.text ? (
-                    <CellText text={cell.text} values={values} labels={labels} showEmpty={showEmpty} />
+                    <CellText text={cell.text} values={values} labels={labels} showEmpty={showEmpty} blankWhenEmpty={blankWhenEmpty} />
                   ) : null}
                 </td>
               );
@@ -127,7 +135,7 @@ function PageTable({
   );
 }
 
-export function FormDocument({ definition, values, labels = {}, showEmpty, rootRef }: Props) {
+export function FormDocument({ definition, values, labels = {}, showEmpty, blankWhenEmpty = NONE, rootRef }: Props) {
   return (
     <div ref={rootRef} className={styles.root} style={{ fontFamily: definition.font.family }}>
       {definition.pages.map((page, i) => (
@@ -138,6 +146,7 @@ export function FormDocument({ definition, values, labels = {}, showEmpty, rootR
             values={values}
             labels={labels}
             showEmpty={showEmpty}
+            blankWhenEmpty={blankWhenEmpty}
           />
         </section>
       ))}
