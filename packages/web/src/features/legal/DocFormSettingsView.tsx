@@ -13,6 +13,7 @@
  *   · 법인설립 = 기본 줄만(결정 3 — 탭이 없다). 세금은 세율 · 최소액 · 배수 · 교육세율 · 수수료(결정 1)
  *   · 기본 줄은 지우지 않고 「사용」을 끈다. 회사유형 줄만 지운다(결정 2)
  *   · 목적변경은 상호변경 줄을 같이 쓴다 — 고르면 안내만 보이고 상호변경으로 보낸다
+ *   · 저장하지 않은 수정이 있으면 다른 줄 · 탭으로 옮기거나 화면을 나갈 때 묻는다(법무 상세의 「나갈 때 확인」과 같다)
  *
  * ★ 등기 설정을 고치는 자리는 이 화면 하나다(한 업무는 한 화면). 코드(등기 종류 · 회사유형 이름)는 읽기만 한다.
  */
@@ -49,6 +50,11 @@ const INCORP_TAX_HINT: Record<IncorpTaxKey, string> = {
 };
 
 const money = (n: number | null | undefined) => (n === null || n === undefined ? '' : comma(n));
+
+/** 화면을 나갈 때 — 법무 상세와 같은 문구. */
+const LEAVE_MESSAGE = '저장하지 않은 내용이 사라집니다. 이 화면을 나갈까요?';
+/** 다른 줄 · 탭으로 옮길 때. */
+const SWITCH_MESSAGE = '저장하지 않은 내용이 사라집니다. 옮길까요?';
 
 export function DocFormSettingsView() {
   const [data, setData] = useState<DocFormSettingsResponse | null>(null);
@@ -109,8 +115,49 @@ export function DocFormSettingsView() {
   /** 회사유형 탭에서 빈칸 안에 흐리게 보일 기본 줄 값. */
   const inherit = isBase ? null : base;
 
-  /** 고르기 · 탭 바꾸기 — 그 줄로 초안을 새로 만든다. */
-  const open = (domain: DocFormDomain, code: string, companyType: string, from: DocFormSettingsResponse | null = data) => {
+  // ── 저장하지 않은 수정 — 다른 줄 · 탭으로 옮기거나 화면을 나갈 때 확인(법무 상세와 같은 방식) ──
+  const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(draftOf(row));
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    /*
+     * ★ 화면 안의 링크(사이드바)는 beforeunload 가 울리지 않는다 — 클라이언트 전환이라서다. 그래서 문서
+     *   맨 위에서 **잡는 단계(capture)** 로 링크 누름을 먼저 본다(법인변경 상세와 같다).
+     * ★ 새 탭(가운데 단추 · Ctrl/⌘ · target=_blank)은 이 화면을 떠나는 것이 아니라 막지 않는다.
+     */
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element | null)?.closest?.('a[href]');
+      if (!(a instanceof HTMLAnchorElement) || (a.target && a.target !== '_self')) return;
+      if (!window.confirm(LEAVE_MESSAGE)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    document.addEventListener('click', onClick, true);
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      document.removeEventListener('click', onClick, true);
+    };
+  }, [dirty]);
+
+  /**
+   * 고르기 · 탭 바꾸기 — 그 줄로 초안을 새로 만든다. 저장하지 않은 수정이 있으면 먼저 묻는다.
+   * @param force 저장 · 삭제 직후 새로 읽은 값으로 다시 열 때 — 묻지 않는다
+   */
+  const open = (
+    domain: DocFormDomain,
+    code: string,
+    companyType: string,
+    from: DocFormSettingsResponse | null = data,
+    force = false,
+  ) => {
+    const same = sel?.domain === domain && sel.code === code && tab === companyType;
+    if (!force && !same && dirty && !window.confirm(SWITCH_MESSAGE)) return;
     const it = from?.groups.find((g) => g.domain === domain)?.items.find((i) => i.code === code) ?? null;
     setSel({ domain, code });
     setTab(companyType);
@@ -128,7 +175,7 @@ export function DocFormSettingsView() {
     try {
       await saveDocFormSetting(bodyOf(sel.domain, sel.code, tab, draft));
       const fresh = await refresh();
-      if (fresh) open(sel.domain, sel.code, tab, fresh);
+      if (fresh) open(sel.domain, sel.code, tab, fresh, true);
       notify('저장했습니다');
     } catch (err) {
       if (err instanceof DocFormSettingError) setFieldErr({ field: err.field ?? 'body', message: err.message });
@@ -146,7 +193,7 @@ export function DocFormSettingsView() {
       await deleteDocFormSettingOverride(sel.domain, sel.code, tab);
       setConfirmDelete(false);
       const fresh = await refresh();
-      open(sel.domain, sel.code, '', fresh);
+      open(sel.domain, sel.code, '', fresh, true);
       notify(`${tabName} 줄을 지웠습니다 — 기본 줄 값을 씁니다`);
     } catch (err) {
       setDeleteError(err instanceof DocFormSettingError ? err.message : '지우지 못했습니다');
