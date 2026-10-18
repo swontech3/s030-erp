@@ -55,6 +55,8 @@ const money = (n: number | null | undefined) => (n === null || n === undefined ?
 const LEAVE_MESSAGE = '저장하지 않은 내용이 사라집니다. 이 화면을 나갈까요?';
 /** 다른 줄 · 탭으로 옮길 때. */
 const SWITCH_MESSAGE = '저장하지 않은 내용이 사라집니다. 옮길까요?';
+/** 법인변경 상호변경(NAME) 줄의 등기의 목적 안내 — 목적변경(PURPOSE)이 이 줄을 같이 쓴다. */
+const NAME_PURPOSE_HINT = '목적변경도 이 줄을 같이 씁니다. 비워 두면 서류에 각 구분 이름(상호변경 · 목적변경)이 들어갑니다';
 
 export function DocFormSettingsView() {
   const [data, setData] = useState<DocFormSettingsResponse | null>(null);
@@ -387,7 +389,9 @@ export function DocFormSettingsView() {
                         wide
                         value={draft.regPurpose}
                         placeholder={inherit?.regPurpose}
-                        hint="비면 등기 종류 이름이 나갑니다"
+                        hint={
+                          group.domain === 'corp-change' && item.code === 'NAME' ? NAME_PURPOSE_HINT : '비면 등기 종류 이름이 나갑니다'
+                        }
                         error={errOf('regPurpose')}
                         onChange={(v) => patch({ regPurpose: v })}
                       />
