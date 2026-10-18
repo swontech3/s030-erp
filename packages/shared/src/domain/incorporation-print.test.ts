@@ -82,6 +82,7 @@ const src = (ps = persons, s: EffectiveDocFormSetting | null = setting): IncorpP
   snapshot: snapshotOf(ps),
   persons: ps,
   setting: s,
+  taxSetting: { regLicenseRate: 4, regLicenseMin: 112_500, metroMultiplier: 3, localEduRate: 20, regFee: 35_000 },
   methodName: '주식회사 발기설립',
   inputs: { applyDate: '2026-11-03', writeDate: '2026-11-02' },
 });
@@ -211,6 +212,11 @@ describe('buildIncorpCasePrintValues', () => {
     expect([off.regLicenseTax, off.localEduTax, off.taxTotal]).toEqual(['400,000', '80,000', '480,000']);
     const noCap = buildIncorpCasePrintValues({ ...s, snapshot: { ...s.snapshot, info: { ...s.snapshot.info, capitalAmount: null } } });
     expect([noCap.regLicenseTax, noCap.localEduTax, noCap.taxTotal, noCap.regFee]).toEqual(['', '', '', '']);
+  });
+
+  it('★ 등기 설정의 설립 세금이 비면 세금 칸 넷 다 빈칸(2026-10-18)', () => {
+    const none = buildIncorpCasePrintValues({ ...src(), taxSetting: null });
+    expect([none.regLicenseTax, none.localEduTax, none.taxTotal, none.regFee]).toEqual(['', '', '', '']);
   });
 
   it('모든 자리표시에 값이 있다 — 사람 칸은 빈칸', () => {

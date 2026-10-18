@@ -202,7 +202,7 @@ export function unescapeNewlines(s: string): string {
 
 const blankToNull = (s: string | null): string | null => (s !== null && s.trim() !== '' ? s : null);
 
-function readTaxes(raw: unknown): DocFormTaxes | null {
+export function readTaxes(raw: unknown): DocFormTaxes | null {
   if (!isObj(raw)) return null;
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
   const t = { regLicense: num(raw.regLicense), localEdu: num(raw.localEdu), regFee: num(raw.regFee) };
@@ -213,7 +213,7 @@ function readTaxes(raw: unknown): DocFormTaxes | null {
  * 첨부서면 — 두 모양이 섞여 있다(개발 DB 실측): 글자 목록(1통으로 친다) · `{ name, copies }` 목록.
  * 이름이 빈 항목은 버린다. 통수가 숫자가 아니면 1, 음수 · 소수는 버리고 1.
  */
-function readAttachments(raw: unknown): DocFormAttachment[] | null {
+export function readAttachments(raw: unknown): DocFormAttachment[] | null {
   if (!Array.isArray(raw)) return null;
   const out: DocFormAttachment[] = [];
   for (const item of raw) {

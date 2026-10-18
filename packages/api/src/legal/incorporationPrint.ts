@@ -23,6 +23,7 @@ import { randomUUID } from 'node:crypto';
 import type { ErpSession } from '@swonbiz/shared';
 import { canPrintCorpChange } from '@swonbiz/shared/domain/corp-change';
 import { parsePrintInputs, parsePrintLogBody, pickDocFormSetting } from '@swonbiz/shared/domain/corp-change-print';
+import { incorpTaxSettingOf } from '@swonbiz/shared/domain/doc-form-setting';
 import { definitionTokens, migrateDefinition, type FormDefinition } from '@swonbiz/shared/domain/form-template';
 import {
   INCORP_ENTITY_TYPE,
@@ -125,6 +126,8 @@ export async function readIncorporationPrint(
     persons,
     // ★ 주식회사뿐이라 회사유형 줄(R)이 있으면 기본 줄 위에 덮는다(법인변경과 같은 고르기)
     setting: pickDocFormSetting(settings, INCORP_METHOD, INCORP_ENTITY_TYPE),
+    // 세율 · 최소액 · 배수 · 수수료 — 발기설립 **기본 줄**의 taxes(2026-10-18, 090). 끈 줄 · 빈 값이면 세금 칸 빈칸
+    taxSetting: incorpTaxSettingOf(settings, INCORP_METHOD),
     methodName: codes.find((c) => c.code === INCORP_METHOD)?.name ?? null,
     inputs: inputs.value,
   });

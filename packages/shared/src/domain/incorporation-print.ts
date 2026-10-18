@@ -7,7 +7,8 @@
  *     문구는 양식(표양식)에 있고, 여기는 자리표시에 들어갈 **값**만 만든다
  *   · 등기 설정은 법인변경과 같은 규칙(결정 1 (가)) — 설정 값을 쓰고 빈 칸은 빈칸. 등기의 목적만 비면 코드 이름
  *     (`LAW_EST_TP` 의 「주식회사 발기설립」). 사유는 설정 값, 첨부서면은 설정 값
- *   · 세금 · 등기신청수수료는 자본금으로 계산한다(2026-10-14, `incorporation-tax.ts`) — 등기 설정의 세금 칸은 읽지 않는다
+ *   · 세금 · 등기신청수수료는 자본금으로 계산한다(2026-10-14, `incorporation-tax.ts`). 세율 · 최소액 · 배수 · 수수료는\r
+ *     등기 설정 발기설립 줄의 `taxes`(2026-10-18, 090 화면) — 비면 세금 칸은 빈칸
  *   · 날짜(결정 2) — 출력 직전 입력은 신청일 · 작성일(기본 오늘, 화면 몫). 정관 끝 날짜 = 설립예정일,
  *     취임승낙서 선임일 = 취임일 → 비면 작성일
  *   · 정관 「서울특별시」(제3조① · 제4조②) = 본점 시·도 정식 이름(결정 3, `korea-sido.ts`)
@@ -33,7 +34,7 @@ import {
 import { personsForIncorpMark, type IncorpMarkUnit, type LegalFormMark } from './legal-form-mark.ts';
 import { sidoOf } from './korea-sido.ts';
 import { closingTimeOf, isTimeOfDay } from './incorporation.ts';
-import { incorporationTax, metroSurchargeOf } from './incorporation-tax.ts';
+import { incorporationTax, metroSurchargeOf, type IncorpTaxSetting } from './incorporation-tax.ts';
 import type { IncorpInfoInput, IncorpSnapshotPerson, IncorporationSnapshot } from './incorporation-detail.ts';
 
 // =============================================================================
@@ -307,6 +308,8 @@ export interface IncorpPrintSource {
   persons: readonly IncorpPrintPerson[];
   /** 등기 설정(설립 · 발기설립 줄, `pickDocFormSetting`). null 이면 설정 칸은 빈칸. */
   setting: EffectiveDocFormSetting | null;
+  /** 설립 세금 설정(발기설립 기본 줄의 `taxes`, `readIncorpTaxSetting`). null 이면 세금 칸은 빈칸. */
+  taxSetting: IncorpTaxSetting | null;
   /** 설립 구분의 코드 이름(`LAW_EST_TP` R_PROMOTER) — 등기의 목적 설정이 비었을 때 쓴다. */
   methodName: string | null;
   inputs: PrintInputs;
@@ -317,7 +320,7 @@ const lines = (xs: readonly string[]) => xs.join('\n');
 
 /** 건마다 한 장 양식의 값. ★ 사람 칸(`person…`)도 빈칸으로 넣는다 — 모든 이름에 값이 있게. */
 export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<string, string> {
-  const { snapshot, persons, setting, methodName, inputs } = src;
+  const { snapshot, persons, setting, taxSetting, methodName, inputs } = src;
   const info = snapshot.info;
   const name = snapshot.composedName;
   const hq = formatIncorpAddress(info.hq);
@@ -331,8 +334,8 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
   const totalUnits = founders.reduce((s, p) => s + (p.unitsSubscribed || 0), 0);
   const purposes = purposeLines(info.purposes ?? '');
   const record = rosterRecordText(info.fiscalStart, info.fiscalEnd);
-  // 세금 · 수수료 — 자본금으로 계산한다(2026-10-14, `incorporation-tax.ts`). 자본금이 없으면 빈칸
-  const tax = incorporationTax(info.capitalAmount, metroSurchargeOf(info.metroSurcharge, info.hq?.address));
+  // 세금 · 수수료 — 자본금 · 등기 설정으로 계산한다(`incorporation-tax.ts`). 자본금이나 설정이 없으면 빈칸
+  const tax = incorporationTax(info.capitalAmount, metroSurchargeOf(info.metroSurcharge, info.hq?.address), taxSetting);
   const attachmentList = setting?.attachments ?? [];
   const attachmentHalf = Math.ceil(attachmentList.length / 2);
 
