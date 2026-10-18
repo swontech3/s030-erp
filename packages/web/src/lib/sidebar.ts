@@ -47,6 +47,7 @@ const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
   s040200010: 'scale', // 법인변경
   s040200011: null, // 법인변경 상세 — 목록에서 들어간다
   s040300010: 'scale', // 사업목적 — 운영사 전용 카탈로그. 법무 서비스라 같은 저울이다(더 맞는 아이콘이 없다)
+  s040900010: 'scale', // 설정(등기 설정) — 운영사 전용. 법무 서비스라 같은 저울이다
 };
 
 export interface NavItem {

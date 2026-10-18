@@ -159,6 +159,16 @@ export const SCREENS = {
    *   카탈로그를 고치는 자리는 이 화면 하나다(한 업무는 한 화면).
    */
   s040300010: { route: '/legal/biz-purposes', name: '사업목적', group: '030' },
+
+  // --- 090 설정 ---
+  /**
+   * 설정 — 등기 설정(`tb_s080_doc_form_settings`)의 표시명 · 양식호수 · 등기의 목적/사유 · 등기할 사항 ·
+   * 세금 · 첨부서면을 구분별로 고친다(2026-10-18). 설립 세금(세율 · 최소액 · 배수 · 수수료)도 여기다.
+   * ★ **운영사 전용**이다. `requireScreen` + Fastify `/legal/doc-form-settings` 의 `role !== 'operator'` 403
+   *   두 겹(표에 RLS 가 없다 — 쓰기를 막는 것은 라우트다).
+   * ★ 등기 설정을 고치는 자리는 이 화면 하나다(한 업무는 한 화면). 출력은 읽기만 한다.
+   */
+  s040900010: { route: '/legal/doc-form-settings', name: '설정', group: '090' },
 } as const satisfies Record<string, ScreenMeta>;
 
 export type ScreenId = keyof typeof SCREENS;
