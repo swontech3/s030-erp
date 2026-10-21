@@ -52,13 +52,27 @@ const KIND = { 법률: '법률', 대통령령: '시행령' };
 // ── API ──────────────────────────────────────────────────────────────────────
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let last = 0;
-async function get(path, params) {
-  const wait = 1100 - (Date.now() - last);
-  if (wait > 0) await sleep(wait);
-  last = Date.now();
+// 호출마다 「목록 · 본문 — 법령명」을 찍는다. 연결이 끊긴 오류(fetch · 응답 읽기가 던지는 네트워크 오류)만
+// 5초 뒤 1회 다시 시도하고, 두 번째도 끊기면 멈춘다. HTTP 오류 · XML 아닌 응답(키 · IP)은 다시 시도하지 않는다.
+async function get(path, params, label) {
+  console.log(`  호출: ${label}`);
   const q = new URLSearchParams({ OC, target: 'law', type: 'XML', ...params });
-  const r = await fetch(`https://www.law.go.kr/DRF/${path}?${q}`);
-  const body = await r.text();
+  let r, body;
+  for (let attempt = 1; ; attempt++) {
+    const wait = 1100 - (Date.now() - last);
+    if (wait > 0) await sleep(wait);
+    last = Date.now();
+    try {
+      r = await fetch(`https://www.law.go.kr/DRF/${path}?${q}`);
+      body = await r.text();
+      break;
+    } catch (e) {
+      const why = mask(`${e.message}${e.cause ? ` (${e.cause.code || e.cause.message})` : ''}`);
+      if (attempt >= 2) throw new Error(`${label}: 연결이 두 번 끊겼습니다 — ${why}`);
+      console.log(`  ⚠ ${label}: 연결이 끊겼습니다(${why}) — 5초 뒤 1회 다시 시도`);
+      await sleep(5000);
+    }
+  }
   if (!r.ok) throw new Error(`HTTP ${r.status}: ${mask(body.slice(0, 300))}`);
   if (!body.trimStart().startsWith('<?xml')) throw new Error(`XML 이 아닌 응답(IP · 키 확인): ${mask(body.slice(0, 300))}`);
   return body;
@@ -69,7 +83,7 @@ const tag = (x, t) => { const m = x.match(new RegExp(String.raw`<${t}(?:\s[^>]*)
 const ymd = (s) => (/^\d{8}$/.test(s) ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : null);
 
 async function findLaw(name) {
-  const x = await get('lawSearch.do', { display: '100', query: name });
+  const x = await get('lawSearch.do', { display: '100', query: name }, `목록 — ${name}`);
   const rows = (x.match(/<law id="[^"]*">[\s\S]*?<\/law>/g) || []).map((l) => ({
     name: tag(l, '법령명한글'), id: tag(l, '법령ID'), mst: tag(l, '법령일련번호'), eff: tag(l, '시행일자'), dept: tag(l, '소관부처명'), cur: tag(l, '현행연혁코드'), kind: tag(l, '법령구분명'),
   }));
@@ -84,7 +98,7 @@ async function findLaw(name) {
 async function fetchArticles(law) {
   // ★ 법령 ID(ID=)로 받으면 목록과 다른 시행일 판이 올 때가 있다(2026-10-21 지방세법: 목록 20260701 · ID 본문 20260101).
   //   목록의 법령일련번호(MST=)로 받아 목록과 같은 판을 받는다. 아래에서 시행일을 다시 대조한다.
-  const x = await get('lawService.do', { MST: law.mst });
+  const x = await get('lawService.do', { MST: law.mst }, `본문 — ${law.law_name}`);
   const info = x.match(/<기본정보>[\s\S]*?<\/기본정보>/);
   if (!info) throw new Error(`「${law.law_name}」: 본문에 기본정보가 없습니다`);
   if (tag(info[0], '법령ID') !== law.law_id) throw new Error(`「${law.law_name}」: 본문의 법령 ID(${tag(info[0], '법령ID')})가 목록과 다릅니다`);
