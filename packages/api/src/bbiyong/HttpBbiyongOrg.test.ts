@@ -314,6 +314,20 @@ describe('HttpBbiyongOrg — ⑥ 퇴실 · 재입주 · 수정 (회신 2026-10-0
     }
   });
 
+  it('★★★ 법무 회사 수정 — 같은 주소 · 값 있는 칸만 · 빈 문자열은 칸째 뺀다 · 회사명은 싣지 않는다', async () => {
+    const { org, calls } = adapter(OKOP);
+    const out = await org.patchOrgLegal(
+      { orgCode: 'Z01', zipCode: '06097', address: '서울 강남구 테헤란로 1', detailAddress: '', bizNumber: '105-87-68687' },
+      'tok-x',
+    );
+
+    expect(out.kind).toBe('ok');
+    expect(calls[0]!.url).toBe('http://192.168.0.22:8082/rest/v1/s021100010/erp-patch-org');
+    expect((calls[0]!.init.headers as Record<string, string>).authorization).toBe('Bearer tok-x');
+    const sent = JSON.parse(String(calls[0]!.init.body)) as Record<string, unknown>;
+    expect(sent).toEqual({ orgCode: 'Z01', zipCode: '06097', address: '서울 강남구 테헤란로 1', bizNumber: '105-87-68687' });
+  });
+
   it('세 호출 모두 Bearer 토큰을 싣는다', async () => {
     for (const run of [
       (o: ReturnType<typeof adapter>['org']) => o.moduleOff('Z01', 'tok-x'),

@@ -92,6 +92,7 @@ function createOnly(createOrg: BbiyongOrg['createOrg']): BbiyongOrg {
     moduleOff: nope('moduleOff') as BbiyongOrg['moduleOff'],
     moduleOn: nope('moduleOn') as BbiyongOrg['moduleOn'],
     patchOrg: nope('patchOrg') as BbiyongOrg['patchOrg'],
+    patchOrgLegal: nope('patchOrgLegal') as BbiyongOrg['patchOrgLegal'],
     sendMember: nope('sendMember') as BbiyongOrg['sendMember'],
     listOrgs: nope('listOrgs') as BbiyongOrg['listOrgs'],
     getOrg: nope('getOrg') as BbiyongOrg['getOrg'],

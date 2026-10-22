@@ -12,7 +12,11 @@ import type { CorpChangeListFilter } from '@swonbiz/shared/domain/corp-change-li
 import { registerCorpChangeRoutes, type CorpChangeDeps } from './corpChanges.ts';
 import { listCorpChanges } from '../db/corpChanges.ts';
 import { encrypt } from '../lib/crypto.ts';
-import type { BbiyongCompanyDefaults } from '@swonbiz/shared/domain/corp-change-detail';
+import type {
+  BbiyongCompanyDefaults,
+  LegalOrgInput,
+  LegalOrgSyncResult,
+} from '@swonbiz/shared/domain/corp-change-detail';
 
 const session = (role: ScopeRole, s020OrgId: number): ErpSession => ({
   erpSid: 'sid-hash',
@@ -58,6 +62,7 @@ function fakeDeps(): CorpChangeDeps & { filters: CorpChangeListFilter[]; who: nu
       throw new Error('목록 시험은 run 을 부르지 않는다');
     },
     companyDefaults: async () => null,
+    pushCompany: async () => null,
   };
 }
 
@@ -211,9 +216,12 @@ interface Seen {
 function fakeDb(
   answers: { match: RegExp; rows: unknown[] }[] = [],
   defaults: BbiyongCompanyDefaults | null = null,
+  sync: LegalOrgSyncResult | null = { kind: 'ok' },
 ) {
   const seen: Seen[] = [];
   const asked: { role: string; orgId: number }[] = [];
+  /** 삐용 보내기 — 그때까지 run 이 몇 번 끝났는지(커밋 뒤인지)도 적는다. */
+  const pushed: { orgCode: string | null; company: LegalOrgInput; runsBefore: number }[] = [];
   let runs = 0;
   const client = {
     query: async (sql: string, params?: unknown[]) => {
@@ -233,8 +241,12 @@ function fakeDb(
       asked.push({ role: s.role, orgId });
       return defaults;
     },
+    pushCompany: async (_s, orgCode, company) => {
+      pushed.push({ orgCode, company, runsBefore: runs });
+      return sync;
+    },
   };
-  return { deps, seen, asked, runs: () => runs };
+  return { deps, seen, asked, pushed, runs: () => runs };
 }
 
 const change = (over: Record<string, unknown> = {}) => ({
@@ -634,6 +646,74 @@ describe('비입주사 회사 정보 — [저장] 하나로(첫 저장 · PATCH 
     expect(res.statusCode).toBe(200);
     expect(db.seen.some((s) => UPSERT_ORG.test(s.sql))).toBe(false);
     expect(db.seen.some((s) => UPD_PAYLOAD.test(s.sql))).toBe(true);
+  });
+});
+
+describe('비입주사 회사 정보 → 삐용 보내기(결정 2026-10-22)', () => {
+  const company = {
+    legalName: '주식회사 한빛',
+    memberType: 'R',
+    bizNumber: '1058768687',
+    corpNumber: '1110002313123',
+    headZipCode: '06097',
+    headAddress: '서울 강남구 테헤란로 1',
+  };
+  const codes = { match: /FROM public\.tb_s080_codes_line/, rows: [{ category: 'MEMBER_TYPE', code: 'R', name: '주식회사' }] };
+  const TENANT = { match: /FROM public\.tb_s080_companies\s+WHERE link_s020_org_id/, rows: [{ company_id: 'c-1' }] };
+  const UPSERT_ORG = /INSERT INTO public\.tb_s080_legal_orgs/;
+
+  it('★★ 첫 저장 — 커밋 뒤에 보낸다 · 단체코드는 팝업 값 · 번호는 저장 모양(하이픈) 그대로 · 응답에 결과', async () => {
+    const db = fakeDb([codes]);
+    const a = await build(session('operator', 1), db.deps);
+    const res = await a.inject({
+      method: 'POST',
+      url: '/legal/corp-changes',
+      payload: { changeType: 'NAME', orgId: 9003, orgCode: 'Z99', payload: {}, company },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ companySync: { kind: 'ok' } });
+    expect(db.pushed).toHaveLength(1);
+    expect(db.pushed[0]).toMatchObject({
+      orgCode: 'Z99',
+      runsBefore: 1,
+      company: { bizNumber: '105-87-68687', corpNumber: '111000-2313123', headZipCode: '06097' },
+    });
+  });
+
+  it('★★ PATCH — 단체코드는 건의 것 · 실패해도 저장은 그대로(200) · 사유를 응답에 싣는다', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' }), codes], null, { kind: 'failed', reason: '삐용이 거절했다' });
+    const a = await build(session('operator', 1), db.deps);
+    const res = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: { newName: '새' }, company } });
+    expect(res.statusCode).toBe(200);
+    expect(db.seen.some((s) => UPSERT_ORG.test(s.sql))).toBe(true);
+    expect(db.pushed.map((p) => [p.orgCode, p.runsBefore])).toEqual([['Z99', 1]]);
+    expect(res.json()).toMatchObject({ id: 'cc-1', companySync: { kind: 'failed', reason: '삐용이 거절했다' } });
+  });
+
+  it('회사 정보를 안 실으면 보내지 않는다 — PATCH 응답의 companySync 는 null', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' })]);
+    const a = await build(session('operator', 1), db.deps);
+    const res = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: { newName: '새' } } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().companySync).toBeNull();
+    expect(db.pushed).toEqual([]);
+  });
+
+  it('★ 저장이 거절되면(입주사 409 · 회사 세션 403 · 칸 오류 400) 보내지 않는다', async () => {
+    const cases: [ErpSession, { match: RegExp; rows: unknown[] }[], Record<string, unknown>, number][] = [
+      [session('operator', 1), [TENANT, codes], company, 409],
+      [session('tenant', 9003), [codes], company, 403],
+      [session('operator', 1), [codes], { ...company, tel: 5 }, 400],
+    ];
+    for (const [who, answers, body, status] of cases) {
+      const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' }), ...answers]);
+      const a = await build(who, db.deps);
+      const res = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: { newName: '새' }, company: body } });
+      expect(res.statusCode).toBe(status);
+      expect(db.pushed).toEqual([]);
+      await a.close();
+      app = null;
+    }
   });
 });
 

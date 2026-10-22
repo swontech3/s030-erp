@@ -76,6 +76,7 @@ import {
   type CorpChangeDetailResponse,
   type CorpChangeDraftResponse,
   type CorpChangeOfficerView,
+  type LegalOrgSyncResult,
 } from '@swonbiz/shared/domain/corp-change-detail';
 import { parseDay } from '@swonbiz/shared/domain/day';
 import { DIGIT_MASK_RULE, isDigitMaskComplete, maskValue, type DigitMaskKind } from '@swonbiz/shared/domain/masked-caret';
@@ -208,6 +209,34 @@ function takeCompleteErrors(id: string): HandedErrors | null {
   }
 }
 
+/**
+ * 첫 저장(임시 모드)의 삐용 반영 실패 사유를 새 건의 화면으로 **한 번** 넘긴다(결정 2026-10-22 — DB 에 남기지
+ * 않으므로 옮겨 가면 사라진다). 저장소가 막혀 있으면 넘기지 않을 뿐이다(회사 정보는 저장돼 있다).
+ */
+const SYNC_FAILURE_KEY = (id: string) => `corp-change-company-sync:${id}`;
+
+function stashSyncFailure(id: string, reason: string) {
+  try {
+    sessionStorage.setItem(SYNC_FAILURE_KEY(id), reason);
+  } catch {
+    /* 저장소 막힘 — 넘기지 않는다 */
+  }
+}
+
+function takeSyncFailure(id: string): string | null {
+  try {
+    const reason = sessionStorage.getItem(SYNC_FAILURE_KEY(id));
+    if (reason !== null) sessionStorage.removeItem(SYNC_FAILURE_KEY(id));
+    return reason;
+  } catch {
+    return null;
+  }
+}
+
+/** 삐용 반영 결과 → 배너 사유. 성공 · 안 보냄은 null. */
+const syncFailureOf = (sync: LegalOrgSyncResult | null | undefined): string | null =>
+  sync?.kind === 'failed' ? sync.reason : null;
+
 // =============================================================================
 // 임원 — 화면이 들고 있는 한 명
 // =============================================================================
@@ -291,6 +320,11 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
   const dirty = JSON.stringify(toWire(def.fields, form)) !== savedWire || companyDirty;
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  /**
+   * 회사 정보는 저장됐으나 삐용 반영이 실패한 사유(결정 2026-10-22). 화면 배너로만 알린다 — DB 에 남기지
+   * 않으므로 다시 보내려면 다시 [저장] 한다. 다음 저장이 성공하면 지운다.
+   */
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // ── 임원 — 두 모드 모두 이 자리가 들고 있다 ─────────────────────────────
@@ -346,7 +380,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
 
     if (isNew) {
       // ★ 첫 저장 — 건 + 변경 내용 + 임원 (+ 회사 정보) 전부를 한 요청으로. 하나라도 틀리면 아무것도 생기지 않는다.
-      const res = await send<{ id: string }>('POST', '/api/legal/corp-changes', {
+      const res = await send<{ id: string; companySync?: LegalOrgSyncResult | null }>('POST', '/api/legal/corp-changes', {
         changeType: draft.changeType,
         orgId: draft.orgId,
         orgCode: draft.orgCode,
@@ -373,16 +407,24 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
         );
         return null;
       }
+      // ★ 곧 새 건의 주소로 옮겨 간다 — 삐용 반영 실패 사유는 그 화면으로 넘긴다.
+      const failed = syncFailureOf(res.body.companySync);
+      if (failed !== null) stashSyncFailure(res.body.id, failed);
       return { id: res.body.id, detail: null };
     }
 
     // ★ 변경 내용 + 회사 정보가 한 트랜잭션이다 — 회사 정보가 틀리면 변경 내용도 안 바뀐다.
-    const res = await send<CorpChangeDetailResponse>('PATCH', base!, { payload: wire, company: companyWire });
+    const res = await send<CorpChangeDetailResponse & { companySync?: LegalOrgSyncResult | null }>('PATCH', base!, {
+      payload: wire,
+      company: companyWire,
+    });
     if (!res.ok) {
       setFieldErrors(errorMap(res.body.errors));
       setSaveError(res.body.message ?? '저장하지 못했습니다');
       return null;
     }
+    // 회사 정보를 실어 보냈을 때만 바꾼다 — 안 실은 저장은 삐용에 보내지 않았으므로 앞의 실패가 그대로다.
+    if (companyWire) setSyncWarning(syncFailureOf(res.body.companySync));
     applyDetail(res.body);
     return { id: res.body.id, detail: res.body };
   };
@@ -603,6 +645,13 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
     );
   }, [initialSaved]);
 
+  /** 첫 저장의 삐용 반영이 실패한 채 이 건으로 옮겨 왔다 — 넘겨받은 사유를 한 번 보여 준다. */
+  useEffect(() => {
+    if (!initialSaved) return;
+    const reason = takeSyncFailure(initialSaved.id);
+    if (reason !== null) setSyncWarning(reason);
+  }, [initialSaved]);
+
   /** 서버가 준 칸 자리 → 그 칸의 오류. 주소 묶음은 `newHqAddress.zipCode` 처럼 아래 자리로 온다. */
   const errorFor = (name: string): string | undefined =>
     fieldErrors[name] ?? Object.entries(fieldErrors).find(([k]) => k.startsWith(`${name}.`))?.[1];
@@ -685,6 +734,14 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
             <div className={`${styles.banner} ${styles.bannerError}`} role="alert">
               <Icon name="circle-alert" size={16} />
               <span>{saveError}</span>
+            </div>
+          ) : null}
+          {syncWarning ? (
+            <div className={`${styles.banner} ${styles.bannerWarning}`} role="status">
+              <Icon name="circle-alert" size={16} />
+              <span>
+                회사 정보는 저장했으나 삐용에 반영하지 못했습니다 — {syncWarning.replace(/\.\s*$/, '')}. 다시 [저장] 하면 다시 보냅니다.
+              </span>
             </div>
           ) : null}
           {saved?.status === 'X' ? (

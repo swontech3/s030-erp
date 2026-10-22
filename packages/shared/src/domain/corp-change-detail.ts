@@ -405,6 +405,13 @@ export interface LegalOrgInput {
   memberType: string | null;
 }
 
+/**
+ * 법무 회사 정보 저장 뒤 삐용 반영 결과(결정 2026-10-22) — 저장 응답(첫 저장 · PATCH)에만 싣는다.
+ * ★ **DB 에 남기지 않는다.** 실패해도 저장은 그대로이고, 화면이 배너로만 알린다.
+ *   null = 보내지 않았다(회사 정보를 안 실었거나 · 보낼 값이 하나도 없다).
+ */
+export type LegalOrgSyncResult = { kind: 'ok' } | { kind: 'failed'; reason: string };
+
 /** 칸 → [이름, DB 길이(null = text)]. 길이는 037 · 038 그대로다. */
 const LEGAL_ORG_FIELDS: Readonly<Record<keyof LegalOrgInput, readonly [string, number | null]>> = {
   legalName: ['등기상 상호', 200],

@@ -28,6 +28,7 @@ import type {
   BbiyongOrg,
   BbiyongOrgInfo,
   BbiyongOrgKey,
+  BbiyongOrgLegalPatch,
   BbiyongOrgPatch,
   BbiyongOrgRequest,
   BbiyongOrgSearch,
@@ -235,6 +236,22 @@ export class MockBbiyongOrg implements BbiyongOrg {
     // 조회에 바뀐 이름이 보여야 한다 — 이 프로세스가 만든 회사만 들고 있다.
     const info = this.#createdInfo.get(patch.orgCode);
     if (info) this.#createdInfo.set(patch.orgCode, { ...info, orgName: patch.orgName });
+    return { kind: 'ok' };
+  }
+
+  /**
+   * 법무 회사 수정 — 실물과 같이 **값 있는 칸만** 받는다(결정 2026-10-22).
+   * ★ 빈 문자열이 실려 오면 거부한다 — 실물에서는 삐용 값이 지워지는 사고다. 만드는 쪽
+   *   (`legal/legalOrgSync.ts`)이 빼야 하므로, 여기 걸리면 그쪽 결함이다.
+   * ★ 조회 모양(`BbiyongOrgInfo`)에 주소 · 번호 칸이 없어 들고 있지 않는다 — 칸 이름만 로그에 남긴다.
+   */
+  async patchOrgLegal(patch: BbiyongOrgLegalPatch, _accessToken: string): Promise<OrgOpOutcome> {
+    const { orgCode, ...fields } = patch;
+    const keys = Object.keys(fields).filter((k) => fields[k as keyof typeof fields] !== undefined);
+    if (keys.some((k) => fields[k as keyof typeof fields]!.trim() === '')) {
+      return { kind: 'rejected', message: '빈 값이 실려 와 삐용에 반영하지 않았습니다', retryable: false };
+    }
+    console.log(`[bbiyong] MOCK 법무 회사 수정 — orgCode=${orgCode} [${keys.join(',')}]`);
     return { kind: 'ok' };
   }
 

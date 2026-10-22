@@ -85,6 +85,7 @@ function memberAdapter(
     moduleOff: nope('moduleOff') as BbiyongOrg['moduleOff'],
     moduleOn: nope('moduleOn') as BbiyongOrg['moduleOn'],
     patchOrg: nope('patchOrg') as BbiyongOrg['patchOrg'],
+    patchOrgLegal: nope('patchOrgLegal') as BbiyongOrg['patchOrgLegal'],
     listOrgs: nope('listOrgs') as BbiyongOrg['listOrgs'],
     getOrg: nope('getOrg') as BbiyongOrg['getOrg'],
     sendMember: async (req) => {

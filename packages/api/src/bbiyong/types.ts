@@ -361,6 +361,24 @@ export interface BbiyongOrgPatch {
   orgName: string;
 }
 
+/**
+ * 법무 비입주사 회사 정보 → 삐용 회사 수정(같은 `erp-patch-org`, 결정 2026-10-22).
+ * 맞추는 것은 **본점 주소 3칸 · 사업자번호 · 법인번호**뿐이다. 회사명 · 업태 · 종목은 보내지 않는다.
+ *
+ * ★★ 값이 없는 칸은 **칸째 뺀다**(`undefined`). 빈 문자열(`""`)로 보내면 삐용에 들어 있는 값이
+ *    지워진다(`patchOrg` 머리말과 같은 경고) — 되돌릴 수 없다.
+ * ★ 주소는 법무의 **본점**(`head_*`)이다. 대표자 자택(`ceo_*`)을 여기 넣지 않는다.
+ * ★ 법무 칸 → 이 모양은 `legal/legalOrgSync.ts` 한 곳에서 만든다(번호 모양도 거기서 정한다).
+ */
+export interface BbiyongOrgLegalPatch {
+  orgCode: string;
+  zipCode?: string;
+  address?: string;
+  detailAddress?: string;
+  bizNumber?: string;
+  corpNumber?: string;
+}
+
 // =============================================================================
 // 단체 조회 — 법무 서비스(S04)의 공용 회사 조회 팝업이 쓴다 (2026-10-09)
 // =============================================================================
@@ -420,6 +438,8 @@ export interface BbiyongOrg {
   moduleOn(orgCode: string, accessToken: string): Promise<OrgOpOutcome>;
   /** 회사명 수정. ★ 주소는 보내지 않는다. */
   patchOrg(patch: BbiyongOrgPatch, accessToken: string): Promise<OrgOpOutcome>;
+  /** 법무 비입주사 회사 정보 수정 — 본점 주소 · 사업자번호 · 법인번호, 값 있는 칸만(). */
+  patchOrgLegal(patch: BbiyongOrgLegalPatch, accessToken: string): Promise<OrgOpOutcome>;
   /** 직원정보 — 신규·수정·삭제. ★ 대표는 `U` 만 보낸다(`BbiyongMemberRequest`). */
   sendMember(req: BbiyongMemberRequest, accessToken: string): Promise<MemberOpOutcome>;
 }

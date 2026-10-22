@@ -69,6 +69,10 @@ function opAdapter(outcome: OrgOpOutcome = { kind: 'ok' }): BbiyongOrg & { seen:
     sendMember: async () => {
       throw new Error('★ 이 시험은 sendMember 를 부르지 않아야 한다');
     },
+    // 법무 회사 수정은 ERP 입주사 연동과 무관하다. 부르면 터진다.
+    patchOrgLegal: async () => {
+      throw new Error('★ 이 시험은 patchOrgLegal 을 부르지 않아야 한다');
+    },
     // 단체 조회는 퇴실·재입주·수정과 무관하다. 부르면 터진다.
     listOrgs: async () => {
       throw new Error('★ 이 시험은 listOrgs 를 부르지 않아야 한다');
@@ -266,6 +270,13 @@ describe('MockBbiyongOrg — 두 번 보내면 거부한다 (삐용과 같게)',
     expect((await mock.patchOrg({ orgCode: 'Z01', orgName: '새이름' }, 'tok')).kind).toBe('ok');
     expect((await mock.patchOrg({ orgCode: 'Z01', orgName: ' ' }, 'tok')).kind).toBe('rejected');
   });
+
+  it('★ 법무 회사 수정 — 값 있는 칸은 통과 · 빈 문자열이 실려 오면 거부한다(실물에서는 값이 지워진다)', async () => {
+    const mock = new MockBbiyongOrg();
+
+    expect((await mock.patchOrgLegal({ orgCode: 'Z01', zipCode: '06097', bizNumber: '105-87-68687' }, 'tok')).kind).toBe('ok');
+    expect((await mock.patchOrgLegal({ orgCode: 'Z01', address: ' ' }, 'tok')).kind).toBe('rejected');
+  });
 });
 
 describe('성공하면 대기 사유를 지운다 — 배너가 남지 않는다', () => {
@@ -321,6 +332,7 @@ describe('퇴실·재입주 — ⑥ 토큰 만료는 재발급으로 이어진�
       createOrg: nope('createOrg') as BbiyongOrg['createOrg'],
       moduleOn: nope('moduleOn') as BbiyongOrg['moduleOn'],
       patchOrg: nope('patchOrg') as BbiyongOrg['patchOrg'],
+      patchOrgLegal: nope('patchOrgLegal') as BbiyongOrg['patchOrgLegal'],
       sendMember: nope('sendMember') as BbiyongOrg['sendMember'],
       listOrgs: nope('listOrgs') as BbiyongOrg['listOrgs'],
       getOrg: nope('getOrg') as BbiyongOrg['getOrg'],

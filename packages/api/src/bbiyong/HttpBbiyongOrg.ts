@@ -43,6 +43,7 @@ import {
   type BbiyongOrg,
   type BbiyongOrgInfo,
   type BbiyongOrgKey,
+  type BbiyongOrgLegalPatch,
   type BbiyongOrgPatch,
   type BbiyongOrgSearch,
   type BbiyongOrgRequest,
@@ -127,6 +128,9 @@ const DENY_MESSAGE =
 
 const SEED_MESSAGE =
   '삐용 권한 설정이 끝나지 않아 회사를 만들지 못했습니다. 삐용 담당자에게 전달해야 합니다';
+
+/** 법무 회사 수정에 실을 수 있는 칸(`BbiyongOrgLegalPatch` 의 `orgCode` 밖). */
+const LEGAL_PATCH_KEYS = ['zipCode', 'address', 'detailAddress', 'bizNumber', 'corpNumber'] as const;
 
 /** 단체 조회 규격이 없을 때 운영자에게 보여 줄 문구. */
 const ORG_LOOKUP_UNSUPPORTED_MESSAGE =
@@ -491,6 +495,26 @@ export class HttpBbiyongOrg implements BbiyongOrg {
     );
     const outcome = parseOrgOp(parsed, '회사 수정');
     console.log(`[bbiyong] 회사 수정 — orgCode=${patch.orgCode} → ${outcome.kind}`);
+    return outcome;
+  }
+
+  /**
+   * 법무 비입주사 회사 정보 수정 — `patchOrg` 와 같은 주소, 다른 칸(결정 2026-10-22).
+   *
+   * ★★ **값이 있는 칸만 싣는다.** `undefined` 는 물론 빈 문자열도 칸째 뺀다 — 빈 문자열은 삐용 값을
+   *    지운다(`patchOrg` 머리말). 만드는 쪽(`legal/legalOrgSync.ts`)이 이미 뺐어도 여기서 한 번 더 본다.
+   * ★ 회사명(`orgName`)은 싣지 않는다 — 법무는 회사명을 맞추지 않는다.
+   */
+  async patchOrgLegal(patch: BbiyongOrgLegalPatch, accessToken: string): Promise<OrgOpOutcome> {
+    const body: Record<string, string> = { orgCode: patch.orgCode };
+    for (const key of LEGAL_PATCH_KEYS) {
+      const v = patch[key];
+      if (v !== undefined && v.trim() !== '') body[key] = v;
+    }
+    const parsed = await this.#post(BBIYONG.ORG_PATCH_PATH, body, accessToken, '회사 수정');
+    const outcome = parseOrgOp(parsed, '회사 수정');
+    // ★ 칸 이름만 남긴다 — 번호 · 주소 값은 로그에 두지 않는다.
+    console.log(`[bbiyong] 법무 회사 수정 — orgCode=${patch.orgCode} [${Object.keys(body).slice(1).join(',')}] → ${outcome.kind}`);
     return outcome;
   }
 
