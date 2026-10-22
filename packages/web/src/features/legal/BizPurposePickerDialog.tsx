@@ -19,17 +19,23 @@
  * =============================================================================
  * ★ 나중에 붙일 자리 (결정 2026-10-11 — 지금은 자리만)
  * =============================================================================
- *   · 탭: 지금은 「전체」 하나. 「추천」(RAG 제안) 탭은 `TABS` 에 한 줄 더하고 그 탭의 목록 읽기를 붙인다
  *   · 분류 필터: 법령 적재로 분류가 생기면 검색 줄의 `filters` 자리에 넣는다. 지금은 비어 있다
- * 탭이 늘어도 넘기는 것은 같다 — 문구 배열.
+ *
+ * ★ 「추천」 탭(2026-10-22, AI 없음) — `BizPurposeRecommendTab`. 사업 설명 → 업종 후보 → 업종 정보 ·
+ *   「검토됨」 인허가 → 사업목적 문구. 고른 문구는 같은 `checked` 에 담긴다 — 넘기는 것은 같다(문구 배열).
+ *   탭을 오가도 고른 문구는 남는다. 추천 탭의 검색은 탭을 다시 열면 처음부터다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { BizPurposeError, loadBizPurposes, type BizPurposeItem } from './biz-purposes-model';
+import { BizPurposeRecommendTab } from './BizPurposeRecommendTab';
 import base from '@/components/org-lookup/org-lookup.module.css';
 import styles from './biz-purpose-picker.module.css';
 
-/** 탭 — 지금은 「전체」 하나(머리말). */
-const TABS = [{ key: 'all', label: '전체' }] as const;
+/** 탭 — 「전체」(카탈로그) · 「추천」(머리말). */
+const TABS = [
+  { key: 'all', label: '전체' },
+  { key: 'recommend', label: '추천' },
+] as const;
 type TabKey = (typeof TABS)[number]['key'];
 
 interface Props {
@@ -54,7 +60,10 @@ export function BizPurposePickerDialog({ title = '사업목적 고르기', exist
   const [tab, setTab] = useState<TabKey>('all');
   const [query, setQuery] = useState('');
   const [load, setLoad] = useState<Load>({ state: 'loading' });
-  /** 고른 줄의 id. ★ 검색을 바꿔도 유지한다 — 여러 번 찾아 모아 담을 수 있게. 넘길 때는 문구로 바꾼다. */
+  /**
+   * 고른 것 — 키(카탈로그 id · 추천 탭은 `recommendKey`) → 문구. ★ 검색 · 탭을 바꿔도 유지한다 —
+   * 여러 번 찾아 모아 담을 수 있게. 넘길 때는 문구만 넘긴다.
+   */
   const [checked, setChecked] = useState<Map<string, string>>(new Map());
   /** 늦게 온 응답이 새 검색 결과를 덮지 않게 — 마지막 요청만 그린다. */
   const seq = useRef(0);
@@ -80,13 +89,14 @@ export function BizPurposePickerDialog({ title = '사업목적 고르기', exist
   }, [search]);
 
   const items = load.state === 'ok' ? load.items : [];
-  const toggle = (item: BizPurposeItem) =>
+  const toggleKey = (key: string, text: string) =>
     setChecked((prev) => {
       const next = new Map(prev);
-      if (next.has(item.id)) next.delete(item.id);
-      else next.set(item.id, item.text);
+      if (next.has(key)) next.delete(key);
+      else next.set(key, text);
       return next;
     });
+  const toggle = (item: BizPurposeItem) => toggleKey(item.id, item.text);
 
   /** 나중 분류 필터 자리(머리말) — 지금은 비어 있다. */
   const filters: ReactNode = null;
@@ -121,78 +131,84 @@ export function BizPurposePickerDialog({ title = '사업목적 고르기', exist
           ))}
         </div>
 
-        <form
-          className={base.searchRow}
-          onSubmit={(e) => {
-            e.preventDefault();
-            void search(query);
-          }}
-        >
-          {filters}
-          <input
-            className={base.input}
-            placeholder="문구"
-            value={query}
-            autoFocus
-            maxLength={200}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <button type="submit" className={`${base.btn} ${base.btnGhost} ${base.btnSearch}`}>
-            검색
-          </button>
-        </form>
+        {tab === 'recommend' ? (
+          <BizPurposeRecommendTab have={have} checked={checked} onToggle={toggleKey} />
+        ) : (
+          <>
+            <form
+              className={base.searchRow}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void search(query);
+              }}
+            >
+              {filters}
+              <input
+                className={base.input}
+                placeholder="문구"
+                value={query}
+                autoFocus
+                maxLength={200}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <button type="submit" className={`${base.btn} ${base.btnGhost} ${base.btnSearch}`}>
+                검색
+              </button>
+            </form>
 
-        <div className={base.list}>
-          {load.state === 'loading' ? (
-            <p className={base.note}>불러오는 중…</p>
-          ) : load.state === 'error' ? (
-            <p className={base.error} role="alert">
-              {load.message}
-            </p>
-          ) : items.length === 0 ? (
-            <p className={base.note}>찾는 문구가 없습니다.</p>
-          ) : (
-            <table className={base.table}>
-              <thead>
-                <tr>
-                  <th className={styles.checkCell} aria-label="고르기" />
-                  <th>사업목적 문구</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((i) => {
-                  const done = have.has(i.text.trim());
-                  return (
-                    <tr
-                      key={i.id}
-                      className={done ? styles.rowDone : `${base.row}${checked.has(i.id) ? ` ${base.rowOn}` : ''}`}
-                      onClick={() => !done && toggle(i)}
-                    >
-                      <td className={styles.checkCell}>
-                        {done ? null : (
-                          <input
-                            type="checkbox"
-                            checked={checked.has(i.id)}
-                            onChange={() => toggle(i)}
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={i.text}
-                          />
-                        )}
-                      </td>
-                      <td>
-                        {i.text} {done ? <span className={styles.done}>추가됨</span> : null}
-                      </td>
+            <div className={base.list}>
+              {load.state === 'loading' ? (
+                <p className={base.note}>불러오는 중…</p>
+              ) : load.state === 'error' ? (
+                <p className={base.error} role="alert">
+                  {load.message}
+                </p>
+              ) : items.length === 0 ? (
+                <p className={base.note}>찾는 문구가 없습니다.</p>
+              ) : (
+                <table className={base.table}>
+                  <thead>
+                    <tr>
+                      <th className={styles.checkCell} aria-label="고르기" />
+                      <th>사업목적 문구</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
+                  </thead>
+                  <tbody>
+                    {items.map((i) => {
+                      const done = have.has(i.text.trim());
+                      return (
+                        <tr
+                          key={i.id}
+                          className={done ? styles.rowDone : `${base.row}${checked.has(i.id) ? ` ${base.rowOn}` : ''}`}
+                          onClick={() => !done && toggle(i)}
+                        >
+                          <td className={styles.checkCell}>
+                            {done ? null : (
+                              <input
+                                type="checkbox"
+                                checked={checked.has(i.id)}
+                                onChange={() => toggle(i)}
+                                onClick={(e) => e.stopPropagation()}
+                                aria-label={i.text}
+                              />
+                            )}
+                          </td>
+                          <td>
+                            {i.text} {done ? <span className={styles.done}>추가됨</span> : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        )}
 
         <p className={styles.count}>
           {checked.size}개 고름
-          {load.state === 'ok' && load.truncated ? ` · 앞의 ${items.length}개만 보입니다 — 검색어로 좁히세요` : ''}
+          {tab === 'all' && load.state === 'ok' && load.truncated ? ` · 앞의 ${items.length}개만 보입니다 — 검색어로 좁히세요` : ''}
         </p>
 
         <div className={base.foot}>
@@ -205,7 +221,7 @@ export function BizPurposePickerDialog({ title = '사업목적 고르기', exist
             disabled={checked.size === 0}
             onClick={() => onPick([...checked.values()])}
           >
-            선택
+            {tab === 'recommend' ? '사업목적에 넣기' : '선택'}
           </button>
         </div>
       </div>

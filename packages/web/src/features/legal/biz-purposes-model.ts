@@ -6,6 +6,7 @@
  *   (`codes-model.ts` 의 `inUse` 와 같은 갈래).
  */
 import type { BizPurposeItem } from '@swonbiz/shared/domain/biz-purpose';
+import type { BizRecommendCandidate, BizRecommendDetail } from '@swonbiz/shared/domain/biz-purpose-recommend';
 
 export type { BizPurposeItem };
 
@@ -70,5 +71,20 @@ export const createBizPurpose = (text: string) =>
 
 export const saveBizPurpose = (id: string, patch: { text?: string; active?: boolean }) =>
   call<{ item: BizPurposeItem }>(`/api/legal/biz-purposes/${encodeURIComponent(id)}`, json('PATCH', patch)).then(
+    (r) => r.item,
+  );
+
+// ── 「추천」 탭(2026-10-22) — 읽기만 한다 ─────────────────────────────────────
+
+export type { BizRecommendCandidate, BizRecommendDetail };
+
+/** 업종 후보 — 사업 설명으로 찾는다(최대 20, 넘으면 `truncated`). */
+export function loadBizRecommend(q: string): Promise<{ items: BizRecommendCandidate[]; truncated: boolean }> {
+  return call(`/api/legal/biz-purposes/recommend?${new URLSearchParams({ q: q.trim() })}`);
+}
+
+/** 고른 업종 — 업태 · 종목 · KSIC · 「검토됨」 인허가 · 사업목적 문구. */
+export const loadBizRecommendDetail = (bizCode: string) =>
+  call<{ item: BizRecommendDetail }>(`/api/legal/biz-purposes/recommend/${encodeURIComponent(bizCode)}`).then(
     (r) => r.item,
   );
