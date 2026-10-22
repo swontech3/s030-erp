@@ -10,9 +10,8 @@
  *   입주 여부는 ERP 입주계약의 기간으로 계산한다. 같은 회사가 상담→서비스→입주→퇴실로
  *   옮겨다니므로 유형으로 두면 값을 계속 바꿔야 하고 이력이 끊긴다.
  *
- * ★ 비밀번호는 계정마다 다르지 않다. `MOCK_PASSWORD` 하나이고, 틀리면 실패한다 —
- *   로그인 화면의 에러 표시(showError)를 실제로 띄워 볼 수 있어야 하기 때문이다.
- *   비밀번호가 무엇이든 통과시키면 그 경로가 죽은 코드로 남는다.
+ * ★ 2026-10-22 — 비밀번호로 로그인하던 signIn · MOCK_PASSWORD 를 없앴다. ERP 서버는 비밀번호를
+ *   받지 않는다(규격서 Q6). 남은 것은 mock 토큰을 확인하는 verifySession 이다.
  */
 import type { ScopeRole } from '@swonbiz/shared';
 import {
@@ -22,9 +21,6 @@ import {
   type BbiyongLoginResult,
   type BbiyongProfile,
 } from './types.ts';
-
-/** 개발용 고정 비밀번호. 실제 삐용 연동으로 바뀌면 사라진다. */
-export const MOCK_PASSWORD = 'erp1234!';
 
 interface MockAccount extends Omit<BbiyongLoginResult, 'accessToken' | 'refreshToken'> {
   email: string;
@@ -100,25 +96,24 @@ export function findMockAccount(memberId: number): MockAccount | undefined {
 }
 
 export class MockBbiyongAuth implements BbiyongAuth {
-  async signIn(email: string, password: string): Promise<BbiyongLoginResult> {
-    const account = MOCK_ACCOUNTS.find((a) => a.email === email.trim().toLowerCase());
-
-    // ★ 계정이 없는 경우와 비밀번호가 틀린 경우의 메시지를 구분하지 않는다.
-    //   구분하면 어떤 이메일이 가입돼 있는지 밖에서 확인할 수 있다(계정 열거).
-    if (!account || password !== MOCK_PASSWORD) {
-      throw new BbiyongAuthError(INVALID_CREDENTIALS_MESSAGE);
-    }
-
+  /**
+   * 토큰 확인 — `mock-access.{memberId}.…` 모양의 토큰만 그 mock 계정으로 받는다(2026-10-22).
+   *
+   * ★ 2026-10-22 부터 로그인 화면은 **브라우저가 삐용을 직접** 부른다(규격서 Q6). 그래서 MOCK 모드에서
+   *   화면 로그인은 되지 않는다 — 이 메서드는 시험 · 대본이 mock 토큰으로 세션을 만들 때 쓴다.
+   */
+  async verifySession(accessToken: string, refreshToken: string): Promise<BbiyongLoginResult> {
+    const [kind, id] = accessToken.split('.');
+    const account = kind === 'mock-access' ? findMockAccount(Number(id)) : undefined;
+    if (!account) throw new BbiyongAuthError(INVALID_CREDENTIALS_MESSAGE);
     return {
       memberId: account.memberId,
       orgId: account.orgId,
       orgTp: account.orgTp,
       memberName: account.memberName,
       orgName: account.orgName,
-      // 실제 삐용 JWT 자리. 형식만 흉내 낸 문자열이고, 이 값도 암호화해서 저장한다 —
-      // 암호화·복호화 경로를 mock 단계에서 같이 태워야 회신 후에 처음 돌리는 일이 없다.
-      accessToken: `mock-access.${account.memberId}.${Date.now()}`,
-      refreshToken: `mock-refresh.${account.memberId}.${Date.now()}`,
+      accessToken,
+      refreshToken,
     };
   }
 

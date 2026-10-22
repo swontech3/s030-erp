@@ -22,25 +22,16 @@
 import { BBIYONG } from '@swonbiz/shared';
 import {
   BbiyongAuthError,
-  BbiyongOrgSelectRequiredError,
   BbiyongReloginRequiredError,
   BbiyongTokenExpiredError,
   BbiyongUnavailableError,
-  INVALID_CREDENTIALS_MESSAGE,
-  ORG_SELECT_MESSAGE,
+  RELOGIN_MESSAGE,
   type BbiyongAuth,
   type BbiyongLoginResult,
   type BbiyongProfile,
 } from './types.ts';
 
 export { INVALID_CREDENTIALS_MESSAGE, ORG_SELECT_MESSAGE, RELOGIN_MESSAGE } from './types.ts';
-
-/** 삐용 응답 하나를 해석한 결과. 성공만이 토큰을 들고 있다. */
-export type SignInOutcome =
-  | { kind: 'success'; result: BbiyongLoginResult }
-  /** 겸직 — 토큰 대신 단체 선택 목록이 왔다. ★ selectToken 은 담지 않는다(3분 유효). */
-  | { kind: 'orgSelect'; candidateCount: number }
-  | { kind: 'fail'; errorCode: string | null; serverMessage: string | null };
 
 export type ReIssueOutcome =
   | { kind: 'success'; accessToken: string }
@@ -104,65 +95,31 @@ function toDisplayString(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
 
+/** my-orgs 에서 꺼낸 「지금 계정」 — 삐용이 토큰으로 확인해 준 값이다. */
+export interface MyOrgsCurrent {
+  memberId: number;
+  orgId: number;
+  memberName: string;
+  orgName: string;
+}
+
 /**
- * POST /rest/v1/s021200010/sign-in 의 응답 본문을 해석한다.
+ * GET /rest/v1/s021200010/my-orgs 의 응답 본문 → 지금 토큰의 계정(current:true 한 줄).
  *
- * ★ 어떤 입력이 와도 예외를 던지지 않는다. 깨진 응답은 `fail` 이다 — 파싱 예외가
- *   그대로 올라가면 로그인 화면에 "서버 오류"가 뜨고, 진짜 원인은 로그 안에 묻힌다.
+ * ★ 로그인 확인용이다(규격서 Q6 · 2026-10-22). 삐용은 토큰으로 「지금 계정」을 알아내
+ *   같은 이메일의 회사 계정 목록을 주고, 그중 지금 계정에 current:true 를 붙인다.
+ * ★ 함정 ①이 여기에도 있다 — 성공은 `result === 'success' && status === 200` 셋 다.
+ * ★ 어떤 입력에도 던지지 않는다. 확인할 수 없으면 null 이다.
  */
-export function parseSignIn(body: unknown): SignInOutcome {
+export function parseMyOrgs(body: unknown): MyOrgsCurrent | null {
   const root = asRecord(body);
-  if (!root) return failOf(null);
-
-  const data = asRecord(root.data);
-
-  // ★ 겸직 판정을 성공 게이트보다 **먼저** 한다.
-  //   회신에는 needOrgSelect 응답의 result·status 가 명시돼 있지 않다. 이 응답이 혹시
-  //   result:'fail' 로 온다면, 게이트를 먼저 통과시킬 경우 겸직 계정이 "비밀번호가
-  //   틀렸습니다"로 뭉개진다 — 회신 §4 가 "조용히 실패하면 안 된다"고 못박은 바로 그 경우다.
-  //   이 가지는 토큰을 만들지 않으므로 순서를 앞당겨도 인증이 느슨해지지 않는다.
-  //   판정은 값이 아니라 **존재 여부**로 한다(회신 §4).
-  //
-  //   ★★ **1단계 응답에는 orgTp 가 없다**(회신 2026-09-12 §4). 겸직 계정이 이 가지를
-  //      타면 후보 목록만으로는 어느 후보가 운영사인지 알 수 없다 — orgTp 는 2단계
-  //      `/sign-in-org` 응답에서 비로소 나온다. 2단계 로그인 팝업(s030000010p1)을
-  //      만들 때 orgTp 는 **반드시 2단계 응답에서** 읽어야 하고, 후보에 붙은 조직
-  //      이름이나 목록 순서로 운영사를 추측해서는 안 된다(같은 회신 §3② — '에스원3DP'
-  //      · '에스원BD' 는 org_tp='N' 인 고객사다).
-  if (data && Object.hasOwn(data, 'needOrgSelect')) {
-    return { kind: 'orgSelect', candidateCount: Array.isArray(data.candidates) ? data.candidates.length : 0 };
-  }
-
-  // ★★ 성공 게이트. 셋 다 맞아야 한다.
-  if (root.result !== 'success' || root.status !== 200) return failOf(root);
-  if (!data) return failOf(root);
-
-  const memberId = toInt(data.memberId);
-  const orgId = toInt(data.orgId);
-  const orgTp = str(data.orgTp);
-  const accessToken = str(data.accessToken);
-  const refreshToken = str(data.refreshToken);
-
-  // 하나라도 없으면 반쪽 세션이 된다. orgId 가 없으면 스코프를 해석할 수 없다.
-  // ★ orgTp 는 ERP 판정에 더는 쓰지 않지만(2026-09-12 §1) tb_s080_auth_session.org_tp 컬럼에
-  //   들어가고, S-WonERP 레거시 브리지가 그 컬럼으로 role·isAdmin 을 정한다. 비어 있으면
-  //   레거시 쪽에서 조용히 권한이 낮아진다. 만들다 만 세션보다 실패가 낫다.
-  if (memberId === null || orgId === null || orgTp === null || accessToken === null || refreshToken === null) {
-    return failOf(root);
-  }
-
-  return {
-    kind: 'success',
-    result: {
-      memberId,
-      orgId,
-      orgTp,
-      memberName: toDisplayString(data.memberName),
-      orgName: toDisplayString(data.orgName),
-      accessToken,
-      refreshToken,
-    },
-  };
+  if (!root || root.result !== 'success' || root.status !== 200 || !Array.isArray(root.data)) return null;
+  const row = root.data.map(asRecord).find((r) => r?.current === true);
+  if (!row) return null;
+  const memberId = toInt(row.memberId);
+  const orgId = toInt(row.orgId);
+  if (memberId === null || orgId === null) return null;
+  return { memberId, orgId, memberName: toDisplayString(row.memberName), orgName: toDisplayString(row.orgName) };
 }
 
 /**
@@ -231,40 +188,34 @@ export class HttpBbiyongAuth implements BbiyongAuth {
     this.#timeoutMs = opts.timeoutMs ?? 10_000;
   }
 
-  async signIn(email: string, password: string): Promise<BbiyongLoginResult> {
-    // 필드명은 `pwd` 다. 평문으로 나가지만 그건 삐용 규격이고, 전송 구간은 TLS 가 맡는다.
-    const body = await this.#call(
-      `${this.#baseUrl}${BBIYONG.LOGIN_PATH}`,
-      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, pwd: password }) },
-      'sign-in',
-    );
-
-    const out = parseSignIn(body);
-
-    if (out.kind === 'orgSelect') {
-      // ★ 조용히 실패시키지 않는다. 이 줄이 로그에 찍히면 2단계 로그인 팝업(s030000010p1)을
-      //   만들 때가 된 것이다. 이메일을 남기는 것은 이 경로만이다 — 자격 증명은 이미
-      //   통과했고(계정 열거가 아니다), 누구를 도와줘야 하는지 알아야 한다.
-      console.warn(
-        `[bbiyong] needOrgSelect — 겸직 계정 로그인 시도: ${email} (후보 ${out.candidateCount}개). ` +
-          '2단계 로그인 팝업 s030000010p1 이 필요하다는 신호다.',
+  /**
+   * 삐용 토큰 → 확인된 로그인 값 (규격서 Q6 · 2026-10-22). ERP 서버는 비밀번호를 받지 않는다.
+   *
+   * ★ 토큰은 **머리글로만** 싣는다 — 주소(쿼리)에 실으면 중계 로그에 평문으로 남는다.
+   * ★ 회사 구분(orgTp)은 my-orgs 응답에 없어 null 이다 — 브라우저가 보낸 값은 믿지 않는다(대표 결정 A).
+   */
+  async verifySession(accessToken: string, refreshToken: string): Promise<BbiyongLoginResult> {
+    let body: unknown;
+    try {
+      body = await this.#call(
+        `${this.#baseUrl}${BBIYONG.MY_ORGS_PATH}`,
+        { method: 'GET', headers: { authorization: `Bearer ${accessToken}` } },
+        'my-orgs',
       );
-      throw new BbiyongOrgSelectRequiredError(ORG_SELECT_MESSAGE, out.candidateCount);
+    } catch (err) {
+      // 가짜 · 만료 토큰 — 인증 실패다. 연결 실패(BbiyongUnavailableError)는 그대로 올린다.
+      if (err instanceof BbiyongTokenExpiredError) throw new BbiyongAuthError(RELOGIN_MESSAGE);
+      throw err;
     }
 
-    if (out.kind === 'fail') {
-      // 실패 경로에는 이메일을 남기지 않는다 — 로그가 계정 목록이 된다.
-      // 삐용은 "이메일 없음"과 "비밀번호 틀림"을 둘 다 A005 로 준다(회신 §7).
-      console.warn(`[bbiyong] sign-in 실패 code=${out.errorCode ?? '-'} massage=${out.serverMessage ?? '-'}`);
-      throw new BbiyongAuthError(INVALID_CREDENTIALS_MESSAGE);
+    const me = parseMyOrgs(body);
+    if (!me) {
+      console.warn('[bbiyong] my-orgs 로 지금 계정을 확인하지 못했다 — 세션을 만들지 않는다');
+      throw new BbiyongAuthError(RELOGIN_MESSAGE);
     }
 
-    this.#profiles.set(out.result.memberId, {
-      memberName: out.result.memberName,
-      orgName: out.result.orgName,
-      orgTp: out.result.orgTp,
-    });
-    return out.result;
+    this.#profiles.set(me.memberId, { memberName: me.memberName, orgName: me.orgName, orgTp: null });
+    return { ...me, orgTp: null, accessToken, refreshToken };
   }
 
   /**

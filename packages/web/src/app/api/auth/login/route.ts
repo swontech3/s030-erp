@@ -6,22 +6,26 @@ import { rejectCrossSite } from '@/lib/csrf';
 /**
  * 로그인 — 브라우저와 Fastify 사이의 유일한 통로.
  *
+ * ★ 2026-10-22 — 규격서 Q6 : 브라우저가 삐용 로그인을 **직접** 부르고, 받은 삐용 토큰 둘만
+ *   이리로 넘긴다. 이 파일도 ERP 서버도 **비밀번호를 받지 않는다.** 토큰은 Fastify 가 삐용에
+ *   물어 확인한 뒤에만 세션이 된다.
+ *
  * 브라우저가 Fastify 를 직접 부르지 않는 이유는 `lib/api.ts` 주석에 있다.
  * 여기서 하는 일은 셋이다.
- *   1. Fastify `/auth/login` 호출
+ *   1. Fastify `/auth/login` 호출(삐용 토큰 둘)
  *   2. 응답의 **원문 erp_sid 를 HttpOnly 쿠키로 굽는다** — 이 값이 브라우저 JS 에
  *      노출되면 XSS 하나로 세션이 통째로 털린다
  *   3. 원문 sid 를 응답 본문에서 **지운 뒤** 나머지만 화면에 돌려준다
  *
  * ★ 브라우저 쿠키에 삐용 토큰은 하나도 내려가지 않는다(완료 기준). 삐용 access·refresh 는
- *   Fastify 가 암호화해서 DB 에만 둔다 — 이 파일은 그 값을 받지도 않는다.
+ *   Fastify 가 암호화해서 DB 에만 둔다 — 이 파일은 본문으로 받아 그대로 넘기기만 한다(남기지 않는다).
  */
 interface ApiLoginResponse {
   erpSid: string;
   expiresAt: string;
   home: string;
   screens: string[];
-  display: { memberName: string; orgName: string; orgTp: string };
+  display: { memberName: string; orgName: string; orgTp: string | null };
   companyId: string | null;
   message?: string;
 }
@@ -32,22 +36,22 @@ export async function POST(request: Request) {
   const blocked = rejectCrossSite(request, { requireJson: true });
   if (blocked) return blocked;
 
-  let payload: { email?: unknown; password?: unknown } | null;
+  let payload: { accessToken?: unknown; refreshToken?: unknown } | null;
   try {
     payload = await request.json();
   } catch {
     return NextResponse.json({ message: '요청 형식이 올바르지 않습니다' }, { status: 400 });
   }
-  // null · 비문자열도 400 이다 — payload.email 에서 500 이 나지 않게(리뷰 M6).
-  if (!payload || typeof payload.email !== 'string' || typeof payload.password !== 'string') {
-    return NextResponse.json({ message: '이메일과 비밀번호를 입력하세요' }, { status: 400 });
+  // null · 비문자열도 400 이다(리뷰 M6). ★ 이메일 · 비밀번호는 받지 않는다 — 넘기는 것은 토큰 둘뿐이다.
+  if (!payload || typeof payload.accessToken !== 'string' || typeof payload.refreshToken !== 'string') {
+    return NextResponse.json({ message: '로그인 정보가 올바르지 않습니다. 다시 로그인해 주세요' }, { status: 400 });
   }
 
   let res;
   try {
     res = await callApi<ApiLoginResponse>('/auth/login', {
       method: 'POST',
-      body: { email: payload.email, password: payload.password },
+      body: { accessToken: payload.accessToken, refreshToken: payload.refreshToken },
     });
   } catch (err) {
     // ★ Fastify 에 못 붙은 것(기동 전·죽음)은 인증 실패가 아니다. 여기서 잡지 않으면

@@ -19,8 +19,12 @@
 // (packages/api/src/bbiyong/MockBbiyongAuth.ts 가 대신 응답한다).
 
 export const BBIYONG = {
-  /** 삐용 백엔드 베이스 URL. 회신 전 placeholder. */
-  BASE_URL: process.env.BBIYONG_BASE_URL ?? "https://bbiyong.s-wontech.co.kr",
+  /*
+   * ★ 삐용 주소(BASE_URL)는 **여기 두지 않는다**(2026-10-22). 코드 기본값이 가동 주소
+   *   (https://bbiyong.s-wontech.co.kr)였다 — 설정이 빠지면 조용히 가동계로 나갔다.
+   *   주소는 설정 값으로만 읽는다 : api `BBIYONG_BASE_URL`(env.ts — 비면 기동 중단) ·
+   *   web `NEXT_PUBLIC_BBIYONG_API_URL`(next.config.ts — 비면 기동 중단).
+   */
 
   /** 1단계 로그인(이메일·비밀번호 확인) — BBIYONG-AUTH.md §4.2 */
   LOGIN_PATH: "/rest/v1/s021200010/sign-in",
@@ -33,6 +37,12 @@ export const BBIYONG = {
 
   /** 로그아웃 — refresh-token 헤더로 해당 세션 1건만 하드 삭제 */
   SIGN_OUT_PATH: "/rest/v1/s021200010/sign-out",
+
+  /**
+   * 지금 계정 확인 — ERP 서버가 브라우저에게서 받은 삐용 토큰을 확인한다(규격서 Q6 · 2026-10-22).
+   * 토큰은 Authorization 머리글로. 응답의 current:true 줄이 지금 계정이다(삐용 명세 075 회사 전환 목록).
+   */
+  MY_ORGS_PATH: "/rest/v1/s021200010/my-orgs",
 
   /*
    * ══════════════════════════════════════════════════════════════════════════

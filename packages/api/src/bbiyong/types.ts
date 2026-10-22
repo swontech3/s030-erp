@@ -7,6 +7,7 @@
  * 삐용의 응답 모양이 다른 파일로 새어나가지 않게 한다.
  */
 import type { ScopeRole } from '@swonbiz/shared';
+import { INVALID_CREDENTIALS_MESSAGE, ORG_SELECT_MESSAGE } from '@swonbiz/shared';
 
 /** 삐용 로그인 성공 시 ERP 가 실제로 쓰는 값만 추린 것. */
 export interface BbiyongLoginResult {
@@ -14,8 +15,12 @@ export interface BbiyongLoginResult {
   memberId: number;
   /** 조직 식별자. ★ JWT 에는 없고 로그인 **응답 본문에만** 있다(ORG §3-2). */
   orgId: number;
-  /** 'S' = 운영사. **표시 전용**이며 접근 판정에 쓰지 않는다(지시문 1-6). */
-  orgTp: string;
+  /**
+   * 'S' = 운영사. **표시 전용**이며 접근 판정에 쓰지 않는다(지시문 1-6).
+   * ★ 2026-10-22 부터 null — 세션은 삐용에 물어 **확인한 값**으로만 만드는데, 확인에 쓰는
+   *   my-orgs 응답에 회사 구분이 없다. 브라우저가 보낸 값은 믿지 않는다(대표 결정 A).
+   */
+  orgTp: string | null;
   /** 헤더의 "홍길동 (에스원테크)" 표시용. */
   memberName: string;
   orgName: string;
@@ -31,11 +36,8 @@ export interface BbiyongLoginResult {
  *   삐용의 `massage` 를 그대로 화면에 흘리지도 않는다: 삐용 문구가 바뀌면 ERP 화면이
  *   같이 바뀌고, 언젠가 내부 사정이 적힌 문구가 사용자에게 간다.
  */
-export const INVALID_CREDENTIALS_MESSAGE = '이메일 또는 비밀번호가 올바르지 않습니다';
-
-/** 겸직 계정 안내. 2단계 로그인 팝업을 만들기 전까지 이 문구가 유일한 출구다. */
-export const ORG_SELECT_MESSAGE =
-  '이 계정은 여러 단체에 소속되어 있습니다. 삐용에서 로그인한 뒤 다시 시도해 주세요.';
+// ★ 2026-10-22 — 문구 둘은 shared 로 옮겼다. 로그인 응답을 읽는 자리가 브라우저가 됐다(규격서 Q6).
+export { INVALID_CREDENTIALS_MESSAGE, ORG_SELECT_MESSAGE };
 
 /**
  * 재발급도 실패했다 — **되살릴 방법이 없으니 다시 로그인하라**는 안내.
@@ -56,26 +58,8 @@ export class BbiyongAuthError extends Error {
   }
 }
 
-/**
- * 겸직 계정 — 같은 이메일이 여러 단체에 있어 삐용이 토큰 대신 **단체 선택 목록**을 준 경우.
- *
- * ★ 조용히 실패하면 안 된다(회신 ⑦ §4). 자격 증명은 맞았는데 단체를 못 고른 상태이므로
- *   "이메일 또는 비밀번호가 올바르지 않습니다"로 뭉개면 사용자는 영원히 못 들어온다.
- *   `BbiyongAuthError` 를 상속하므로 라우트의 401 번역은 그대로 타고, 메시지만 다르다.
- *
- * 2단계 로그인 팝업(s030000010p1)은 아직 만들지 않는다 — 겸직 계정이 실제로 없다.
- * 이 예외가 서버 로그에 찍히면 그때가 팝업을 만들 때다.
- */
-export class BbiyongOrgSelectRequiredError extends BbiyongAuthError {
-  constructor(
-    message: string,
-    /** 후보 개수만 남긴다. ★ selectToken 은 3분 유효이고 보관하지 않는다. */
-    readonly candidateCount: number,
-  ) {
-    super(message);
-    this.name = 'BbiyongOrgSelectRequiredError';
-  }
-}
+// ★ 겸직 계정 예외(BbiyongOrgSelectRequiredError)는 2026-10-22 에 없앴다 — 서버가 로그인을 대신하지
+//   않으므로 겸직 응답을 받는 자리가 브라우저(shared `readSignInTokens` · ORG_SELECT_MESSAGE)다.
 
 /**
  * 삐용이 **HTTP 401** 을 줬다 — 실은 토큰이 만료·무효라는 뜻이다.
@@ -137,11 +121,21 @@ export class BbiyongUnavailableError extends Error {
 export interface BbiyongProfile {
   memberName: string;
   orgName: string;
-  orgTp: string;
+  /** 2026-10-22 부터 null 일 수 있다 — `BbiyongLoginResult.orgTp` 주석 */
+  orgTp: string | null;
 }
 
 export interface BbiyongAuth {
-  signIn(email: string, password: string): Promise<BbiyongLoginResult>;
+  /**
+   * 삐용 토큰 → 확인된 로그인 값 (규격서 Q6 · 2026-10-22).
+   *
+   * ★ 브라우저가 삐용 로그인을 직접 부르고 받은 토큰 둘을 넘긴다. **ERP 서버는 비밀번호를 받지 않는다.**
+   *   토큰은 삐용에 물어 확인하고(my-orgs — 토큰은 머리글로), 확인된 「지금 계정」의
+   *   회원 · 회사만 돌려준다. 확인이 안 되면 `BbiyongAuthError` · 삐용에 못 붙으면 `BbiyongUnavailableError`.
+   * ★ refresh 토큰은 여기서 따로 확인하지 않는다 — 처음 재발급할 때 삐용이 대조한다
+   *   (re-issue 는 토큰을 주소에 싣는 규격이라 로그인 확인에 쓰지 않았다).
+   */
+  verifySession(accessToken: string, refreshToken: string): Promise<BbiyongLoginResult>;
   /** 삐용 세션 1건 삭제. 실패해도 ERP 로그아웃은 계속 진행한다(ORG §3-5). */
   signOut(refreshToken: string): Promise<void>;
   /**

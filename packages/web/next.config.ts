@@ -15,6 +15,18 @@ const PROTECTED_PATHS = [
   '/inquiry-admin/:path*',
 ];
 
+/**
+ * ★ 삐용 API 주소 — **비면 기동을 막는다**(2026-10-22). 로그인 화면이 삐용 로그인을 직접 부른다
+ *   (규격서 Q6). 코드에 기본 주소를 두지 않는다 — 예전 기본값은 가동 주소였고, 설정이 빠지면
+ *   조용히 가동계로 나갔다. api 쪽 `BBIYONG_BASE_URL`(env.ts)과 같은 원칙이다.
+ */
+if (!process.env.NEXT_PUBLIC_BBIYONG_API_URL?.trim()) {
+  throw new Error(
+    'NEXT_PUBLIC_BBIYONG_API_URL 이 없다 — 로그인 화면이 부를 삐용 API 주소다. packages/web/.env 에 넣을 것 ' +
+      '(개발계 http://192.168.0.22:8082 · .env.example 참고).',
+  );
+}
+
 const nextConfig: NextConfig = {
   // @swonbiz/shared 는 빌드 산출물이 아니라 TS 소스를 그대로 내보낸다.
   // 워크스페이스 패키지라 Next 가 직접 트랜스파일해야 한다.

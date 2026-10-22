@@ -21,7 +21,7 @@ export interface MeResponse {
   screens: string[];
   home: string;
   /** ★ 헤더 표시 전용. 사이드바·접근 판정에 쓰지 않는다(지시문 1-6). */
-  display: { memberName: string; orgName: string; orgTp: string } | null;
+  display: { memberName: string; orgName: string; orgTp: string | null } | null;
   companyId: string | null;
   role: 'operator' | 'tenant';
   expiresAt: string;

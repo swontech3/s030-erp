@@ -30,7 +30,7 @@
  *   실제로 쓰이는 DS 컴포넌트는 Icon 하나뿐이다(원본도 x-import 로 Icon 만 쓴다).
  */
 import { useState } from 'react';
-import { BBIYONG, LINKS } from '@swonbiz/shared';
+import { BBIYONG, LINKS, readSignInTokens } from '@swonbiz/shared';
 import { Icon } from '@/components/ds';
 import { AuthShell } from '@/components/patterns/AuthShell';
 import styles from './login.module.css';
@@ -67,6 +67,14 @@ const BBIYONG_WEB_URL = process.env.NEXT_PUBLIC_BBIYONG_WEB_URL ?? '';
  */
 const PASSWORD_RESET_URL = BBIYONG_WEB_URL ? `${BBIYONG_WEB_URL}${BBIYONG.PASSWORD_RESET_PATH}` : '';
 
+/**
+ * 삐용 **API** 주소 — 브라우저가 삐용 로그인을 직접 부른다(규격서 Q6 · 2026-10-22).
+ *
+ * ★ 기본값을 두지 않는다 — 비면 `next.config.ts` 가 기동을 막는다(가동 주소로 조용히 나가지 않게).
+ * ★ `NEXT_PUBLIC_*` 은 빌드 때 박힌다 — 계통을 바꾸면 web 을 다시 빌드한다(위 BBIYONG_WEB_URL 과 같다).
+ */
+const BBIYONG_API_URL = (process.env.NEXT_PUBLIC_BBIYONG_API_URL ?? '').replace(/\/+$/, '');
+
 /** 펼침 안내의 id — 버튼의 `aria-controls` 와 한 쌍이다. */
 const RESET_HELP_ID = 'login-reset-help';
 
@@ -89,11 +97,10 @@ export default function LoginPage() {
   /**
    * 에러 표시 상태.
    *
-   * ★★ 삐용 응답의 함정(BBIYONG-AUTH.md §2.4 함정 1) — 로그인 API 는 **HTTP 200 이어도
-   *    body.status !== 200 이면 실패**다. 그 검사는 이 화면이 아니라 **삐용 어댑터**가 한다
-   *    (packages/api/src/bbiyong/). 어댑터가 실패를 예외로 번역 → Fastify 401 → route handler 가
-   *    message 로 바꿔 준다. 화면까지 body.status 를 들고 오면 삐용 응답 모양이 프론트로 샌다.
-   *    이 화면은 상태코드와 message 만 본다.
+   * ★★ 2026-10-22 — 규격서 Q6 : 이 화면이 삐용 로그인을 **직접** 부른다. ERP 서버는 비밀번호를
+   *    받지 않는다. 삐용 응답의 함정(HTTP 200 이어도 실패 · 겸직)은 shared `readSignInTokens` 한 곳이
+   *    읽고, 이 화면은 그 결과(토큰 둘 · 문구)만 본다. 토큰은 `/api/auth/login` **본문**으로만 넘긴다
+   *    (주소에 싣지 않는다) — 거기서 ERP 서버가 삐용에 물어 확인한 뒤에만 세션이 된다.
    */
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -109,10 +116,28 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
+      // ① 삐용 로그인 — 브라우저가 직접(규격서 Q6). 비밀번호는 여기서 삐용으로만 간다
+      const bbRes = await fetch(`${BBIYONG_API_URL}${BBIYONG.LOGIN_PATH}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, pwd: password }),
+      });
+      if (bbRes.status >= 500) {
+        // 삐용 장애는 비밀번호 잘못이 아니다
+        setError('서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요');
+        return;
+      }
+      const tokens = readSignInTokens(await bbRes.json().catch(() => null));
+      if (tokens.kind !== 'success') {
+        setError(tokens.message);
+        return;
+      }
+
+      // ② 삐용 토큰 → ERP 세션 — 서버가 삐용에 물어 확인한다
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }),
       });
       const body = await res.json().catch(() => null);
 
@@ -120,8 +145,8 @@ export default function LoginPage() {
       //   route handler 와 Fastify 가 이미 걸러 상태코드로 번역해 주지만,
       //   화면도 body 를 확인해서 홈 경로가 실제로 왔을 때만 이동한다.
       if (!res.ok || !body?.home) {
-        // 401 만 자격 증명 문제다. 나머지(503 등)는 서버가 준 문구를 쓰고, 없으면 사용자 잘못으로 돌리지 않는다.
-        const fallback = res.status === 401 ? '이메일 또는 비밀번호가 올바르지 않습니다' : '로그인 처리 중 오류가 났습니다';
+        // 401 = 삐용 토큰을 확인하지 못했다. 나머지(503 등)는 서버가 준 문구를 쓰고, 없으면 사용자 잘못으로 돌리지 않는다.
+        const fallback = res.status === 401 ? '세션이 만료되었습니다. 다시 로그인해 주세요' : '로그인 처리 중 오류가 났습니다';
         setError(body?.message ?? fallback);
         return;
       }

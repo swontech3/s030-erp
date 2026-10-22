@@ -72,6 +72,7 @@ export async function createSession(login: BbiyongLoginResult): Promise<CreatedS
       login.memberId,
       // ★ org_tp 는 ERP 판정에 쓰지 않지만 컬럼에는 계속 넣는다 —
       //   S-WonERP 레거시 브리지(erp-session-map.ts)가 이 컬럼을 읽는다.
+      //   2026-10-22 부터 null — 확인에 쓰는 삐용 my-orgs 에 없다(migration 037).
       login.orgTp,
       login.orgId,
       encrypt(login.accessToken),

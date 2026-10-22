@@ -11,71 +11,52 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { homeRouteFor } from '@swonbiz/shared';
-import {
-  bbiyongAcl,
-  bbiyongAuth,
-  BbiyongAuthError,
-  BbiyongOrgSelectRequiredError,
-  BbiyongUnavailableError,
-} from '../bbiyong/index.ts';
+import { bbiyongAcl, bbiyongAuth, BbiyongAuthError, BbiyongUnavailableError } from '../bbiyong/index.ts';
 import { createSession, readRefreshToken, revokeSession } from '../session/store.ts';
 import { requireRawSid, requireSession } from '../session/hook.ts';
 
+/** 브라우저가 삐용 로그인에서 받은 토큰 둘. ★ 비밀번호는 받지 않는다(규격서 Q6 · 2026-10-22). */
 interface LoginBody {
-  email?: string;
-  password?: string;
+  accessToken: string;
+  refreshToken: string;
 }
 
 export function registerAuthRoutes(app: FastifyInstance): void {
   /**
-   * POST /auth/login — 로그인.
+   * POST /auth/login — 삐용 토큰 → ERP 세션 (규격서 Q6 · 2026-10-22).
    *
-   * 흐름 (SPEC 요구사항 10):
-   *   삐용 로그인 → memberId·orgId·orgTp 추출 → erp_sid 32바이트 생성
-   *   → SHA-256 해시만 tb_s080_auth_session 저장 → 원문을 web 에 반환
+   * 흐름 :
+   *   브라우저가 삐용 sign-in 을 직접 부른다(ERP 서버는 비밀번호를 받지 않는다)
+   *   → 받은 토큰 둘을 web 이 이리로 넘긴다
+   *   → **삐용에 물어 확인**(my-orgs) — 확인된 회원 · 회사만 쓴다. 확인이 안 되면 세션을 만들지 않는다
+   *   → erp_sid 32바이트 생성 → SHA-256 해시만 tb_s080_auth_session 저장 → 원문을 web 에 반환
    *   → 삐용 토큰은 서버에만 암호화 보관
+   * ★ 로그인 길은 이것 하나다 — 「삐용 안에 뜬 ERP」도 이 자리를 쓴다(대표 결정 2026-10-22).
    */
   app.post<{ Body: LoginBody }>('/auth/login', {
     config: { public: true }, // 로그인은 세션 없이 들어온다 — 유일하게 공개된 쓰기 라우트
-    // 본문 형식은 스키마가 거른다 — 비문자열 email 이 .trim() 에서 500 을 내지 않게(리뷰 2026-09-07).
-    // 길이 상한은 삐용 규격(회신 ⑦)이 오면 맞춘다. 지금은 상식선.
+    // 본문 형식은 스키마가 거른다 — 이메일 · 비밀번호 등 다른 칸이 섞이면 400 이다.
     schema: {
       body: {
         type: 'object',
-        required: ['email', 'password'],
+        required: ['accessToken', 'refreshToken'],
         additionalProperties: false,
         properties: {
-          email: { type: 'string', minLength: 1, maxLength: 254 },
-          password: { type: 'string', minLength: 1, maxLength: 128 },
+          accessToken: { type: 'string', minLength: 1, maxLength: 4096 },
+          refreshToken: { type: 'string', minLength: 1, maxLength: 4096 },
         },
       },
     },
   }, async (req, reply) => {
-    const email = req.body?.email?.trim();
-    const password = req.body?.password;
-    if (!email || !password) {
-      return reply.code(400).send({ error: 'invalid_request', message: '이메일과 비밀번호를 입력하세요' });
-    }
-
     let login;
     try {
-      login = await bbiyongAuth.signIn(email, password);
+      login = await bbiyongAuth.verifySession(req.body.accessToken, req.body.refreshToken);
     } catch (err) {
-      // ★ 겸직 계정 — 자격 증명은 맞았고 단체를 못 고른 것뿐이다. 조용히 실패시키지 않는다.
-      //   이 줄이 로그에 찍히면 2단계 로그인 팝업(s030000010p1)을 만들 때가 된 것이다(회신 ⑦ §4).
-      if (err instanceof BbiyongOrgSelectRequiredError) {
-        req.log.warn(
-          { candidateCount: err.candidateCount },
-          '겸직 계정 로그인 시도 — needOrgSelect. 2단계 로그인 팝업 s030000010p1 이 필요하다',
-        );
-        return reply.code(401).send({ error: 'org_select_required', message: err.message });
-      }
       if (err instanceof BbiyongAuthError) {
-        // 401 이지만 메시지는 계정 존재 여부를 흘리지 않는다(어댑터가 이미 합쳐서 준다).
-        return reply.code(401).send({ error: 'invalid_credentials', message: err.message });
+        return reply.code(401).send({ error: 'invalid_token', message: err.message });
       }
       // ★ 삐용에 못 붙은 것은 인증 실패가 아니다. 401 로 내려보내면 삐용 장애가
-      //   "비밀번호가 틀렸습니다"로 보이고, 사용자는 멀쩡한 비밀번호를 계속 다시 친다.
+      //   "다시 로그인하세요"로 보이고, 사용자는 멀쩡한 계정으로 계속 다시 로그인한다.
       //   (web 은 5xx 문구를 자기 문구로 가린다 — 여기 문구는 로그·개발용이다.)
       if (err instanceof BbiyongUnavailableError) {
         req.log.error({ err }, '삐용 인증 서버 연결 실패');
