@@ -176,8 +176,8 @@ export function purposeTextFor(
   itemName: string,
   catalog: readonly { bizCode: string | null; text: string }[],
 ): BizRecommendDetail['purpose'] {
-  const mine = catalog.filter((c) => c.bizCode === bizCode && c.text.trim() !== '').map((c) => c.text.trim()).sort();
-  return mine.length > 0 ? { text: mine[0], source: 'catalog' } : { text: itemName.trim(), source: 'item' };
+  const first = catalog.filter((c) => c.bizCode === bizCode && c.text.trim() !== '').map((c) => c.text.trim()).sort()[0];
+  return first !== undefined ? { text: first, source: 'catalog' } : { text: itemName.trim(), source: 'item' };
 }
 
 /** 조문 표기 — 「제12조 제1항」 · 「제26조의2 제1항제1호」 · 「제4조」. */
