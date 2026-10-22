@@ -3,7 +3,6 @@ import {
   BIZ_RECOMMEND_LIMIT,
   BIZ_RECOMMEND_QUERY_MAX,
   aliasWords,
-  articleFirstLine,
   articleLabel,
   parseBizCodeParam,
   parseBizRecommendQuery,
@@ -128,18 +127,14 @@ describe('purposeTextFor', () => {
   });
 });
 
-describe('articleLabel · articleFirstLine', () => {
-  it('조문 표기', () => {
-    expect(articleLabel(12, 0, '제1항')).toBe('제12조 제1항');
-    expect(articleLabel(26, 2, '제1항제1호')).toBe('제26조의2 제1항제1호');
-    expect(articleLabel(4, 0, null)).toBe('제4조');
+describe('articleLabel', () => {
+  it('번호 · 제목 · 항 · 호', () => {
+    expect(articleLabel(12, 0, '통신판매업자의 신고 등', '제1항')).toBe('제12조(통신판매업자의 신고 등) 제1항');
+    expect(articleLabel(26, 2, '등록하여야 하는 영업', '제1항제1호')).toBe('제26조의2(등록하여야 하는 영업) 제1항제1호');
+    expect(articleLabel(4, 0, '숙박업의 세분', null)).toBe('제4조(숙박업의 세분)');
   });
-  it('첫 줄 — 「제N조(제목)」을 뗀다. 같은 줄에 글이 없으면 다음 줄', () => {
-    expect(articleFirstLine('제4조(숙박업의 세분) 법 제2조제2항에 따라 숙박업을 다음과 같이 세분한다.\n1. …')).toBe(
-      '법 제2조제2항에 따라 숙박업을 다음과 같이 세분한다.',
-    );
-    expect(articleFirstLine('제12조(통신판매업자의 신고 등)\n① 통신판매업자는 …')).toBe('① 통신판매업자는 …');
-    expect(articleFirstLine('제26조의2(등록하여야 하는 영업)\n① 법 …')).toBe('① 법 …');
+  it('제목이 없는 조는 괄호 없이', () => {
+    expect(articleLabel(8, 0, null, null)).toBe('제8조');
   });
 });
 

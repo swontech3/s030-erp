@@ -5,14 +5,13 @@
  *   · 업종 사전 047(`tb_s080_biz_code` · `_ksic`) — 사용 중인 줄
  *   · 바꿔 부르는 말 — 공통 코드 `BIZ_ALIAS` / `000` 의 사용 중인 값(코드값 = 업종코드, 이름 = 말들).
  *     소비용 `listCodes`(`db/lookups.ts`)처럼 건물을 가리지 않는다
- *   · 인허가 기준표 049 — **「검토됨」 · 사용 중인 규칙만**. 근거 조문은 048 에서 읽는다
+ *   · 인허가 기준표 049 — **「검토됨」 · 사용 중인 규칙만**. 근거 조문은 048 에서 번호 · 제목만 읽는다(조문 글은 내보내지 않는다)
  *   · 카탈로그 030(`tb_s080_biz_purpose_catalog`) — 업종코드 · 문구만, 사용 중인 줄만
  * ★ 047 · 048 · 049 는 RLS 읽기 정책(운영사 · 회사)이 있다 — `withCompanyScope` 안에서 부른다.
  */
 import {
   BIZ_ALIAS_CATEGORY,
   BIZ_ALIAS_USE_TP,
-  articleFirstLine,
   articleLabel,
   type BizAliasRow,
   type BizDictEntry,
@@ -71,7 +70,7 @@ type LicenseRow = {
   article_no: number | null;
   branch_no: number | null;
   part: string | null;
-  body: string | null;
+  title: string | null;
 };
 
 /**
@@ -81,7 +80,7 @@ type LicenseRow = {
 export async function loadReviewedLicenses(client: ScopedClient, bizCode: string): Promise<BizRecommendLicense[]> {
   const { rows } = (await client.query(
     `SELECT r.rule_id, r.license_kind, r.license_name, r.note,
-            l.law_name, a.article_no, a.branch_no, b.part, a.body
+            l.law_name, a.article_no, a.branch_no, a.title, b.part
        FROM public.tb_s080_license_rule_biz_code k
        JOIN public.tb_s080_license_rule r ON r.rule_id = k.rule_id AND r.active AND r.review_status = '검토됨'
        LEFT JOIN public.tb_s080_license_rule_basis b ON b.rule_id = r.rule_id AND b.active
@@ -99,11 +98,10 @@ export async function loadReviewedLicenses(client: ScopedClient, bizCode: string
       lic = { kind: r.license_kind, name: r.license_name, note: r.note, basis: [] };
       byRule.set(r.rule_id, lic);
     }
-    if (r.law_name !== null && r.article_no !== null && r.body !== null) {
+    if (r.law_name !== null && r.article_no !== null) {
       lic.basis.push({
         lawName: r.law_name,
-        article: articleLabel(r.article_no, r.branch_no ?? 0, r.part),
-        firstLine: articleFirstLine(r.body),
+        article: articleLabel(r.article_no, r.branch_no ?? 0, r.title, r.part),
       });
     }
   }

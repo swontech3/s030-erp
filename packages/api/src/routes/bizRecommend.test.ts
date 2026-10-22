@@ -124,8 +124,8 @@ describe('recommendBizOp · bizDetailOp', () => {
     const client = fakeClient([
       [/tb_s080_biz_code d/, [{ biz_code: '525101', biz_type: '도매 및 소매업', item_name: '전자상거래 소매업', ksic: [{ code: '47912', name: '전자상거래 소매업' }] }]],
       [/tb_s080_license_rule_biz_code/, [
-        { rule_id: 'ecom_mail_order', license_kind: '신고', license_name: '통신판매업 신고', note: '단서', law_name: '전자상거래법', article_no: 12, branch_no: 0, part: '제1항', body: '제12조(통신판매업자의 신고 등)\n① 통신판매업자는 …' },
-        { rule_id: 'ecom_mail_order', license_kind: '신고', license_name: '통신판매업 신고', note: '단서', law_name: '전자상거래법 시행령', article_no: 13, branch_no: 0, part: '제1항', body: '제13조(통신판매업자의 신고절차)\n① 법 …' },
+        { rule_id: 'ecom_mail_order', license_kind: '신고', license_name: '통신판매업 신고', note: '단서', law_name: '전자상거래법', article_no: 12, branch_no: 0, title: '통신판매업자의 신고 등', part: '제1항' },
+        { rule_id: 'ecom_mail_order', license_kind: '신고', license_name: '통신판매업 신고', note: '단서', law_name: '전자상거래법 시행령', article_no: 13, branch_no: 0, title: '통신판매업자의 신고절차', part: '제1항' },
       ]],
       [/tb_s080_biz_purpose_catalog/, [{ biz_code: '525101', biz_name: '전자상거래 소매업(통신판매업)' }]],
     ]);
@@ -136,8 +136,8 @@ describe('recommendBizOp · bizDetailOp', () => {
         name: '통신판매업 신고',
         note: '단서',
         basis: [
-          { lawName: '전자상거래법', article: '제12조 제1항', firstLine: '① 통신판매업자는 …' },
-          { lawName: '전자상거래법 시행령', article: '제13조 제1항', firstLine: '① 법 …' },
+          { lawName: '전자상거래법', article: '제12조(통신판매업자의 신고 등) 제1항' },
+          { lawName: '전자상거래법 시행령', article: '제13조(통신판매업자의 신고절차) 제1항' },
         ],
       },
     ]);

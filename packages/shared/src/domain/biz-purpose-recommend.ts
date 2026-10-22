@@ -62,13 +62,14 @@ export interface BizRecommendCandidate {
   matchedBy: { kind: BizMatchKind; word?: string }[];
 }
 
-/** 인허가 근거 조문 하나. */
+/**
+ * 인허가 근거 조문 하나 — 법령명 + 조문 번호 · 제목 · 항 · 호만(조문 글은 내보내지 않는다, 2026-10-22).
+ * ★ 조문 첫 줄은 그 조의 ①항 글이라, 다른 항이 근거일 때 엉뚱한 글이 보였다(37조 ④ 신고에 ① 허가 글).
+ */
 export interface BizRecommendBasis {
   lawName: string;
-  /** 예: 「제12조 제1항」 · 「제26조의2 제1항제1호」 */
+  /** 예: 「제12조(통신판매업자의 신고 등) 제1항」 · 「제26조의2(등록하여야 하는 영업) 제1항제1호」 */
   article: string;
-  /** 조문 첫 줄(제목 줄 「제N조(…)」을 뗀 글자) */
-  firstLine: string;
 }
 
 /** 「검토됨」 인허가 하나. */
@@ -181,16 +182,13 @@ export function purposeTextFor(
   return first !== undefined ? { text: first, source: 'catalog' } : { text: itemName.trim(), source: 'item' };
 }
 
-/** 조문 표기 — 「제12조 제1항」 · 「제26조의2 제1항제1호」 · 「제4조」. */
-export function articleLabel(articleNo: number, branchNo: number, part: string | null): string {
-  return `제${articleNo}조${branchNo ? `의${branchNo}` : ''}${part ? ` ${part}` : ''}`;
-}
-
-/** 조문 첫 줄 — 본문 첫 줄의 「제N조(제목)」을 떼고, 남는 글자가 없으면 다음 줄. */
-export function articleFirstLine(body: string): string {
-  const lines = body.split('\n');
-  const head = (lines[0] ?? '').replace(/^제\d+조(의\d+)?(\([^)]*\))?\s*/, '').trim();
-  return head !== '' ? head : (lines[1] ?? '').trim();
+/**
+ * 조문 표기 — 번호 · 제목 · 항 · 호.
+ * 예: 「제12조(통신판매업자의 신고 등) 제1항」 · 「제26조의2(등록하여야 하는 영업) 제1항제1호」 · 「제4조(숙박업의 세분)」.
+ * 제목이 없는(삭제된) 조는 괄호를 붙이지 않는다.
+ */
+export function articleLabel(articleNo: number, branchNo: number, title: string | null, part: string | null): string {
+  return `제${articleNo}조${branchNo ? `의${branchNo}` : ''}${title ? `(${title})` : ''}${part ? ` ${part}` : ''}`;
 }
 
 /** 추천 목록 조건 — `?q=`. 빈 설명은 거절한다(무엇을 찾을지 모른다). */
