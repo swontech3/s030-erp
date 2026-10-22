@@ -194,12 +194,20 @@ async function codeNames(
  * 회사 정보를 쓰기 **전에** 거절할 것을 다 본다 — 이 함수가 통과해야 건 · 변경 내용도 쓴다.
  * 쓰는 쪽이 판정 뒤에 쓰므로, 회사 정보가 틀리면 건 · 변경 내용도 남지 않는다.
  *
+ * ★★ **운영사만** 고친다(결정 2026-10-22, 회사 사용자는 읽기만 — 나중에 열 예정). 회사 세션이 `company` 를
+ *    실어 오면 **403** — DB 를 읽기 전에 거절한다. RLS(037)는 그대로 둔다(코드에서만 막는다).
  * ★★ 입주사 단체(`link_s020_org_id` 에 있다)면 **409** — 법무는 ERP 에 쓰지 않는다. 입주사
  *    정보는 입주사 화면에서 고친다.
  * ★ 회사유형은 `MEMBER_TYPE` 002 에 있어야 한다(400, 자리 `company.memberType`).
  * ★ 단체는 RLS 를 통과한 건의 것이거나 `parseOrgTarget` 을 거친 것만 넣는다(db 머리말 ⚠).
  */
-async function checkCompanyWrite(client: ScopedClient, orgId: number, company: LegalOrgInput): Promise<OpError | null> {
+async function checkCompanyWrite(
+  client: ScopedClient,
+  session: ErpSession,
+  orgId: number,
+  company: LegalOrgInput,
+): Promise<OpError | null> {
+  if (session.role !== 'operator') return fail(403, 'operator_only', '회사 정보는 운영사만 고칠 수 있습니다');
   const source = await readCompanySource(client, orgId);
   if (source.isTenant) return fail(409, 'tenant_company', '입주사 정보는 ERP 입주사 화면에서 고칩니다');
 
@@ -257,7 +265,7 @@ export async function createCorpChange(
 ): Promise<OpResult<{ id: string }>> {
   // ★ 회사 정보 판정이 먼저다 — 틀리면 건도 만들지 않는다(쓰기 전에 돌려준다).
   if (input.company) {
-    const refused = await checkCompanyWrite(client, input.orgId, input.company);
+    const refused = await checkCompanyWrite(client, session, input.orgId, input.company);
     if (refused) return refused;
   }
 
@@ -499,7 +507,7 @@ export async function saveCorpChangePayload(
   if (!parsed.ok || !company.ok) return fail(400, 'invalid_request', errors[0]!.message, errors);
 
   if (company.value) {
-    const refused = await checkCompanyWrite(client, row.orgId, company.value);
+    const refused = await checkCompanyWrite(client, session, row.orgId, company.value);
     if (refused) return refused;
   }
 

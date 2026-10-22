@@ -580,12 +580,24 @@ describe('비입주사 회사 정보 — [저장] 하나로(첫 저장 · PATCH 
     expect(db.runs()).toBe(0);
   });
 
-  it('★★ 회사 세션 — 회사 정보는 세션 단체로 저장된다(본문에 단체를 적을 자리가 없다)', async () => {
+  it('★★ 회사 세션 — 회사 정보를 실으면 403 · 건도 회사 정보도 쓰지 않는다(운영사만, 결정 2026-10-22)', async () => {
     const db = fakeDb([codes]);
     const a = await build(session('tenant', 9003), db.deps);
     const res = await a.inject({ method: 'POST', url: '/legal/corp-changes', payload: { changeType: 'NAME', payload: {}, company } });
-    expect(res.statusCode).toBe(201);
-    expect(db.seen.find((s) => UPSERT_ORG.test(s.sql))!.params[0]).toBe(9003);
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error).toBe('operator_only');
+    expect(db.seen.some((s) => /^\s*(INSERT|UPDATE)/.test(s.sql))).toBe(false);
+  });
+
+  it('★★ 회사 세션 — PATCH 에 회사 정보를 실으면 403 · 변경 내용도 안 바뀐다 · 안 실으면 저장된다', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' }), codes]);
+    const a = await build(session('tenant', 9003), db.deps);
+    const res = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: { newName: '새' }, company } });
+    expect(res.statusCode).toBe(403);
+    expect(db.seen.some((s) => UPD_PAYLOAD.test(s.sql) || UPSERT_ORG.test(s.sql))).toBe(false);
+    const ok = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: { newName: '새' } } });
+    expect(ok.statusCode).toBe(200);
+    expect(db.seen.some((s) => UPSERT_ORG.test(s.sql))).toBe(false);
   });
 
   it('PATCH — 변경 내용과 회사 정보를 같이 저장하고 새 상세를 돌려준다', async () => {
