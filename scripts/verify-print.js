@@ -40,7 +40,12 @@ const CHROME_CANDIDATES = [
 ];
 const PORT = 9366;
 const WEB = 'http://localhost:3100';
-const LOGIN = { email: 'operator@s-wontech.co.kr', password: 'erp1234!' };
+// ★ 2026-10-22 — 로그인은 삐용 토큰 → ERP 세션이다(규격서 Q6 · 서버는 비밀번호를 받지 않는다).
+//   MOCK 모드(BBIYONG_MOCK=true)의 토큰 = mock-access.{회원번호} · mock-refresh.{회원번호}
+//   (packages/api/src/bbiyong/MockBbiyongAuth.ts — 이메일 → 회원번호는 그 파일의 MOCK_ACCOUNTS)
+const MOCK_MEMBER_IDS = { 'admin@s-wontech.co.kr': 1001, 'operator@s-wontech.co.kr': 1002, 'tenant@test.com': 2001, 'noaccess@test.com': 2002 };
+const mockTokens = (email) => ({ accessToken: `mock-access.${MOCK_MEMBER_IDS[email]}.verify`, refreshToken: `mock-refresh.${MOCK_MEMBER_IDS[email]}.verify` });
+const LOGIN = mockTokens('operator@s-wontech.co.kr');
 /** 맞닿았다고 볼 간격(px). 1px 선이 장치 픽셀 하나 안에서 흔들리는 폭이다. */
 const GAP = 0.6;
 

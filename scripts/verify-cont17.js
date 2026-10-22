@@ -64,11 +64,16 @@ const jpeg = (size) => {
   return b;
 };
 
+// ★ 2026-10-22 — 로그인은 삐용 토큰 → ERP 세션이다(규격서 Q6 · 서버는 비밀번호를 받지 않는다).
+//   MOCK 모드(BBIYONG_MOCK=true)의 토큰 = mock-access.{회원번호} · mock-refresh.{회원번호}
+//   (packages/api/src/bbiyong/MockBbiyongAuth.ts — 이메일 → 회원번호는 그 파일의 MOCK_ACCOUNTS)
+const MOCK_MEMBER_IDS = { 'admin@s-wontech.co.kr': 1001, 'operator@s-wontech.co.kr': 1002, 'tenant@test.com': 2001, 'noaccess@test.com': 2002 };
+const mockTokens = (email) => ({ accessToken: `mock-access.${MOCK_MEMBER_IDS[email]}.verify`, refreshToken: `mock-refresh.${MOCK_MEMBER_IDS[email]}.verify` });
 async function login(email) {
   const res = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password: 'erp1234!' }),
+    body: JSON.stringify(mockTokens(email)),
   });
   if (!res.ok) throw new Error(`로그인 실패 ${email}: ${res.status} ${await res.text()}`);
   const body = await res.json();

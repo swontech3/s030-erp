@@ -14,6 +14,7 @@ import { homeRouteFor } from '@swonbiz/shared';
 import { bbiyongAcl, bbiyongAuth, BbiyongAuthError, BbiyongUnavailableError } from '../bbiyong/index.ts';
 import { createSession, readRefreshToken, revokeSession } from '../session/store.ts';
 import { requireRawSid, requireSession } from '../session/hook.ts';
+import { callBbiyong } from '../session/bbiyongToken.ts';
 
 /** 브라우저가 삐용 로그인에서 받은 토큰 둘. ★ 비밀번호는 받지 않는다(규격서 Q6 · 2026-10-22). */
 interface LoginBody {
@@ -112,6 +113,25 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     }
 
     return reply.send({ ok: true });
+  });
+
+  /**
+   * POST /auth/bbiyong-token — ERP 가 바깥 틀일 때, 내 안에 뜬 삐용 화면에 넘길 삐용 토큰 (2026-10-22 「2번」).
+   *
+   * ★ **자기 화면에만** — 공개 라우트가 아니다. 전역 훅이 erp_sid 쿠키로 세션을 붙인 요청만 온다.
+   *   web 은 `forwardJson`(같은 출처 · JSON 만)으로만 부른다 — 다른 사이트의 페이지는 응답을 읽을 수 없다.
+   * ★ access 는 **살아 있는 것** — `callBbiyong` 을 거친다(만료면 재발급). refresh 는 세션의 것.
+   * ★ 화면은 이 값을 저장하지 않고 바로 안쪽 삐용에 넘긴다(`@swonbiz/shared` embedBridge). 응답은 캐시하지 않는다.
+   */
+  app.post('/auth/bbiyong-token', async (req, reply) => {
+    const session = requireSession(req);
+    const rawSid = requireRawSid(req);
+    const accessToken = await callBbiyong(session.erpSid, async (fresh) => fresh);
+    const refreshToken = await readRefreshToken(rawSid);
+    if (!refreshToken) {
+      return reply.code(401).send({ error: 'session_expired', message: '세션이 만료되었습니다. 다시 로그인해 주세요' });
+    }
+    return reply.header('cache-control', 'no-store').send({ accessToken, refreshToken });
   });
 
   /**

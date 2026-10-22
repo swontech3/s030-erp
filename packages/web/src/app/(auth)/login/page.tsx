@@ -29,11 +29,13 @@
  *   `.dc.html` 이 시각 기준이므로 원본 인라인 스타일을 따랐다. 이 화면에서
  *   실제로 쓰이는 DS 컴포넌트는 Icon 하나뿐이다(원본도 x-import 로 Icon 만 쓴다).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BBIYONG, LINKS, readSignInTokens } from '@swonbiz/shared';
 import { Icon } from '@/components/ds';
 import { AuthShell } from '@/components/patterns/AuthShell';
 import styles from './login.module.css';
+/* ★ 2026-10-22 — 다른 화면(삐용) 안에 떴으면 바깥이 넘긴 토큰으로 로그인(대표 지시 「2번」) */
+import { startInnerLogin } from '@/lib/embed';
 
 /**
  * 삐용 **화면** 주소 — 비밀번호 초기화가 그 화면에서만 되기 때문에 필요하다.
@@ -104,6 +106,13 @@ export default function LoginPage() {
    */
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  /*
+   * ★ 2026-10-22 — 삐용 안에 떠 있으면 「준비됨」을 알리고, 바깥(허용 주소)이 보낸 토큰을
+   *   **이 화면이 쓰는 그 로그인 자리**(/api/auth/login)로 넘긴다. 새 로그인 길이 아니다.
+   *   혼자 열렸으면 아무것도 하지 않는다.
+   */
+  useEffect(() => startInnerLogin(), []);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

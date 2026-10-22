@@ -11,3 +11,4 @@ export * from './constants';
 export * from './session';
 export * from './tenant-registration';
 export * from './bbiyongSignIn';
+export * from './embedBridge';

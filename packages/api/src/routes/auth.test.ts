@@ -23,10 +23,15 @@ vi.mock('../bbiyong/index.ts', async () => {
 });
 vi.mock('../session/store.ts', () => ({
   createSession,
-  readRefreshToken: vi.fn(),
+  readRefreshToken,
   revokeSession: vi.fn(),
 }));
-vi.mock('../session/hook.ts', () => ({ requireRawSid: vi.fn(), requireSession: vi.fn() }));
+const requireSession = vi.fn();
+const requireRawSid = vi.fn();
+const readRefreshToken = vi.fn();
+const callBbiyong = vi.fn();
+vi.mock('../session/hook.ts', () => ({ requireRawSid, requireSession }));
+vi.mock('../session/bbiyongToken.ts', () => ({ callBbiyong }));
 
 const { registerAuthRoutes } = await import('./auth.ts');
 const { BbiyongAuthError, BbiyongUnavailableError } = await import('../bbiyong/types.ts');
@@ -41,11 +46,11 @@ const VERIFIED = {
   refreshToken: 'ref',
 };
 
-async function post(body: unknown) {
+async function post(body: unknown, url = '/auth/login') {
   const app = Fastify();
   registerAuthRoutes(app);
   await app.ready();
-  const res = await app.inject({ method: 'POST', url: '/auth/login', payload: body as object });
+  const res = await app.inject({ method: 'POST', url, payload: body as object });
   await app.close();
   return res;
 }
@@ -109,5 +114,49 @@ describe('POST /auth/login — 삐용 토큰 → ERP 세션', () => {
     expect(res.statusCode).toBe(200);
     expect(verifySession).toHaveBeenCalledWith('acc', 'ref');
     expect(createSession).toHaveBeenCalledWith(VERIFIED);
+  });
+});
+
+/**
+ * POST /auth/bbiyong-token — ERP 가 바깥 틀일 때, 안에 뜬 삐용에 넘길 삐용 토큰 (2026-10-22 「2번」).
+ * ★ 자기 화면에만 — 세션(erp_sid 쿠키)이 있어야 오는 보호 라우트다(공개 아님 · 전역 훅이 세션을 붙인다).
+ * ★ access 는 살아 있는 것(callBbiyong — 만료면 재발급) · refresh 는 세션의 것. 응답은 캐시하지 않는다.
+ */
+describe('POST /auth/bbiyong-token — 내 화면에 삐용 토큰', () => {
+  beforeEach(() => {
+    requireSession.mockReset();
+    requireRawSid.mockReset();
+    readRefreshToken.mockReset();
+    callBbiyong.mockReset();
+  });
+
+  it('세션의 살아 있는 access 와 refresh 를 준다 · 캐시 금지', async () => {
+    requireSession.mockReturnValue({ erpSid: 'hash-1' });
+    requireRawSid.mockReturnValue('raw-1');
+    callBbiyong.mockImplementation(async (_sid: string, fn: (a: string) => Promise<string>) => fn('fresh-acc'));
+    readRefreshToken.mockResolvedValue('ref-1');
+
+    const res = await post({}, '/auth/bbiyong-token');
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ accessToken: 'fresh-acc', refreshToken: 'ref-1' });
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(callBbiyong.mock.calls[0]![0]).toBe('hash-1');
+    expect(readRefreshToken).toHaveBeenCalledWith('raw-1');
+  });
+
+  it('★ 공개 라우트가 아니다 — 세션 없이 오면 넘기지 않는다', async () => {
+    requireSession.mockImplementation(() => { throw new Error('세션 없이 보호 라우트에 도달했다'); });
+    const res = await post({}, '/auth/bbiyong-token');
+    expect(res.statusCode).toBe(500);
+    expect(callBbiyong).not.toHaveBeenCalled();
+  });
+
+  it('refresh 가 없으면 401 — 넘길 것이 없다', async () => {
+    requireSession.mockReturnValue({ erpSid: 'hash-1' });
+    requireRawSid.mockReturnValue('raw-1');
+    callBbiyong.mockImplementation(async (_sid: string, fn: (a: string) => Promise<string>) => fn('fresh-acc'));
+    readRefreshToken.mockResolvedValue(null);
+    const res = await post({}, '/auth/bbiyong-token');
+    expect(res.statusCode).toBe(401);
   });
 });

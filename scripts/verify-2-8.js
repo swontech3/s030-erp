@@ -15,7 +15,11 @@ const { Client } = require('pg');
 
 const API = 'http://127.0.0.1:3001';
 const WEB = 'http://localhost:3100';
-const PASSWORD = 'erp1234!';
+// ★ 2026-10-22 — 로그인은 삐용 토큰 → ERP 세션이다(규격서 Q6 · 서버는 비밀번호를 받지 않는다).
+//   MOCK 모드(BBIYONG_MOCK=true)의 토큰 = mock-access.{회원번호} · mock-refresh.{회원번호}
+//   (packages/api/src/bbiyong/MockBbiyongAuth.ts — 이메일 → 회원번호는 그 파일의 MOCK_ACCOUNTS)
+const MOCK_MEMBER_IDS = { 'admin@s-wontech.co.kr': 1001, 'operator@s-wontech.co.kr': 1002, 'tenant@test.com': 2001, 'noaccess@test.com': 2002 };
+const mockTokens = (email) => ({ accessToken: `mock-access.${MOCK_MEMBER_IDS[email]}.verify`, refreshToken: `mock-refresh.${MOCK_MEMBER_IDS[email]}.verify` });
 
 const env = Object.fromEntries(
   fs.readFileSync(process.argv[2] || '.env', 'utf8').split(/\r?\n/)
@@ -41,7 +45,7 @@ const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 async function apiLogin(email) {
   const res = await fetch(`${API}/auth/login`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password: PASSWORD }),
+    body: JSON.stringify(mockTokens(email)),
   });
   return { status: res.status, body: await res.json() };
 }
@@ -63,13 +67,13 @@ async function apiLogin(email) {
     check(r.status === 200 && r.body.home === home, 'A1', `홈 분기 ${email}`, `[${r.status}] ${r.body.home} (기대 ${home})`);
   }
 
-  // --- A2 잘못된 비밀번호는 401 -------------------------------------------
+  // --- A2 확인되지 않는 토큰은 401 (2026-10-22 — 종전 「잘못된 비밀번호」) --------
   {
     const res = await fetch(`${API}/auth/login`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: 'tenant@test.com', password: 'wrong' }),
+      body: JSON.stringify({ accessToken: 'forged.token', refreshToken: 'forged.token' }),
     });
-    check(res.status === 401, 'A2', '잘못된 비밀번호 → 401', String(res.status));
+    check(res.status === 401, 'A2', '확인되지 않는 토큰 → 401', String(res.status));
   }
 
   // --- A3 세션 쿠키 없이 보호 라우트 → 401 (리다이렉트가 아니라) ----------
@@ -147,11 +151,11 @@ async function apiLogin(email) {
     // ★ 웹 라우트는 출처를 본다(CSRF). 브라우저처럼 Origin 을 실어 보낸다.
     const res = await fetch(`${WEB}/api/auth/login`, {
       method: 'POST', headers: { 'content-type': 'application/json', origin: WEB },
-      body: JSON.stringify({ email: 'tenant@test.com', password: PASSWORD }),
+      body: JSON.stringify(mockTokens('tenant@test.com')),
     });
     const csrf = await fetch(`${WEB}/api/auth/login`, {
       method: 'POST', headers: { 'content-type': 'text/plain', origin: 'https://evil.example' },
-      body: JSON.stringify({ email: 'tenant@test.com', password: PASSWORD }),
+      body: JSON.stringify(mockTokens('tenant@test.com')),
     });
     check(csrf.status === 403 && !csrf.headers.getSetCookie().length, 'A11', '교차 출처 text/plain 로그인 → 403, 쿠키 없음', String(csrf.status));
     const setCookies = res.headers.getSetCookie();

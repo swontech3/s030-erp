@@ -33,6 +33,8 @@ import { Icon } from '@/components/ds';
 import { UserMenu } from './UserMenu';
 import { SIDEBAR_COOKIE, SIDEBAR_COOKIE_MAX_AGE, screenNameForPath, type NavItem } from '@/lib/sidebar';
 import styles from './AppShell.module.css';
+/* ★ 2026-10-22 — 서로 안에 뜨는 모드 · 로그인 한 번(대표 지시 「2번」) */
+import { embeddedNow, startOuterLogin } from '@/lib/embed';
 
 export interface AppShellDisplay {
   memberName: string;
@@ -92,6 +94,17 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
    */
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const pathname = usePathname();
+
+  /*
+   * ★ 2026-10-22 — 다른 화면(삐용) 안에 떠 있으면 사이드바 · 접기 · 상단 띠를 그리지 않는다(바깥 틀이 그린다).
+   *   서버는 iframe 인지 모른다 — 마운트 뒤에 안다(한 번 그렸다가 숨긴다).
+   * ★ 맨 위에 혼자 열렸으면 내 안에 뜬 삐용 화면이 「준비됨」을 보낼 때 삐용 토큰을 넘긴다(embedBridge).
+   */
+  const [embedded, setEmbedded] = useState(false);
+  useEffect(() => {
+    setEmbedded(embeddedNow());
+  }, []);
+  useEffect(() => startOuterLogin(), []);
 
   /*
    * ★★★ **반응형은 정해진 화면에서만** 한다 — 회의실 예약·현황판 둘뿐이다
@@ -187,6 +200,7 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
         (drawer ? ` ${styles.drawerOpen}` : '')
       }
     >
+      {embedded ? null : (
       <aside className={styles.aside}>
         <div className={styles.logoWrap}>
           {/* 원본에서도 로고가 곧 홈 진입점이다(data-nav="dashboard"). */}
@@ -229,6 +243,7 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
           })}
         </nav>
       </aside>
+      )}
 
       {/* ★ 767 이하에서 사이드바가 덮개로 뜬다 — 바깥을 누르면 닫힌다 */}
       {responsive ? (
@@ -240,12 +255,15 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
         />
       ) : null}
 
+      {embedded ? null : (
       <button type="button" className={styles.toggle} onClick={onToggle} aria-label={toggleLabel}>
         <Icon name={collapsed ? 'chevron-right' : 'chevron-left'} size={14} />
         <span className={styles.toggleTip}>{toggleLabel}</span>
       </button>
+      )}
 
       <div className={styles.column}>
+        {embedded ? null : (
         <header className={styles.header}>
           {responsive ? (
             <button
@@ -314,6 +332,7 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
           */}
           <UserMenu display={display} />
         </header>
+        )}
 
         <main className={styles.main}>{children}</main>
       </div>
