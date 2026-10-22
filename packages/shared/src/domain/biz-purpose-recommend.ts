@@ -13,7 +13,8 @@
  *      2글자 미만 낱말은 버린다
  *   ② 바꿔 부르는 말 — 그 말이 입력 글자 안에 들어 있으면(공백 무시) 그 줄의 업종코드가 후보
  *   ③ 이름 맞추기 — 낱말이 종목 · KSIC 이름 · 업태에 들어 있으면 후보(공백 무시)
- *   ④ 점수 = 바꿔 부르는 말 3 · 종목 2 · KSIC 2 · 업태 1(종류마다 한 번). 점수 높은 순, 같으면 업종코드 순.
+ *   ④ 점수 = 바꿔 부르는 말 10 · 종목 2 · KSIC 2 · 업태 1(종류마다 한 번). 점수 높은 순, 같으면 업종코드 순.
+ *      바꿔 부르는 말이 맞은 업종은 이름만 맞은 업종(최대 5)보다 언제나 앞이다(2026-10-22 3 → 10)
  *      20개에서 자른다
  *
  * ★ 사업목적 문구(결정 2026-10-22) — 카탈로그에 그 업종코드 문구(사용 중)가 있으면 그것, 없으면 종목 이름.
@@ -30,7 +31,7 @@ export const BIZ_RECOMMEND_QUERY_MAX = 200;
 export const BIZ_RECOMMEND_LIMIT = 20;
 
 /** 점수(검색 규칙 ④). */
-export const BIZ_MATCH_SCORE = { alias: 3, item: 2, ksic: 2, type: 1 } as const;
+export const BIZ_MATCH_SCORE = { alias: 10, item: 2, ksic: 2, type: 1 } as const;
 export type BizMatchKind = keyof typeof BIZ_MATCH_SCORE;
 
 /** 낱말 끝에서 떼는 조사 — 긴 것부터 본다. */
