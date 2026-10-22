@@ -22,6 +22,8 @@
  *
  *   node scripts/oneoff/2026-10-21-law-text.js .env              (보기)
  *   node scripts/oneoff/2026-10-21-law-text.js .env --apply      (쓰기)
+ *   node scripts/oneoff/2026-10-21-law-text.js .env --recheck [--apply]   (시행일이 같아도 본문을 받아 해시로 대조
+ *     — 2026-10-22 CDATA 경계 표시를 고친 뒤 다시 적재할 때)
  */
 const fs = require('fs');
 const crypto = require('crypto');
@@ -29,6 +31,7 @@ const { Client } = require('pg');
 
 const envPath = process.argv[2];
 const APPLY = process.argv.includes('--apply');
+const RECHECK = process.argv.includes('--recheck');
 if (!envPath) {
   console.error('사용법: node scripts/oneoff/2026-10-21-law-text.js <.env> [--apply]');
   process.exit(2);
@@ -78,7 +81,13 @@ async function get(path, params, label) {
   return body;
 }
 const dec = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
-const text = (raw) => { const m = raw.match(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/); return (m ? m[1] : dec(raw)).trim(); };
+// 원본은 한 칸을 CDATA 여러 조각으로 나눠 줄 때가 있다(식품위생법 시행령 제21조 등). 조각마다 속 글자를 꺼내고,
+// 조각 사이 글자(줄바꿈 등)는 XML 글자 그대로 잇는다 — 경계 표시 「]]> <![CDATA[」가 본문에 남지 않게.
+const text = (raw) => {
+  let out = '', i = 0;
+  for (const m of raw.matchAll(/<!\[CDATA\[([\s\S]*?)\]\]>/g)) { out += dec(raw.slice(i, m.index)) + m[1]; i = m.index + m[0].length; }
+  return (out + dec(raw.slice(i))).trim();
+};
 const tag = (x, t) => { const m = x.match(new RegExp(String.raw`<${t}(?:\s[^>]*)?>([\s\S]*?)</${t}>`)); return m ? text(m[1]) : ''; };
 const ymd = (s) => (/^\d{8}$/.test(s) ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : null);
 
@@ -143,7 +152,7 @@ async function fetchArticles(law) {
     for (const name of LAWS) {
       const law = await findLaw(name);
       const o = oldLaw.get(law.law_id);
-      if (o && o.effective_date === law.effective_date) { plan.push({ law, skip: true }); continue; }
+      if (o && o.effective_date === law.effective_date && !RECHECK) { plan.push({ law, skip: true }); continue; }
       plan.push({ law, prev: o ? o.effective_date : null, ...(await fetchArticles(law)) });
     }
 
