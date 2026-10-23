@@ -60,8 +60,15 @@ describe('legalOrgPatchOf', () => {
       zipCode: '06097',
       address: '서울 강남구 테헤란로 1',
       detailAddress: '3층',
-      bizNumber: '105-87-68687',
-      corpNumber: '111000-2313123',
+      bizNumber: '1058768687',
+      corpNumber: '1110002313123',
+    });
+  });
+  it('★★ 번호는 숫자만 보낸다(삐용 회신 2026-10-23) — 하이픈 · 공백을 뗀다', () => {
+    expect(legalOrgPatchOf('Z01', { ...EMPTY, bizNumber: '105-87-68687', corpNumber: ' 111000-2313123 ' })).toEqual({
+      orgCode: 'Z01',
+      bizNumber: '1058768687',
+      corpNumber: '1110002313123',
     });
   });
   it('★★ 값이 없는 칸은 칸째 뺀다(빈 문자열도) — 보낼 칸이 없으면 null', () => {

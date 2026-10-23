@@ -662,7 +662,7 @@ describe('비입주사 회사 정보 → 삐용 보내기(결정 2026-10-22)', (
   const TENANT = { match: /FROM public\.tb_s080_companies\s+WHERE link_s020_org_id/, rows: [{ company_id: 'c-1' }] };
   const UPSERT_ORG = /INSERT INTO public\.tb_s080_legal_orgs/;
 
-  it('★★ 첫 저장 — 커밋 뒤에 보낸다 · 단체코드는 팝업 값 · 번호는 저장 모양(하이픈) 그대로 · 응답에 결과', async () => {
+  it('★★ 첫 저장 — 커밋 뒤에 보낸다 · 단체코드는 팝업 값 · 보내기에는 저장 모양(하이픈)으로 넘긴다(숫자만으로는 legalOrgPatchOf) · 응답에 결과', async () => {
     const db = fakeDb([codes]);
     const a = await build(session('operator', 1), db.deps);
     const res = await a.inject({

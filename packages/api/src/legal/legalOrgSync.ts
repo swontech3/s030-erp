@@ -19,10 +19,10 @@ import type { BbiyongOrg, BbiyongOrgLegalPatch } from '../bbiyong/types.ts';
 import { callBbiyong } from '../session/bbiyongToken.ts';
 
 /**
- * 번호 칸을 삐용에 보낼 모양으로 — **지금은 법무 저장 모양(하이픈 넣은 것) 그대로다.**
- * ★ 삐용 규격을 확인한 뒤 바꿀 자리는 여기 한 곳이다.
+ * 번호 칸을 삐용에 보낼 모양으로 — **숫자만**(삐용 회신 2026-10-23: 주고받을 때 하이픈 없이,
+ * 삐용은 형식 검사 없이 그대로 저장한다). 법무 DB 저장 모양(하이픈)은 그대로 둔다.
  */
-const toBbiyongNumber = (v: string): string => v;
+const toBbiyongNumber = (v: string): string => v.replace(/\D/g, '');
 
 /**
  * 법무 칸 → 삐용 수정 본문. 값이 있는 칸만 담는다. 담을 칸이 하나도 없으면 null(보내지 않는다).
