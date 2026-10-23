@@ -301,13 +301,16 @@ describe('HttpBbiyongOrg — ⑥ 퇴실 · 재입주 · 수정 (회신 2026-10-0
     expect(sentOn).toEqual([...ORG_MODULE_CODES]);
   });
 
-  it('★★★ 수정 — 보내는 칸은 둘뿐이다. 주소를 빈 문자열로도 보내지 않는다', async () => {
+  it('★★★ 수정 — 다섯 칸 중 값 있는 칸만 · 빈 문자열은 칸째 뺀다 · 주소를 빈 문자열로도 보내지 않는다', async () => {
     const { org, calls } = adapter(OKOP);
-    await org.patchOrg({ orgCode: 'Z01', orgName: '한성무역' }, 'tok');
+    await org.patchOrg(
+      { orgCode: 'Z01', orgName: '한성무역', bizNumber: '1058768687', corpNumber: '', businessType: '도매', businessItem: ' ' },
+      'tok',
+    );
 
     expect(calls[0]!.url).toBe('http://192.168.0.22:8082/rest/v1/s021100010/erp-patch-org');
     const sent = JSON.parse(String(calls[0]!.init.body)) as Record<string, unknown>;
-    expect(Object.keys(sent).sort()).toEqual(['orgCode', 'orgName']);
+    expect(sent).toEqual({ orgCode: 'Z01', orgName: '한성무역', bizNumber: '1058768687', businessType: '도매' });
     // ★ 빈 문자열로 보내면 삐용에 들어 있는 주소가 지워진다 — 되돌릴 수 없다.
     for (const key of ['zipCode', 'address', 'detailAddress', 'telNo']) {
       expect(sent, key).not.toHaveProperty(key);

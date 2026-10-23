@@ -376,6 +376,12 @@ export function ContractForm({
    * ★★ [다시 시도] 버튼이 **없다.** 고칠 자리가 바로 아래 섹션 3 이고, 고쳐서 저장하면
    *    그게 재시도다(한 업무는 한 화면에서 — 처리 버튼을 늘리지 않는다).
    */
+  /**
+   * 입주사 정보는 저장됐으나 삐용 회사 수정이 실패한 사유(결정 2026-10-23). **DB 에 남기지 않으므로**
+   * 화면 배너로만 알린다 — 다시 [저장] 하면 값 있는 다섯 칸을 다시 보낸다. [다시 시도] 대상이 아니다.
+   */
+  const [companySyncWarning, setCompanySyncWarning] = useState<string | null>(null);
+
   const memberPending = users
     .map((row, index) => ({ name: effectiveName(row, index, companyState), reason: row.linkReason }))
     .filter((u): u is { name: string; reason: string } => Boolean(u.reason));
@@ -606,6 +612,11 @@ export function ContractForm({
        */
       bbiyong?: string | null;
       bbiyongReason?: string | null;
+      /**
+       * 삐용 회사 수정 결과(`PATCH /companies/:id`, 결정 2026-10-23). null = 보내지 않았다(미연결 등).
+       * ★ DB 에 남지 않는다 — 실패는 화면 배너로만 알린다(`companySyncWarning`).
+       */
+      companySync?: { kind: 'ok' } | { kind: 'failed'; reason: string } | null;
     };
     if (!res.ok) throw new Error(data.message ?? '저장에 실패했습니다');
     return data;
@@ -661,7 +672,9 @@ export function ContractForm({
       id = created.companyId;
     } else {
       id = companyId;
-      await send(`/api/companies/${id}`, 'PATCH', body);
+      const patched = await send(`/api/companies/${id}`, 'PATCH', body);
+      // ★ 저장할 때마다 다시 보낸다 — 성공 · 안 보냄이면 앞의 실패 배너를 지운다.
+      setCompanySyncWarning(patched.companySync?.kind === 'failed' ? patched.companySync.reason : null);
     }
 
     // 미체크 행은 저장에서 뺀다 — **입력값은 화면에 그대로 둔다**(명세 섹션 3).
@@ -1096,6 +1109,16 @@ export function ContractForm({
               >
                 다시 시도
               </button>
+            </div>
+          ) : null}
+
+          {companySyncWarning ? (
+            <div className={styles.linkPending} role="status" data-bbiyong-company-sync="failed">
+              <Icon name="circle-alert" size={16} />
+              <span>
+                <b>삐용 회사 정보 반영 실패</b> — 입주사 정보는 저장했습니다. {companySyncWarning.replace(/\.\s*$/, '')}. 다시
+                저장하면 다시 보냅니다.
+              </span>
             </div>
           ) : null}
 

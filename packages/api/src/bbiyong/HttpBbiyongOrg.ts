@@ -132,6 +132,9 @@ const SEED_MESSAGE =
 /** 법무 회사 수정에 실을 수 있는 칸(`BbiyongOrgLegalPatch` 의 `orgCode` 밖). */
 const LEGAL_PATCH_KEYS = ['zipCode', 'address', 'detailAddress', 'bizNumber', 'corpNumber'] as const;
 
+/** 입주사 회사 수정에 실을 수 있는 칸(`BbiyongOrgPatch` 의 `orgCode` 밖, 결정 2026-10-23). */
+const COMPANY_PATCH_KEYS = ['orgName', 'bizNumber', 'corpNumber', 'businessType', 'businessItem'] as const;
+
 /** 단체 조회 규격이 없을 때 운영자에게 보여 줄 문구. */
 const ORG_LOOKUP_UNSUPPORTED_MESSAGE =
   '삐용 단체 조회가 아직 연결되지 않았습니다(삐용 규격 대기). 개발계에서는 BBIYONG_MOCK=true 로 확인할 수 있습니다';
@@ -477,8 +480,10 @@ export class HttpBbiyongOrg implements BbiyongOrg {
   }
 
   /**
-   * 회사명 수정.
+   * 입주사 회사 수정 — 회사명 · 사업자번호 · 법인번호 · 업태 · 종목(결정 2026-10-23).
    *
+   * ★★ **값이 있는 칸만 싣는다.** `undefined` 는 물론 빈 문자열도 칸째 뺀다 — 빈 문자열은 삐용 값을
+   *    지운다. 만드는 쪽(`companies/companyOrgSync.ts`)이 이미 뺐어도 여기서 한 번 더 본다.
    * ★★★ **주소 3칸을 보내지 않는다.** 규격 본문에 `zipCode`·`address`·`detailAddress` 가
    *    있지만 빼고 보낸다 — 안 보낸 칸은 삐용이 그대로 둔다.
    *    ★★ **빈 문자열(`""`)로 보내면 삐용에 들어 있는 주소가 지워진다. 절대 그러지 말 것.**
@@ -486,15 +491,16 @@ export class HttpBbiyongOrg implements BbiyongOrg {
    *       자택**이라 애초에 삐용의 회사 주소 자리에 들어갈 값이 아니다.
    */
   async patchOrg(patch: BbiyongOrgPatch, accessToken: string): Promise<OrgOpOutcome> {
-    const parsed = await this.#post(
-      BBIYONG.ORG_PATCH_PATH,
-      // ★ 이 두 칸뿐이다. 주소를 더하지 말 것(위 주석).
-      { orgCode: patch.orgCode, orgName: patch.orgName },
-      accessToken,
-      '회사 수정',
-    );
+    // ★ 주소를 더하지 말 것(위 주석).
+    const body: Record<string, string> = { orgCode: patch.orgCode };
+    for (const key of COMPANY_PATCH_KEYS) {
+      const v = patch[key];
+      if (v !== undefined && v.trim() !== '') body[key] = v;
+    }
+    const parsed = await this.#post(BBIYONG.ORG_PATCH_PATH, body, accessToken, '회사 수정');
     const outcome = parseOrgOp(parsed, '회사 수정');
-    console.log(`[bbiyong] 회사 수정 — orgCode=${patch.orgCode} → ${outcome.kind}`);
+    // ★ 칸 이름만 남긴다 — 번호 값은 로그에 두지 않는다.
+    console.log(`[bbiyong] 회사 수정 — orgCode=${patch.orgCode} [${Object.keys(body).slice(1).join(',')}] → ${outcome.kind}`);
     return outcome;
   }
 

@@ -31,6 +31,12 @@
 export type FieldSink =
   /** 삐용 회사·대표 등록 요청 본문에 실려 나간다. */
   | 'bbiyong'
+  /**
+   * ERP 에 보관하고 삐용에는 **회사 수정**(`erp-patch-org`)으로만 보낸다 — 등록 요청에는 싣지 않는다
+   * (결정 2026-10-23). 사업자번호 · 법인번호 · 업태 · 종목이다. **ERP 값이 정본이다.**
+   * 보내는 자리는 `api/src/companies/companyOrgSync.ts` 한 곳이다.
+   */
+  | 'erp+patch'
   /** ERP 테이블(`tb_s080_*`)에만 남는다. **삐용에 보내지 않는다.** */
   | 'erp'
   /**
@@ -49,7 +55,7 @@ export interface RegistrationField {
   label: string;
   /** ★ 이 값이 어디로 가는가. */
   sink: FieldSink;
-  /** 삐용 요청 본문의 필드명. `sink: 'erp'` 면 `null`. */
+  /** 삐용 요청 본문의 필드명. `sink: 'erp'` 면 `null`. `erp+patch` 는 회사 수정(`erp-patch-org`) 본문의 이름. */
   wire: string | null;
   required: boolean;
   /** 삐용 규격의 최대 길이(문자). 규격이 없으면 `null`. */
@@ -72,9 +78,9 @@ export interface RegistrationField {
 /**
  * 회사 정보.
  *
- * ★ 사업자등록번호를 삐용에 보내지 않는 이유 — 같은 값이 두 곳에 생기면 달라졌을 때
- *   어느 쪽이 맞는지 다투게 된다. 회사 식별은 `org_id` 하나로 충분하다(회신 4 §4).
- *   삐용 `org010` 에는 사업자등록번호 컬럼이 아예 없다.
+ * ★ 사업자등록번호 · 법인번호 · 업태 · 종목 — 2026-10-23 결정으로 삐용 회사 수정(`erp-patch-org`)에
+ *   **숫자만**(번호) 보낸다(sink `erp+patch`). 등록 요청에는 여전히 싣지 않는다. 그 전에는 「삐용 org010 에
+ *   사업자등록번호 컬럼이 없다(회신 4 §4)」로 보내지 않았다.
  */
 export const COMPANY_FIELDS = {
   orgName: { label: '회사명', sink: 'bbiyong', wire: 'orgName', required: true, maxLength: 100, onScreen: true },
@@ -111,18 +117,25 @@ export const COMPANY_FIELDS = {
     note: '대표자 자택 상세주소.',
   },
 
-  // ── 여기서부터 ERP 에만 남는다 ──────────────────────────────────────────────
+  // ── 여기서부터 등록 요청에는 싣지 않는다(ERP 가 보관 · sink 가 erp+patch 면 회사 수정으로만 보낸다) ──
   bizNumber: {
-    label: '사업자등록번호', sink: 'erp', wire: null, required: false, maxLength: null, onScreen: true,
-    note: '★ 삐용에 보내지 않는다(회신 4 §4). tb_s080_companies.biz_number — UNIQUE 다.',
+    label: '사업자등록번호', sink: 'erp+patch', wire: 'bizNumber', required: false, maxLength: null, onScreen: true,
+    digitsOnly: true,
+    note: '★ 회사 수정으로만 보낸다(결정 2026-10-23) · 등록 요청에는 싣지 않는다. tb_s080_companies.biz_number — UNIQUE 다.',
+  },
+  corpNumber: {
+    label: '법인등록번호', sink: 'erp+patch', wire: 'corpNumber', required: false, maxLength: null, onScreen: true,
+    digitsOnly: true,
+    note: '★ 회사 수정으로만 보낸다(결정 2026-10-23). tb_s080_companies.corp_number.',
   },
   // ★ ceoName(대표자명)은 여기 없다. OWNER_FIELDS.memberName 으로 합쳤다 — 그쪽 주석 참조.
   bizKind: {
-    label: '업태', sink: 'erp', wire: null, required: false, maxLength: null, onScreen: true,
-    note: '세금계산서 발행에 필요하다. 삐용에는 없는 개념이다.',
+    label: '업태', sink: 'erp+patch', wire: 'businessType', required: false, maxLength: null, onScreen: true,
+    note: '세금계산서 발행에 필요하다. ★ 회사 수정으로만 보낸다(결정 2026-10-23). tb_s080_companies.business_type.',
   },
   bizItem: {
-    label: '종목', sink: 'erp', wire: null, required: false, maxLength: null, onScreen: true,
+    label: '종목', sink: 'erp+patch', wire: 'businessItem', required: false, maxLength: null, onScreen: true,
+    note: '★ 회사 수정으로만 보낸다(결정 2026-10-23). tb_s080_companies.business_item.',
   },
   taxEmail: {
     label: '세금계산서 수신 이메일', sink: 'erp', wire: null, required: false, maxLength: null, onScreen: true,
@@ -201,7 +214,6 @@ export const NEVER_SENT = [
   { name: 'org_tp', reason: "삐용 서버가 정한다. 신규 입주사도 'N'(일반)이다." },
   { name: 'member_tp', reason: "삐용 서버가 정한다. 대표는 항상 'C'. ERP 가 보내면 안 된다." },
   { name: 'mailAgentYn', reason: '폐기됐다. 메일 구독은 moduleCodes 로 정한다.' },
-  { name: 'bizNumber', reason: '삐용 org010 에 컬럼이 없다. ERP 가 보관한다(회신 4 §4).' },
 ] as const;
 
 /**

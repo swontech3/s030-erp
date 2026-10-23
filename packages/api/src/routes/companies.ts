@@ -46,10 +46,8 @@ import {
   type CompanyRow,
   type MemberRow,
 } from '../db/companies.ts';
-import {
-  patchOrgForCompany,
-  retryBbiyongForCompany,
-} from '../companies/registerOrg.ts';
+import { retryBbiyongForCompany } from '../companies/registerOrg.ts';
+import { pushCompanyOrg, type CompanyOrgValues } from '../companies/companyOrgSync.ts';
 import { syncMembersForCompany } from '../companies/syncMembers.ts';
 import { needsHumanHand } from '../bbiyong/retryPolicy.ts';
 
@@ -440,18 +438,14 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
      *   트랜잭션에 COMMIT 을 부른다 — 등록 쪽 주석에 그 이유가 적혀 있다.
      */
     /**
-     * ★ 회사명이 **실제로 바뀌었는지**를 들고 나온다 — 바뀐 때만 삐용에 수정을 보낸다.
-     *   매번 보내면 연락처만 고친 요청에도 삐용 호출이 나가고, 삐용이 그것을 어떻게
-     *   취급하는지는 규격에 없다.
+     * ★ 저장된 값과 단체코드를 들고 나온다 — 커밋 뒤 삐용에 보낸다(결정 2026-10-23, 저장마다 값 있는
+     *   다섯 칸 전부 · `companies/companyOrgSync.ts`).
      */
-    let result: { kind: 'ok'; nameChanged: boolean } | { kind: 'not_found' };
+    let result: { kind: 'ok'; orgCode: string | null; values: CompanyOrgValues } | { kind: 'not_found' };
     try {
       result = await withCompanyScope(scopeOf(session), async (client) => {
         const company = await findCompany(client, req.params.id);
         if (!company) return { kind: 'not_found' } as const;
-        // ★ 빈 이름은 `updateCompany` 가 무시한다 — 그때는 바뀐 것이 아니다.
-        const nameChanged = companyName !== null && companyName !== company.company_name;
-
         await updateCompany(client, {
           companyId: company.company_id,
           actor,
@@ -471,7 +465,19 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
             memo: text(req.body?.memo),
           },
         });
-        return { kind: 'ok', nameChanged } as const;
+        // ★ 저장된 값을 다시 읽는다 — 빈 회사명은 `updateCompany` 가 기존 값으로 둔다.
+        const after = (await findCompany(client, company.company_id)) ?? company;
+        return {
+          kind: 'ok',
+          orgCode: after.link_org_code,
+          values: {
+            companyName: after.company_name,
+            bizNumber: after.biz_number,
+            corpNumber: after.corp_number,
+            businessType: after.business_type,
+            businessItem: after.business_item,
+          },
+        } as const;
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
@@ -486,19 +492,17 @@ export function registerCompanyRoutes(app: FastifyInstance): void {
     if (result.kind === 'not_found') return notFound(reply);
 
     /*
-     * ★★ 삐용 회사명 수정 — **트랜잭션이 커밋된 뒤다**(등록·퇴실과 같은 이유).
-     *    연결되지 않은 입주사면 `patchOrgName` 이 보내지 않는다(`skipped`).
-     *    실패해도 ERP 수정은 그대로다 — 「연동 대기」로 남고 [다시 시도] 가 있다.
+     * ★★ 삐용 회사 수정 — **트랜잭션이 커밋된 뒤다**(등록·퇴실과 같은 이유).
+     *    연결되지 않은 입주사(단체코드 없음)면 보내지 않는다(null).
+     *    ★ 실패해도 ERP 수정은 그대로이고 **DB 에 남기지 않는다**(결정 2026-10-23) — 「연동 대기」가
+     *      아니라 응답의 `companySync` 로 화면 배너만 띄운다. 다시 [저장] 하면 다시 보낸다.
      */
-    const bbiyong = result.nameChanged
-      ? await patchOrgForCompany({ companyId: req.params.id, session, actor })
-      : null;
+    const companySync = await pushCompanyOrg(session, result.orgCode, result.values);
 
     return reply.send({
       companyId: req.params.id,
-      /** 삐용 반영 결과. 회사명이 안 바뀌었으면 null. `pending` 이면 화면이 배너를 띄운다. */
-      bbiyong: bbiyong?.kind ?? null,
-      bbiyongReason: bbiyong?.kind === 'pending' ? bbiyong.reason : null,
+      /** 삐용 반영 결과 — `{ kind: 'ok' }` · `{ kind: 'failed', reason }` · null(보내지 않음). */
+      companySync,
     });
   });
 

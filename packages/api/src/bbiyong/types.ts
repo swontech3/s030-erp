@@ -261,7 +261,9 @@ export interface BbiyongAcl {
  *     등록되고 세금계산서·계약서에 인쇄된다. **수정 API 도 없어 되돌릴 수 없다.**
  *   · `telNo`(회사 전화) — ERP 계약 폼에 전화 칸이 「연락처」 하나뿐이고 그것이
  *     대표 휴대전화(`hpNo`)다. 같은 값을 두 칸에 보내지 않는다. 선택 항목이다.
- *   · `pwd`·`org_tp`·`member_tp`·`mailAgentYn`·`bizNumber` — `NEVER_SENT` 참조.
+ *   · `pwd`·`org_tp`·`member_tp`·`mailAgentYn` — `NEVER_SENT` 참조.
+ *   · `bizNumber` · 법인번호 · 업태 · 종목 — 등록에는 싣지 않고 회사 수정으로만 보낸다
+ *     (sink `erp+patch`, 결정 2026-10-23 · `BbiyongOrgPatch`).
  */
 export interface BbiyongOrgRequest {
   orgName: string;
@@ -371,10 +373,22 @@ export type OrgOpOutcome =
   /** `message` 는 **운영자에게 그대로 보여줄 문구**다. */
   | { kind: 'rejected'; message: string; retryable: boolean };
 
-/** 삐용 회사 수정 — 보내는 칸은 이 둘뿐이다. ★ 주소 3칸은 **일부러 없다**(constants.ts). */
+/**
+ * 입주사 회사 정보 → 삐용 회사 수정(`erp-patch-org`, 결정 2026-10-23) — 회사명 · 사업자번호 · 법인번호 ·
+ * 업태 · 종목. 번호는 **숫자만** 싣는다(삐용 회신 2026-10-23).
+ *
+ * ★★★ 주소 3칸은 **일부러 없다**(constants.ts) — ERP 계약 폼의 주소는 대표자 자택이다.
+ * ★★ 값이 없는 칸은 **칸째 뺀다**(`undefined`). 빈 문자열(`""`)로 보내면 삐용 값이 지워진다 —
+ *    되돌릴 수 없다. 운영자가 칸을 비워 저장해도 보내지 않는다(결정 2026-10-23).
+ * ★ ERP 칸 → 이 모양은 `companies/companyOrgSync.ts` 한 곳에서 만든다.
+ */
 export interface BbiyongOrgPatch {
   orgCode: string;
-  orgName: string;
+  orgName?: string;
+  bizNumber?: string;
+  corpNumber?: string;
+  businessType?: string;
+  businessItem?: string;
 }
 
 /**

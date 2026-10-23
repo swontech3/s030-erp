@@ -226,16 +226,23 @@ export class MockBbiyongOrg implements BbiyongOrg {
     return { kind: 'ok' };
   }
 
-  /** 회사명 수정. ★ 주소 칸은 애초에 인터페이스에 없다(`BbiyongOrgPatch`). */
+  /**
+   * 입주사 회사 수정 — 실물과 같이 **값 있는 칸만** 받는다(결정 2026-10-23). ★ 주소 칸은 애초에
+   * 인터페이스에 없다(`BbiyongOrgPatch`).
+   * ★ 빈 문자열이 실려 오면 거부한다 — 실물에서는 삐용 값이 지워지는 사고다. 만드는 쪽
+   *   (`companies/companyOrgSync.ts`)이 빼야 하므로, 여기 걸리면 그쪽 결함이다.
+   */
   async patchOrg(patch: BbiyongOrgPatch, _accessToken: string): Promise<OrgOpOutcome> {
-    if (!patch.orgName.trim()) {
-      return { kind: 'rejected', message: '회사명이 비어 있어 삐용에 반영할 수 없습니다', retryable: false };
+    const { orgCode, ...fields } = patch;
+    const keys = Object.keys(fields).filter((k) => fields[k as keyof typeof fields] !== undefined);
+    if (keys.some((k) => fields[k as keyof typeof fields]!.trim() === '')) {
+      return { kind: 'rejected', message: '빈 값이 실려 와 삐용에 반영하지 않았습니다', retryable: false };
     }
-    // ★ 회사명은 로그에 남겨도 되는 값이다(공개 정보). 이메일·전화는 여기 오지 않는다.
-    console.log(`[bbiyong] MOCK 회사 수정 — orgCode=${patch.orgCode}`);
+    // ★ 칸 이름만 남긴다 — 번호 값은 로그에 두지 않는다.
+    console.log(`[bbiyong] MOCK 회사 수정 — orgCode=${orgCode} [${keys.join(',')}]`);
     // 조회에 바뀐 이름이 보여야 한다 — 이 프로세스가 만든 회사만 들고 있다.
-    const info = this.#createdInfo.get(patch.orgCode);
-    if (info) this.#createdInfo.set(patch.orgCode, { ...info, orgName: patch.orgName });
+    const info = this.#createdInfo.get(orgCode);
+    if (info && patch.orgName !== undefined) this.#createdInfo.set(orgCode, { ...info, orgName: patch.orgName });
     return { kind: 'ok' };
   }
 

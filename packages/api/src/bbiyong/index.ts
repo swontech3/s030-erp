@@ -60,7 +60,6 @@ export {
   linkOrg,
   moduleOffOrg,
   moduleOnOrg,
-  patchOrgName,
   type OrgLinkResult,
   type OrgLinkStore,
   type OrgLinkTarget,

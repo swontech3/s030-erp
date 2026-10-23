@@ -38,7 +38,6 @@ import {
   linkOrg,
   moduleOffOrg,
   moduleOnOrg,
-  patchOrgName,
   type OrgLinkResult,
   type OrgLinkStore,
 } from '../bbiyong/index.ts';
@@ -181,9 +180,9 @@ export async function registerOrgForCompany(args: {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   퇴실 · 재입주 · 수정 — 등록과 같은 자리, 같은 규칙
+   퇴실 · 재입주 — 등록과 같은 자리, 같은 규칙
    ══════════════════════════════════════════════════════════════════════════
-   ★ 넷 다 **던지지 않는다.** ERP 업무(계약 확정·종료·회사명 수정)는 이미 커밋됐고,
+   ★ 셋 다 **던지지 않는다.** ERP 업무(계약 확정·종료)는 이미 커밋됐고,
      여기서 던지면 그 응답이 500 이 되어 운영자가 업무가 안 된 줄 안다.
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -226,18 +225,6 @@ export function moduleOnForCompany(args: {
   );
 }
 
-/** 회사명 수정. ★ 주소는 보내지 않는다(`orgLink.ts` 의 `patchOrgName`). */
-export function patchOrgForCompany(args: {
-  companyId: string;
-  session: ErpSession;
-  actor: string;
-}): Promise<OrgLinkResult> {
-  const { companyId, session, actor } = args;
-  return callOrFail('회사 수정', companyId, session, (accessToken) =>
-    patchOrgName(dbStore(companyId, actor), bbiyongOrg, accessToken),
-  );
-}
-
 /**
  * [다시 시도] 한 번이 **지금 필요한 것**을 한다 (결정 2026-10-03).
  *
@@ -248,9 +235,9 @@ export function patchOrgForCompany(args: {
  *      연결됨 + 계약 없음   → 퇴실 (`moduleOff`)
  *      연결됨 + 계약 있음   → 재입주 (`moduleOn`)
  *
- * ★ 회사명 수정은 여기서 고르지 않는다 — 「이름이 달라졌는가」는 삐용에 물어봐야 알고,
- *   ERP 는 마지막으로 보낸 이름을 적지 않는다(사본을 두지 않는다는 같은 이유).
- *   이름은 **바뀌는 순간** 보낸다(`PATCH /companies/:id`).
+ * ★ 회사 수정은 여기서 다시 보내지 않는다(결정 2026-10-23) — 회사 수정은 실패를 「연동 대기」로
+ *   남기지 않고 저장 응답의 배너로만 알린다. 다시 보내는 길은 계약 폼 [저장] 이고, 저장마다 값 있는
+ *   다섯 칸을 모두 보낸다(`companies/companyOrgSync.ts`).
  */
 export async function retryBbiyongForCompany(args: {
   companyId: string;
