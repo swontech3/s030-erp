@@ -499,9 +499,13 @@ export interface BbiyongMemberRequest {
    * 값의 출처는 `erp-member` 의 `I` 응답 또는 회사 등록 응답(대표)이다.
    */
   memberId?: number;
-  memberName: string;
+  /**
+   * ★ `I`·`D` 는 늘 싣는다. `U` 는 **바뀐 칸만 · 값이 있을 때만** 싣는다(결정 2026-10-23) — 없으면
+   *   칸째 뺀다(빈 문자열은 삐용 값을 지운다). `memberName`·`email`·`hpNo` 셋 다 같은 규칙이다.
+   */
+  memberName?: string;
   /** 로그인 아이디다. ★ 겹치면 삐용이 거절한다 — 그 문구를 운영자에게 그대로 보인다. */
-  email: string;
+  email?: string;
   /** 연락처. 선택 항목이고 **숫자만** 보낸다(회사 등록의 `hpNo` 와 같은 규칙). */
   hpNo?: string;
   /** 대표여부. ★ `I` 에서만 쓴다. ERP 가 보내는 `I` 는 직원뿐이라 늘 `'N'` 이다. */

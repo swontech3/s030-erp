@@ -35,6 +35,7 @@ import {
 import {
   bbiyongOrg,
   syncMembers,
+  type MemberChanges,
   type MemberSyncResult,
   type MemberSyncStore,
 } from '../bbiyong/index.ts';
@@ -105,7 +106,7 @@ const nothing = (why: string): MemberSyncResult => ({
  * **던지지 않는다.** 구성원 저장은 이미 커밋됐고, 여기서 던지면 저장 응답이 500 이 되어
  * 운영자가 저장이 안 된 줄 안다(`registerOrgForCompany` 와 같은 규칙).
  *
- * @param changed 이번 저장에서 **값이 실제로 바뀐** ERP member_id 들
+ * @param changed 이번 저장에서 **값이 실제로 바뀐** ERP member_id 와 그 칸들
  *   (`replaceMembers` 가 돌려준 `changed`). 비우고 부르면 「바뀐 것은 없다」이고,
  *   번호 없는 직원을 따라붙이는 일만 한다 — 회사 등록 직후가 그 경우다.
  */
@@ -113,12 +114,12 @@ export async function syncMembersForCompany(args: {
   companyId: string;
   session: ErpSession;
   actor: string;
-  changed?: readonly string[];
+  changed?: MemberChanges;
 }): Promise<MemberSyncResult> {
   const { companyId, session, actor, changed } = args;
   try {
     return await callBbiyong(session.erpSid, (accessToken) =>
-      syncMembers(dbStore(companyId, actor), bbiyongOrg, accessToken, new Set(changed ?? [])),
+      syncMembers(dbStore(companyId, actor), bbiyongOrg, accessToken, changed ?? new Map()),
     );
   } catch (err) {
     /*

@@ -29,7 +29,7 @@
  * 번호를 기준으로 가르면 그 구멍이 없다:
  *
  *   번호 없음 + 직원   → `I` (바뀌지 않았어도 보낸다 — 밀린 것을 따라잡는다)
- *   번호 있음 + 바뀜   → `U`
+ *   번호 있음 + 바뀜   → `U` (바뀐 칸만 · 값 있는 칸만, 결정 2026-10-23)
  *   번호 있음 + 그대로 → 보내지 않는다
  *   명부에서 빠짐      → `D` (번호가 있을 때만)
  *
@@ -58,6 +58,15 @@ import {
   type BbiyongOrg,
   type MemberOpOutcome,
 } from './types.ts';
+
+/** 삐용에 보내는 직원 칸 — `U` 는 이 중 **바뀐 칸만** 싣는다(결정 2026-10-23). */
+export type MemberSyncField = 'name' | 'email' | 'phone';
+
+/**
+ * 이번 저장에서 값이 실제로 바뀐 직원 → 바뀐 칸들(`replaceMembers` 의 `changed`).
+ * 새 행은 세 칸 모두다. 비어 있으면 「바뀐 것은 없다」.
+ */
+export type MemberChanges = ReadonlyMap<string, ReadonlySet<MemberSyncField>>;
 
 /** 구성원 한 줄 — 삐용에 보낼 칸과 연동 상태만 추린 것. */
 export interface MemberLinkRow {
@@ -157,7 +166,7 @@ interface Plan {
 /**
  * 구성원 명부를 삐용에 맞춘다.
  *
- * @param changed 이번 저장에서 **값이 실제로 바뀐** ERP member_id 들. 비우면
+ * @param changed 이번 저장에서 **값이 실제로 바뀐** ERP member_id 와 그 칸들. 비우면
  *   「바뀐 것은 없다」 — 번호 없는 직원을 따라붙이는 용도(회사 등록 직후)로 그렇게 부른다.
  *   ★ 이 집합이 없으면 `U` 를 매 저장마다 전원에게 보내야 한다. 그건 20명이면 20번이고,
  *     아무것도 안 바꾼 저장에도 삐용을 두드리는 모양이다.
@@ -166,7 +175,7 @@ export async function syncMembers(
   store: MemberSyncStore,
   org: BbiyongOrg,
   accessToken: string,
-  changed: ReadonlySet<string> = new Set(),
+  changed: MemberChanges = new Map(),
 ): Promise<MemberSyncResult> {
   const result: MemberSyncResult = { sent: 0, created: 0, updated: 0, deleted: 0, pending: [], skipped: [] };
 
@@ -231,15 +240,24 @@ export async function syncMembers(
 
     if (row.linkMemberId !== null) {
       // 이미 삐용에 있다 → 바뀐 것만 `U`. 대표도 이 길로 간다(대표의 유일한 길이다).
-      if (!changed.has(row.memberId)) {
+      const fields = changed.get(row.memberId);
+      if (!fields || fields.size === 0) {
         result.skipped.push(`바뀐 것이 없다 — 보내지 않는다 (${row.memberId})`);
         continue;
       }
-      if (!email) {
-        refused.push({ memberId: row.memberId, name: row.name, reason: NO_EMAIL });
+      /*
+       * ★★ **바뀐 칸만 · 값이 있을 때만** 싣는다(결정 2026-10-23). 빈 칸은 보내지 않는다 — 빈 문자열은
+       *    삐용 값을 지운다. 그래서 이메일을 비운 저장도 거절하지 않고 그 칸만 뺀다.
+       */
+      const req: BbiyongMemberRequest = { regTp: 'U', orgCode, memberId: row.linkMemberId };
+      if (fields.has('name') && base.memberName !== '') req.memberName = base.memberName;
+      if (fields.has('email') && base.email !== '') req.email = base.email;
+      if (fields.has('phone') && base.hpNo !== '') req.hpNo = base.hpNo;
+      if (req.memberName === undefined && req.email === undefined && req.hpNo === undefined) {
+        result.skipped.push(`바뀐 칸이 모두 비었다 — 보내지 않는다 (${row.memberId})`);
         continue;
       }
-      plans.push({ row, req: { regTp: 'U', ...base, memberId: row.linkMemberId } });
+      plans.push({ row, req });
       continue;
     }
 
@@ -251,7 +269,7 @@ export async function syncMembers(
        *   배너가 영구히 뜬다(회사 쪽 [다시 시도]가 멀쩡한 회사를 망가뜨리던 것과 같은
        *   모양이다, `registerOrg.retryBbiyongForCompany` 주석).
        */
-      if (changed.has(row.memberId)) {
+      if ((changed.get(row.memberId)?.size ?? 0) > 0) {
         refused.push({ memberId: row.memberId, name: row.name, reason: REP_NO_NUMBER });
       } else {
         result.skipped.push(`대표 회원번호가 없고 바뀐 것도 없다 — 보내지 않는다 (${row.memberId})`);

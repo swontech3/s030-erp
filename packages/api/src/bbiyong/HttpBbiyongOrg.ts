@@ -546,12 +546,15 @@ export class HttpBbiyongOrg implements BbiyongOrg {
    *    가 한다 — 이 어댑터는 HTTP 왕복과 응답 해석만 한다(파일 머리말).
    */
   async sendMember(req: BbiyongMemberRequest, accessToken: string): Promise<MemberOpOutcome> {
-    const body: Record<string, unknown> = {
-      regTp: req.regTp,
-      orgCode: req.orgCode,
-      memberName: req.memberName,
-      email: req.email,
-    };
+    const body: Record<string, unknown> = { regTp: req.regTp, orgCode: req.orgCode };
+    if (req.regTp === 'U') {
+      // ★ `U` 는 값 있는 칸만(결정 2026-10-23) — 빈 문자열은 삐용 값을 지운다.
+      if (req.memberName && req.memberName.trim() !== '') body.memberName = req.memberName;
+      if (req.email && req.email.trim() !== '') body.email = req.email;
+    } else {
+      body.memberName = req.memberName ?? '';
+      body.email = req.email ?? '';
+    }
     // ★ `I` 는 번호가 없고, `U`·`D` 는 필수다. 없는 값을 null 로 보내지 않는다.
     if (req.regTp !== 'I') body.memberId = req.memberId;
     if (req.regTp === 'I') body.repYn = req.repYn ?? 'N';

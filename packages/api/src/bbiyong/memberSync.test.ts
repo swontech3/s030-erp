@@ -12,7 +12,7 @@
  * 삐용도 DB 도 없이 돈다 — 저장소와 어댑터를 주입받는다.
  */
 import { describe, it, expect } from 'vitest';
-import { syncMembers, type MemberLinkRow, type MemberSyncStore } from './memberSync.ts';
+import { syncMembers, type MemberLinkRow, type MemberSyncField, type MemberSyncStore } from './memberSync.ts';
 import {
   BbiyongTokenExpiredError,
   BbiyongUnavailableError,
@@ -20,6 +20,10 @@ import {
   type BbiyongOrg,
   type MemberOpOutcome,
 } from './types.ts';
+
+/** 세 칸 모두 바뀐 직원들 — 새 행과 같은 모양(`replaceMembers`). */
+const allChanged = (...ids: string[]) =>
+  new Map(ids.map((id) => [id, new Set<MemberSyncField>(['name', 'email', 'phone'])]));
 
 const staff = (over: Partial<MemberLinkRow> = {}): MemberLinkRow => ({
   memberId: 'M-staff',
@@ -100,7 +104,7 @@ describe('syncMembers — ① 대표', () => {
     const s = store({ orgCode: 'Z04', active: [rep()] });
     const org = memberAdapter();
 
-    const out = await syncMembers(s, org, 'token', new Set(['M-rep']));
+    const out = await syncMembers(s, org, 'token', allChanged('M-rep'));
 
     expect(org.seen).toEqual([]);
     expect(out.sent).toBe(0);
@@ -121,7 +125,7 @@ describe('syncMembers — ① 대표', () => {
     const s = store({ orgCode: 'Z04', active: [rep({ linkMemberId: 851, name: '최현수2' })] });
     const org = memberAdapter();
 
-    await syncMembers(s, org, 'token', new Set(['M-rep']));
+    await syncMembers(s, org, 'token', allChanged('M-rep'));
 
     expect(org.seen).toHaveLength(1);
     expect(org.seen[0]).toMatchObject({ regTp: 'U', orgCode: 'Z04', memberId: 851, memberName: '최현수2' });
@@ -195,7 +199,7 @@ describe('syncMembers — ② 직원', () => {
     });
     const org = memberAdapter((req) => (req.regTp === 'I' ? { kind: 'created', memberId: 903 } : { kind: 'ok' }));
 
-    await syncMembers(s, org, 'token', new Set(['M-new']));
+    await syncMembers(s, org, 'token', allChanged('M-new'));
 
     expect(org.seen.map((r) => r.regTp)).toEqual(['D', 'I']);
   });
@@ -212,10 +216,43 @@ describe('syncMembers — ② 직원', () => {
   });
 });
 
+describe('syncMembers — ⑦ U 는 바뀐 칸만 · 빈 칸은 보내지 않는다(결정 2026-10-23)', () => {
+  const linked = staff({ linkMemberId: 902, name: '이정희2', email: 'new@example.com', phone: '010-9999-8888' });
+
+  it('★★ 바뀐 칸만 싣는다 — 연락처만 바뀌면 hpNo 하나(숫자만)', async () => {
+    const s = store({ orgCode: 'Z04', active: [linked] });
+    const org = memberAdapter();
+
+    await syncMembers(s, org, 'token', new Map([['M-staff', new Set<MemberSyncField>(['phone'])]]));
+
+    expect(org.seen).toEqual([{ regTp: 'U', orgCode: 'Z04', memberId: 902, hpNo: '01099998888' }]);
+  });
+
+  it('★★ 바뀐 칸이 비었으면 그 칸은 싣지 않는다 — 이메일을 비워도 거절하지 않는다', async () => {
+    const s = store({ orgCode: 'Z04', active: [{ ...linked, email: null, phone: null }] });
+    const org = memberAdapter();
+
+    const out = await syncMembers(s, org, 'token', new Map([['M-staff', new Set<MemberSyncField>(['name', 'email', 'phone'])]]));
+
+    expect(org.seen).toEqual([{ regTp: 'U', orgCode: 'Z04', memberId: 902, memberName: '이정희2' }]);
+    expect(out.pending).toEqual([]);
+  });
+
+  it('바뀐 칸이 모두 비었으면 보내지 않는다', async () => {
+    const s = store({ orgCode: 'Z04', active: [{ ...linked, email: null }] });
+    const org = memberAdapter();
+
+    const out = await syncMembers(s, org, 'token', new Map([['M-staff', new Set<MemberSyncField>(['email'])]]));
+
+    expect(org.seen).toEqual([]);
+    expect(out.skipped.join(' ')).toContain('모두 비었다');
+  });
+});
+
 describe('syncMembers — ③ 보낼 것이 없는 경우', () => {
   it('★★ 단체코드가 없으면 아무것도 보내지 않고 **사유도 남기지 않는다**', async () => {
     const s = store({ orgCode: null, active: [staff(), rep()] });
-    const out = await syncMembers(s, memberAdapter(), 'token', new Set(['M-staff', 'M-rep']));
+    const out = await syncMembers(s, memberAdapter(), 'token', allChanged('M-staff', 'M-rep'));
 
     expect(out.sent).toBe(0);
     // ★ 확정 전 회사가 전부 여기 걸린다 — 잘못된 상태가 아니므로 배너를 띄우지 않는다.

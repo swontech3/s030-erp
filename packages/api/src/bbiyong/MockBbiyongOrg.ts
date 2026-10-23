@@ -302,7 +302,8 @@ export class MockBbiyongOrg implements BbiyongOrg {
       ['성명', req.memberName],
       ['이메일', req.email],
     ] as const) {
-      if (!value) {
+      // ★ `U` 는 바뀐 칸만 실려 온다(결정 2026-10-23) — 없는 칸은 「안 바꿈」이다. 빈 문자열은 거부한다.
+      if (req.regTp === 'U' ? value !== undefined && value.trim() === '' : !value) {
         return { kind: 'rejected', message: `${key}이(가) 없어 삐용에 보낼 수 없습니다`, retryable: false };
       }
     }
@@ -312,8 +313,9 @@ export class MockBbiyongOrg implements BbiyongOrg {
         return { kind: 'rejected', message: '대표는 회사 등록으로만 만들 수 있습니다', retryable: false };
       }
       // ★ 이메일 겹침 — 삐용은 이메일을 로그인 아이디로 쓴다. 이 프로세스가 아는 범위에서만 본다.
+      const email = req.email ?? '';
       for (const [id, m] of this.#members) {
-        if (m.email.toLowerCase() === req.email.toLowerCase()) {
+        if (m.email.toLowerCase() === email.toLowerCase()) {
           return {
             kind: 'rejected',
             message: `이미 사용중인 이메일입니다(회원번호 ${id}). 다른 이메일을 입력해 주세요`,
@@ -321,8 +323,8 @@ export class MockBbiyongOrg implements BbiyongOrg {
           };
         }
       }
-      const memberId = this.#memberIdFor(req.email);
-      this.#members.set(memberId, { orgCode: req.orgCode, email: req.email });
+      const memberId = this.#memberIdFor(email);
+      this.#members.set(memberId, { orgCode: req.orgCode, email });
       console.log(`[bbiyong] MOCK 직원 등록 — orgCode=${req.orgCode} memberId=${memberId}`);
       return { kind: 'created', memberId };
     }
@@ -349,7 +351,7 @@ export class MockBbiyongOrg implements BbiyongOrg {
 
     // U — 대표도 이것만은 된다. ★ 이메일을 바꿨으면 들고 있는 값도 맞춘다(겹침 판정의 근거).
     const known = this.#members.get(req.memberId);
-    if (known) this.#members.set(req.memberId, { ...known, email: req.email });
+    if (known && req.email !== undefined) this.#members.set(req.memberId, { ...known, email: req.email });
     console.log(`[bbiyong] MOCK 직원 수정 — orgCode=${req.orgCode} memberId=${req.memberId}`);
     return { kind: 'ok' };
   }

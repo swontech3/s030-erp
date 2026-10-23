@@ -69,6 +69,8 @@ export {
   syncMembers,
   type MemberLinkRow,
   type MemberPending,
+  type MemberChanges,
+  type MemberSyncField,
   type MemberSyncResult,
   type MemberSyncStore,
 } from './memberSync.ts';

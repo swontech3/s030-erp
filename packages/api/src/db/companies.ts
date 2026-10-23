@@ -9,6 +9,7 @@
  */
 import { MEMBER_ROLE } from '@swonbiz/shared/domain/member-payload';
 import type { ScopedClient } from './withCompanyScope.ts';
+import type { MemberSyncField } from '../bbiyong/memberSync.ts';
 
 interface Rows<T> {
   rows: T[];
@@ -380,15 +381,15 @@ export interface ReplaceMembersResult {
   updated: number;
   deactivated: number;
   /**
-   * 삐용에 **보낼 것이 있는** 구성원들(ERP member_id).
+   * 삐용에 **보낼 것이 있는** 구성원들(ERP member_id) → **바뀐 칸들**(결정 2026-10-23 — `U` 는 바뀐 칸만).
    *
-   * ★ 새로 만든 행과, **이름·연락처·이메일 중 하나가 실제로 바뀐** 행이다. 비고만
+   * ★ 새로 만든 행(세 칸 모두)과, **이름·연락처·이메일 중 하나가 실제로 바뀐** 행이다. 비고만
    *   고친 저장은 여기 없다 — 삐용에 보내지 않는 값이다.
    * ★★ 이 목록은 `syncMembers` 의 `changed` 로 그대로 들어간다. 「무엇이 바뀌었나」를
    *    아는 자리는 저장을 한 이 함수뿐이다 — 삐용 쪽에 사본을 두지 않기 때문에
    *    나중에는 알 길이 없다(`link_*` 는 상태이고 값의 사본이 아니다).
    */
-  changed: string[];
+  changed: Map<string, Set<MemberSyncField>>;
 }
 
 /**
@@ -484,7 +485,7 @@ export async function replaceMembers(
 
   const keep: string[] = [];
   /** 삐용에 `U` 를 보내야 하는 행들 — 이름·연락처·이메일 중 하나가 **실제로** 바뀐 행. */
-  const changed: string[] = [];
+  const changed = new Map<string, Set<MemberSyncField>>();
   let inserted = 0;
   let updated = 0;
 
@@ -514,9 +515,11 @@ export async function replaceMembers(
          *    모를 때는 보내는 쪽으로 틀린다 — 안 보내면 어긋남이 남는다.
          */
         const was = before.get(m.memberId);
-        if (!was || was.name !== m.name || was.phone !== m.phone || was.email !== m.email) {
-          changed.push(m.memberId);
-        }
+        const fields = new Set<MemberSyncField>();
+        if (!was || was.name !== m.name) fields.add('name');
+        if (!was || was.phone !== m.phone) fields.add('phone');
+        if (!was || was.email !== m.email) fields.add('email');
+        if (fields.size > 0) changed.set(m.memberId, fields);
         continue;
       }
       // 없는 id 가 올라왔다 — 새로 만든다. 조용히 버리면 입력이 사라진다.
@@ -534,7 +537,7 @@ export async function replaceMembers(
     keep.push(id);
     inserted += 1;
     // ★ 새 행은 당연히 바뀐 것이다. 삐용 번호도 없으므로 `I` 로 나간다.
-    changed.push(id);
+    changed.set(id, new Set<MemberSyncField>(['name', 'phone', 'email']));
   }
 
   const res = await q(
