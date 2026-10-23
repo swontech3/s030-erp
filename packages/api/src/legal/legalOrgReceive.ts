@@ -14,10 +14,11 @@
  */
 import { isDigitMaskComplete, maskValue, DIGIT_MASK_RULE, type DigitMaskKind } from '@swonbiz/shared/domain/masked-caret';
 import type { LegalOrgFromBbiyong } from '../db/corpChanges.ts';
-import { BbiyongUnavailableError, type MyMenusOutcome } from '../bbiyong/types.ts';
+import type { MyMenusOutcome } from '../bbiyong/types.ts';
+import { checkReceiveCaller, type CallerRefused } from '../bbiyong/receiveCaller.ts';
 
-/** 이 화면이 내 메뉴에 있어야 받는다 — 회사 등록 · 수정과 같은 단체관리 권한(연동규격 §2-2). */
-export const RECEIVE_REQUIRED_MENU = 'S021100010';
+// ★ 부르는 쪽 확인은 입주사 회사 · 직원 받기와 같은 함수다(`bbiyong/receiveCaller.ts`).
+export { bearerOf, RECEIVE_REQUIRED_MENU } from '../bbiyong/receiveCaller.ts';
 
 /** 받는 본문의 칸 → [법무 칸, 이름, 최대 길이(null = 제한 없음), 숫자 칸 종류]. */
 const RECEIVE_FIELDS: Readonly<
@@ -82,8 +83,7 @@ export type ReceiveSkipped = 'not_found' | 'tenant' | 'no_fields';
 export type ReceiveOutcome =
   | { status: 200; body: { ok: true; applied: boolean; skipped: ReceiveSkipped | null } }
   | { status: 400; body: { error: 'invalid_request'; message: string; errors: ReceiveFieldError[] } }
-  | { status: 403; body: { error: 'forbidden'; message: string } }
-  | { status: 503; body: { error: 'bbiyong_unavailable'; message: string } };
+  | CallerRefused;
 
 export interface ReceiveDeps {
   /** 삐용 「내 메뉴」 — 받은 토큰 그대로(`BbiyongAuth.myMenus`). */
@@ -95,14 +95,6 @@ export interface ReceiveDeps {
   apply(orgId: number, fields: LegalOrgFromBbiyong): Promise<'applied' | 'tenant' | 'not_found'>;
 }
 
-const FORBIDDEN = '삐용 단체관리 권한이 있는 토큰이 아닙니다';
-
-/** `Authorization: Bearer <토큰>` 에서 토큰. 없으면 null. */
-export function bearerOf(header: string | undefined): string | null {
-  const m = /^Bearer\s+(\S+)\s*$/i.exec(header ?? '');
-  return m ? m[1]! : null;
-}
-
 /**
  * 받기 한 번 — 토큰 확인 → 본문 → 쓰기. 토큰을 먼저 본다(확인 안 된 쪽에 칸 오류를 알려 주지 않는다).
  */
@@ -111,20 +103,8 @@ export async function receiveLegalOrg(
   raw: unknown,
   deps: ReceiveDeps,
 ): Promise<ReceiveOutcome> {
-  const token = bearerOf(authorization);
-  if (token === null) return { status: 403, body: { error: 'forbidden', message: FORBIDDEN } };
-
-  let menus: MyMenusOutcome;
-  try {
-    menus = await deps.myMenus(token);
-  } catch (err) {
-    if (!(err instanceof BbiyongUnavailableError)) throw err;
-    console.error(`[bbiyong] 법무 회사 정보 받기 — 내 메뉴 확인 실패: ${err.message}`);
-    return { status: 503, body: { error: 'bbiyong_unavailable', message: '삐용 권한 확인이 끝나지 않았습니다. 잠시 후 다시 보내 주세요' } };
-  }
-  if (menus.kind !== 'ok' || !menus.screens.includes(RECEIVE_REQUIRED_MENU)) {
-    return { status: 403, body: { error: 'forbidden', message: FORBIDDEN } };
-  }
+  const refused = await checkReceiveCaller(authorization, deps.myMenus, '법무 회사 정보 받기');
+  if (refused) return refused;
 
   const parsed = parseReceiveBody(raw);
   if (!parsed.ok) {

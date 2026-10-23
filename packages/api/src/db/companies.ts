@@ -957,3 +957,62 @@ export async function listPendingLinks(client: ScopedClient): Promise<PendingLin
   );
   return rows;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   삐용 → ERP 「받기」(2026-10-23) — 회사 · 직원
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 받은 칸만 바꾼다. 줄이 없으면 만들지 않는다. 판정(누가 불렀는가 · 칸 모양)은
+     `companies/companyReceive.ts` · `companies/memberReceive.ts` 가 한다.
+   ★★ 여기서 삐용에 다시 보내지 않는다 — 부르는 쪽도 보내지 않는다(되돌아가기 방지).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** 삐용 단체 ID 로 입주사 — 연결된 회사만 있다(`link_s020_org_id` UNIQUE). 없으면 null. */
+export async function findCompanyIdByOrgId(client: ScopedClient, orgId: number): Promise<string | null> {
+  const { rows } = await q<{ company_id: string }>(
+    client,
+    `SELECT company_id FROM public.tb_s080_companies WHERE link_s020_org_id = $1`,
+    [orgId],
+  );
+  return rows[0]?.company_id ?? null;
+}
+
+/** 삐용에서 받는 회사 칸 — 회사명 · 사업자번호 · 법인번호 · 업태 · 종목(주소는 받지 않는다). */
+export interface CompanyFromBbiyong {
+  companyName?: string;
+  bizNumber?: string;
+  corpNumber?: string;
+  businessType?: string;
+  businessItem?: string;
+}
+
+const COMPANY_FROM_BBIYONG_COLUMNS: Readonly<Record<keyof CompanyFromBbiyong, string>> = {
+  companyName: 'company_name',
+  bizNumber: 'biz_number',
+  corpNumber: 'corp_number',
+  businessType: 'business_type',
+  businessItem: 'business_item',
+};
+
+/**
+ * 받은 칸만 바꾼다. 칸이 하나도 없으면 부르지 않는다.
+ * ★ `biz_number` 는 UNIQUE 다 — 남의 번호면 23505 를 던진다(부르는 쪽이 409 로 바꾼다).
+ * @returns 바뀐 줄 수(0 또는 1)
+ */
+export async function patchCompanyFromBbiyong(
+  client: ScopedClient,
+  args: { companyId: string; fields: CompanyFromBbiyong; actor: string },
+): Promise<number> {
+  const keys = (Object.keys(COMPANY_FROM_BBIYONG_COLUMNS) as (keyof CompanyFromBbiyong)[]).filter(
+    (k) => args.fields[k] !== undefined,
+  );
+  if (keys.length === 0) throw new Error('patchCompanyFromBbiyong — 바꿀 칸이 없다');
+  const sets = keys.map((k, i) => `${COMPANY_FROM_BBIYONG_COLUMNS[k]} = $${i + 3}`);
+  const { rowCount } = await q(
+    client,
+    `UPDATE public.tb_s080_companies
+        SET ${sets.join(', ')}, updated_at = now(), updated_by = $2
+      WHERE company_id = $1`,
+    [args.companyId, args.actor, ...keys.map((k) => args.fields[k])],
+  );
+  return rowCount ?? 0;
+}

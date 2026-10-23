@@ -23,6 +23,7 @@ import { registerKioskRoutes } from './routes/kiosk.ts';
 import { registerInquiryRoutes } from './routes/inquiry.ts';
 import { registerInquiryAdminRoutes } from './routes/inquiryAdmin.ts';
 import { registerCompanyRoutes } from './routes/companies.ts';
+import { registerCompanyReceiveRoutes } from './routes/companyReceive.ts';
 import { registerFileRoutes } from './routes/files.ts';
 import { registerOcrRoutes } from './routes/ocr.ts';
 import { registerFacilityRoutes } from './routes/facility.ts';
@@ -125,6 +126,9 @@ registerInquiryRoutes(app);
 //   같은 파일에 두면 `config.public` 을 잘못 붙여 개인정보가 로그인 없이 열릴 수 있다.
 registerInquiryAdminRoutes(app);
 registerCompanyRoutes(app);
+// ★ 입주사 회사 · 직원 「받기」(삐용 → ERP, 2026-10-23) — ERP 세션 없이 삐용이 부른다(`config.public`).
+//   부르는 쪽 확인은 실어 온 삐용 토큰의 「내 메뉴」로 한다(`bbiyong/receiveCaller.ts`).
+registerCompanyReceiveRoutes(app);
 // ★ 첨부 서류(CONT-17). 회사 하위 경로라 입주사 라우트 **뒤에** 둔다 — 같은 접두사를
 //   쓰는 라우트는 등록 순서와 무관하지만, 읽는 사람이 묶어서 보게 한다.
 registerFileRoutes(app);
