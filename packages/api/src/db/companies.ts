@@ -1016,3 +1016,86 @@ export async function patchCompanyFromBbiyong(
   );
   return rowCount ?? 0;
 }
+
+/** 삐용 회원번호로 구성원 한 줄 — `link_s020_member_id` 는 UNIQUE 다(035). 없으면 null. */
+export interface MemberByLink {
+  member_id: string;
+  company_id: string;
+  is_representative: string | null;
+  status: string;
+}
+
+export async function findMemberByLinkId(client: ScopedClient, linkMemberId: number): Promise<MemberByLink | null> {
+  const { rows } = await q<MemberByLink>(
+    client,
+    `SELECT member_id, company_id, is_representative, status
+       FROM public.tb_s080_members
+      WHERE link_s020_member_id = $1`,
+    [linkMemberId],
+  );
+  return rows[0] ?? null;
+}
+
+/** 같은 회사의 **다른 활성** 구성원이 이 이메일을 쓰는가 — 대소문자 · 앞뒤 공백은 같게 본다. */
+export async function isMemberEmailTaken(
+  client: ScopedClient,
+  args: { companyId: string; memberId: string; email: string },
+): Promise<boolean> {
+  const { rows } = await q<{ one: number }>(
+    client,
+    `SELECT 1 AS one FROM public.tb_s080_members
+      WHERE company_id = $1 AND member_id <> $2 AND status = 'active'
+        AND lower(btrim(COALESCE(email, ''))) = lower(btrim($3))
+      LIMIT 1`,
+    [args.companyId, args.memberId, args.email],
+  );
+  return rows.length > 0;
+}
+
+/** 삐용에서 받는 직원 칸 — 이름 · 이메일 · 연락처(하이픈 모양). */
+export interface MemberFromBbiyong {
+  name?: string;
+  email?: string;
+  phone?: string;
+}
+
+const MEMBER_FROM_BBIYONG_COLUMNS: Readonly<Record<keyof MemberFromBbiyong, string>> = {
+  name: 'name',
+  email: 'email',
+  phone: 'phone',
+};
+
+/**
+ * 받은 칸만 바꾼다. 칸이 하나도 없으면 부르지 않는다.
+ * ★ 연동 칸(`link_*`)은 건드리지 않는다 — 대기 사유는 ERP 가 보낸 일의 결과다.
+ */
+export async function patchMemberFromBbiyong(
+  client: ScopedClient,
+  args: { memberId: string; fields: MemberFromBbiyong; actor: string },
+): Promise<number> {
+  const keys = (Object.keys(MEMBER_FROM_BBIYONG_COLUMNS) as (keyof MemberFromBbiyong)[]).filter(
+    (k) => args.fields[k] !== undefined,
+  );
+  if (keys.length === 0) throw new Error('patchMemberFromBbiyong — 바꿀 칸이 없다');
+  const sets = keys.map((k, i) => `${MEMBER_FROM_BBIYONG_COLUMNS[k]} = $${i + 3}`);
+  const { rowCount } = await q(
+    client,
+    `UPDATE public.tb_s080_members
+        SET ${sets.join(', ')}, updated_at = now(), updated_by = $2
+      WHERE member_id = $1`,
+    [args.memberId, args.actor, ...keys.map((k) => args.fields[k])],
+  );
+  return rowCount ?? 0;
+}
+
+/** 회사 표의 대표자명(사본) — 활성 대표 직원의 이름을 삐용에서 받았을 때 맞춘다. */
+export async function updateCompanyCeoName(
+  client: ScopedClient,
+  args: { companyId: string; ceoName: string; actor: string },
+): Promise<void> {
+  await q(
+    client,
+    `UPDATE public.tb_s080_companies SET ceo_name = $2, updated_at = now(), updated_by = $3 WHERE company_id = $1`,
+    [args.companyId, args.ceoName, args.actor],
+  );
+}

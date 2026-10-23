@@ -14,11 +14,21 @@
  * 삐용 팀에 넘기는 규격: `doc/연동규격_입주사_회사정보_받기.md` · `doc/연동규격_입주사_직원정보_받기.md`.
  */
 import type { FastifyInstance } from 'fastify';
-import type { CompanyScope } from '../db/withCompanyScope.ts';
+import type { CompanyScope, ScopedClient } from '../db/withCompanyScope.ts';
 import { bbiyongAuth } from '../bbiyong/index.ts';
-import { findCompanyIdByOrgId, patchCompanyFromBbiyong } from '../db/companies.ts';
+import { MEMBER_ROLE } from '@swonbiz/shared/domain/member-payload';
+import {
+  findCompanyIdByOrgId,
+  findMemberByLinkId,
+  isMemberEmailTaken,
+  patchCompanyFromBbiyong,
+  patchMemberFromBbiyong,
+  updateCompanyCeoName,
+  type MemberFromBbiyong,
+} from '../db/companies.ts';
 import { withCompanyScope } from '../db/withCompanyScope.ts';
 import { receiveCompany, type CompanyReceiveDeps } from '../companies/companyReceive.ts';
+import { receiveMember, type MemberReceiveDeps } from '../companies/memberReceive.ts';
 
 /** `updated_by` 에 남기는 값 — 삐용이 보낸 줄이라는 표시(회원번호는 내 메뉴가 주지 않는다). */
 export const RECEIVE_ACTOR = 'bbiyong';
@@ -48,12 +58,48 @@ const defaultCompanyDeps: CompanyReceiveDeps = {
   },
 };
 
+/**
+ * 직원 받기의 쓰기 — 트랜잭션 하나 안에서 부른다(시험이 가짜 클라이언트로 부른다).
+ */
+export async function applyMemberFromBbiyong(
+  client: ScopedClient,
+  linkMemberId: number,
+  fields: MemberFromBbiyong,
+): Promise<'applied' | 'not_found' | 'email_taken'> {
+  const member = await findMemberByLinkId(client, linkMemberId);
+  if (member === null) return 'not_found' as const;
+  // ★ 쓰기 **전에** 본다 — 겹치면 아무것도 쓰지 않는다.
+  if (
+    fields.email !== undefined &&
+    (await isMemberEmailTaken(client, { companyId: member.company_id, memberId: member.member_id, email: fields.email }))
+  ) {
+    return 'email_taken' as const;
+  }
+  await patchMemberFromBbiyong(client, { memberId: member.member_id, fields, actor: RECEIVE_ACTOR });
+  // ★ 회사 표의 대표자명은 활성 대표 행의 **사본**이다 — 같이 맞춘다(비활성으로 내려간 옛 대표는 아니다).
+  if (fields.name !== undefined && member.status === 'active' && member.is_representative === MEMBER_ROLE.REPRESENTATIVE) {
+    await updateCompanyCeoName(client, { companyId: member.company_id, ceoName: fields.name, actor: RECEIVE_ACTOR });
+  }
+  return 'applied' as const;
+}
+
+const defaultMemberDeps: MemberReceiveDeps = {
+  myMenus: (token) => bbiyongAuth.myMenus(token),
+  apply: (linkMemberId, fields) =>
+    withCompanyScope(RECEIVE_SCOPE, (client) => applyMemberFromBbiyong(client, linkMemberId, fields)),
+};
+
 export function registerCompanyReceiveRoutes(
   app: FastifyInstance,
-  deps: { company: CompanyReceiveDeps } = { company: defaultCompanyDeps },
+  deps: { company: CompanyReceiveDeps; member: MemberReceiveDeps } = { company: defaultCompanyDeps, member: defaultMemberDeps },
 ): void {
   app.post('/companies/bbiyong/org-changed', { config: { public: true } }, async (req, reply) => {
     const out = await receiveCompany(req.headers.authorization, req.body, deps.company);
+    return reply.code(out.status).send(out.body);
+  });
+
+  app.post('/companies/bbiyong/member-changed', { config: { public: true } }, async (req, reply) => {
+    const out = await receiveMember(req.headers.authorization, req.body, deps.member);
     return reply.code(out.status).send(out.body);
   });
 }
