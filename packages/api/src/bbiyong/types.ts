@@ -125,7 +125,11 @@ export class BbiyongReloginRequiredError extends BbiyongAuthError {
  *   URL 을 그대로 붙여 던지고, `/re-issue` 의 URL 에는 토큰 2개가 쿼리스트링으로 실려 있다.
  */
 export class BbiyongUnavailableError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    /** 삐용이 HTTP 비정상(401 밖)으로 답했을 때 그 상태. 못 붙었거나 본문이 깨졌으면 없다. */
+    readonly httpStatus?: number,
+  ) {
     super(message);
     this.name = 'BbiyongUnavailableError';
   }
@@ -168,7 +172,19 @@ export interface BbiyongAuth {
    *   실패하면 `BbiyongReloginRequiredError` 를 던진다(되살릴 방법이 없다).
    */
   reIssue(accessToken: string, refreshToken: string): Promise<string>;
+
+  /**
+   * 내 메뉴(`GET /s021000000/my-menus`, 연동규격 §1-5) — **받은 토큰 그대로** 부른다.
+   * 법무 회사 정보 「받기」가 삐용이 실어 온 토큰을 확인하는 자리다(2026-10-23).
+   *
+   * ★ 재발급하지 않는다 — ERP 가 가진 토큰이 아니다. 만료 · 무효(401)와 삐용의 업무 거절은
+   *   `rejected` 다. 연결 · 규격 문제는 `BbiyongUnavailableError` 를 던진다.
+   */
+  myMenus(accessToken: string): Promise<MyMenusOutcome>;
 }
+
+/** 내 메뉴 결과 — `ok` 면 삐용 화면코드 목록(대문자 그대로). */
+export type MyMenusOutcome = { kind: 'ok'; screens: string[] } | { kind: 'rejected' };
 
 /** 동작 어휘 4종 — ACL-10. APPROVE·EXPORT 는 쓰지 않는다. 런타임 검사와 타입이 한 원천이다. */
 export const ACL_ACTIONS = ['VIEW', 'CREATE', 'UPDATE', 'DELETE'] as const;

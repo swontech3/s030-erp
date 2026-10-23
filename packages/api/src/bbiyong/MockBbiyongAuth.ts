@@ -21,6 +21,7 @@ import {
   type BbiyongAuth,
   type BbiyongLoginResult,
   type BbiyongProfile,
+  type MyMenusOutcome,
 } from './types.ts';
 
 /** 개발용 고정 비밀번호. 실제 삐용 연동으로 바뀌면 사라진다. */
@@ -45,6 +46,11 @@ interface MockAccount extends Omit<BbiyongLoginResult, 'accessToken' | 'refreshT
    *   나오면 안 된다. 실물은 삐용이 거르고(회신 2026-10-09), mock 은 여기 적지 않는 것으로 맞춘다.
    */
   orgCode?: string;
+  /**
+   * 삐용 「내 메뉴」(`my-menus`)가 줄 **삐용** 화면코드(대문자) — `screens`(ERP 화면)와 다른 어휘다.
+   * 법무 회사 정보 「받기」가 토큰을 확인할 때 본다(2026-10-23). 운영사 계정에만 단체관리(`S021100010`).
+   */
+  bbiyongMenus?: string[];
 }
 
 /**
@@ -63,6 +69,7 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     memberName: '김대표',
     orgName: '에스원비즈',
     scope: 'operator',
+    bbiyongMenus: ['S021100010'],
     // ★ s030200030·s030200040·s030200080 은 운영사 전용(audience_tp='P')이다.
     //   입주사 계정에는 넣지 않는다 — 문의 관리(080)에는 남의 이름·연락처가 모여 있다.
     //   계약 폼(s030200040)은 사이드바에 없고 계약 상세·목록에서 들어가지만, 목록에 없으면
@@ -85,6 +92,7 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     memberName: '박운영',
     orgName: '에스원비즈',
     scope: 'operator',
+    bbiyongMenus: ['S021100010'],
     // ★ admin 계정과 같은 목록이다(위 주석 참조) — 센터 관리·표양식 관리·코드 관리·법인변경 포함.
     screens: ['s030000050', 's030000060', 's030100010', 's030100020', 's030100030', 's030200030', 's030200040', 's030200070', 's030200080', 's030600010', 's040100010', 's040100020', 's040200010', 's040200011', 's040300010', 's040900010'],
   },
@@ -162,6 +170,17 @@ export class MockBbiyongAuth implements BbiyongAuth {
     const account = findMockAccount(memberId);
     if (!account) return null;
     return { memberName: account.memberName, orgName: account.orgName, orgTp: account.orgTp };
+  }
+
+  /**
+   * 내 메뉴 — mock 토큰(`mock-access.<회원번호>.<시각>`)의 회원번호로 계정을 찾아 `bbiyongMenus` 를 준다.
+   * 모양이 아니거나 계정이 없으면 `rejected`(삐용의 401 자리).
+   */
+  async myMenus(accessToken: string): Promise<MyMenusOutcome> {
+    const m = /^mock-access\.(\d+)\.\d+$/.exec(accessToken);
+    const account = m ? findMockAccount(Number(m[1])) : undefined;
+    if (!account) return { kind: 'rejected' };
+    return { kind: 'ok', screens: [...(account.bbiyongMenus ?? [])] };
   }
 
   async signOut(_refreshToken: string): Promise<void> {

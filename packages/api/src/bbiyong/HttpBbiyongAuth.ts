@@ -31,6 +31,7 @@ import {
   type BbiyongAuth,
   type BbiyongLoginResult,
   type BbiyongProfile,
+  type MyMenusOutcome,
 } from './types.ts';
 
 export { INVALID_CREDENTIALS_MESSAGE, ORG_SELECT_MESSAGE, RELOGIN_MESSAGE } from './types.ts';
@@ -182,6 +183,19 @@ export function parseReIssue(body: unknown): ReIssueOutcome {
   return { kind: 'success', accessToken };
 }
 
+/**
+ * GET /rest/v1/s021000000/my-menus 의 응답 본문(연동규격 §1-5). 함정 ①이 여기에도 있다 —
+ * 성공은 `result === 'success' && status === 200` 이고 `data` 가 화면코드 배열이다.
+ * 그 밖은 전부 `rejected`(입구 거절 `AUTHZ_DENY` 도 HTTP 200 · 본문 403 으로 온다).
+ */
+export function parseMyMenus(body: unknown): MyMenusOutcome {
+  const root = asRecord(body);
+  if (!root || root.result !== 'success' || root.status !== 200 || !Array.isArray(root.data)) {
+    return { kind: 'rejected' };
+  }
+  return { kind: 'ok', screens: root.data.filter((v): v is string => typeof v === 'string') };
+}
+
 // =============================================================================
 // 어댑터
 // =============================================================================
@@ -328,6 +342,27 @@ export class HttpBbiyongAuth implements BbiyongAuth {
   }
 
   /**
+   * 내 메뉴 — 받은 토큰 그대로 부른다(재발급 없음, `BbiyongAuth.myMenus`).
+   * ★ 401 은 그 토큰이 만료 · 무효라는 뜻이라 `rejected` 다. HTTP 403(삐용 입구가 토큰을 못 받음 —
+   *   연동규격 §1 「토큰을 안 실으면 403」)도 `rejected` 다. 연결 문제만 던진다.
+   */
+  async myMenus(accessToken: string): Promise<MyMenusOutcome> {
+    let body: unknown;
+    try {
+      body = await this.#call(
+        `${this.#baseUrl}${BBIYONG.MY_MENUS_PATH}`,
+        { method: 'GET', headers: { authorization: `Bearer ${accessToken}` } },
+        'my-menus',
+      );
+    } catch (err) {
+      if (err instanceof BbiyongTokenExpiredError) return { kind: 'rejected' };
+      if (err instanceof BbiyongUnavailableError && err.httpStatus === 403) return { kind: 'rejected' };
+      throw err;
+    }
+    return parseMyMenus(body);
+  }
+
+  /**
    * 호출 + JSON 파싱. 던지는 것은 `BbiyongUnavailableError` 뿐이다 —
    * **연결·규격 문제를 인증 실패로 번역하지 않는다.** 401 로 내려보내면 삐용 장애가
    * "비밀번호가 틀렸습니다"로 보이고, 사용자는 멀쩡한 비밀번호를 계속 다시 친다.
@@ -352,7 +387,7 @@ export class HttpBbiyongAuth implements BbiyongAuth {
     }
 
     // 나머지 HTTP 비정상은 삐용의 업무 실패가 아니라 인프라 문제다(업무 실패는 200 으로 온다).
-    if (!res.ok) throw new BbiyongUnavailableError(`삐용 ${label} 이 HTTP ${res.status} 로 응답했다`);
+    if (!res.ok) throw new BbiyongUnavailableError(`삐용 ${label} 이 HTTP ${res.status} 로 응답했다`, res.status);
 
     const text = await res.text();
     try {

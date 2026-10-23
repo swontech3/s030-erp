@@ -15,6 +15,7 @@ import {
   HttpBbiyongAuth,
   parseSignIn,
   parseReIssue,
+  parseMyMenus,
   INVALID_CREDENTIALS_MESSAGE,
   ORG_SELECT_MESSAGE,
 } from './HttpBbiyongAuth.ts';
@@ -465,5 +466,45 @@ describe('HttpBbiyongAuth — HTTP 상태 번역', () => {
       expect(err, `HTTP ${status}`).toBeInstanceOf(BbiyongUnavailableError);
       expect(err, `HTTP ${status}`).not.toBeInstanceOf(BbiyongTokenExpiredError);
     }
+  });
+});
+
+// =============================================================================
+// 4. 내 메뉴 — 법무 회사 정보 「받기」가 실어 온 토큰을 확인한다 (2026-10-23)
+// =============================================================================
+describe('parseMyMenus', () => {
+  it('성공이면 화면코드 목록 — 글자가 아닌 것은 버린다', () => {
+    expect(parseMyMenus({ status: 200, result: 'success', massage: null, data: ['S021000000', 'S021100010', 7], error: [] })).toEqual({
+      kind: 'ok',
+      screens: ['S021000000', 'S021100010'],
+    });
+  });
+  it('★ 입구 거절(HTTP 200 · 본문 403 · AUTHZ_DENY) · 깨진 본문은 rejected', () => {
+    const deny = { status: 403, result: 'fail', massage: '권한이 없습니다. 관리자에게 권한을 요청하세요', data: [], error: ['AUTHZ_DENY'] };
+    expect(parseMyMenus(deny)).toEqual({ kind: 'rejected' });
+    expect(parseMyMenus({ status: 200, result: 'success', data: null })).toEqual({ kind: 'rejected' });
+    expect(parseMyMenus('x')).toEqual({ kind: 'rejected' });
+  });
+});
+
+describe('HttpBbiyongAuth.myMenus', () => {
+  it('받은 토큰을 Bearer 로 싣고 GET my-menus 를 부른다', async () => {
+    const { impl, calls } = stubFetch(json({ status: 200, result: 'success', massage: null, data: ['S021100010'], error: [] }));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+    await expect(auth.myMenus('eyJ.in')).resolves.toEqual({ kind: 'ok', screens: ['S021100010'] });
+    expect(calls[0]!.url).toBe(`${BASE}/rest/v1/s021000000/my-menus`);
+    expect(calls[0]!.init.method).toBe('GET');
+    expect((calls[0]!.init.headers as Record<string, string>).authorization).toBe('Bearer eyJ.in');
+  });
+  it('★ HTTP 401 · 403 은 rejected(재발급하지 않는다) · 그 밖의 HTTP 비정상은 연결 문제로 던진다', async () => {
+    for (const status of [401, 403]) {
+      const { impl, calls } = stubFetch(new Response('', { status }));
+      const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+      await expect(auth.myMenus('eyJ.in'), `HTTP ${status}`).resolves.toEqual({ kind: 'rejected' });
+      expect(calls).toHaveLength(1);
+    }
+    const { impl } = stubFetch(new Response('', { status: 502 }));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+    await expect(auth.myMenus('eyJ.in')).rejects.toBeInstanceOf(BbiyongUnavailableError);
   });
 });

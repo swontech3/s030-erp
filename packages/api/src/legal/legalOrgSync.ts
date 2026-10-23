@@ -10,7 +10,7 @@
  *   · 실패해도 저장은 그대로다. 결과는 응답에만 싣고(`LegalOrgSyncResult`) **DB 에 남기지 않는다**
  *   · ERP 입주사 표와는 주고받지 않는다 — 입주사 단체는 애초에 회사 정보를 저장하지 않는다(409)
  *
- * ★ 「받기」(삐용 → 법무)는 아직 없다 — 삐용 규격을 확인한 뒤.
+ * ★ 「받기」(삐용 → 법무, 2026-10-23)는 `legalOrgReceive.ts` 다 — 받은 값은 여기로 다시 보내지 않는다.
  */
 import type { ErpSession } from '@swonbiz/shared';
 import type { LegalOrgInput, LegalOrgSyncResult } from '@swonbiz/shared/domain/corp-change-detail';

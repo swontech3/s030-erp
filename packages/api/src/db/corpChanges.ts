@@ -583,6 +583,57 @@ export async function upsertLegalOrg(
   );
 }
 
+/** 입주사 단체인가 — `link_s020_org_id` 에 있으면 입주사다(퇴실해도, 위 머리말). */
+export async function isTenantOrg(client: ScopedClient, orgId: number): Promise<boolean> {
+  const { rows } = await q<{ one: number }>(
+    client,
+    `SELECT 1 AS one FROM public.tb_s080_companies WHERE link_s020_org_id = $1`,
+    [orgId],
+  );
+  return rows.length > 0;
+}
+
+/** 삐용에서 받는 칸(삐용 → 법무, 2026-10-23) — 본점 주소 3칸 · 사업자번호 · 법인번호. */
+export interface LegalOrgFromBbiyong {
+  headZipCode?: string;
+  headAddress?: string;
+  headAddressDetail?: string;
+  bizNumber?: string;
+  corpNumber?: string;
+}
+
+const FROM_BBIYONG_COLUMNS: Readonly<Record<keyof LegalOrgFromBbiyong, string>> = {
+  headZipCode: 'head_zip_code',
+  headAddress: 'head_address',
+  headAddressDetail: 'head_address_detail',
+  bizNumber: 'biz_number',
+  corpNumber: 'corp_number',
+};
+
+/**
+ * 받은 칸만 바꾼다 — 줄이 없으면 만들지 않는다(0 을 돌려준다). 칸이 하나도 없으면 부르지 않는다.
+ * ★ **입주사 단체에는 부르지 않는다** — 판정은 부르는 쪽이 한다(`upsertLegalOrg` 와 같다).
+ * @returns 바뀐 줄 수(0 또는 1)
+ */
+export async function patchLegalOrgFromBbiyong(
+  client: ScopedClient,
+  args: { orgId: number; fields: LegalOrgFromBbiyong; actor: string },
+): Promise<number> {
+  const keys = (Object.keys(FROM_BBIYONG_COLUMNS) as (keyof LegalOrgFromBbiyong)[]).filter(
+    (k) => args.fields[k] !== undefined,
+  );
+  if (keys.length === 0) throw new Error('patchLegalOrgFromBbiyong — 바꿀 칸이 없다');
+  const sets = keys.map((k, i) => `${FROM_BBIYONG_COLUMNS[k]} = $${i + 3}`);
+  const { rowCount } = await q(
+    client,
+    `UPDATE public.tb_s080_legal_orgs
+        SET ${sets.join(', ')}, updated_at = now(), updated_by = $2
+      WHERE org_id = $1`,
+    [args.orgId, args.actor, ...keys.map((k) => args.fields[k])],
+  );
+  return rowCount ?? 0;
+}
+
 // =============================================================================
 // 서류 출력(5단계, 2026-10-11)
 // =============================================================================
