@@ -134,7 +134,7 @@ configuration.setAllowCredentials(true);
 configuration.setAllowedOrigins(List.of(
     "https://bbiyong.s-wontech.co.kr",
     "https://erp.swonbiz.com",          // ERP 연동 시
-    "http://localhost:3000"             // 개발계에서만
+    "http://localhost:3100"             // 개발계에서만
 ));
 configuration.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));
 configuration.setAllowedHeaders(List.of("Authorization","Content-Type","refresh-token"));

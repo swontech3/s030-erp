@@ -145,7 +145,7 @@ noaccess@test.com         erp1234!   미구독 → /no-access
 ```powershell
 # 창 1 — 화면
 cd C:\workspace\SwonBiz-erp
-npm run dev --workspace @swonbiz/web      # → localhost:3000
+npm run dev --workspace @swonbiz/web      # → localhost:3100
 
 # 창 2 — API
 cd C:\workspace\SwonBiz-erp
