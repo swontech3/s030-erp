@@ -13,6 +13,9 @@ const PROTECTED_PATHS = [
   '/settings/:path*',
   '/facility/:path*',
   '/inquiry-admin/:path*',
+  '/forms/:path*',
+  // 법무 서비스(s04, 2026-10-09) — 회사가 직접 로그인해 자기 법무 서류를 보는 화면이다.
+  '/legal/:path*',
 ];
 
 /**

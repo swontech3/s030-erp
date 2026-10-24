@@ -47,6 +47,25 @@ export interface CompanyScope {
    * 예외가 아니라 0건이다(ORG_ARCHITECTURE.md §1-2).
    */
   companyId: string | null;
+  /**
+   * 삐용 단체 ID(`ErpSession.s020OrgId`) — **법무 표(S04)가 이것으로 갈린다**(037).
+   *
+   * ★ 법무의 손님에는 비입주사가 있다. 비입주사는 `companyId` 가 null 이라 회사 번호로는
+   *   가를 수 없고, 입주사·비입주사가 공통으로 가진 것은 삐용 단체 ID 뿐이다.
+   * ★ **생략하면 빈 스코프다** — 법무 표에서 아무것도 안 보인다(fail-closed). 기존 라우트
+   *   (`scopeOf` 들)는 법무 표를 읽지 않으므로 넣지 않아도 된다. 법무를 읽는 라우트는
+   *   `scopeOfSession` 으로 만든다.
+   */
+  orgId?: number | null;
+}
+
+/** 세션 → 스코프. 회사 번호와 단체 ID 를 **함께** 싣는다 — 법무 라우트는 이것을 쓴다. */
+export function scopeOfSession(session: {
+  role: ScopeRole;
+  companyId: string | null;
+  s020OrgId: number;
+}): CompanyScope {
+  return { role: session.role, companyId: session.companyId, orgId: session.s020OrgId };
 }
 
 /**
@@ -61,6 +80,12 @@ export async function applyCompanyScope(client: ScopedClient, scope: CompanyScop
   // nullif(..., '') 로 감싸고 있다.
   if (scope.role !== 'operator') {
     await client.query(`SELECT set_config('app.current_company_id', $1, true)`, [scope.companyId ?? '']);
+    // ★ 단체 ID 도 같은 규칙이다 — 없으면 빈 문자열, erp_current_org_id() 가 NULL 로 읽는다.
+    //   정수가 아닌 값은 여기서 막는다. DB 의 ::integer 캐스트가 실패해도 닫힌 쪽이지만,
+    //   그러면 원인이 「쿼리 오류」로 보인다.
+    const orgId = scope.orgId;
+    const orgValue = typeof orgId === 'number' && Number.isSafeInteger(orgId) ? String(orgId) : '';
+    await client.query(`SELECT set_config('app.current_org_id', $1, true)`, [orgValue]);
   }
 }
 

@@ -1,0 +1,393 @@
+/*
+ * 표양식 관리(s030100020) — 이 화면에만 있는 모양.
+ *
+ * ★ 틀(머리 · 왼쪽 420px 목록 · 오른쪽 패널 · 표 · 작은 버튼 · 딱지)은 **코드 관리의
+ *   `codes.module.css` 를 그대로 쓴다**(사용자 지시 「모양은 다른 ERP 화면과 같게」).
+ *   여기에는 그 파일에 없는 것만 둔다 — 입력칸 열 · 미리보기 상자 · 편집기.
+ */
+
+/* ── 목록 화면 · 오른쪽 ─────────────────────────────────────────────────── */
+
+.panelMeta {
+  margin: 4px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-caption);
+}
+
+/* 입력칸(왼쪽) + 미리보기(오른쪽). */
+.work {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 16px;
+}
+
+.fields {
+  width: 280px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fieldsHead {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+}
+
+.fieldsBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  color: var(--text-muted);
+}
+
+.fieldKey {
+  margin-left: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 400;
+  color: var(--text-caption);
+}
+
+.note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-caption);
+}
+
+.preview {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 20px;
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+}
+
+.tip {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-caption);
+}
+
+/* ── 편집 페이지 ────────────────────────────────────────────────────────── */
+
+.editPage {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 560px;
+}
+
+.editHead {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* 제목 옆 저장 상태 — 같은 줄에 붙는다(2026-10-11). 글자가 바뀌어도 세로 자리는 그대로다. */
+.editTitleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.editNote {
+  font-size: 12px;
+  color: var(--text-caption);
+}
+
+.editNoteDirty {
+  color: var(--color-warning-text);
+}
+
+.editInfo {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 180px minmax(0, 3fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.editBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.toolSep {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--border);
+}
+
+.toolLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.toolNum {
+  width: 56px;
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-heading);
+}
+
+.pageTab {
+  min-width: 30px;
+  justify-content: center;
+}
+
+.pageTabOn {
+  background: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: var(--text-on-primary) !important;
+}
+
+.editMain {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.canvas {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 24px;
+  background: var(--surface-alt);
+}
+
+.side {
+  width: 300px;
+  flex: 0 0 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-left: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.box {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.boxTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.small {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  color: var(--text-muted);
+}
+
+.sideInput {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-heading);
+  box-sizing: border-box;
+}
+
+.sideInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.sideTextarea {
+  composes: sideInput;
+  height: auto;
+  min-height: 72px;
+  padding: 6px 8px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.seg {
+  display: flex;
+  gap: 4px;
+}
+
+.seg > button {
+  flex: 1;
+  justify-content: center;
+}
+
+.segOn {
+  background: var(--color-accent-bg) !important;
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-body);
+}
+
+.sideEmpty {
+  margin: 0;
+  padding: 16px 0;
+  font-size: 13px;
+  color: var(--text-caption);
+  text-align: center;
+}
+
+/* ── 편집 칸 ── 종이 모양은 `form-doc.module.css` 그대로, 고르기·바로 쓰기만 더한다 ── */
+
+.grid {
+  user-select: none;
+  cursor: crosshair;
+}
+
+.cellSel {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  background-color: var(--color-accent-bg) !important;
+}
+
+/*
+ * ★ 칸 안에서 바로 쓰는 입력 — 편집기 화면에만 있다(종이에는 나가지 않는다).
+ *   `position: relative` 를 칸에 주지 않고 **입력이 칸을 채우는** 방식으로 둔다 —
+ *   표에 절대위치를 섞으면 병합 칸의 높이 계산이 브라우저마다 다르다.
+ */
+.inlineEdit {
+  display: block;
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  resize: none;
+  border: 2px solid var(--color-primary);
+  background: #fff;
+  font: inherit;
+  padding: 0 2px;
+  outline: none;
+}
+
+/* ── 양식 편집 · 법무 표시(5-3) ── 한 줄 띠(2026-10-11). 도구 막대와 같은 꼴(12px 이름 · 30px 칸 · 가는 칸막이) ── */
+
+.legalBox {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.legalSep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+}
+
+.legalLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.legalSelect {
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-heading);
+}
+
+.legalProblem {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-danger);
+}

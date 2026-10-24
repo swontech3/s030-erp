@@ -109,7 +109,11 @@ export class BbiyongReloginRequiredError extends BbiyongAuthError {
  *   URL 을 그대로 붙여 던지고, `/re-issue` 의 URL 에는 토큰 2개가 쿼리스트링으로 실려 있다.
  */
 export class BbiyongUnavailableError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    /** 삐용이 HTTP 비정상(401 밖)으로 답했을 때 그 상태. 못 붙었거나 본문이 깨졌으면 없다. */
+    readonly httpStatus?: number,
+  ) {
     super(message);
     this.name = 'BbiyongUnavailableError';
   }
@@ -162,7 +166,19 @@ export interface BbiyongAuth {
    *   실패하면 `BbiyongReloginRequiredError` 를 던진다(되살릴 방법이 없다).
    */
   reIssue(accessToken: string, refreshToken: string): Promise<string>;
+
+  /**
+   * 내 메뉴(`GET /s021000000/my-menus`, 연동규격 §1-5) — **받은 토큰 그대로** 부른다.
+   * 법무 회사 정보 「받기」가 삐용이 실어 온 토큰을 확인하는 자리다(2026-10-23).
+   *
+   * ★ 재발급하지 않는다 — ERP 가 가진 토큰이 아니다. 만료 · 무효(401)와 삐용의 업무 거절은
+   *   `rejected` 다. 연결 · 규격 문제는 `BbiyongUnavailableError` 를 던진다.
+   */
+  myMenus(accessToken: string): Promise<MyMenusOutcome>;
 }
+
+/** 내 메뉴 결과 — `ok` 면 삐용 화면코드 목록(대문자 그대로). */
+export type MyMenusOutcome = { kind: 'ok'; screens: string[] } | { kind: 'rejected' };
 
 /** 동작 어휘 4종 — ACL-10. APPROVE·EXPORT 는 쓰지 않는다. 런타임 검사와 타입이 한 원천이다. */
 export const ACL_ACTIONS = ['VIEW', 'CREATE', 'UPDATE', 'DELETE'] as const;
@@ -239,7 +255,9 @@ export interface BbiyongAcl {
  *     등록되고 세금계산서·계약서에 인쇄된다. **수정 API 도 없어 되돌릴 수 없다.**
  *   · `telNo`(회사 전화) — ERP 계약 폼에 전화 칸이 「연락처」 하나뿐이고 그것이
  *     대표 휴대전화(`hpNo`)다. 같은 값을 두 칸에 보내지 않는다. 선택 항목이다.
- *   · `pwd`·`org_tp`·`member_tp`·`mailAgentYn`·`bizNumber` — `NEVER_SENT` 참조.
+ *   · `pwd`·`org_tp`·`member_tp`·`mailAgentYn` — `NEVER_SENT` 참조.
+ *   · `bizNumber` · 법인번호 · 업태 · 종목 — 등록에는 싣지 않고 회사 수정으로만 보낸다
+ *     (sink `erp+patch`, 결정 2026-10-23 · `BbiyongOrgPatch`).
  */
 export interface BbiyongOrgRequest {
   orgName: string;
@@ -349,20 +367,103 @@ export type OrgOpOutcome =
   /** `message` 는 **운영자에게 그대로 보여줄 문구**다. */
   | { kind: 'rejected'; message: string; retryable: boolean };
 
-/** 삐용 회사 수정 — 보내는 칸은 이 둘뿐이다. ★ 주소 3칸은 **일부러 없다**(constants.ts). */
+/**
+ * 입주사 회사 정보 → 삐용 회사 수정(`erp-patch-org`, 결정 2026-10-23) — 회사명 · 사업자번호 · 법인번호 ·
+ * 업태 · 종목. 번호는 **숫자만** 싣는다(삐용 회신 2026-10-23).
+ *
+ * ★★★ 주소 3칸은 **일부러 없다**(constants.ts) — ERP 계약 폼의 주소는 대표자 자택이다.
+ * ★★ 값이 없는 칸은 **칸째 뺀다**(`undefined`). 빈 문자열(`""`)로 보내면 삐용 값이 지워진다 —
+ *    되돌릴 수 없다. 운영자가 칸을 비워 저장해도 보내지 않는다(결정 2026-10-23).
+ * ★ ERP 칸 → 이 모양은 `companies/companyOrgSync.ts` 한 곳에서 만든다.
+ */
 export interface BbiyongOrgPatch {
   orgCode: string;
-  orgName: string;
+  orgName?: string;
+  bizNumber?: string;
+  corpNumber?: string;
+  businessType?: string;
+  businessItem?: string;
 }
+
+/**
+ * 법무 비입주사 회사 정보 → 삐용 회사 수정(같은 `erp-patch-org`, 결정 2026-10-22).
+ * 맞추는 것은 **본점 주소 3칸 · 사업자번호 · 법인번호**뿐이다. 회사명 · 업태 · 종목은 보내지 않는다.
+ *
+ * ★★ 값이 없는 칸은 **칸째 뺀다**(`undefined`). 빈 문자열(`""`)로 보내면 삐용에 들어 있는 값이
+ *    지워진다(`patchOrg` 머리말과 같은 경고) — 되돌릴 수 없다.
+ * ★ 주소는 법무의 **본점**(`head_*`)이다. 대표자 자택(`ceo_*`)을 여기 넣지 않는다.
+ * ★ 법무 칸 → 이 모양은 `legal/legalOrgSync.ts` 한 곳에서 만든다(번호 모양도 거기서 정한다).
+ */
+export interface BbiyongOrgLegalPatch {
+  orgCode: string;
+  zipCode?: string;
+  address?: string;
+  detailAddress?: string;
+  bizNumber?: string;
+  corpNumber?: string;
+}
+
+// =============================================================================
+// 단체 조회 — 법무 서비스(S04)의 공용 회사 조회 팝업이 쓴다 (2026-10-09)
+// =============================================================================
+
+/**
+ * 삐용 단체 한 곳. **조회 결과로만 쓰고 ERP DB 에 복사하지 않는다** — 회사 정본은 삐용 단체다.
+ *
+ * ★★ 삐용 단체 조회 API **규격이 아직 없다.** 이 모양은 ERP 가 필요한 것을 먼저 적은 것이고,
+ *    규격이 오면 `HttpBbiyongOrg` 가 그 응답을 이 모양으로 옮긴다.
+ */
+export interface BbiyongOrgInfo {
+  orgId: number;
+  orgCode: string;
+  orgName: string;
+  /** 대표자명. 삐용이 안 주면 null. */
+  repName: string | null;
+  /**
+   * 단체 상태. ★ **어휘가 정해지지 않았다**(규격 없음) — 해석하지 않고 그대로 보여 준다.
+   *   규격이 오면 그때 코드로 묶는다.
+   */
+  status: string | null;
+}
+
+/**
+ * 목록 조건. ★ 결과는 **「법무 서비스를 받은 회사」** 다(삐용 회신 2026-10-09) — 거르는 것은
+ * 삐용 몫이고 ERP 는 받은 목록을 그대로 보여 준다. 단체코드 대역(Z 등)으로 거르지 않는다.
+ */
+export interface BbiyongOrgSearch {
+  /** 회사명 일부. 빈 문자열이면 받은 목록 전부. */
+  name: string;
+}
+
+/** 단건 조건 — 단체 ID 또는 단체코드 하나. */
+export type BbiyongOrgKey = { orgId: number } | { orgCode: string };
+
+/**
+ * 조회 결과.
+ *
+ * ★ `unsupported` 는 **장애가 아니다** — 「삐용에 그 API 가 아직 없다」이다. 장애
+ *   (`BbiyongUnavailableError`)로 던지면 화면에 「인증 서버에 연결할 수 없습니다」가 떠서
+ *   삐용이 꺼진 것처럼 읽힌다.
+ */
+export type OrgLookupOutcome<T> =
+  | { kind: 'ok'; value: T }
+  /** `message` 는 운영자에게 그대로 보여줄 문구다. */
+  | { kind: 'unsupported'; message: string };
 
 export interface BbiyongOrg {
   createOrg(req: BbiyongOrgRequest, accessToken: string): Promise<CreateOrgOutcome>;
+  /** 단체 목록 — 회사명 검색, 법무 서비스를 받은 회사(`BbiyongOrgSearch`). */
+  listOrgs(search: BbiyongOrgSearch, accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo[]>>;
+  /** 단체 한 곳 — 없으면 `value: null`. */
+  getOrg(key: BbiyongOrgKey, accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo | null>>;
   /** 퇴실 — OFFICE 구독을 끈다. 계약이 종료될 때. */
   moduleOff(orgCode: string, accessToken: string): Promise<OrgOpOutcome>;
   /** 재입주 — OFFICE 구독을 다시 켠다. ★ 회사를 다시 만들지 않는다. */
   moduleOn(orgCode: string, accessToken: string): Promise<OrgOpOutcome>;
   /** 회사명 수정. ★ 주소는 보내지 않는다. */
   patchOrg(patch: BbiyongOrgPatch, accessToken: string): Promise<OrgOpOutcome>;
+  /** 법무 비입주사 회사 정보 수정 — 본점 주소 · 사업자번호 · 법인번호, 값 있는 칸만(). */
+  patchOrgLegal(patch: BbiyongOrgLegalPatch, accessToken: string): Promise<OrgOpOutcome>;
   /** 직원정보 — 신규·수정·삭제. ★ 대표는 `U` 만 보낸다(`BbiyongMemberRequest`). */
   sendMember(req: BbiyongMemberRequest, accessToken: string): Promise<MemberOpOutcome>;
 }
@@ -392,9 +493,13 @@ export interface BbiyongMemberRequest {
    * 값의 출처는 `erp-member` 의 `I` 응답 또는 회사 등록 응답(대표)이다.
    */
   memberId?: number;
-  memberName: string;
+  /**
+   * ★ `I`·`D` 는 늘 싣는다. `U` 는 **바뀐 칸만 · 값이 있을 때만** 싣는다(결정 2026-10-23) — 없으면
+   *   칸째 뺀다(빈 문자열은 삐용 값을 지운다). `memberName`·`email`·`hpNo` 셋 다 같은 규칙이다.
+   */
+  memberName?: string;
   /** 로그인 아이디다. ★ 겹치면 삐용이 거절한다 — 그 문구를 운영자에게 그대로 보인다. */
-  email: string;
+  email?: string;
   /** 연락처. 선택 항목이고 **숫자만** 보낸다(회사 등록의 `hpNo` 와 같은 규칙). */
   hpNo?: string;
   /** 대표여부. ★ `I` 에서만 쓴다. ERP 가 보내는 `I` 는 직원뿐이라 늘 `'N'` 이다. */

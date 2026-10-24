@@ -22,15 +22,41 @@
  * ★ 같은 프로세스 안에서는 두 번째 등록이 같은 코드를 쓰면 실제로 중복을 돌려준다
  *   (아래 `#byCode`). 재기동하면 비어 있다 — 진실원은 ERP DB 쪽 `link_org_code` 다.
  */
+import { MOCK_ACCOUNTS } from './MockBbiyongAuth.ts';
 import type {
   BbiyongMemberRequest,
   BbiyongOrg,
+  BbiyongOrgInfo,
+  BbiyongOrgKey,
+  BbiyongOrgLegalPatch,
   BbiyongOrgPatch,
   BbiyongOrgRequest,
+  BbiyongOrgSearch,
   CreateOrgOutcome,
   MemberOpOutcome,
+  OrgLookupOutcome,
   OrgOpOutcome,
 } from './types.ts';
+
+/**
+ * 모의 단체 상태. ★ 삐용 단체 조회 규격이 없어 **어휘가 정해지지 않았다**(`BbiyongOrgInfo.status`).
+ *   화면은 해석하지 않고 그대로 보여 준다.
+ */
+const MOCK_ORG_STATUS = '정상';
+
+/**
+ * 로그인 모의 계정 중 **회사 단체**(단체코드를 적은 것). 단체 조회가 이것을 돌려준다.
+ * ★ 여기 다시 적지 않는다 — `MockBbiyongAuth` 의 계정표 한 곳에서 끌어온다.
+ */
+function seededOrgs(): BbiyongOrgInfo[] {
+  return MOCK_ACCOUNTS.filter((a) => a.orgCode !== undefined).map((a) => ({
+    orgId: a.orgId,
+    orgCode: a.orgCode as string,
+    orgName: a.orgName,
+    repName: a.memberName,
+    status: MOCK_ORG_STATUS,
+  }));
+}
 
 /**
  * mock org_id 의 기준값. 실제 번호는 `기준값 + 단체코드의 숫자` 다 — `Z01` → 9101.
@@ -105,6 +131,17 @@ export class MockBbiyongOrg implements BbiyongOrg {
     return MOCK_MEMBER_ID_BASE + 1000 + (hash % 90_000);
   }
 
+  /**
+   * 이 프로세스가 만든 회사의 조회용 정보 — 코드 → 단체. 단체 조회가 모의 계정 단체와 함께 돌려준다.
+   * ★ 재기동하면 비어 있다(`#byCode` 와 같다). 진실원은 삐용이고, 여기는 대역이다.
+   */
+  readonly #createdInfo = new Map<string, BbiyongOrgInfo>();
+
+  /** 조회 대상 전부 — 모의 계정 단체 + 이 프로세스가 만든 회사. */
+  #directory(): BbiyongOrgInfo[] {
+    return [...seededOrgs(), ...this.#createdInfo.values()];
+  }
+
   /** 이 프로세스가 아는 코드인가. 모르면 중복 판정을 하지 않는다(위 주석). */
   #known(orgCode: string): boolean {
     return this.#byCode.has(orgCode);
@@ -118,6 +155,11 @@ export class MockBbiyongOrg implements BbiyongOrg {
     if (!/^[A-Za-z0-9]{3}$/.test(req.orgCode)) {
       return { kind: 'rejected', message: '단체코드가 규격에 맞지 않습니다', retryable: false };
     }
+    // ★ ERP 등록 주소(erp-register-org)는 Z 코드만 받는다(삐용 회신 2026-10-14).
+    //   거절 문구는 회신에 적힌 문장 그대로 둔다.
+    if (!req.orgCode.startsWith('Z')) {
+      return { kind: 'rejected', message: 'Z 로 시작하는 단체코드는 시스템 예약 코드입니다', retryable: false };
+    }
     for (const [key, value] of [
       ['회사명', req.orgName],
       ['대표자명', req.memberName],
@@ -130,12 +172,14 @@ export class MockBbiyongOrg implements BbiyongOrg {
     }
 
     const existing = this.#byCode.get(req.orgCode);
-    if (existing !== undefined) {
+    // ★ 모의 계정 단체(Z97~Z99)의 코드도 「이미 있음」이다 — 삐용이라면 그렇게 답한다.
+    //   ERP 채번이 다음 번호로 넘어간다.
+    if (existing !== undefined || seededOrgs().some((o) => o.orgCode === req.orgCode)) {
       // ★ orgId 를 결과에 담지 않는다 — 호출자가 그것을 쓰면 안 되는 값이다(types.ts).
       return { kind: 'duplicate_code', orgCode: req.orgCode };
     }
 
-    // ★ 코드에서 유도한다(위 주석). `Z01` → 9101. ERP 코드가 아니면 뒤 2자리를 그대로 쓴다.
+    // ★ 코드에서 유도한다(위 주석). `Z01` → 9101. 숫자가 아니면 기준값 그대로다.
     const orgId = MOCK_ORG_ID_BASE + (Number(req.orgCode.slice(1)) || 0);
     this.#byCode.set(req.orgCode, orgId);
     /*
@@ -146,6 +190,13 @@ export class MockBbiyongOrg implements BbiyongOrg {
      */
     const repMemberId = MOCK_MEMBER_ID_BASE + 100 + (Number(req.orgCode.slice(1)) || 0);
     this.#repByCode.set(req.orgCode, repMemberId);
+    this.#createdInfo.set(req.orgCode, {
+      orgId,
+      orgCode: req.orgCode,
+      orgName: req.orgName,
+      repName: req.memberName,
+      status: MOCK_ORG_STATUS,
+    });
     // ★ 등록은 OFFICE 를 켠 상태로 만든다 — moduleCodes 에 OFFICE 를 보내기 때문이다.
     if (req.moduleCodes.includes('OFFICE')) this.#officeOn.add(req.orgCode);
     // ★ 평문 로그에 이메일·전화를 남기지 않는다. 남는 것은 코드와 번호뿐이다.
@@ -175,14 +226,62 @@ export class MockBbiyongOrg implements BbiyongOrg {
     return { kind: 'ok' };
   }
 
-  /** 회사명 수정. ★ 주소 칸은 애초에 인터페이스에 없다(`BbiyongOrgPatch`). */
+  /**
+   * 입주사 회사 수정 — 실물과 같이 **값 있는 칸만** 받는다(결정 2026-10-23). ★ 주소 칸은 애초에
+   * 인터페이스에 없다(`BbiyongOrgPatch`).
+   * ★ 빈 문자열이 실려 오면 거부한다 — 실물에서는 삐용 값이 지워지는 사고다. 만드는 쪽
+   *   (`companies/companyOrgSync.ts`)이 빼야 하므로, 여기 걸리면 그쪽 결함이다.
+   */
   async patchOrg(patch: BbiyongOrgPatch, _accessToken: string): Promise<OrgOpOutcome> {
-    if (!patch.orgName.trim()) {
-      return { kind: 'rejected', message: '회사명이 비어 있어 삐용에 반영할 수 없습니다', retryable: false };
+    const { orgCode, ...fields } = patch;
+    const keys = Object.keys(fields).filter((k) => fields[k as keyof typeof fields] !== undefined);
+    if (keys.some((k) => fields[k as keyof typeof fields]!.trim() === '')) {
+      return { kind: 'rejected', message: '빈 값이 실려 와 삐용에 반영하지 않았습니다', retryable: false };
     }
-    // ★ 회사명은 로그에 남겨도 되는 값이다(공개 정보). 이메일·전화는 여기 오지 않는다.
-    console.log(`[bbiyong] MOCK 회사 수정 — orgCode=${patch.orgCode}`);
+    // ★ 칸 이름만 남긴다 — 번호 값은 로그에 두지 않는다.
+    console.log(`[bbiyong] MOCK 회사 수정 — orgCode=${orgCode} [${keys.join(',')}]`);
+    // 조회에 바뀐 이름이 보여야 한다 — 이 프로세스가 만든 회사만 들고 있다.
+    const info = this.#createdInfo.get(orgCode);
+    if (info && patch.orgName !== undefined) this.#createdInfo.set(orgCode, { ...info, orgName: patch.orgName });
     return { kind: 'ok' };
+  }
+
+  /**
+   * 법무 회사 수정 — 실물과 같이 **값 있는 칸만** 받는다(결정 2026-10-22).
+   * ★ 빈 문자열이 실려 오면 거부한다 — 실물에서는 삐용 값이 지워지는 사고다. 만드는 쪽
+   *   (`legal/legalOrgSync.ts`)이 빼야 하므로, 여기 걸리면 그쪽 결함이다.
+   * ★ 조회 모양(`BbiyongOrgInfo`)에 주소 · 번호 칸이 없어 들고 있지 않는다 — 칸 이름만 로그에 남긴다.
+   */
+  async patchOrgLegal(patch: BbiyongOrgLegalPatch, _accessToken: string): Promise<OrgOpOutcome> {
+    const { orgCode, ...fields } = patch;
+    const keys = Object.keys(fields).filter((k) => fields[k as keyof typeof fields] !== undefined);
+    if (keys.some((k) => fields[k as keyof typeof fields]!.trim() === '')) {
+      return { kind: 'rejected', message: '빈 값이 실려 와 삐용에 반영하지 않았습니다', retryable: false };
+    }
+    console.log(`[bbiyong] MOCK 법무 회사 수정 — orgCode=${orgCode} [${keys.join(',')}]`);
+    return { kind: 'ok' };
+  }
+
+  /**
+   * 단체 목록 — 회사명 일부로 찾는다(삐용 회신 2026-10-09).
+   * ★ 실물은 「법무 서비스를 받은 회사」만 준다 — 거르는 것은 삐용 몫이다. mock 은 자기가
+   *   아는 단체(모의 계정 + 이 프로세스가 만든 회사)를 **거르지 않고** 준다.
+   * ★ 대소문자·앞뒤 공백을 무시한다. 빈 검색어는 전부다. 코드 순으로 준다.
+   */
+  async listOrgs(search: BbiyongOrgSearch, _accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo[]>> {
+    const needle = search.name.trim().toLowerCase();
+    const value = this.#directory()
+      .filter((o) => needle === '' || o.orgName.toLowerCase().includes(needle))
+      .sort((a, b) => a.orgCode.localeCompare(b.orgCode));
+    return { kind: 'ok', value };
+  }
+
+  /** 단체 한 곳 — 단체 ID 또는 단체코드. 없으면 null. */
+  async getOrg(key: BbiyongOrgKey, _accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo | null>> {
+    const found = this.#directory().find((o) =>
+      'orgId' in key ? o.orgId === key.orgId : o.orgCode === key.orgCode.trim().toUpperCase(),
+    );
+    return { kind: 'ok', value: found ?? null };
   }
 
   /**
@@ -203,7 +302,8 @@ export class MockBbiyongOrg implements BbiyongOrg {
       ['성명', req.memberName],
       ['이메일', req.email],
     ] as const) {
-      if (!value) {
+      // ★ `U` 는 바뀐 칸만 실려 온다(결정 2026-10-23) — 없는 칸은 「안 바꿈」이다. 빈 문자열은 거부한다.
+      if (req.regTp === 'U' ? value !== undefined && value.trim() === '' : !value) {
         return { kind: 'rejected', message: `${key}이(가) 없어 삐용에 보낼 수 없습니다`, retryable: false };
       }
     }
@@ -213,8 +313,9 @@ export class MockBbiyongOrg implements BbiyongOrg {
         return { kind: 'rejected', message: '대표는 회사 등록으로만 만들 수 있습니다', retryable: false };
       }
       // ★ 이메일 겹침 — 삐용은 이메일을 로그인 아이디로 쓴다. 이 프로세스가 아는 범위에서만 본다.
+      const email = req.email ?? '';
       for (const [id, m] of this.#members) {
-        if (m.email.toLowerCase() === req.email.toLowerCase()) {
+        if (m.email.toLowerCase() === email.toLowerCase()) {
           return {
             kind: 'rejected',
             message: `이미 사용중인 이메일입니다(회원번호 ${id}). 다른 이메일을 입력해 주세요`,
@@ -222,8 +323,8 @@ export class MockBbiyongOrg implements BbiyongOrg {
           };
         }
       }
-      const memberId = this.#memberIdFor(req.email);
-      this.#members.set(memberId, { orgCode: req.orgCode, email: req.email });
+      const memberId = this.#memberIdFor(email);
+      this.#members.set(memberId, { orgCode: req.orgCode, email });
       console.log(`[bbiyong] MOCK 직원 등록 — orgCode=${req.orgCode} memberId=${memberId}`);
       return { kind: 'created', memberId };
     }
@@ -250,7 +351,7 @@ export class MockBbiyongOrg implements BbiyongOrg {
 
     // U — 대표도 이것만은 된다. ★ 이메일을 바꿨으면 들고 있는 값도 맞춘다(겹침 판정의 근거).
     const known = this.#members.get(req.memberId);
-    if (known) this.#members.set(req.memberId, { ...known, email: req.email });
+    if (known && req.email !== undefined) this.#members.set(req.memberId, { ...known, email: req.email });
     console.log(`[bbiyong] MOCK 직원 수정 — orgCode=${req.orgCode} memberId=${req.memberId}`);
     return { kind: 'ok' };
   }

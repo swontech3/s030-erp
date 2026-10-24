@@ -9,6 +9,7 @@
  */
 import { MEMBER_ROLE } from '@swonbiz/shared/domain/member-payload';
 import type { ScopedClient } from './withCompanyScope.ts';
+import type { MemberSyncField } from '../bbiyong/memberSync.ts';
 
 interface Rows<T> {
   rows: T[];
@@ -380,15 +381,15 @@ export interface ReplaceMembersResult {
   updated: number;
   deactivated: number;
   /**
-   * 삐용에 **보낼 것이 있는** 구성원들(ERP member_id).
+   * 삐용에 **보낼 것이 있는** 구성원들(ERP member_id) → **바뀐 칸들**(결정 2026-10-23 — `U` 는 바뀐 칸만).
    *
-   * ★ 새로 만든 행과, **이름·연락처·이메일 중 하나가 실제로 바뀐** 행이다. 비고만
+   * ★ 새로 만든 행(세 칸 모두)과, **이름·연락처·이메일 중 하나가 실제로 바뀐** 행이다. 비고만
    *   고친 저장은 여기 없다 — 삐용에 보내지 않는 값이다.
    * ★★ 이 목록은 `syncMembers` 의 `changed` 로 그대로 들어간다. 「무엇이 바뀌었나」를
    *    아는 자리는 저장을 한 이 함수뿐이다 — 삐용 쪽에 사본을 두지 않기 때문에
    *    나중에는 알 길이 없다(`link_*` 는 상태이고 값의 사본이 아니다).
    */
-  changed: string[];
+  changed: Map<string, Set<MemberSyncField>>;
 }
 
 /**
@@ -484,7 +485,7 @@ export async function replaceMembers(
 
   const keep: string[] = [];
   /** 삐용에 `U` 를 보내야 하는 행들 — 이름·연락처·이메일 중 하나가 **실제로** 바뀐 행. */
-  const changed: string[] = [];
+  const changed = new Map<string, Set<MemberSyncField>>();
   let inserted = 0;
   let updated = 0;
 
@@ -514,9 +515,11 @@ export async function replaceMembers(
          *    모를 때는 보내는 쪽으로 틀린다 — 안 보내면 어긋남이 남는다.
          */
         const was = before.get(m.memberId);
-        if (!was || was.name !== m.name || was.phone !== m.phone || was.email !== m.email) {
-          changed.push(m.memberId);
-        }
+        const fields = new Set<MemberSyncField>();
+        if (!was || was.name !== m.name) fields.add('name');
+        if (!was || was.phone !== m.phone) fields.add('phone');
+        if (!was || was.email !== m.email) fields.add('email');
+        if (fields.size > 0) changed.set(m.memberId, fields);
         continue;
       }
       // 없는 id 가 올라왔다 — 새로 만든다. 조용히 버리면 입력이 사라진다.
@@ -534,7 +537,7 @@ export async function replaceMembers(
     keep.push(id);
     inserted += 1;
     // ★ 새 행은 당연히 바뀐 것이다. 삐용 번호도 없으므로 `I` 로 나간다.
-    changed.push(id);
+    changed.set(id, new Set<MemberSyncField>(['name', 'phone', 'email']));
   }
 
   const res = await q(
@@ -953,4 +956,146 @@ export async function listPendingLinks(client: ScopedClient): Promise<PendingLin
       ORDER BY link_failed_at NULLS FIRST`,
   );
   return rows;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   삐용 → ERP 「받기」(2026-10-23) — 회사 · 직원
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 받은 칸만 바꾼다. 줄이 없으면 만들지 않는다. 판정(누가 불렀는가 · 칸 모양)은
+     `companies/companyReceive.ts` · `companies/memberReceive.ts` 가 한다.
+   ★★ 여기서 삐용에 다시 보내지 않는다 — 부르는 쪽도 보내지 않는다(되돌아가기 방지).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** 삐용 단체 ID 로 입주사 — 연결된 회사만 있다(`link_s020_org_id` UNIQUE). 없으면 null. */
+export async function findCompanyIdByOrgId(client: ScopedClient, orgId: number): Promise<string | null> {
+  const { rows } = await q<{ company_id: string }>(
+    client,
+    `SELECT company_id FROM public.tb_s080_companies WHERE link_s020_org_id = $1`,
+    [orgId],
+  );
+  return rows[0]?.company_id ?? null;
+}
+
+/** 삐용에서 받는 회사 칸 — 회사명 · 사업자번호 · 법인번호 · 업태 · 종목(주소는 받지 않는다). */
+export interface CompanyFromBbiyong {
+  companyName?: string;
+  bizNumber?: string;
+  corpNumber?: string;
+  businessType?: string;
+  businessItem?: string;
+}
+
+const COMPANY_FROM_BBIYONG_COLUMNS: Readonly<Record<keyof CompanyFromBbiyong, string>> = {
+  companyName: 'company_name',
+  bizNumber: 'biz_number',
+  corpNumber: 'corp_number',
+  businessType: 'business_type',
+  businessItem: 'business_item',
+};
+
+/**
+ * 받은 칸만 바꾼다. 칸이 하나도 없으면 부르지 않는다.
+ * ★ `biz_number` 는 UNIQUE 다 — 남의 번호면 23505 를 던진다(부르는 쪽이 409 로 바꾼다).
+ * @returns 바뀐 줄 수(0 또는 1)
+ */
+export async function patchCompanyFromBbiyong(
+  client: ScopedClient,
+  args: { companyId: string; fields: CompanyFromBbiyong; actor: string },
+): Promise<number> {
+  const keys = (Object.keys(COMPANY_FROM_BBIYONG_COLUMNS) as (keyof CompanyFromBbiyong)[]).filter(
+    (k) => args.fields[k] !== undefined,
+  );
+  if (keys.length === 0) throw new Error('patchCompanyFromBbiyong — 바꿀 칸이 없다');
+  const sets = keys.map((k, i) => `${COMPANY_FROM_BBIYONG_COLUMNS[k]} = $${i + 3}`);
+  const { rowCount } = await q(
+    client,
+    `UPDATE public.tb_s080_companies
+        SET ${sets.join(', ')}, updated_at = now(), updated_by = $2
+      WHERE company_id = $1`,
+    [args.companyId, args.actor, ...keys.map((k) => args.fields[k])],
+  );
+  return rowCount ?? 0;
+}
+
+/** 삐용 회원번호로 구성원 한 줄 — `link_s020_member_id` 는 UNIQUE 다(035). 없으면 null. */
+export interface MemberByLink {
+  member_id: string;
+  company_id: string;
+  is_representative: string | null;
+  status: string;
+}
+
+export async function findMemberByLinkId(client: ScopedClient, linkMemberId: number): Promise<MemberByLink | null> {
+  const { rows } = await q<MemberByLink>(
+    client,
+    `SELECT member_id, company_id, is_representative, status
+       FROM public.tb_s080_members
+      WHERE link_s020_member_id = $1`,
+    [linkMemberId],
+  );
+  return rows[0] ?? null;
+}
+
+/** 같은 회사의 **다른 활성** 구성원이 이 이메일을 쓰는가 — 대소문자 · 앞뒤 공백은 같게 본다. */
+export async function isMemberEmailTaken(
+  client: ScopedClient,
+  args: { companyId: string; memberId: string; email: string },
+): Promise<boolean> {
+  const { rows } = await q<{ one: number }>(
+    client,
+    `SELECT 1 AS one FROM public.tb_s080_members
+      WHERE company_id = $1 AND member_id <> $2 AND status = 'active'
+        AND lower(btrim(COALESCE(email, ''))) = lower(btrim($3))
+      LIMIT 1`,
+    [args.companyId, args.memberId, args.email],
+  );
+  return rows.length > 0;
+}
+
+/** 삐용에서 받는 직원 칸 — 이름 · 이메일 · 연락처(하이픈 모양). */
+export interface MemberFromBbiyong {
+  name?: string;
+  email?: string;
+  phone?: string;
+}
+
+const MEMBER_FROM_BBIYONG_COLUMNS: Readonly<Record<keyof MemberFromBbiyong, string>> = {
+  name: 'name',
+  email: 'email',
+  phone: 'phone',
+};
+
+/**
+ * 받은 칸만 바꾼다. 칸이 하나도 없으면 부르지 않는다.
+ * ★ 연동 칸(`link_*`)은 건드리지 않는다 — 대기 사유는 ERP 가 보낸 일의 결과다.
+ */
+export async function patchMemberFromBbiyong(
+  client: ScopedClient,
+  args: { memberId: string; fields: MemberFromBbiyong; actor: string },
+): Promise<number> {
+  const keys = (Object.keys(MEMBER_FROM_BBIYONG_COLUMNS) as (keyof MemberFromBbiyong)[]).filter(
+    (k) => args.fields[k] !== undefined,
+  );
+  if (keys.length === 0) throw new Error('patchMemberFromBbiyong — 바꿀 칸이 없다');
+  const sets = keys.map((k, i) => `${MEMBER_FROM_BBIYONG_COLUMNS[k]} = $${i + 3}`);
+  const { rowCount } = await q(
+    client,
+    `UPDATE public.tb_s080_members
+        SET ${sets.join(', ')}, updated_at = now(), updated_by = $2
+      WHERE member_id = $1`,
+    [args.memberId, args.actor, ...keys.map((k) => args.fields[k])],
+  );
+  return rowCount ?? 0;
+}
+
+/** 회사 표의 대표자명(사본) — 활성 대표 직원의 이름을 삐용에서 받았을 때 맞춘다. */
+export async function updateCompanyCeoName(
+  client: ScopedClient,
+  args: { companyId: string; ceoName: string; actor: string },
+): Promise<void> {
+  await q(
+    client,
+    `UPDATE public.tb_s080_companies SET ceo_name = $2, updated_at = now(), updated_by = $3 WHERE company_id = $1`,
+    [args.companyId, args.ceoName, args.actor],
+  );
 }

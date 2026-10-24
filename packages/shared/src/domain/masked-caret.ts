@@ -54,3 +54,74 @@ export function caretForMasked({ raw, caret, masked, keep }: MaskedCaretArgs): n
   // ★ 마스크가 상한에서 잘라낸 경우(10자리 초과 등) — 남은 것의 끝에 둔다.
   return masked.length;
 }
+
+// =============================================================================
+// 숫자 마스크 — 사업자등록번호 · 법인등록번호 · 전화 (web 계약 폼에서 옮겨 왔다, 2026-10-10)
+// =============================================================================
+// ★ 화면(계약 폼 · 법무 상세)과 서버(법무 회사 정보 검사)가 **같은 함수**를 쓴다. 전에는
+//   web `features/contracts/form-model.ts` 에 있었다 — 서버가 쓸 수 없어서 옮겼다.
+// ★ 표시 형식이다. 저장된 DB 값을 고쳐 쓰지 않는다 — 읽어 보여 줄 때 씌울 뿐이다.
+
+export type DigitMaskKind = 'bizno' | 'corpno' | 'phone';
+
+/**
+ * 마스크 3종 — 시안 `maskValue`(`05-logic.md` §5) 그대로에 **서울 02** 를 더했다.
+ *
+ *   사업자등록번호 000-00-00000 · 법인등록번호 000000-0000000
+ *   전화  02  → 02-XXX-XXXX(9자리) / 02-XXXX-XXXX(10자리)
+ *         010 → 010-XXXX-XXXX
+ *         그 밖 → 3-3-4, 11자리면 3-4-4
+ *
+ * ★ 02 는 결함 수정이다(2026-10-10) — 전에는 `0212345678` 이 `021-234-5678` 로 끊겼다.
+ * ★ 0 으로 시작하지 않는 번호(1588 등 대표번호)는 규칙이 없다 — 「그 밖」으로 끊긴다
+ *   (`15881234` → `158-812-34`). 막지는 않는다(`isDigitMaskComplete`).
+ */
+export function maskValue(kind: DigitMaskKind, raw: string): string {
+  const max = kind === 'corpno' ? 13 : kind === 'phone' ? 11 : 10;
+  const d = raw.replace(/\D/g, '').slice(0, max);
+
+  if (kind === 'bizno') {
+    if (d.length > 5) return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`;
+    return d.length > 3 ? `${d.slice(0, 3)}-${d.slice(3)}` : d;
+  }
+  if (kind === 'corpno') {
+    return d.length > 6 ? `${d.slice(0, 6)}-${d.slice(6)}` : d;
+  }
+  if (d.startsWith('02')) {
+    const x = d.slice(0, 10);
+    const mid = x.length > 9 ? 6 : 5;
+    if (x.length > mid) return `${x.slice(0, 2)}-${x.slice(2, mid)}-${x.slice(mid)}`;
+    return x.length > 2 ? `${x.slice(0, 2)}-${x.slice(2)}` : x;
+  }
+  // 010 은 3-4-4, 그 외는 3-3-4
+  const mid = d.startsWith('010') || d.length > 10 ? 7 : 6;
+  if (d.length > mid) return `${d.slice(0, 3)}-${d.slice(3, mid)}-${d.slice(mid)}`;
+  return d.length > 3 ? `${d.slice(0, 3)}-${d.slice(3)}` : d;
+}
+
+/** 자릿수 규칙 — 칸 옆 안내 · 서버 오류 문구가 같이 쓴다. */
+export const DIGIT_MASK_RULE: Readonly<Record<DigitMaskKind, string>> = {
+  corpno: '숫자 13자리',
+  bizno: '숫자 10자리',
+  phone: '지역번호를 포함한 숫자(02 는 9~10자리, 010 은 11자리, 그 밖의 0XX 는 10~11자리)',
+};
+
+/**
+ * 자릿수가 맞는가 — 빈 값은 맞다(작성 중 임시 저장 · 칸을 비워 두는 회사가 있다).
+ * 숫자 · 하이픈 · 공백 말고 다른 글자가 있으면 틀리다.
+ *
+ * ★ 전화는 **0 으로 시작할 때만** 자릿수를 본다. 1588 같은 대표번호는 막지 않는다(결정 2026-10-10).
+ */
+export function isDigitMaskComplete(kind: DigitMaskKind, value: string | null | undefined): boolean {
+  const t = (value ?? '').trim();
+  if (t === '') return true;
+  if (/[^\d\s-]/.test(t)) return false;
+  const n = t.replace(/\D/g, '').length;
+  if (kind === 'corpno') return n === 13;
+  if (kind === 'bizno') return n === 10;
+  const d = t.replace(/\D/g, '');
+  if (d.startsWith('02')) return n === 9 || n === 10;
+  if (d.startsWith('010')) return n === 11;
+  if (d.startsWith('0')) return n === 10 || n === 11;
+  return true;
+}

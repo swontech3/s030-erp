@@ -11,7 +11,7 @@
  * 삐용도 DB 도 없이 돈다 — 저장소와 어댑터를 주입받는다.
  */
 import { describe, it, expect } from 'vitest';
-import { moduleOffOrg, moduleOnOrg, patchOrgName, type OrgLinkStore, type OrgLinkTarget } from './orgLink.ts';
+import { moduleOffOrg, moduleOnOrg, type OrgLinkStore, type OrgLinkTarget } from './orgLink.ts';
 import { MockBbiyongOrg } from './MockBbiyongOrg.ts';
 import { withFreshAccess, type AccessTokenStore } from './withFreshAccess.ts';
 import {
@@ -68,6 +68,17 @@ function opAdapter(outcome: OrgOpOutcome = { kind: 'ok' }): BbiyongOrg & { seen:
     // ★ 허시·재입주·수정은 직원정보를 부르지 않는다. 부르면 터진다.
     sendMember: async () => {
       throw new Error('★ 이 시험은 sendMember 를 부르지 않아야 한다');
+    },
+    // 법무 회사 수정은 ERP 입주사 연동과 무관하다. 부르면 터진다.
+    patchOrgLegal: async () => {
+      throw new Error('★ 이 시험은 patchOrgLegal 을 부르지 않아야 한다');
+    },
+    // 단체 조회는 퇴실·재입주·수정과 무관하다. 부르면 터진다.
+    listOrgs: async () => {
+      throw new Error('★ 이 시험은 listOrgs 를 부르지 않아야 한다');
+    },
+    getOrg: async () => {
+      throw new Error('★ 이 시험은 getOrg 를 부르지 않아야 한다');
     },
     moduleOff: async (orgCode) => {
       seen.push({ op: 'off', orgCode });
@@ -143,34 +154,6 @@ describe('재입주 — ② 회사를 다시 만들지 않는다', () => {
     const out = await moduleOnOrg(s, org, 'token');
     expect(out.kind).toBe('skipped');
     if (out.kind === 'skipped') expect(out.why).toContain('신규 등록');
-  });
-});
-
-describe('수정 — ③ 주소를 보내지 않는다', () => {
-  it('★★★ 보내는 칸은 orgCode · orgName 뿐이다 — 주소를 빈 문자열로도 보내지 않는다', async () => {
-    const s = store({ ...LINKED, liveContractCount: 1 });
-    const org = opAdapter();
-
-    await patchOrgName(s, org, 'token');
-
-    const body = org.seen[0]!.body!;
-    expect(Object.keys(body).sort()).toEqual(['orgCode', 'orgName']);
-    // ★ 빈 문자열로 보내면 삐용에 들어 있는 주소가 지워진다 — 칸 자체가 없어야 한다.
-    for (const key of ['zipCode', 'address', 'detailAddress', 'telNo']) {
-      expect(body, key).not.toHaveProperty(key);
-    }
-    expect(body.orgName).toBe('한성무역');
-  });
-
-  it('★ 회사명이 비면 보내지 않는다 — 삐용의 단체명을 지우는 셈이다', async () => {
-    const s = store({ ...LINKED, companyName: '   ' });
-    const org = opAdapter();
-
-    const out = await patchOrgName(s, org, 'token');
-
-    expect(out.kind).toBe('pending');
-    expect(org.seen).toEqual([]);
-    expect(s.pending[0]).toContain('회사명');
   });
 });
 
@@ -253,11 +236,19 @@ describe('MockBbiyongOrg — 두 번 보내면 거부한다 (삐용과 같게)',
     expect((await mock.moduleOn('Z77', 'tok')).kind).toBe('ok');
   });
 
-  it('수정은 회사명이 있으면 통과한다', async () => {
+  it('★ 입주사 회사 수정 — 값 있는 칸은 통과 · 빈 문자열이 실려 오면 거부한다(실물에서는 값이 지워진다)', async () => {
     const mock = new MockBbiyongOrg();
 
-    expect((await mock.patchOrg({ orgCode: 'Z01', orgName: '새이름' }, 'tok')).kind).toBe('ok');
+    expect((await mock.patchOrg({ orgCode: 'Z01', orgName: '새이름', bizNumber: '1058768687' }, 'tok')).kind).toBe('ok');
+    expect((await mock.patchOrg({ orgCode: 'Z01', businessType: '도매' }, 'tok')).kind).toBe('ok');
     expect((await mock.patchOrg({ orgCode: 'Z01', orgName: ' ' }, 'tok')).kind).toBe('rejected');
+  });
+
+  it('★ 법무 회사 수정 — 값 있는 칸은 통과 · 빈 문자열이 실려 오면 거부한다(실물에서는 값이 지워진다)', async () => {
+    const mock = new MockBbiyongOrg();
+
+    expect((await mock.patchOrgLegal({ orgCode: 'Z01', zipCode: '06097', bizNumber: '105-87-68687' }, 'tok')).kind).toBe('ok');
+    expect((await mock.patchOrgLegal({ orgCode: 'Z01', address: ' ' }, 'tok')).kind).toBe('rejected');
   });
 });
 
@@ -314,7 +305,10 @@ describe('퇴실·재입주 — ⑥ 토큰 만료는 재발급으로 이어진�
       createOrg: nope('createOrg') as BbiyongOrg['createOrg'],
       moduleOn: nope('moduleOn') as BbiyongOrg['moduleOn'],
       patchOrg: nope('patchOrg') as BbiyongOrg['patchOrg'],
+      patchOrgLegal: nope('patchOrgLegal') as BbiyongOrg['patchOrgLegal'],
       sendMember: nope('sendMember') as BbiyongOrg['sendMember'],
+      listOrgs: nope('listOrgs') as BbiyongOrg['listOrgs'],
+      getOrg: nope('getOrg') as BbiyongOrg['getOrg'],
       moduleOff: async (_orgCode, accessToken) => {
         tokens.push(accessToken);
         if (tokens.length === 1) throw new BbiyongTokenExpiredError('삐용 퇴실이 401');

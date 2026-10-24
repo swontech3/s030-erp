@@ -23,10 +23,19 @@ import { registerKioskRoutes } from './routes/kiosk.ts';
 import { registerInquiryRoutes } from './routes/inquiry.ts';
 import { registerInquiryAdminRoutes } from './routes/inquiryAdmin.ts';
 import { registerCompanyRoutes } from './routes/companies.ts';
+import { registerCompanyReceiveRoutes } from './routes/companyReceive.ts';
 import { registerFileRoutes } from './routes/files.ts';
 import { registerOcrRoutes } from './routes/ocr.ts';
 import { registerFacilityRoutes } from './routes/facility.ts';
 import { registerCodeRoutes } from './routes/codes.ts';
+import { registerFormTemplateRoutes } from './routes/formTemplates.ts';
+import { registerOrgLookupRoutes } from './routes/orgLookup.ts';
+import { registerCorpChangeRoutes } from './routes/corpChanges.ts';
+import { registerLegalOrgReceiveRoutes } from './routes/legalOrgReceive.ts';
+import { registerBizPurposeRoutes } from './routes/bizPurposes.ts';
+import { registerBizRecommendRoutes } from './routes/bizRecommend.ts';
+import { registerIncorporationRoutes } from './routes/incorporations.ts';
+import { registerDocFormSettingRoutes } from './routes/docFormSettings.ts';
 import { closePool } from './db/pool.ts';
 import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
 
@@ -117,6 +126,9 @@ registerInquiryRoutes(app);
 //   같은 파일에 두면 `config.public` 을 잘못 붙여 개인정보가 로그인 없이 열릴 수 있다.
 registerInquiryAdminRoutes(app);
 registerCompanyRoutes(app);
+// ★ 입주사 회사 · 직원 「받기」(삐용 → ERP, 2026-10-23) — ERP 세션 없이 삐용이 부른다(`config.public`).
+//   부르는 쪽 확인은 실어 온 삐용 토큰의 「내 메뉴」로 한다(`bbiyong/receiveCaller.ts`).
+registerCompanyReceiveRoutes(app);
 // ★ 첨부 서류(CONT-17). 회사 하위 경로라 입주사 라우트 **뒤에** 둔다 — 같은 접두사를
 //   쓰는 라우트는 등록 순서와 무관하지만, 읽는 사람이 묶어서 보게 한다.
 registerFileRoutes(app);
@@ -131,6 +143,30 @@ registerFacilityRoutes(app);
 // ★★ 소비용 조회는 `registerLookupRoutes` 의 `GET /codes` 다 — 경로가 겹치지 않게 이쪽은
 //    `/codes-admin/**` 를 쓴다. 같은 접두사를 쓰면 `/codes/:category` 가 `/codes` 를 가린다.
 registerCodeRoutes(app);
+// ★ 표양식 관리(s030100020) — 양식 등록·수정·삭제. **운영사 전용**. 등기 설정이 가리키는
+//   양식은 FK 가 없어 핸들러가 세어서 막는다(`db/formTemplates.ts` 머리말).
+registerFormTemplateRoutes(app);
+// ★ 공용 회사 조회(삐용 단체) — 법무 서비스(S04)가 처음 쓰는 팝업의 서버 쪽. **운영사 전용**.
+//   화면이 아니라 부품이라 화면 코드가 없다(`routes/orgLookup.ts` 머리말).
+registerOrgLookupRoutes(app);
+// ★ 법인변경(s040200010) — 운영사 · 회사가 함께 쓴다. 누가 무엇을 보는지는 RLS(037)가
+//   단체 ID 로 가른다(`routes/corpChanges.ts` 머리말). 목록(2단계) · 새 건 · 상세 · 임원(3단계).
+registerCorpChangeRoutes(app);
+// ★ 법무 회사 정보 「받기」(삐용 → 법무, 2026-10-23) — ERP 세션 없이 삐용이 부른다(`config.public`).
+//   부르는 쪽 확인은 실어 온 삐용 토큰의 「내 메뉴」로 한다(`legal/legalOrgReceive.ts` 머리말).
+registerLegalOrgReceiveRoutes(app);
+// ★ 사업목적 카탈로그(s040300010, 041) — 목록은 로그인한 모든 사용자(법인변경 상세의 고르기 팝업이
+//   부른다), 추가 · 고치기는 운영사만. 지우기는 없다(`routes/bizPurposes.ts` 머리말).
+registerBizPurposeRoutes(app);
+// ★ 사업목적 「추천」 탭(2026-10-22) — 읽기 전용 두 주소, 로그인한 모든 사용자. 업종 사전(047) · 「검토됨」
+//   인허가(049) · 근거 조문(048) · 카탈로그 문구를 읽는다(`routes/bizRecommend.ts` 머리말).
+registerBizRecommendRoutes(app);
+// ★ 법인설립(s040100010 · s040100020, 042) — 법인변경과 같은 모양 · 같은 전이 규칙. 운영사 · 회사가 함께 쓰고
+//   RLS 가 단체 ID 로 가른다. ERP 회사표에 쓰지 않는다(`routes/incorporations.ts` 머리말).
+registerIncorporationRoutes(app);
+// ★ 등기 설정(s040900010) — 운영사만(읽기도). 표에 RLS 가 없어 쓰기를 막는 것은 이 라우트다.
+//   기본 줄은 지우지 않고 사용 끔, 회사유형 줄만 지운다(`routes/docFormSettings.ts` 머리말).
+registerDocFormSettingRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,

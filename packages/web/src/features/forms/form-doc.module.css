@@ -1,0 +1,79 @@
+/*
+ * 표양식 문서 — 미리보기 · 인쇄 · 편집기가 같이 쓰는 종이 모양.
+ *
+ * ★★ 치수는 레거시 `S-WonERP/src/components/form-builder/print-css.ts` 와 **같다**
+ *    (A4 210×297mm · 위아래 12mm · 표 가운데 · 칸 테두리 1px 검정). 기존 양식 2건이
+ *    그 모양에 맞춰 그려져 있어서, 숫자를 바꾸면 이미 맞춰 둔 양식이 밀린다.
+ *
+ * ★ 인쇄는 이 파일이 아니라 `styles/print.css` 의 `form-doc` 규칙이 맡는다 — 다른 화면의
+ *   Ctrl+P 에 걸리지 않게 `body[data-printing]` 표시가 있을 때만 걸린다(계약서와 같다).
+ * ★ `position: absolute` 를 쓰지 않는다 — 흐름에서 빠지면 브라우저가 장을 나눌 높이를
+ *   잃는다(계약서에서 3장이 2장으로 잘린 적이 있다, `CONTRACT_DOCUMENTS.md`).
+ */
+
+.root {
+  color: #000;
+}
+
+.page {
+  width: 210mm;
+  min-height: 297mm;
+  box-sizing: border-box;
+  margin: 0 auto 16px;
+  padding: 12mm 0;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.page:last-child {
+  margin-bottom: 0;
+}
+
+.table {
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.td {
+  border: 1px solid #000;
+  padding: 0 2px;
+  font-weight: 400;
+  vertical-align: middle;
+  word-break: break-all;
+  white-space: pre-wrap;
+  /*
+   * ★ 줄 간격을 1.5 로 못 박는다 — 레거시 화면(Tailwind 기본 `line-height: 1.5`)과 같게.
+   *   ERP 본문 줄 간격(`--text-body-lh`)을 물려받으면 같은 양식의 행이 레거시와 다르게 밀린다.
+   */
+  line-height: 1.5;
+}
+
+.al { text-align: left; }
+.ac { text-align: center; }
+.ar { text-align: right; }
+.vt { vertical-align: top; }
+.vm { vertical-align: middle; }
+.vb { vertical-align: bottom; }
+
+/*
+ * ★ 아직 채우지 않은 자리표시 — **화면에만** 이름표를 흐리게 보인다.
+ *   종이에는 빈칸이다(인쇄 문서는 이 조각을 그리지 않는다, `FormDocument` 의 `showEmpty`).
+ */
+.empty {
+  color: var(--color-primary);
+  background: var(--color-accent-bg);
+  border-radius: 2px;
+  padding: 0 2px;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+/* ★ 화면에서는 숨긴다 — 인쇄 때만 `print.css` 가 꺼낸다. */
+.printOnly {
+  display: none;
+}

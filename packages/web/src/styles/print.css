@@ -327,3 +327,44 @@
     vertical-align: top !important;
   }
 }
+
+/* =============================================================================
+ * 표양식(s030100020) — `FormPrintPortal` 이 body 밑에 둔 문서만 종이에 낸다.
+ *
+ * ★ 계약서와 **같은 방식**이다(위 머리말 ①②) — 포털 + 형제 감추기, 절대위치 없음.
+ * ★ 표시 이름이 다르다(`form-doc`). 계약서 규칙과 섞이지 않게 따로 둔다.
+ * ★ 장 치수는 레거시 「양식관리」 인쇄 규칙(`print-css.ts`)과 같다 — A4 한 장에 한 `section`,
+ *   위아래 12mm, 장마다 `break-after: page`. 기존 양식 2건이 그 치수로 그려져 있다.
+ * ★ 화면에서는 포털이 숨어 있다(CSS 모듈 `printOnly`). 여기서 꺼낸다.
+ * ============================================================================= */
+@media print {
+  body[data-printing='form-doc'] {
+    margin: 0;
+    background: #ffffff;
+  }
+
+  body[data-printing='form-doc'] > *:not([data-print-portal='form-doc']) {
+    display: none !important;
+  }
+
+  body[data-printing='form-doc'] [data-print-portal='form-doc'] {
+    display: block !important;
+  }
+
+  body[data-printing='form-doc'] [data-form-page] {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  body[data-printing='form-doc'] [data-form-page]:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}

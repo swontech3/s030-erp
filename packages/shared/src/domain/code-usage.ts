@@ -60,7 +60,7 @@ export interface CodeUsageRef {
 }
 
 /**
- * 코드값이 실제로 저장되는 자리 — **9건** (2026-10-03 실측).
+ * 코드값이 실제로 저장되는 자리 — **13건** (2026-10-03 실측 9건 + 2026-10-07 표양식 1건 + 2026-10-10 법인변경 2건 + 법무 회사유형 1건).
  *
  * 각 줄은 「그 컬럼의 값이 이 (category, use_tp) 의 code 다」를 뜻한다. 앱 코드에서
  * 확인한 것만 적었다 — 값이 우연히 겹치는 컬럼은 넣지 않았다(머리말 ★).
@@ -112,6 +112,20 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
 
   // --- 문의상담 (s030500070 · s030200080) ---
   { category: 'QU_TP', useTp: '000', table: 'tb_s080_inquiries', column: 'type', label: '문의' },
+
+  // --- 표양식 (s030100020) — 2026-10-07 추가 ---
+  /** 양식 종류(표 · 일반서류). `domain/form-template.ts` 의 `FORM_KIND_CATEGORY`. */
+  { category: 'LAW_DOC_TP', useTp: '000', table: 'tb_s080_form_templates', column: 'kind', label: '표양식' },
+
+  // --- 법인변경 (s040200010) — 2026-10-10 추가. `domain/corp-change.ts` ---
+  { category: 'LAW_CNG_TP', useTp: '000', table: 'tb_s080_corp_changes', column: 'change_type', label: '법인변경' },
+  { category: 'LAW_PROG_ST', useTp: '000', table: 'tb_s080_corp_changes', column: 'status', label: '법인변경' },
+  /**
+   * 비입주사 회사유형(038, 2026-10-10) — 파티션 **002**(주식회사 · 유한회사). 입주사의 회원구분
+   * (`tb_s080_companies.member_type`, 000)과 칸 이름은 같지만 파티션이 다르다.
+   * `domain/corp-change-detail.ts` 의 `LEGAL_MEMBER_TYPE_USE_TP`.
+   */
+  { category: 'MEMBER_TYPE', useTp: '002', table: 'tb_s080_legal_orgs', column: 'member_type', label: '법무 회사유형' },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */
@@ -126,7 +140,7 @@ export interface PinnedCodeRef {
 }
 
 /**
- * ★★ 자료가 **0행이어도** 코드값을 바꾸면 깨지는 자리 — **4건** (2026-10-03 실측).
+ * ★★ 자료가 **0행이어도** 코드값을 바꾸면 깨지는 자리 — **7건** (2026-10-03 실측 4건 + 2026-10-07 표양식 1건 + 2026-10-10 법인변경 2건).
  *
  * 앱 코드가 코드값을 상수로 비교한다. 예컨대 `spaceStatus.ts` 가 `'E'`(공실)를 직접
  * 쓰므로, `ROOM_ST` 의 `E` 를 `V` 로 고치면 호실상태 자동화가 **조용히** 틀린다 —
@@ -163,6 +177,46 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     codes: ['R', 'A'],
     source: 'packages/shared/src/domain/inquiry.ts (InquiryStatus)',
     label: '문의 상태 판정',
+  },
+  /**
+   * 새 양식의 종류 — 앱과 DB 기본값(`kind DEFAULT 'T'`)이 둘 다 `T` 를 박아 두었다.
+   * ★ 2026-10-07 추가. `T` 를 바꾸면 새 양식이 코드에 없는 종류로 만들어진다.
+   */
+  {
+    category: 'LAW_DOC_TP',
+    useTp: '000',
+    codes: ['T'],
+    source: 'packages/shared/src/domain/form-template.ts (DEFAULT_FORM_KIND)',
+    label: '표양식 기본 종류',
+  },
+  /**
+   * 법인변경 — 구분마다 입력 칸과 검증이, 상태마다 전이표와 역할이 박혀 있다. ★ 2026-10-10 추가.
+   * ★ `LAW_CNG_TP` 의 `CEO_CHG` · `LAW_PROG_ST` 의 `S` · `A`(제출 — 2026-10-10 뺐다) 는 앱이 쓰지 않아 여기 없다.
+   */
+  {
+    category: 'LAW_CNG_TP',
+    useTp: '000',
+    codes: ['NAME', 'HQ', 'PURPOSE', 'OFFICER', 'CEO_ADDR'],
+    source: 'packages/shared/src/domain/corp-change.ts (CORP_CHANGE_TYPES)',
+    label: '법인변경 구분별 입력 칸',
+  },
+  {
+    category: 'LAW_PROG_ST',
+    useTp: '000',
+    codes: ['P', 'E', 'C', 'X'],
+    source: 'packages/shared/src/domain/corp-change.ts (CORP_CHANGE_STATUSES)',
+    label: '법인변경 상태 전이',
+  },
+  /**
+   * 양식의 법무 표시(정의 jsonb `legal.companyType`)가 주식회사 · 유한회사를 코드값으로 담는다 —
+   * 컬럼이 아니라 jsonb 안이라 `CODE_USAGE` 로 셀 수 없어 여기 박는다. ★ 2026-10-11 추가(서류 출력).
+   */
+  {
+    category: 'MEMBER_TYPE',
+    useTp: '002',
+    codes: ['R', 'A'],
+    source: 'packages/shared/src/domain/legal-form-mark.ts (LEGAL_FORM_COMPANY_TYPES)',
+    label: '법무 양식 회사유형',
   },
 ] as const;
 

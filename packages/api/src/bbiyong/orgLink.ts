@@ -65,7 +65,7 @@ export interface OrgLinkTarget {
   /** 이미 연결됐으면 그 org_id. ★ 값이 있으면 **다시 만들지 않는다.** */
   linkedOrgId: number | null;
   /**
-   * 이미 발급된 단체코드. 퇴실·재입주·수정이 **이 코드로 회사를 지목한다**.
+   * 이미 발급된 단체코드. 퇴실·재입주·회사 수정이 **이 코드로 회사를 지목한다**.
    *
    * ★ `linkedOrgId` 와 함께 저장되므로 둘은 같이 있거나 같이 없다. 그래도 따로 보는 것은
    *   org_id 가 있는데 코드가 없는 행(손으로 고친 자료)이 생겼을 때 조용히 엉뚱한 회사를
@@ -94,7 +94,7 @@ export interface OrgLinkStore {
   read(): Promise<{ company: OrgLinkTarget; takenCodes: string[] } | null>;
   /**
    * @param repMemberId 회사 등록 응답이 준 **대표 회원번호**(규격 2026-10-05).
-   *   ★ 등록에서만 온다. 퇴실·재입주·수정이 「대기 사유를 지우는 수단」으로 이 함수를
+   *   ★ 등록에서만 온다. 퇴실·재입주가 「대기 사유를 지우는 수단」으로 이 함수를
    *     쓸 때는 **없다**(`undefined`) — 그때 번호를 덮어쓰면 안 된다.
    */
   saveLinked(args: { orgId: number; orgCode: string; repMemberId?: number | null }): Promise<void>;
@@ -113,14 +113,18 @@ export type OrgLinkResult =
   | { kind: 'already'; orgId: number }
   /** 계약은 확정됐고 연결만 아직이다. `reason` 이 화면에 뜬다. */
   | { kind: 'pending'; reason: string }
-  /** 퇴실·재입주·수정이 삐용에 반영됐다. */
+  /** 퇴실·재입주가 삐용에 반영됐다. */
   | { kind: 'synced'; op: OrgOp }
   /** 보낼 것이 없었다 — 연결되지 않은 회사이거나 바뀐 것이 없다. */
   | { kind: 'skipped'; why: string }
   | { kind: 'not_found' };
 
-/** 삐용에 보낼 수 있는 일. 등록은 `linkOrg` 가 따로 한다. */
-export type OrgOp = 'off' | 'on' | 'patch';
+/**
+ * 삐용에 보낼 수 있는 일. 등록은 `linkOrg` 가 따로 한다.
+ * ★ 회사 수정은 여기 없다(결정 2026-10-23) — 실패를 「연동 대기」로 남기지 않고 저장 응답의 배너로만
+ *   알린다(`companies/companyOrgSync.ts`). [다시 시도]는 등록 · 퇴실 · 재입주 전용이다.
+ */
+export type OrgOp = 'off' | 'on';
 
 /**
  * 중복 응답을 몇 번까지 따라갈 것인가.
@@ -280,7 +284,7 @@ export async function linkOrg(
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   퇴실 · 재입주 · 수정 (삐용 회신 2026-10-02)
+   퇴실 · 재입주 (삐용 회신 2026-10-02 · 회사 수정은 2026-10-23 에 companyOrgSync 로 옮겼다)
    ══════════════════════════════════════════════════════════════════════════
    ★★★ 등록과 **같은 규칙**이다 — 던지지 않고, 실패는 `pending` 이며, 사유는 운영자가
         그대로 읽는 문구다. `savePending` 을 새로 만들지 않고 그대로 쓴다.
@@ -306,15 +310,15 @@ async function applyOp(
     /*
      * ★★★ 토큰 만료는 **그대로 던진다** — `linkOrg` 와 같은 이유다(그쪽 주석).
      *    삼키면 `withFreshAccess` 가 재발급할 기회를 잃고, 멀쩡한 토큰으로 되살릴 수
-     *    있는 퇴실·재입주·수정이 「연동 대기」로 떨어진다.
+     *    있는 퇴실·재입주가 「연동 대기」로 떨어진다.
      *
-     * ★ 다시 불려도 안전하다 — `moduleOffOrg`·`moduleOnOrg`·`patchOrgName` 이 각자
+     * ★ 다시 불려도 안전하다 — `moduleOffOrg`·`moduleOnOrg` 가 각자
      *   `store.read()` 부터 다시 한다. 재입주는 이미 켠 모듈을 또 보내도 삐용이
      *   「이미 구독 중」으로 답하고 그건 성공으로 센다(`HttpBbiyongOrg.moduleOn`).
      */
     if (err instanceof BbiyongTokenExpiredError) throw err;
 
-    // ★ 여기 남는 것은 삐용 장애다. 던지지 않는다 — ERP 업무(계약 종료·회사명 수정)는 이미 끝났다.
+    // ★ 여기 남는 것은 삐용 장애다. 던지지 않는다 — ERP 업무(계약 종료·재입주)는 이미 끝났다.
     console.warn(`[bbiyong] ${label} 실패(대기로 남긴다): ${(err as Error).message}`);
     const reason = `삐용에 연결할 수 없어 ${label}이 반영되지 않았습니다. 잠시 후 다시 시도해 주세요`;
     await store.savePending(reason, true);
@@ -384,37 +388,4 @@ export async function moduleOnOrg(
 
   const orgCode = company.linkedOrgCode;
   return applyOp(store, company, 'on', '재입주', () => org.moduleOn(orgCode, accessToken));
-}
-
-/**
- * 회사명 수정 — 삐용의 단체명을 ERP 값으로 맞춘다.
- *
- * ★★★ **주소를 보내지 않는다**(`BbiyongOrgPatch` 에 칸이 없다). 빈 문자열로 보내면
- *    삐용에 들어 있는 주소가 지워지고 되돌릴 수 없다 — ERP 가 가진 주소는 **대표자
- *    자택**이라 애초에 그 자리에 들어갈 값이 아니다.
- */
-export async function patchOrgName(
-  store: OrgLinkStore,
-  org: BbiyongOrg,
-  accessToken: string,
-): Promise<OrgLinkResult> {
-  const target = await store.read();
-  if (!target) return { kind: 'not_found' };
-  const { company } = target;
-
-  if (company.linkedOrgId === null || !company.linkedOrgCode) {
-    return { kind: 'skipped', why: '삐용에 연결되지 않은 입주사다 — 반영할 곳이 없다' };
-  }
-
-  const orgName = (company.companyName ?? '').trim();
-  if (!orgName) {
-    // ★ 회사명은 NOT NULL 이지만 빈 문자열이 들어갈 수 있다(가계약). 빈 이름을 보내면
-    //   삐용의 단체명을 지우는 셈이라 보내지 않는다.
-    const reason = '회사명이 비어 있어 삐용에 반영할 수 없습니다. 입주사 정보를 채운 뒤 다시 시도해 주세요';
-    await store.savePending(reason, false);
-    return { kind: 'pending', reason };
-  }
-
-  const orgCode = company.linkedOrgCode;
-  return applyOp(store, company, 'patch', '회사 수정', () => org.patchOrg({ orgCode, orgName }, accessToken));
 }
