@@ -40,7 +40,7 @@ export function bbiyongBanner({ mock, baseUrl, system }: BbiyongTarget): string[
     // ★ MOCK 이어도 **어디를 향해 설정돼 있는지**는 같이 찍는다. MOCK 을 끄는 순간
     //   나가게 될 주소이고, 그것이 개발계인지 가동계인지는 끄기 **전에** 보여야 한다.
     const target = baseUrl ? ` · 실연동 시 붙을 곳: ${baseUrl}${SYSTEM_LABEL[system ?? 'unknown']}` : '';
-    return [`[BBIYONG] MOCK — 삐용에 붙지 않습니다 (packages/api/.env 의 BBIYONG_MOCK=true)${target}`];
+    return [`[BBIYONG] MOCK — 삐용에 붙지 않습니다 (erp-api.env 의 BBIYONG_MOCK=true)${target}`];
   }
 
   if (system === 'dev') return [`[BBIYONG] ${baseUrl}${SYSTEM_LABEL.dev}`];
@@ -52,7 +52,7 @@ export function bbiyongBanner({ mock, baseUrl, system }: BbiyongTarget): string[
       `  ★★  [BBIYONG] ${baseUrl}  — 가동계(운영) ★★`,
       '',
       '      여기로 나가는 것은 운영 계정의 실제 로그인 요청입니다.',
-      '      개발계로 되돌리려면 packages/api/.env 의 BBIYONG_SYSTEM 과',
+      '      개발계로 되돌리려면 common.env 의 BBIYONG_SYSTEM 과',
       '      BBIYONG_BASE_URL 을 **함께** 되돌립니다(둘은 한 쌍입니다).',
       '      의도한 것이 아니면 지금 멈추십시오.',
       bar,

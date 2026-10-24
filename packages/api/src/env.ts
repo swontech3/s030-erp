@@ -9,15 +9,23 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { existsSync } from 'node:fs';
+import { envDir, loadEnvFiles } from '@swonbiz/shared/envFiles';
 
-// packages/api/.env — 저장소 루트의 .env(스크립트용 postgres 접속)와 다른 파일이다.
+/**
+ * 환경 파일 — 저장소 밖 한 폴더의 **common.env + erp-api.env**(결정 2026-10-24).
+ *   폴더는 SWONBIZ_ENV_DIR (없으면 C:\workspace\env\). 관리자(postgres) 접속이 든 admin.env 는
+ *   **읽지 않는다.** 칸 설명은 저장소의 env.example/.
+ *
+ * ★ 옮기는 동안만: 새 폴더가 없으면 옛 `packages/api/.env` 를 읽는다(다 옮기면 걷어낸다).
+ * ★ 시험(vitest)은 **파일을 읽지 않는다**(결정 ⑥) — vitest.config 의 값만 쓴다. 진짜 DB·삐용·
+ *   Vision 키가 시험에 섞여 들어오지 않게 한다.
+ */
 const here = dirname(fileURLToPath(import.meta.url));
-const envPath = resolve(here, '../.env');
-if (existsSync(envPath)) process.loadEnvFile(envPath);
+if (!process.env.VITEST) loadEnvFiles(['common', 'erp-api'], { legacy: ['packages/api/.env'] });
 
 function required(name: string): string {
   const v = process.env[name];
-  if (!v) throw new Error(`환경변수 ${name} 가 없다. packages/api/.env 를 확인할 것.`);
+  if (!v) throw new Error(`환경변수 ${name} 가 없다. ${envDir()} 의 common.env · erp-api.env 를 확인할 것.`);
   return v;
 }
 
@@ -135,6 +143,8 @@ function assertServiceRole(token: string): void {
  *    순간 OCR 이 죽었다. 상대경로를 그대로 두면 이번에는 **프로세스의 cwd** 에
  *    따라 죽는다(`npm --prefix` 로 띄우면 cwd 가 저장소 루트다). 그래서 읽는
  *    자리에서 한 번 확정한다.
+ * ★ 2026-10-24 부터 키 파일은 환경 폴더(C:\workspace\env\)에 두고 **절대경로**로 적는다.
+ *    절대경로는 아래 resolve 가 그대로 둔다. 상대경로 처리는 옛 `.env` 용으로 남긴다.
  */
 const credentialsRaw = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 const ocrCredentialsPath = credentialsRaw ? resolve(here, '..', credentialsRaw) : null;
@@ -151,8 +161,8 @@ if (ocrCredentialsPath && !existsSync(ocrCredentialsPath)) {
  * ★ **없어도 기동한다.** OCR 키와 같은 이유다 — 확인이 안 되는 것은 계약 등록을
  *   막을 이유가 못 된다. 없으면 [확인] 버튼이 「확인하지 못했습니다」라고 답한다.
  *
- * ★ 저장소 루트 `.env` 에도 같은 키가 있다(스크립트용). 두 파일이 갈릴 수 있으니
- *   **여기(`packages/api/.env`)가 이 서버의 정본**이다.
+ * ★ 예전에는 저장소 루트 `.env` 에도 같은 키가 있었다. 한 폴더로 옮기면서 erp-api.env 에
+ *   한 번만 둔다(api 쪽 값이 정본, 결정 2026-10-24).
  */
 const ntsServiceKey = process.env.DATA_GO_KR_KEY?.trim() || null;
 
