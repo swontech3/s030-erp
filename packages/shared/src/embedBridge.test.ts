@@ -13,6 +13,7 @@ import {
   EMBED_LOGIN,
   EMBED_READY,
   acceptLogin,
+  embedLoginTarget,
   isEmbedded,
   parseAllowedOrigins,
   shouldAnswerReady,
@@ -54,6 +55,28 @@ describe('shouldAnswerReady', () => {
     expect(shouldAnswerReady({ ...ok, origin: 'http://evil.test' }, ALLOWED, self)).toBe(false);
     expect(shouldAnswerReady({ ...ok, source: { parent: {} } }, ALLOWED, self)).toBe(false);
     expect(shouldAnswerReady({ ...ok, data: { type: EMBED_LOGIN } }, ALLOWED, self)).toBe(false);
+  });
+});
+
+describe('embedLoginTarget — 안에서 로그인한 뒤 갈 곳 (2026-10-24 삐용 연계 시험)', () => {
+  const HOME = '/dashboard';
+  it('ERP 안 주소면 그곳으로 — 삐용 틀에서 법인설립을 처음 누른 경우', () => {
+    expect(embedLoginTarget('?redirect=%2Flegal%2Fincorporations', HOME)).toBe('/legal/incorporations');
+    expect(embedLoginTarget('?redirect=/legal/incorporations?tab=1', HOME)).toBe('/legal/incorporations?tab=1');
+  });
+  it('redirect 가 없거나 비면 첫 화면', () => {
+    expect(embedLoginTarget('', HOME)).toBe(HOME);
+    expect(embedLoginTarget('?redirect=', HOME)).toBe(HOME);
+  });
+  it('★ 바깥 주소는 무시하고 첫 화면 — // · 주소 형식 · / 로 시작하지 않음', () => {
+    for (const bad of ['//evil.test/x', 'https://evil.test/x', 'http:/evil.test', 'javascript:alert(1)', 'legal/x']) {
+      expect(embedLoginTarget('?redirect=' + encodeURIComponent(bad), HOME)).toBe(HOME);
+    }
+  });
+  it('★ 브라우저가 // 로 읽는 모양도 무시 — 역슬래시 · 사이에 낀 탭', () => {
+    for (const bad of ['/\\evil.test/x', '/\t/evil.test/x']) {
+      expect(embedLoginTarget('?redirect=' + encodeURIComponent(bad), HOME)).toBe(HOME);
+    }
   });
 });
 

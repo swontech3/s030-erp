@@ -89,6 +89,24 @@ export function shouldAnswerReady(event: MessageEventLike, allowed: readonly str
 }
 
 /**
+ * 안에서 로그인한 뒤 갈 곳 — 로그인 화면 주소의 `redirect`(proxy.ts 가 원래 가려던 곳을 싣는다)가
+ * ERP 안 주소면 그곳, 아니면 `home`. (2026-10-24 삐용 연계 시험 — 삐용 틀에서 법무 화면을 처음 누르면 첫 화면이 뜨던 것)
+ * ★ 오픈 리다이렉트 막기 — 「/」로 시작 · 「//」 아님 · 브라우저가 풀어 읽은 결과도 같은 사이트일 때만
+ *   (역슬래시 · 탭이 낀 「/\\evil」 「/\t/evil」 을 브라우저는 「//evil」 로 읽는다)
+ */
+export function embedLoginTarget(search: string, home: string): string {
+  const raw = new URLSearchParams(search).get('redirect') ?? '';
+  if (!raw.startsWith('/') || raw.startsWith('//')) return home;
+  const base = 'http://erp.invalid';
+  try {
+    const u = new URL(raw, base);
+    return u.origin === base ? u.pathname + u.search + u.hash : home;
+  } catch {
+    return home;
+  }
+}
+
+/**
  * ERP 가 안에 떴을 때(로그인 화면에서 부른다) — 「준비됨」을 허용 주소로만 보내고, 받은 토큰을 `login` 으로.
  * @returns 정리 함수
  */

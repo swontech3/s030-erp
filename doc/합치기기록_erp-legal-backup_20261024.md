@@ -72,3 +72,19 @@ master 방식(지켜야 할 것) : ERP 서버는 비밀번호를 받지 않는�
 - 이 가지만 있고 master 는 그대로다. 버리려면 : `git push origin --delete integrate-erp-legal` · `git branch -D integrate-erp-legal`
 - master 에 합친 뒤 되돌리려면 : `git revert -m 1 <합친 커밋>`
 - DB 는 이 합치기로 바뀐 것이 없다(037~049 는 이전에 이미 개발계에 적용돼 있었다).
+
+## 6. 합친 뒤 고친 것 — 삐용 쪽이 만든 `embed.ts` 를 고침 (2026-10-24 삐용 연계 시험)
+
+> ★ ERP 팀이 볼 것 — **삐용 쪽이 만든 `packages/web/src/lib/embed.ts`(서로 안에 뜨는 모드 · master `5f205cb`)를 이 가지에서 고쳤다.**
+> 대표 지시 2026-10-24. master · ERP 팀 가지는 건드리지 않았다.
+
+| 항목 | 내용 |
+|---|---|
+| 증상 | 삐용 틀에서 법무 법인설립(`/legal/incorporations`)을 **처음** 누르면 안쪽 ERP 에 대시보드가 뜬다 |
+| 원인 | 세션이 없으면 `proxy.ts` 가 `/login?redirect=/legal/incorporations` 로 보내는데, 안쪽 로그인(`startInnerLogin`)이 `redirect` 를 보지 않고 그 사람의 첫 화면(`home`)으로 갔다. ERP 대시보드는 첫 화면과 같아 드러나지 않았다 |
+| 고친 것 | `packages/shared/src/embedBridge.ts` 에 판정 한 곳 `embedLoginTarget(search, home)` · `embed.ts` 는 그것을 부르기만 |
+| 규칙 | `redirect` 가 ERP 안 주소일 때만 그곳 — 「/」로 시작 · 「//」 아님 · 브라우저가 풀어 읽은 결과도 같은 사이트(역슬래시 · 탭이 낀 `/\evil` · `/\t/evil` 막음). 아니면 지금처럼 `home` |
+| 고치지 않은 것 | 보통 로그인 화면(`(auth)/login/page.tsx` — 비밀번호 없이 삐용 토큰으로 들어오는 길)도 `redirect` 를 읽지 않는다. 이번 지시 밖이라 그대로 — `proxy.ts` 주석의 「AUTH-08 후반부」 |
+
+시험 : `packages/shared` `embedBridge.test.ts` 4건(고치기 전 빨강 4 → 초록) · 전체 51 파일 **1270/1270** · tsc 0(shared · web) · `lint-no-green` OK
+실제 브라우저(삐용 s09-mail 대본) : `verify_service_frame_ui --target legal` 고치기 전 5/7 → **7/7** · `--target erp` 7/7 · `verify_embed_login_ui` 8/8(E7 바깥 주소 `//` · `http://` · `/\` redirect 는 첫 화면)

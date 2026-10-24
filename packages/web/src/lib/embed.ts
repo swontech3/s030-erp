@@ -7,6 +7,7 @@
  *   비면 주고받지 않는다. 빌드 때 박힌다 — 바꾸면 web 을 다시 빌드한다.
  */
 import {
+  embedLoginTarget,
   isEmbedded,
   parseAllowedOrigins,
   startEmbedInner,
@@ -24,7 +25,10 @@ export function embeddedNow(): boolean {
   return typeof window !== 'undefined' && isEmbedded(win());
 }
 
-/** ERP 가 안에 떴을 때(로그인 화면) — 받은 토큰을 기존 로그인 자리로. 성공하면 그 사람의 홈으로 */
+/**
+ * ERP 가 안에 떴을 때(로그인 화면) — 받은 토큰을 기존 로그인 자리로. 성공하면 원래 가려던 ERP 안 주소(redirect),
+ * 없거나 바깥 주소면 그 사람의 홈으로(판정은 embedLoginTarget 한 곳)
+ */
 export function startInnerLogin(): () => void {
   return startEmbedInner({
     win: win(),
@@ -36,7 +40,7 @@ export function startInnerLogin(): () => void {
         body: JSON.stringify({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }),
       });
       const body = (await res.json().catch(() => null)) as { home?: string } | null;
-      if (res.ok && body?.home) window.location.assign(body.home);
+      if (res.ok && body?.home) window.location.assign(embedLoginTarget(window.location.search, body.home));
     },
   });
 }
