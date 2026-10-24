@@ -23,3 +23,9 @@ design/SwonBiz Design System_html시안_2/
 
 # 업종 사전(047) 원본 — 홈택스에서 받는 연계표 xlsx · 경비율 xls. 적재 스크립트만 커밋한다.
 doc/data-src/
+
+# 서류 양식 원본(docx) — 이미 추적 중인 7개는 그대로 둔다. 새 원본은 커밋하지 않는다.
+doc/forms-src/
+
+# 개인 PC 의 Claude 설정 — 이미 추적 중인 것은 그대로 둔다.
+.claude/settings.local.json*
