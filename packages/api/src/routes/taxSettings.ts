@@ -18,7 +18,8 @@
  * ★ 계좌 · 카드는 **id 를 유지한다** — 있는 줄은 고치고, 새 줄은 넣고, 보낸 목록에 없는 줄은 지운다.
  *   보낸 id 가 이 단체의 줄이 아니면(남의 단체 · 없는 id) **404** 이고 아무것도 쓰지 않는다(법무와 같이 둘을 가르지 않는다).
  * ★ 회사 정보는 법무 `readCompanySource` 를 **고치지 않고** 부른다 — 입주사면 ERP 회사 표, 아니면 법무 회사 정보.
- *   둘 다 없으면 회사명만 세션 값(삐용 my-orgs → `getProfile`)이고 번호는 비운다. 번호는 숫자만 내려 준다.
+ *   둘 다 없으면 번호는 비운다. 회사명이 비어 있으면(source 와 상관없이) 세션 회사명(삐용 my-orgs → `getProfile`)으로
+ *   채운다. 번호는 숫자만 내려 준다.
  */
 import type { FastifyInstance } from 'fastify';
 import type { ErpSession } from '@swonbiz/shared';
@@ -175,18 +176,26 @@ const run = <T>(session: ErpSession, fn: (client: ScopedClient) => Promise<T>) =
   withCompanyScope(scopeOfSession(session), fn);
 
 /**
- * 회사 정보가 둘 다 없으면 회사명만 세션 값(삐용 my-orgs → `getProfile`). 삐용 호출은 트랜잭션 **밖에서**.
+ * 회사명이 비어 있으면 세션 회사명으로 — **source 와 상관없이**(상호가 빈 법무 비입주사 줄도, 줄이 없는 단체도).
+ * 번호는 건드리지 않는다.
+ */
+export function fillCompanyName(company: TaxCompanyInfo, sessionName: string | null): TaxCompanyInfo {
+  return company.name && company.name.trim() !== '' ? company : { ...company, name: sessionName };
+}
+
+/**
+ * 회사명이 비어 있을 때만 세션 회사명(삐용 my-orgs → `getProfile`)을 읽어 채운다. 삐용 호출은 트랜잭션 **밖에서**.
  * ★ 조회 실패는 화면을 깨뜨리지 않는다 — 회사명이 빈 채로 간다.
  */
 async function withSessionName(session: ErpSession, data: TaxSettingsResponse): Promise<TaxSettingsResponse> {
-  if (data.company.source !== 'none') return data;
+  if (data.company.name && data.company.name.trim() !== '') return data;
   let name: string | null = null;
   try {
     name = (await bbiyongAuth.getProfile(session.s020MemberId))?.orgName || null;
   } catch {
     name = null;
   }
-  return { ...data, company: { ...data.company, name } };
+  return { ...data, company: fillCompanyName(data.company, name) };
 }
 
 const defaultDeps: TaxSettingsDeps = {

@@ -8,7 +8,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ErpSession, ScopeRole } from '@swonbiz/shared';
 import type { TaxSettingsResponse, TaxSettingsSave } from '@swonbiz/shared/domain/tax-settings';
-import { registerTaxSettingRoutes, type TaxSettingsDeps } from './taxSettings.ts';
+import { fillCompanyName, registerTaxSettingRoutes, type TaxSettingsDeps } from './taxSettings.ts';
 
 const session = (role: ScopeRole): ErpSession => ({
   erpSid: 'sid-hash',
@@ -138,5 +138,12 @@ describe('PUT /tax/settings — 저장', () => {
     const res = await a.inject({ method: 'PUT', url: '/tax/settings', payload: body() });
     expect(res.statusCode).toBe(404);
     expect(res.json()).toEqual({ error: 'not_found', message: '없는 계좌 · 카드입니다' });
+  });
+});
+
+describe('fillCompanyName — 회사명이 비어 있으면 세션 회사명', () => {
+  it('★ 상호가 빈 법무 비입주사도 세션 회사명으로 채운다(source 와 상관없이)', () => {
+    const company = { source: 'legal' as const, name: null, bizNumber: '2208162517', corpNumber: null };
+    expect(fillCompanyName(company, '에스원테크')).toEqual({ ...company, name: '에스원테크' });
   });
 });
