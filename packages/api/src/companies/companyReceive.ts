@@ -14,6 +14,7 @@
 import { isDigitMaskComplete, maskValue, DIGIT_MASK_RULE, type DigitMaskKind } from '@swonbiz/shared/domain/masked-caret';
 import type { CompanyFromBbiyong } from '../db/companies.ts';
 import { checkReceiveCaller, type CallerRefused, type ReceiveCallerDeps } from '../bbiyong/receiveCaller.ts';
+import { hasEditGrant, parseEditGrant } from '../legal/companyEditGrant.ts';
 
 /** 받는 본문의 칸 → [ERP 칸, 이름, 숫자 칸 종류]. 칸 이름은 `erp-patch-org` 와 같다. */
 const RECEIVE_FIELDS: Readonly<Record<string, readonly [keyof CompanyFromBbiyong, string, DigitMaskKind | null]>> = {
@@ -78,6 +79,8 @@ export type CompanyReceiveOutcome =
 
 /** 부르는 쪽 확인(`ReceiveCallerDeps` — 삐용 내 메뉴 · 지금 계정의 단체) + 쓰기. */
 export interface CompanyReceiveDeps extends ReceiveCallerDeps {
+  /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `ORG_SELF` 줄 이름(`화면코드:키`). 없으면 null. */
+  orgGrantName(): Promise<string | null>;
   /**
    * 운영사 스코프 트랜잭션 하나에서: 단체 ID 의 입주사가 없으면 `not_found`, 바꿨으면 `applied`,
    * 사업자번호가 겹치면 `duplicate`(아무것도 쓰지 않는다). ★ 삐용에 보내지 않는다.
@@ -88,6 +91,7 @@ export interface CompanyReceiveDeps extends ReceiveCallerDeps {
 /**
  * 받기 한 번 — 토큰 확인 → 본문 → 쓰기.
  * ★ 대상 회사 = 본문 `orgId`. 본문이 틀려 읽지 못하면 대상을 모른다(운영사만 400 을 받는다).
+ *   운영사가 아니면 단체 수정 키(`ORG_SELF`)가 있을 때만(키가 없거나 코드 줄이 틀리면 대상을 모른다, C3).
  */
 export async function receiveCompany(
   authorization: string | undefined,
@@ -98,7 +102,11 @@ export async function receiveCompany(
   const refused = await checkReceiveCaller(
     authorization,
     deps,
-    async () => (parsed.ok ? parsed.orgId : null),
+    async (menus) => {
+      if (!parsed.ok) return null;
+      const grant = parseEditGrant(await deps.orgGrantName());
+      return grant && hasEditGrant(menus, grant) ? parsed.orgId : null;
+    },
     '입주사 회사 정보 받기',
   );
   if (refused) return refused;

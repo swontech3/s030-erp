@@ -98,7 +98,8 @@ const EMAIL_TAKEN = '같은 회사의 다른 직원이 쓰는 이메일입니다
 /**
  * 받기 한 번 — 토큰 확인 → 본문 → 쓰기.
  * ★ 대상 회사 = `memberId` 의 직원이 속한 회사의 단체 ID. 본문이 틀리면 대상을 모른다(운영사만 400 을 받는다).
- *   직원이 없으면 본문 `orgId` — 직원 수정 키가 있을 때만(키가 없거나 코드 줄이 틀리면 대상을 모른다).
+ *   직원이 없으면 본문 `orgId`. 운영사가 아니면 직원이 있든 없든 직원 수정 키(`MEMBER_SELF`)가 있을 때만
+ *   (키가 없거나 코드 줄이 틀리면 대상을 모른다, C1 · C3).
  */
 export async function receiveMember(
   authorization: string | undefined,
@@ -111,10 +112,10 @@ export async function receiveMember(
     deps,
     async (menus) => {
       if (!parsed.ok) return null;
-      const org = await deps.orgIdOfMember(parsed.memberId);
-      if (org !== 'not_found') return org;
       const grant = parseEditGrant(await deps.memberGrantName());
-      return grant && hasEditGrant(menus, grant) ? parsed.orgId : null;
+      if (!grant || !hasEditGrant(menus, grant)) return null;
+      const org = await deps.orgIdOfMember(parsed.memberId);
+      return org === 'not_found' ? parsed.orgId : org;
     },
     '입주사 직원 정보 받기',
   );

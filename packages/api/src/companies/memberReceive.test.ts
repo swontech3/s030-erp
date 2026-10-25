@@ -8,6 +8,8 @@ import type { MemberFromBbiyong } from '../db/companies.ts';
 import { parseMemberReceiveBody, receiveMember, type MemberReceiveDeps } from './memberReceive.ts';
 
 const OK_MENUS: MyMenusOutcome = { kind: 'ok', screens: ['S021100010'] };
+/** 회사 계정 — 단체관리 없음 · 대역 코드 줄(MEMBER_SELF = S021100031:F003)의 화면 · 키 있음. */
+const KEYED: MyMenusOutcome = { kind: 'ok', screens: ['S021100031'], keys: { S021100031: ['F003'] } };
 
 /** 직원 851 은 단체 324 의 입주사 직원이다(대역). 852 는 ERP 에 있지만 회사에 단체 ID 가 없다. 그 밖은 없다. */
 const ORG_OF_MEMBER: Record<number, number | null> = { 851: 324, 852: null };
@@ -74,16 +76,27 @@ describe('receiveMember', () => {
     expect([...none.applied, ...rejected.applied]).toEqual([]);
   });
   it('★★ 운영사가 아니면 대상 = 그 직원이 속한 회사의 단체 — 지금 계정의 단체와 같을 때만 받는다', async () => {
-    const own = deps({ kind: 'ok', screens: [] }, 'applied', { kind: 'ok', orgId: 324 });
+    const own = deps(KEYED, 'applied', { kind: 'ok', orgId: 324 });
     expect((await receiveMember('Bearer t', body, own.d)).status).toBe(200);
     expect(own.asked).toEqual([851]);
     expect(own.applied).toEqual([{ memberId: 851, fields: { name: '최현수2' } }]);
-    const other = deps({ kind: 'ok', screens: [] }, 'applied', { kind: 'ok', orgId: 325 });
+    const other = deps(KEYED, 'applied', { kind: 'ok', orgId: 325 });
     expect((await receiveMember('Bearer t', body, other.d)).status).toBe(403);
-    // 직원이 없으면 대상을 모른다 — 운영사가 아니면 403
-    const unknown = deps({ kind: 'ok', screens: [] }, 'applied', { kind: 'ok', orgId: 324 });
+    // 직원이 없고 본문 orgId 도 없으면 대상을 모른다 — 운영사가 아니면 403
+    const unknown = deps(KEYED, 'applied', { kind: 'ok', orgId: 324 });
     expect((await receiveMember('Bearer t', { memberId: 999, memberName: 'x' }, unknown.d)).status).toBe(403);
     expect([...other.applied, ...unknown.applied]).toEqual([]);
+  });
+  it('★★ 직원이 ERP 에 있어도 운영사가 아니면 직원 수정 키(MEMBER_SELF)가 있을 때만 — 없으면 403 · 직원도 묻지 않는다(C3)', async () => {
+    const own = { kind: 'ok', orgId: 324 } as const;
+    const cases = [
+      deps({ kind: 'ok', screens: [] }, 'applied', own),
+      deps({ kind: 'ok', screens: ['S021100031'], keys: { S021100031: ['F001'] } }, 'applied', own),
+      deps(KEYED, 'applied', own, null),
+      deps(KEYED, 'applied', own, 'S021100031'),
+    ];
+    for (const v of cases) expect((await receiveMember('Bearer t', body, v.d)).status).toBe(403);
+    expect(cases.flatMap((v) => [...v.applied, ...v.asked])).toEqual([]);
   });
   it('★ 운영사면 직원의 회사를 묻지 않는다', async () => {
     const v = deps();
@@ -105,8 +118,7 @@ describe('receiveMember', () => {
     expect(empty.applied).toEqual([]);
   });
   describe('★★ 직원이 ERP 에 없으면 대상 = 본문 orgId · 직원 수정 키가 있을 때만(삐용 통합 시험 C1)', () => {
-    // 비입주사 대표 토큰 — 단체관리 없음 · 지금 회사 9003 · 대역 코드 줄의 화면 · 키
-    const KEYED: MyMenusOutcome = { kind: 'ok', screens: ['S021100031'], keys: { S021100031: ['F003'] } };
+    // 비입주사 대표 토큰 — 단체관리 없음 · 지금 회사 9003 · 대역 코드 줄의 화면 · 키(위 KEYED)
     const NOT_IN_ERP = { memberId: 999, orgId: 9003, memberName: '새직원' };
     const own = { kind: 'ok', orgId: 9003 } as const;
 

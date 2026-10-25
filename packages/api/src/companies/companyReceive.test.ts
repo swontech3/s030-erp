@@ -8,16 +8,20 @@ import type { CompanyFromBbiyong } from '../db/companies.ts';
 import { parseCompanyReceiveBody, receiveCompany, type CompanyReceiveDeps } from './companyReceive.ts';
 
 const OK_MENUS: MyMenusOutcome = { kind: 'ok', screens: ['S021100010'] };
+/** 회사 계정 — 단체관리 없음 · 「내 단체 정보」 수정 키 있음(대역 코드 줄 ORG_SELF = S021100021:F002). */
+const KEYED: MyMenusOutcome = { kind: 'ok', screens: ['S021100021'], keys: { S021100021: ['F002'] } };
 
 function deps(
   menus: MyMenusOutcome = OK_MENUS,
   result: 'applied' | 'not_found' | 'duplicate' = 'applied',
   org: MyOrgOutcome = { kind: 'rejected' },
+  grantName: string | null = 'S021100021:F002',
 ) {
   const applied: { orgId: number; fields: CompanyFromBbiyong }[] = [];
   const d: CompanyReceiveDeps = {
     myMenus: async () => menus,
     myOrg: async () => org,
+    orgGrantName: async () => grantName,
     apply: async (orgId, fields) => {
       applied.push({ orgId, fields });
       return result;
@@ -84,12 +88,23 @@ describe('receiveCompany', () => {
     expect([...none.applied, ...noMenu.applied]).toEqual([]);
   });
   it('★★ 운영사가 아니면 대상 = 본문 orgId — 지금 계정의 단체와 같을 때만 받는다', async () => {
-    const own = deps({ kind: 'ok', screens: [] }, 'applied', { kind: 'ok', orgId: 324 });
+    const own = deps(KEYED, 'applied', { kind: 'ok', orgId: 324 });
     expect((await receiveCompany('Bearer t', body, own.d)).status).toBe(200);
     expect(own.applied).toEqual([{ orgId: 324, fields: { companyName: '한성무역' } }]);
-    const other = deps({ kind: 'ok', screens: [] }, 'applied', { kind: 'ok', orgId: 325 });
+    const other = deps(KEYED, 'applied', { kind: 'ok', orgId: 325 });
     expect((await receiveCompany('Bearer t', body, other.d)).status).toBe(403);
     expect(other.applied).toEqual([]);
+  });
+  it('★★ 운영사가 아니면 단체 수정 키(ORG_SELF)가 있을 때만 — 키 없음 · 화면 없음 · 코드 줄 없음 · 모양 틀림은 403(C3)', async () => {
+    const own = { kind: 'ok', orgId: 324 } as const;
+    const cases = [
+      deps({ kind: 'ok', screens: ['S021100021'], keys: { S021100021: ['F001'] } }, 'applied', own),
+      deps({ kind: 'ok', screens: [], keys: { S021100021: ['F002'] } }, 'applied', own),
+      deps(KEYED, 'applied', own, null),
+      deps(KEYED, 'applied', own, 'S021100021'),
+    ];
+    for (const v of cases) expect((await receiveCompany('Bearer t', body, v.d)).status).toBe(403);
+    expect(cases.flatMap((v) => v.applied)).toEqual([]);
   });
   it('★ 그 단체의 입주사가 없으면 성공(not_found) · 칸이 없으면 쓰기를 부르지 않고 성공', async () => {
     expect((await receiveCompany('Bearer t', body, deps(OK_MENUS, 'not_found').d)).body).toEqual({

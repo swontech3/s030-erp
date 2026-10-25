@@ -31,6 +31,17 @@ export interface EditGrant {
   key: string;
 }
 
+/**
+ * 받기(삐용 → ERP — 세션이 없다)에서 `BBIYONG_EDIT_GRANT` 줄 이름. 운영사 스코프로 읽는다. 없으면 null.
+ * 받기 셋이 같은 판정(`parseEditGrant` · `hasEditGrant`)을 쓴다(삐용 통합 시험 C3, 2026-10-25).
+ */
+export async function receiveGrantName(code: string): Promise<string | null> {
+  const rows = await withCompanyScope({ role: 'operator', companyId: null }, (client) =>
+    listCodes(client, [{ category: EDIT_GRANT_CATEGORY, useTp: EDIT_GRANT_USE_TP }]),
+  );
+  return rows.find((r) => r.code === code)?.name ?? null;
+}
+
 /** 코드 줄 이름 `화면코드:키` → 둘. 모양이 틀리면 null(아무에게도 열지 않는다). */
 export function parseEditGrant(name: string | null | undefined): EditGrant | null {
   const m = /^\s*([A-Za-z0-9]+)\s*:\s*([A-Za-z0-9]+)\s*$/.exec(name ?? '');

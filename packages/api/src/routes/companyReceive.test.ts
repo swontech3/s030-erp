@@ -42,6 +42,7 @@ async function build(companyId: string | null = 'c-1') {
   const company: CompanyReceiveDeps = {
     myMenus: okMenus,
     myOrg: noOrg,
+    orgGrantName: async () => null,
     apply: async (orgId, fields) => {
       const id = await findCompanyIdByOrgId(db.client, orgId);
       if (id === null) return 'not_found';
