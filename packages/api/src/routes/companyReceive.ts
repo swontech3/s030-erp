@@ -30,6 +30,8 @@ import {
 import { withCompanyScope } from '../db/withCompanyScope.ts';
 import { receiveCompany, type CompanyReceiveDeps } from '../companies/companyReceive.ts';
 import { receiveMember, type MemberReceiveDeps } from '../companies/memberReceive.ts';
+import { EDIT_GRANT_CATEGORY, EDIT_GRANT_USE_TP, MEMBER_SELF_GRANT } from '../legal/companyEditGrant.ts';
+import { listCodes } from '../db/lookups.ts';
 
 /** `updated_by` 에 남기는 값 — 삐용이 보낸 줄이라는 표시(회원번호는 내 메뉴가 주지 않는다). */
 export const RECEIVE_ACTOR = 'bbiyong';
@@ -90,6 +92,12 @@ const defaultMemberDeps: MemberReceiveDeps = {
   myOrg: (token) => bbiyongAuth.myOrg(token),
   orgIdOfMember: (linkMemberId) =>
     withCompanyScope(RECEIVE_SCOPE, (client) => findOrgIdByMemberLinkId(client, linkMemberId)),
+  memberGrantName: async () => {
+    const rows = await withCompanyScope(RECEIVE_SCOPE, (client) =>
+      listCodes(client, [{ category: EDIT_GRANT_CATEGORY, useTp: EDIT_GRANT_USE_TP }]),
+    );
+    return rows.find((r) => r.code === MEMBER_SELF_GRANT)?.name ?? null;
+  },
   apply: (linkMemberId, fields) =>
     withCompanyScope(RECEIVE_SCOPE, (client) => applyMemberFromBbiyong(client, linkMemberId, fields)),
 };

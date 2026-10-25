@@ -52,7 +52,7 @@ async function build(companyId: string | null = 'c-1') {
   registerSessionHook(app);
   // ★ 같은 앞머리의 세션 라우트가 있어도 고정 경로가 먼저 골라진다.
   app.post('/companies/:id/bbiyong-link', async () => ({ wrong: true }));
-  const member: MemberReceiveDeps = { myMenus: okMenus, myOrg: noOrg, orgIdOfMember: async () => null, apply: async () => 'not_found' };
+  const member: MemberReceiveDeps = { myMenus: okMenus, myOrg: noOrg, orgIdOfMember: async () => null, memberGrantName: async () => null, apply: async () => 'not_found' };
   registerCompanyReceiveRoutes(app, { company, member });
   await app.ready();
   return { a: app, db };

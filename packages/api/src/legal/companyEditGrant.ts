@@ -23,6 +23,8 @@ export const EDIT_GRANT_CATEGORY = 'BBIYONG_EDIT_GRANT';
 export const EDIT_GRANT_USE_TP = '000';
 /** 자기 단체 정보를 고치는 권한 — 법무 회사 정보 수정을 연다. */
 export const ORG_SELF_GRANT = 'ORG_SELF';
+/** 자기 회사 직원 정보를 고치는 권한 — 직원 받기에서 직원이 ERP 에 없을 때 본문 `orgId` 를 대상으로 본다(삐용 통합 시험 C1). */
+export const MEMBER_SELF_GRANT = 'MEMBER_SELF';
 
 export interface EditGrant {
   screen: string;
