@@ -41,5 +41,5 @@ export function proxy(request: NextRequest) {
  */
 export const config = {
   // ★ `/legal` — 법무 서비스(s04, 2026-10-09). `next.config.ts` 의 PROTECTED_PATHS 에도 있다.
-  matcher: ['/dashboard/:path*', '/booking/:path*', '/tenants/:path*', '/contracts/:path*', '/billing/:path*', '/settings/:path*', '/facility/:path*', '/inquiry-admin/:path*', '/forms/:path*', '/legal/:path*'],
+  matcher: ['/dashboard/:path*', '/booking/:path*', '/tenants/:path*', '/contracts/:path*', '/billing/:path*', '/settings/:path*', '/facility/:path*', '/inquiry-admin/:path*', '/forms/:path*', '/legal/:path*', '/tax/:path*'],
 };

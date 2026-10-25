@@ -17,7 +17,7 @@ import { requireSession } from '../session/hook.ts';
 /**
  * 화면코드 형식 — 시스템 코드 + 3자리 업무구분 + 4자리 순번 [+ `p{n}`] = **10자리**.
  *
- * 시스템 코드는 둘이다 — `s03` SwonBiz ERP · `s04` **법무 서비스**(2026-10-09).
+ * 시스템 코드는 셋이다 — `s03` SwonBiz ERP · `s04` **법무 서비스**(2026-10-09) · `s05` **세무 서비스**(2026-10-25).
  * ★ s04 를 더할 때 이 정규식을 고치지 않으면 법무 화면의 모든 확인 요청이 400 이다 —
  *   아래 2026-10-02 사고와 같은 모양이다.
  *
@@ -27,7 +27,7 @@ import { requireSession } from '../session/hook.ts';
  *      그래서 모든 `/acl/verify` 호출이 400 「화면코드 형식이 올바르지 않습니다」가 됐다
  *      (verify-2-8 의 A8 이 이것을 잡았다). 자리수를 바꿀 때 **여기도 같이 본다.**
  */
-export const SCREEN_CODE = /^s0[34]\d{7}(p\d{1,2})?$/;
+export const SCREEN_CODE = /^s0[345]\d{7}(p\d{1,2})?$/;
 /** shadow 로그의 route 컬럼 상한. 클라이언트가 보낸 문자열이라 길이를 자른다. */
 const ROUTE_MAX = 200;
 

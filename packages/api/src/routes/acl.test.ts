@@ -22,8 +22,16 @@ describe('SCREEN_CODE', () => {
   });
 
   it('다른 시스템 코드 · 옛 11자리 · 잘린 코드는 거부한다', () => {
-    for (const bad of ['s021200010', 's050100010', 's0300200070', 's04020001', 'S040200010', 's040200010p', 's040200010p123']) {
+    for (const bad of ['s021200010', 's060100010', 's0300200070', 's04020001', 'S040200010', 's040200010p', 's040200010p123']) {
       expect(SCREEN_CODE.test(bad)).toBe(false);
     }
+  });
+
+  it('세무 서비스(s05) 화면은 통과한다', () => {
+    expect(SCREEN_CODE.test('s050000010')).toBe(true);
+  });
+
+  it('s06 은 거부한다 — 시스템 코드는 s03 · s04 · s05 뿐', () => {
+    expect(SCREEN_CODE.test('s060000010')).toBe(false);
   });
 });
