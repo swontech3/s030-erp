@@ -174,6 +174,14 @@ export const SCREENS = {
   // --- 000 이번 달 할 일 ---
   // ★ 1-0 은 빈 껍데기다 — 제목과 「준비 중」 한 줄만(doc/tax-service/).
   s050000010: { route: '/tax/this-month', name: '이번 달 할 일', group: '000' },
+
+  // --- 010 기초 ---
+  /**
+   * 세무 설정 — 사업자 유형 · 세무사 메일 · 계좌 · 카드 · 쓰지 않는 자료 · 원천세 신고 주기(201 · 202).
+   * 회사 기본정보는 보기만 한다(ERP · 법무 표를 법무 `readCompanySource` 로 읽는다).
+   * ★ 운영사 · 회사 모두 **자기 단체만** — Fastify `/tax/settings` 가 org_id = 세션 단체 ID 를 직접 건다.
+   */
+  s050100010: { route: '/tax/settings', name: '세무 설정', group: '010' },
 } as const satisfies Record<string, ScreenMeta>;
 
 export type ScreenId = keyof typeof SCREENS;

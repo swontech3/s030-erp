@@ -49,6 +49,7 @@ const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
   s040300010: 'scale', // 사업목적 — 운영사 전용 카탈로그. 법무 서비스라 같은 저울이다(더 맞는 아이콘이 없다)
   s040900010: 'scale', // 설정(등기 설정) — 운영사 전용. 법무 서비스라 같은 저울이다
   s050000010: 'calculator', // 이번 달 할 일 — 세무 서비스(s05)
+  s050100010: 'settings', // 세무 설정 — 세무 서비스(s05)
 };
 
 export interface NavItem {

@@ -22,6 +22,16 @@ export function isCorpNumberLength(digits: string): boolean {
   return /^\d{13}$/.test(digits);
 }
 
+/** 화면 표시용 — 사업자번호 `000-00-00000`. 숫자 10자리가 아니면 받은 그대로. 저장은 숫자만이다. */
+export function formatBizNumber(digits: string): string {
+  return isBizNumberLength(digits) ? `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}` : digits;
+}
+
+/** 화면 표시용 — 법인번호 `000000-0000000`. 숫자 13자리가 아니면 받은 그대로. */
+export function formatCorpNumber(digits: string): string {
+  return isCorpNumberLength(digits) ? `${digits.slice(0, 6)}-${digits.slice(6)}` : digits;
+}
+
 /** 끝자리 검증 가중치 — 국세청 사업자등록번호 규칙. */
 const BIZ_CHECK_WEIGHTS = [1, 3, 7, 1, 3, 7, 1, 3, 5] as const;
 

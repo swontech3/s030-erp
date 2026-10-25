@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   digitsOnly,
+  formatBizNumber,
+  formatCorpNumber,
   isAccountNumberInput,
   isBizNumberChecksumOk,
   isBizNumberLength,
@@ -72,5 +74,16 @@ describe('계좌 · 카드 · 메일 모양', () => {
     expect(isEmailShape('tax example.com')).toBe(false);
     expect(isEmailShape('@example.com')).toBe(false);
     expect(isEmailShape('')).toBe(false);
+  });
+});
+
+describe('화면 표시용 하이픈 — 저장은 숫자만, 보여 줄 때만 붙인다', () => {
+  it('사업자번호 000-00-00000 · 법인번호 000000-0000000', () => {
+    expect(formatBizNumber('2148812345')).toBe('214-88-12345');
+    expect(formatCorpNumber('1101117654321')).toBe('110111-7654321');
+  });
+  it('자리수가 안 맞으면 받은 그대로', () => {
+    expect(formatBizNumber('12345')).toBe('12345');
+    expect(formatCorpNumber('110111')).toBe('110111');
   });
 });
