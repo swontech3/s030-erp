@@ -230,6 +230,18 @@ describe('parseMyMenus', () => {
       screens: ['S021000000', 'S021100010'],
     });
   });
+  it('★ 지금 삐용 모양(규격서 §1-5 · 2026-10-03 바뀜) — 객체 배열의 menuCode 를 읽는다', () => {
+    const data = [
+      { menuCode: 'S021100021', keys: ['F001', 'F002'], menuNm: '내 단체 정보' },
+      { menuCode: 'S021100010', keys: ['F001', 'F002'], menuNm: '단체관리' },
+      { keys: ['F001'] },
+      { menuCode: 7 },
+    ];
+    expect(parseMyMenus({ status: 200, result: 'success', massage: null, data, error: [] })).toEqual({
+      kind: 'ok',
+      screens: ['S021100021', 'S021100010'],
+    });
+  });
   it('★ 입구 거절(HTTP 200 · 본문 403 · AUTHZ_DENY) · 깨진 본문은 rejected', () => {
     const deny = { status: 403, result: 'fail', massage: '권한이 없습니다. 관리자에게 권한을 요청하세요', data: [], error: ['AUTHZ_DENY'] };
     expect(parseMyMenus(deny)).toEqual({ kind: 'rejected' });

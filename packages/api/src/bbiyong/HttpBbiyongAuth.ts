@@ -150,7 +150,12 @@ export function parseMyMenus(body: unknown): MyMenusOutcome {
   if (!root || root.result !== 'success' || root.status !== 200 || !Array.isArray(root.data)) {
     return { kind: 'rejected' };
   }
-  return { kind: 'ok', screens: root.data.filter((v): v is string => typeof v === 'string') };
+  // ★ 2026-10-25 — 삐용 응답은 객체 배열(`{ menuCode, keys, … }` · 규격서 §1-5 2026-10-03 바뀜)이다.
+  //   옛 모양(화면코드 문자열 배열)도 그대로 받는다. 연계 시험으로 찾아 삐용 쪽이 고쳤다
+  const screens = root.data
+    .map((v) => (typeof v === 'string' ? v : asRecord(v)?.menuCode))
+    .filter((v): v is string => typeof v === 'string');
+  return { kind: 'ok', screens };
 }
 
 // =============================================================================

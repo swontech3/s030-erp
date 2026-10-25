@@ -88,3 +88,15 @@ master 방식(지켜야 할 것) : ERP 서버는 비밀번호를 받지 않는�
 
 시험 : `packages/shared` `embedBridge.test.ts` 4건(고치기 전 빨강 4 → 초록) · 전체 51 파일 **1270/1270** · tsc 0(shared · web) · `lint-no-green` OK
 실제 브라우저(삐용 s09-mail 대본) : `verify_service_frame_ui --target legal` 고치기 전 5/7 → **7/7** · `--target erp` 7/7 · `verify_embed_login_ui` 8/8(E7 바깥 주소 `//` · `http://` · `/\` redirect 는 첫 화면)
+
+## 7. 합친 뒤 고친 것 — 받기의 「내 메뉴」 읽기 `parseMyMenus` (2026-10-25 · 연계 시험으로 찾아 삐용 쪽이 고침)
+
+> ★ ERP 팀이 볼 것 — **연계 시험으로 찾아 삐용 쪽이 이 가지에서 고쳤다.** 대표 지시 2026-10-25. master · ERP 팀 가지는 건드리지 않았다.
+
+| 항목 | 내용 |
+|---|---|
+| 증상 | 삐용 → ERP · 법무 받기(`/companies/bbiyong/org-changed` · `member-changed` · `/legal/bbiyong/org-changed`)가 **누구의 토큰이든** 403 「삐용 단체관리 권한이 있는 토큰이 아닙니다」 — 운영사 관리자(단체관리 `S021100010` 을 가짐)도 |
+| 원인 | 삐용 `my-menus` 의 `data` 는 2026-10-03 부터 객체 배열(`{ menuCode, keys, … }` — 삐용 규격서 §1-5)인데, `packages/api/src/bbiyong/HttpBbiyongAuth.ts` `parseMyMenus` 가 **글자만** 골라 화면 목록이 늘 비었다 |
+| 고친 것 | `parseMyMenus` 가 항목이 글자면 그대로 · 객체면 `menuCode` 를 읽는다(옛 문자열 배열도 그대로 받는다) — 받기 셋 · `receiveCaller.ts` 는 고치지 않았다 |
+
+시험 : `packages/api` `HttpBbiyongAuth.test.ts` 객체 배열 1건(고치기 전 빨강 — `screens: []`) → 초록 · 전체 31 파일 **426/426** · tsc 0
