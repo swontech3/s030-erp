@@ -97,8 +97,6 @@ interface Props {
   saved: CorpChangeDetailResponse | null;
   /** 「입주사 화면에서 입력」 링크를 보여 줄까 — 그 화면(s030200030)을 받은 사람에게만. */
   canOpenTenantScreen: boolean;
-  /** 운영사 세션인가 — 비입주사 회사 정보는 운영사만 고친다(결정 2026-10-22). 회사 사용자는 읽기만. */
-  operator: boolean;
 }
 
 export type Address = { zipCode: string; address: string; addressDetail: string };
@@ -262,7 +260,7 @@ interface OfficerDraft {
   rrnMasked: string | null;
 }
 
-export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScreen, operator }: Props) {
+export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScreen }: Props) {
   const router = useRouter();
   /**
    * ★ 저장된 건은 **상태로** 든다 — 상태 전이가 돌려준 새 상세, 409 뒤에 다시 읽은 상세로 바꿔
@@ -295,13 +293,14 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
    * ★ 「저장 안 한 입력」은 사람이 고친 것만이다 — 기본값으로 채운 것만으로는 아니다(처음 입력
    *   상태가 기본값을 담고 있으므로 비교에서 저절로 빠진다).
    * ★ 입주사는 ERP 값을 읽기만 한다 — 싣지 않는다.
-   * ★★ 회사 사용자도 읽기만 한다(운영사만, 결정 2026-10-22) — 칸을 잠그고, 삐용 기본값이 있어도 싣지 않는다
-   *    (실으면 서버가 403 으로 [저장] 전체를 거절한다).
+   * ★★ 고칠 권한이 없으면 읽기만 한다 — 운영사 또는 수정 권한이 있는 그 회사 사용자만 연다(2026-10-25,
+   *    서버가 정한 `canEditCompany`). 칸을 잠그고, 삐용 기본값이 있어도 싣지 않는다(실으면 서버가 403 으로
+   *    [저장] 전체를 거절한다).
    */
   const [company, setCompany] = useState<CorpChangeCompanyInfo>(draft.company);
   const [companyInput, setCompanyInput] = useState<CompanyForm>(() => companyForm(draft.company));
   const [companySaved, setCompanySaved] = useState(() => JSON.stringify(companyForm(draft.company)));
-  const companyEditable = operator && editable && !company.isTenant;
+  const companyEditable = draft.canEditCompany && editable && !company.isTenant;
   const companyDirty = companyEditable && JSON.stringify(companyInput) !== companySaved;
   const sendCompany = companyEditable && (companyDirty || company.defaultedFields.length > 0);
 

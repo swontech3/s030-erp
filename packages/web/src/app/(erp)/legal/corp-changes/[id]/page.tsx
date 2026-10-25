@@ -43,7 +43,6 @@ export default async function CorpChangeDetailPage({
   const sid = await readSid();
   const me = await getMe();
   const canOpenTenantScreen = me?.screens.includes('s030200030') ?? false;
-  const operator = me?.role === 'operator';
 
   if (id === NEW) {
     const { changeType, orgId, orgCode } = await searchParams;
@@ -61,7 +60,6 @@ export default async function CorpChangeDetailPage({
         draft={res.body}
         saved={null}
         canOpenTenantScreen={canOpenTenantScreen}
-        operator={operator}
       />
     );
   }
@@ -77,7 +75,6 @@ export default async function CorpChangeDetailPage({
       draft={res.body}
       saved={res.body}
       canOpenTenantScreen={canOpenTenantScreen}
-      operator={operator}
     />
   );
 }

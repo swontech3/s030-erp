@@ -186,8 +186,12 @@ export interface BbiyongAuth {
   myOrg(accessToken: string): Promise<MyOrgOutcome>;
 }
 
-/** 내 메뉴 결과 — `ok` 면 삐용 화면코드 목록(대문자 그대로). */
-export type MyMenusOutcome = { kind: 'ok'; screens: string[] } | { kind: 'rejected' };
+/**
+ * 내 메뉴 결과 — `ok` 면 삐용 화면코드 목록(대문자 그대로).
+ * `keys` 는 화면코드 → 그 화면의 기능 키(예: `F002` 수정, 2026-10-25). 키를 실은 화면이 없으면(옛 모양 —
+ * 화면코드 문자열 배열) 싣지 않는다.
+ */
+export type MyMenusOutcome = { kind: 'ok'; screens: string[]; keys?: Record<string, string[]> } | { kind: 'rejected' };
 
 /** 지금 계정의 단체 — `ok` 면 삐용 단체 ID. */
 export type MyOrgOutcome = { kind: 'ok'; orgId: number } | { kind: 'rejected' };

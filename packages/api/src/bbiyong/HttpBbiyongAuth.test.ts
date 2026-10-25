@@ -6,7 +6,7 @@
  *   shared `readSignInTokens` 시험(packages/shared/src/bbiyongSignIn.test.ts)으로 옮겼다.
  */
 import { describe, it, expect } from 'vitest';
-import { HttpBbiyongAuth, parseReIssue, parseMyMenus } from './HttpBbiyongAuth.ts';
+import { HttpBbiyongAuth, parseReIssue, parseMyMenus, parseMyMenuKeys } from './HttpBbiyongAuth.ts';
 import {
   BbiyongAuthError,
   BbiyongReloginRequiredError,
@@ -247,6 +247,36 @@ describe('parseMyMenus', () => {
     expect(parseMyMenus(deny)).toEqual({ kind: 'rejected' });
     expect(parseMyMenus({ status: 200, result: 'success', data: null })).toEqual({ kind: 'rejected' });
     expect(parseMyMenus('x')).toEqual({ kind: 'rejected' });
+  });
+});
+
+describe('parseMyMenuKeys — 화면별 기능 키(2026-10-25, 법무 회사 정보 수정 열기)', () => {
+  it('★ 객체 배열의 menuCode → keys · 글자가 아닌 키는 버린다 · 키 없는 줄은 빠진다', () => {
+    const data = [
+      { menuCode: 'S021100021', keys: ['F001', 'F002', 3], menuNm: '내 단체 정보' },
+      { menuCode: 'S021100010', keys: [] },
+      { menuCode: 'S021000000' },
+      { keys: ['F001'] },
+    ];
+    expect(parseMyMenuKeys({ status: 200, result: 'success', massage: null, data, error: [] })).toEqual({
+      S021100021: ['F001', 'F002'],
+      S021100010: [],
+    });
+  });
+  it('옛 모양(문자열 배열) · 깨진 본문은 null', () => {
+    expect(parseMyMenuKeys({ status: 200, result: 'success', data: ['S021100010'] })).toBeNull();
+    expect(parseMyMenuKeys({ status: 200, result: 'success', data: null })).toBeNull();
+    expect(parseMyMenuKeys('x')).toBeNull();
+  });
+  it('★ myMenus — 화면코드 목록은 그대로 두고 keys 를 덧붙인다', async () => {
+    const data = [{ menuCode: 'S021100021', keys: ['F001', 'F002'] }];
+    const { impl } = stubFetch(json({ status: 200, result: 'success', massage: null, data, error: [] }));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+    await expect(auth.myMenus('eyJ.in')).resolves.toEqual({
+      kind: 'ok',
+      screens: ['S021100021'],
+      keys: { S021100021: ['F001', 'F002'] },
+    });
   });
 });
 

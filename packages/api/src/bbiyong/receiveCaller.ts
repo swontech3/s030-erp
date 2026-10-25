@@ -28,7 +28,7 @@ export type CallerRefused =
   | { status: 403; body: { error: 'forbidden'; message: string } }
   | { status: 503; body: { error: 'bbiyong_unavailable'; message: string } };
 
-const FORBIDDEN = '삐용 단체관리 권한이 있는 토큰이 아닙니다';
+const FORBIDDEN = '운영사이거나 그 회사의 토큰이 아닙니다';
 
 const REFUSED_403: CallerRefused = { status: 403, body: { error: 'forbidden', message: FORBIDDEN } };
 const REFUSED_503: CallerRefused = {

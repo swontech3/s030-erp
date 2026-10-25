@@ -159,6 +159,22 @@ export function parseMyMenus(body: unknown): MyMenusOutcome {
   return { kind: 'ok', screens };
 }
 
+/**
+ * my-menus 의 기능 키 — 화면코드 → `keys`(2026-10-25, 법무 회사 정보 수정 열기). `parseMyMenus` 는 그대로 두고
+ * 키만 따로 읽는다. 키를 실은 화면이 하나도 없으면(옛 모양) null.
+ */
+export function parseMyMenuKeys(body: unknown): Record<string, string[]> | null {
+  const data = asRecord(body)?.data;
+  if (!Array.isArray(data)) return null;
+  const keys: Record<string, string[]> = {};
+  for (const v of data) {
+    const row = asRecord(v);
+    if (typeof row?.menuCode !== 'string' || !Array.isArray(row.keys)) continue;
+    keys[row.menuCode] = row.keys.filter((k): k is string => typeof k === 'string');
+  }
+  return Object.keys(keys).length > 0 ? keys : null;
+}
+
 // =============================================================================
 // 어댑터
 // =============================================================================
@@ -316,7 +332,9 @@ export class HttpBbiyongAuth implements BbiyongAuth {
       if (err instanceof BbiyongUnavailableError && err.httpStatus === 403) return { kind: 'rejected' };
       throw err;
     }
-    return parseMyMenus(body);
+    const out = parseMyMenus(body);
+    const keys = out.kind === 'ok' ? parseMyMenuKeys(body) : null;
+    return out.kind === 'ok' && keys ? { ...out, keys } : out;
   }
 
   /**

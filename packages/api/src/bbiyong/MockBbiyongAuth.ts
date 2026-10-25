@@ -48,6 +48,8 @@ interface MockAccount extends Omit<BbiyongLoginResult, 'accessToken' | 'refreshT
    * 법무 회사 정보 「받기」가 토큰을 확인할 때 본다(2026-10-23). 운영사 계정에만 단체관리(`S021100010`).
    */
   bbiyongMenus?: string[];
+  /** 「내 메뉴」가 함께 줄 화면별 기능 키(예: `{ S021100021: ['F002'] }`, 2026-10-25). 없으면 싣지 않는다. */
+  bbiyongMenuKeys?: Record<string, string[]>;
 }
 
 /**
@@ -180,7 +182,8 @@ export class MockBbiyongAuth implements BbiyongAuth {
   async myMenus(accessToken: string): Promise<MyMenusOutcome> {
     const account = accountOfMockToken(accessToken);
     if (!account) return { kind: 'rejected' };
-    return { kind: 'ok', screens: [...(account.bbiyongMenus ?? [])] };
+    const screens = [...(account.bbiyongMenus ?? [])];
+    return account.bbiyongMenuKeys ? { kind: 'ok', screens, keys: { ...account.bbiyongMenuKeys } } : { kind: 'ok', screens };
   }
 
   /** 지금 계정의 단체 — 내 메뉴와 같은 토큰 규칙으로 계정을 찾아 그 `orgId` 를 준다(my-orgs 의 자리). */
