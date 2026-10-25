@@ -36,6 +36,7 @@ import { registerBizPurposeRoutes } from './routes/bizPurposes.ts';
 import { registerBizRecommendRoutes } from './routes/bizRecommend.ts';
 import { registerIncorporationRoutes } from './routes/incorporations.ts';
 import { registerDocFormSettingRoutes } from './routes/docFormSettings.ts';
+import { registerTaxSettingRoutes } from './routes/taxSettings.ts';
 import { closePool } from './db/pool.ts';
 import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
 
@@ -167,6 +168,8 @@ registerIncorporationRoutes(app);
 // ★ 등기 설정(s040900010) — 운영사만(읽기도). 표에 RLS 가 없어 쓰기를 막는 것은 이 라우트다.
 //   기본 줄은 지우지 않고 사용 끔, 회사유형 줄만 지운다(`routes/docFormSettings.ts` 머리말).
 registerDocFormSettingRoutes(app);
+// ★ 세무 설정(s050100010, 세무 S05) — 운영사 · 회사 모두 **자기 단체만**(org_id = 세션 단체 ID 를 직접 건다).
+registerTaxSettingRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,
