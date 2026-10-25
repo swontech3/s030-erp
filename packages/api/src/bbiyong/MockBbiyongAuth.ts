@@ -135,6 +135,9 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     scope: 'tenant',
     screens: ['s030000050', 's040100010', 's040100020', 's040200010', 's040200011'],
     orgCode: 'Z99',
+    // ★ 화면 확인용(2026-10-25) — 「내 단체 정보」 수정 키가 있는 회사 사용자. 법무 회사 정보 칸이 열린다.
+    bbiyongMenus: ['S021100021'],
+    bbiyongMenuKeys: { S021100021: ['F002'] },
   },
 ];
 

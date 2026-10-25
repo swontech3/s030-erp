@@ -12,7 +12,13 @@ describe('MockBbiyongAuth.myMenus', () => {
   it('★ 운영사 계정 토큰이면 단체관리(S021100010)가 있다 · 회사 계정은 없다', async () => {
     const auth = new MockBbiyongAuth();
     expect(await auth.myMenus(mockAccess('operator@s-wontech.co.kr'))).toEqual({ kind: 'ok', screens: ['S021100010'] });
-    expect(await auth.myMenus(mockAccess('nontenant@test.com'))).toEqual({ kind: 'ok', screens: [] });
+    // 회사 계정(화면 확인용, 2026-10-25)은 「내 단체 정보」와 수정 키만 — 단체관리는 없다.
+    expect(await auth.myMenus(mockAccess('nontenant@test.com'))).toEqual({
+      kind: 'ok',
+      screens: ['S021100021'],
+      keys: { S021100021: ['F002'] },
+    });
+    expect(await auth.myMenus(mockAccess('tenant@test.com'))).toEqual({ kind: 'ok', screens: [] });
   });
   it('mock 토큰 모양이 아니거나 없는 계정이면 rejected', async () => {
     const auth = new MockBbiyongAuth();
