@@ -126,6 +126,31 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
    * `domain/corp-change-detail.ts` 의 `LEGAL_MEMBER_TYPE_USE_TP`.
    */
   { category: 'MEMBER_TYPE', useTp: '002', table: 'tb_s080_legal_orgs', column: 'member_type', label: '법무 회사유형' },
+
+  // --- 세무 설정 (s050100010) — 2026-10-25 추가. 201_tax_settings.sql ---
+  /**
+   * ★ `tb_s050_settings.unused_kinds`(TAX_KIND 목록, text[])는 여기 없다 — `칸 = 코드` 로 셀 수 없는
+   *   목록 칸이라 `PINNED_CODES` 로 막는다.
+   * ★ 은행 · 카드사는 칸이 둘이다(bank_code · card_co_code) — 한 칸에 두 분류를 적으면 값이 겹칠 때
+   *   남의 분류 줄까지 센다(201 머리말).
+   */
+  { category: 'TAX_BIZ_TP', useTp: '000', table: 'tb_s050_settings', column: 'biz_type', label: '세무 사업자 유형' },
+  {
+    category: 'TAX_WH_CYCLE',
+    useTp: '000',
+    table: 'tb_s050_settings',
+    column: 'withholding_cycle',
+    label: '세무 원천세 신고 주기',
+  },
+  { category: 'TAX_FIN_KIND', useTp: '000', table: 'tb_s050_fin_accounts', column: 'kind', label: '세무 계좌·카드' },
+  { category: 'BANK', useTp: '000', table: 'tb_s050_fin_accounts', column: 'bank_code', label: '세무 사업용 계좌' },
+  {
+    category: 'CARD_COMPANY',
+    useTp: '000',
+    table: 'tb_s050_fin_accounts',
+    column: 'card_co_code',
+    label: '세무 사업용 카드',
+  },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */
@@ -217,6 +242,33 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     codes: ['R', 'A'],
     source: 'packages/shared/src/domain/legal-form-mark.ts (LEGAL_FORM_COMPANY_TYPES)',
     label: '법무 양식 회사유형',
+  },
+  /**
+   * 세무(S05) — 2026-10-25 추가. 원천세 주기는 DB 기본값(`withholding_cycle DEFAULT 'M'`)이 박았고,
+   * 마감일 · 신고자료 만드는 때가 M · H 에 기댄다.
+   */
+  {
+    category: 'TAX_WH_CYCLE',
+    useTp: '000',
+    codes: ['M', 'H'],
+    source: 'supabase/migrations/201_tax_settings.sql (tb_s050_settings.withholding_cycle DEFAULT)',
+    label: '세무 원천세 신고 주기',
+  },
+  /** 쓰지 않는 자료(`unused_kinds`, text[])는 목록 칸이라 `CODE_USAGE` 로 셀 수 없어 여기 박는다. */
+  {
+    category: 'TAX_KIND',
+    useTp: '000',
+    codes: ['INVOICE', 'CARD', 'CASH', 'BANK', 'NTAX', 'LTAX', 'SOCIAL', 'LOAN'],
+    source: 'supabase/migrations/201_tax_settings.sql (tb_s050_settings.unused_kinds)',
+    label: '세무 자료 종류',
+  },
+  /** 번호 검사(DB CHECK)가 B(계좌 10~14자리) · C(카드 끝 4자리)에 기댄다. */
+  {
+    category: 'TAX_FIN_KIND',
+    useTp: '000',
+    codes: ['B', 'C'],
+    source: 'supabase/migrations/201_tax_settings.sql (ck_s050_fin_accounts_kind · ck_s050_fin_accounts_number)',
+    label: '세무 계좌·카드 번호 검사',
   },
 ] as const;
 
