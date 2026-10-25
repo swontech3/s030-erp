@@ -2,9 +2,8 @@
  * 법무 비입주사 회사 정보 「받기」(삐용 → 법무, 2026-10-23) — 삐용이 회사 정보를 고쳤을 때 부른다.
  * 「보내기」(`legalOrgSync.ts`)의 짝이다. 삐용 팀에 넘기는 규격은 `doc/연동규격_법무_회사정보_받기.md`.
  *
- *   · 부르는 쪽 확인: **실어 온 삐용 토큰**으로 삐용 「내 메뉴」(`my-menus`)를 부르고, 목록에
- *     단체관리(`S021100010`)가 있을 때만 받는다. 토큰이 없거나 거절되면 403(연동규격 Q1 —
- *     새 열쇠 · 새 삐용 API 를 만들지 않는다). 모의 모드는 모의 계정의 `bbiyongMenus` 로 같은 확인
+ *   · 부르는 쪽 확인: **실어 온 삐용 토큰**이 운영사(내 메뉴에 단체관리 `S021100010`)이거나, 지금 계정의
+ *     단체가 본문 `orgId` 와 같을 때만 받는다. 그 밖은 403(`bbiyong/receiveCaller.ts`)
  *   · 회사 찾기: **단체 ID** 로 찾는다. 함께 온 단체코드는 비교하지 않는다(결정 2026-10-23)
  *   · 법무 회사 정보 줄이 없으면 아무것도 안 하고 **성공**으로 답한다(삐용이 장애로 보지 않게)
  *   · 입주사 단체면 쓰지 않는다(성공으로 답한다) — 입주사 정보는 ERP 회사 표다
@@ -14,8 +13,7 @@
  */
 import { isDigitMaskComplete, maskValue, DIGIT_MASK_RULE, type DigitMaskKind } from '@swonbiz/shared/domain/masked-caret';
 import type { LegalOrgFromBbiyong } from '../db/corpChanges.ts';
-import type { MyMenusOutcome } from '../bbiyong/types.ts';
-import { checkReceiveCaller, type CallerRefused } from '../bbiyong/receiveCaller.ts';
+import { checkReceiveCaller, type CallerRefused, type ReceiveCallerDeps } from '../bbiyong/receiveCaller.ts';
 
 // ★ 부르는 쪽 확인은 입주사 회사 · 직원 받기와 같은 함수다(`bbiyong/receiveCaller.ts`).
 export { bearerOf, RECEIVE_REQUIRED_MENU } from '../bbiyong/receiveCaller.ts';
@@ -85,9 +83,8 @@ export type ReceiveOutcome =
   | { status: 400; body: { error: 'invalid_request'; message: string; errors: ReceiveFieldError[] } }
   | CallerRefused;
 
-export interface ReceiveDeps {
-  /** 삐용 「내 메뉴」 — 받은 토큰 그대로(`BbiyongAuth.myMenus`). */
-  myMenus(accessToken: string): Promise<MyMenusOutcome>;
+/** 부르는 쪽 확인(`ReceiveCallerDeps` — 삐용 내 메뉴 · 지금 계정의 단체) + 쓰기. */
+export interface ReceiveDeps extends ReceiveCallerDeps {
   /**
    * 운영사 스코프 트랜잭션 하나에서: 입주사면 `tenant`, 법무 줄이 없으면 `not_found`, 바꿨으면 `applied`.
    * ★ 삐용에 보내지 않는다.
@@ -97,16 +94,22 @@ export interface ReceiveDeps {
 
 /**
  * 받기 한 번 — 토큰 확인 → 본문 → 쓰기. 토큰을 먼저 본다(확인 안 된 쪽에 칸 오류를 알려 주지 않는다).
+ * ★ 대상 회사 = 본문 `orgId`. 본문이 틀려 읽지 못하면 대상을 모른다(운영사만 400 을 받는다).
  */
 export async function receiveLegalOrg(
   authorization: string | undefined,
   raw: unknown,
   deps: ReceiveDeps,
 ): Promise<ReceiveOutcome> {
-  const refused = await checkReceiveCaller(authorization, deps.myMenus, '법무 회사 정보 받기');
+  const parsed = parseReceiveBody(raw);
+  const refused = await checkReceiveCaller(
+    authorization,
+    deps,
+    async () => (parsed.ok ? parsed.orgId : null),
+    '법무 회사 정보 받기',
+  );
   if (refused) return refused;
 
-  const parsed = parseReceiveBody(raw);
   if (!parsed.ok) {
     return { status: 400, body: { error: 'invalid_request', message: parsed.errors[0]!.message, errors: parsed.errors } };
   }

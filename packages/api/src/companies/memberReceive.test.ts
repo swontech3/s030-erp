@@ -3,22 +3,35 @@
  * ★ DB · 삐용에 붙지 않는다. 내 메뉴와 쓰기는 대역이다. 실제 쓰기 SQL 은 `routes/companyReceive.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
-import type { MyMenusOutcome } from '../bbiyong/types.ts';
+import type { MyMenusOutcome, MyOrgOutcome } from '../bbiyong/types.ts';
 import type { MemberFromBbiyong } from '../db/companies.ts';
 import { parseMemberReceiveBody, receiveMember, type MemberReceiveDeps } from './memberReceive.ts';
 
 const OK_MENUS: MyMenusOutcome = { kind: 'ok', screens: ['S021100010'] };
 
-function deps(menus: MyMenusOutcome = OK_MENUS, result: 'applied' | 'not_found' | 'email_taken' = 'applied') {
+/** 직원 851 은 단체 324 의 입주사 직원이다(대역). */
+const ORG_OF_MEMBER: Record<number, number> = { 851: 324 };
+
+function deps(
+  menus: MyMenusOutcome = OK_MENUS,
+  result: 'applied' | 'not_found' | 'email_taken' = 'applied',
+  org: MyOrgOutcome = { kind: 'rejected' },
+) {
   const applied: { memberId: number; fields: MemberFromBbiyong }[] = [];
+  const asked: number[] = [];
   const d: MemberReceiveDeps = {
     myMenus: async () => menus,
+    myOrg: async () => org,
+    orgIdOfMember: async (memberId) => {
+      asked.push(memberId);
+      return ORG_OF_MEMBER[memberId] ?? null;
+    },
     apply: async (memberId, fields) => {
       applied.push({ memberId, fields });
       return result;
     },
   };
-  return { d, applied };
+  return { d, applied, asked };
 }
 
 describe('parseMemberReceiveBody', () => {
@@ -56,6 +69,23 @@ describe('receiveMember', () => {
     const rejected = deps({ kind: 'rejected' });
     expect((await receiveMember('Bearer t', body, rejected.d)).status).toBe(403);
     expect([...none.applied, ...rejected.applied]).toEqual([]);
+  });
+  it('★★ 운영사가 아니면 대상 = 그 직원이 속한 회사의 단체 — 지금 계정의 단체와 같을 때만 받는다', async () => {
+    const own = deps({ kind: 'ok', screens: [] }, 'applied', { kind: 'ok', orgId: 324 });
+    expect((await receiveMember('Bearer t', body, own.d)).status).toBe(200);
+    expect(own.asked).toEqual([851]);
+    expect(own.applied).toEqual([{ memberId: 851, fields: { name: '최현수2' } }]);
+    const other = deps({ kind: 'ok', screens: [] }, 'applied', { kind: 'ok', orgId: 325 });
+    expect((await receiveMember('Bearer t', body, other.d)).status).toBe(403);
+    // 직원이 없으면 대상을 모른다 — 운영사가 아니면 403
+    const unknown = deps({ kind: 'ok', screens: [] }, 'applied', { kind: 'ok', orgId: 324 });
+    expect((await receiveMember('Bearer t', { memberId: 999, memberName: 'x' }, unknown.d)).status).toBe(403);
+    expect([...other.applied, ...unknown.applied]).toEqual([]);
+  });
+  it('★ 운영사면 직원의 회사를 묻지 않는다', async () => {
+    const v = deps();
+    await receiveMember('Bearer t', body, v.d);
+    expect(v.asked).toEqual([]);
   });
   it('★ 회원번호의 직원이 없으면 성공(not_found) · 칸이 없으면 쓰기를 부르지 않고 성공', async () => {
     expect((await receiveMember('Bearer t', body, deps(OK_MENUS, 'not_found').d)).body).toEqual({

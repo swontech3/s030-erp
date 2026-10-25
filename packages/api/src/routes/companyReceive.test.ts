@@ -12,6 +12,7 @@ import { applyMemberFromBbiyong, registerCompanyReceiveRoutes } from './companyR
 
 const okMenus: MemberReceiveDeps['myMenus'] = async (token) =>
   token === 'good' ? { kind: 'ok', screens: ['S021100010'] } : { kind: 'rejected' };
+const noOrg: MemberReceiveDeps['myOrg'] = async () => ({ kind: 'rejected' });
 
 let app: FastifyInstance | null = null;
 afterEach(async () => {
@@ -39,7 +40,8 @@ function fakeClient(companyId: string | null) {
 async function build(companyId: string | null = 'c-1') {
   const db = fakeClient(companyId);
   const company: CompanyReceiveDeps = {
-    myMenus: async (token) => (token === 'good' ? { kind: 'ok', screens: ['S021100010'] } : { kind: 'rejected' }),
+    myMenus: okMenus,
+    myOrg: noOrg,
     apply: async (orgId, fields) => {
       const id = await findCompanyIdByOrgId(db.client, orgId);
       if (id === null) return 'not_found';
@@ -50,7 +52,7 @@ async function build(companyId: string | null = 'c-1') {
   registerSessionHook(app);
   // ★ 같은 앞머리의 세션 라우트가 있어도 고정 경로가 먼저 골라진다.
   app.post('/companies/:id/bbiyong-link', async () => ({ wrong: true }));
-  const member: MemberReceiveDeps = { myMenus: okMenus, apply: async () => 'not_found' };
+  const member: MemberReceiveDeps = { myMenus: okMenus, myOrg: noOrg, orgIdOfMember: async () => null, apply: async () => 'not_found' };
   registerCompanyReceiveRoutes(app, { company, member });
   await app.ready();
   return { a: app, db };

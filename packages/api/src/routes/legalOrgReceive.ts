@@ -20,6 +20,7 @@ const RECEIVE_ACTOR = 'bbiyong';
 
 const defaultDeps: ReceiveDeps = {
   myMenus: (token) => bbiyongAuth.myMenus(token),
+  myOrg: (token) => bbiyongAuth.myOrg(token),
   // ★ 운영사 스코프 — 법무 회사 정보는 운영사가 전부 본다(037 RLS).
   apply: (orgId, fields) =>
     withCompanyScope({ role: 'operator', companyId: null, orgId: null }, async (client) => {

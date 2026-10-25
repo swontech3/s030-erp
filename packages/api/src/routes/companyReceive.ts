@@ -20,6 +20,7 @@ import { MEMBER_ROLE } from '@swonbiz/shared/domain/member-payload';
 import {
   findCompanyIdByOrgId,
   findMemberByLinkId,
+  findOrgIdByMemberLinkId,
   isMemberEmailTaken,
   patchCompanyFromBbiyong,
   patchMemberFromBbiyong,
@@ -42,6 +43,7 @@ const isUniqueViolation = (err: unknown): boolean =>
 
 const defaultCompanyDeps: CompanyReceiveDeps = {
   myMenus: (token) => bbiyongAuth.myMenus(token),
+  myOrg: (token) => bbiyongAuth.myOrg(token),
   // ★★ try/catch 가 트랜잭션 **밖**이어야 한다 — 안에서 삼키면 abort 된 트랜잭션에 COMMIT 을 부른다.
   apply: async (orgId, fields) => {
     try {
@@ -85,6 +87,9 @@ export async function applyMemberFromBbiyong(
 
 const defaultMemberDeps: MemberReceiveDeps = {
   myMenus: (token) => bbiyongAuth.myMenus(token),
+  myOrg: (token) => bbiyongAuth.myOrg(token),
+  orgIdOfMember: (linkMemberId) =>
+    withCompanyScope(RECEIVE_SCOPE, (client) => findOrgIdByMemberLinkId(client, linkMemberId)),
   apply: (linkMemberId, fields) =>
     withCompanyScope(RECEIVE_SCOPE, (client) => applyMemberFromBbiyong(client, linkMemberId, fields)),
 };

@@ -3,16 +3,21 @@
  * ★ DB · 삐용에 붙지 않는다. 내 메뉴와 쓰기는 대역이다.
  */
 import { describe, expect, it } from 'vitest';
-import type { MyMenusOutcome } from '../bbiyong/types.ts';
+import type { MyMenusOutcome, MyOrgOutcome } from '../bbiyong/types.ts';
 import type { CompanyFromBbiyong } from '../db/companies.ts';
 import { parseCompanyReceiveBody, receiveCompany, type CompanyReceiveDeps } from './companyReceive.ts';
 
 const OK_MENUS: MyMenusOutcome = { kind: 'ok', screens: ['S021100010'] };
 
-function deps(menus: MyMenusOutcome = OK_MENUS, result: 'applied' | 'not_found' | 'duplicate' = 'applied') {
+function deps(
+  menus: MyMenusOutcome = OK_MENUS,
+  result: 'applied' | 'not_found' | 'duplicate' = 'applied',
+  org: MyOrgOutcome = { kind: 'rejected' },
+) {
   const applied: { orgId: number; fields: CompanyFromBbiyong }[] = [];
   const d: CompanyReceiveDeps = {
     myMenus: async () => menus,
+    myOrg: async () => org,
     apply: async (orgId, fields) => {
       applied.push({ orgId, fields });
       return result;
@@ -71,12 +76,20 @@ describe('receiveCompany', () => {
     expect(await receiveCompany('Bearer t', body, v.d)).toEqual({ status: 200, body: { ok: true, applied: true, skipped: null } });
     expect(v.applied).toEqual([{ orgId: 324, fields: { companyName: '한성무역' } }]);
   });
-  it('★ 토큰이 없거나 단체관리가 없으면 403 · 쓰지 않는다', async () => {
+  it('★ 토큰이 없거나 운영사도 그 회사도 아니면 403 · 쓰지 않는다', async () => {
     const none = deps();
     expect((await receiveCompany(undefined, body, none.d)).status).toBe(403);
     const noMenu = deps({ kind: 'ok', screens: [] });
     expect((await receiveCompany('Bearer t', body, noMenu.d)).status).toBe(403);
     expect([...none.applied, ...noMenu.applied]).toEqual([]);
+  });
+  it('★★ 운영사가 아니면 대상 = 본문 orgId — 지금 계정의 단체와 같을 때만 받는다', async () => {
+    const own = deps({ kind: 'ok', screens: [] }, 'applied', { kind: 'ok', orgId: 324 });
+    expect((await receiveCompany('Bearer t', body, own.d)).status).toBe(200);
+    expect(own.applied).toEqual([{ orgId: 324, fields: { companyName: '한성무역' } }]);
+    const other = deps({ kind: 'ok', screens: [] }, 'applied', { kind: 'ok', orgId: 325 });
+    expect((await receiveCompany('Bearer t', body, other.d)).status).toBe(403);
+    expect(other.applied).toEqual([]);
   });
   it('★ 그 단체의 입주사가 없으면 성공(not_found) · 칸이 없으면 쓰기를 부르지 않고 성공', async () => {
     expect((await receiveCompany('Bearer t', body, deps(OK_MENUS, 'not_found').d)).body).toEqual({

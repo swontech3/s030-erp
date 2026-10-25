@@ -3,7 +3,8 @@
  * 직원 보내기(`bbiyong/memberSync.ts` 의 `U`)의 짝이고, 회사 받기(`companyReceive.ts`)와 같은 모양이다.
  * 삐용 팀에 넘기는 규격은 `doc/연동규격_입주사_직원정보_받기.md`.
  *
- *   · 부르는 쪽 확인: 실어 온 삐용 토큰의 「내 메뉴」에 단체관리가 있어야 한다(`bbiyong/receiveCaller.ts`)
+ *   · 부르는 쪽 확인: 실어 온 삐용 토큰이 운영사이거나, 지금 계정의 단체가 그 직원이 속한 회사의
+ *     단체와 같아야 한다(`bbiyong/receiveCaller.ts`)
  *   · 직원 찾기: **삐용 회원번호**(`link_s020_member_id`)로 찾는다. 없으면 아무것도 안 하고 **성공**
  *   · 받는 칸: 이름 · 이메일 · 연락처. **받은 칸만** 바꾸고 빈 값은 「안 바꿈」. 연락처는 숫자로 받아
  *     ERP 저장 모양(하이픈)으로 저장한다
@@ -14,8 +15,7 @@
  */
 import { isDigitMaskComplete, maskValue, DIGIT_MASK_RULE } from '@swonbiz/shared/domain/masked-caret';
 import type { MemberFromBbiyong } from '../db/companies.ts';
-import type { MyMenusOutcome } from '../bbiyong/types.ts';
-import { checkReceiveCaller, type CallerRefused } from '../bbiyong/receiveCaller.ts';
+import { checkReceiveCaller, type CallerRefused, type ReceiveCallerDeps } from '../bbiyong/receiveCaller.ts';
 import type { ReceiveFieldError } from './companyReceive.ts';
 
 export type MemberReceiveParsed =
@@ -70,9 +70,10 @@ export type MemberReceiveOutcome =
   | { status: 400; body: { error: 'invalid_request'; message: string; errors: ReceiveFieldError[] } }
   | CallerRefused;
 
-export interface MemberReceiveDeps {
-  /** 삐용 「내 메뉴」 — 받은 토큰 그대로(`BbiyongAuth.myMenus`). */
-  myMenus(accessToken: string): Promise<MyMenusOutcome>;
+/** 부르는 쪽 확인(`ReceiveCallerDeps` — 삐용 내 메뉴 · 지금 계정의 단체) + 대상 찾기 + 쓰기. */
+export interface MemberReceiveDeps extends ReceiveCallerDeps {
+  /** 회원번호의 직원이 속한 입주사의 삐용 단체 ID(`link_s020_org_id`). 직원 · 연결이 없으면 null. */
+  orgIdOfMember(memberId: number): Promise<number | null>;
   /**
    * 운영사 스코프 트랜잭션 하나에서: 회원번호의 직원이 없으면 `not_found`, 이메일이 같은 회사 다른 활성
    * 직원과 겹치면 `email_taken`(아무것도 쓰지 않는다), 바꿨으면 `applied`(활성 대표면 `ceo_name` 도).
@@ -83,16 +84,25 @@ export interface MemberReceiveDeps {
 
 const EMAIL_TAKEN = '같은 회사의 다른 직원이 쓰는 이메일입니다';
 
-/** 받기 한 번 — 토큰 확인 → 본문 → 쓰기. */
+/**
+ * 받기 한 번 — 토큰 확인 → 본문 → 쓰기.
+ * ★ 대상 회사 = `memberId` 의 직원이 속한 회사의 단체 ID. 본문이 틀리거나 직원이 없으면 대상을 모른다
+ *   (운영사만 400 · `not_found` 를 받는다).
+ */
 export async function receiveMember(
   authorization: string | undefined,
   raw: unknown,
   deps: MemberReceiveDeps,
 ): Promise<MemberReceiveOutcome> {
-  const refused = await checkReceiveCaller(authorization, deps.myMenus, '입주사 직원 정보 받기');
+  const parsed = parseMemberReceiveBody(raw);
+  const refused = await checkReceiveCaller(
+    authorization,
+    deps,
+    async () => (parsed.ok ? deps.orgIdOfMember(parsed.memberId) : null),
+    '입주사 직원 정보 받기',
+  );
   if (refused) return refused;
 
-  const parsed = parseMemberReceiveBody(raw);
   if (!parsed.ok) {
     return { status: 400, body: { error: 'invalid_request', message: parsed.errors[0]!.message, errors: parsed.errors } };
   }

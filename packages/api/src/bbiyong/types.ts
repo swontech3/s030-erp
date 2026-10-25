@@ -175,10 +175,22 @@ export interface BbiyongAuth {
    *   `rejected` 다. 연결 · 규격 문제는 `BbiyongUnavailableError` 를 던진다.
    */
   myMenus(accessToken: string): Promise<MyMenusOutcome>;
+
+  /**
+   * 지금 계정의 단체(`GET /s021200010/my-orgs` 의 `current:true` 줄) — **받은 토큰 그대로** 부른다.
+   * 「받기」가 운영사가 아닌 토큰의 회사를 확인하는 자리다(2026-10-25).
+   *
+   * ★ `myMenus` 와 같은 규칙 — 재발급하지 않고, 만료 · 무효 · 확인 불가는 `rejected`,
+   *   연결 · 규격 문제는 `BbiyongUnavailableError` 를 던진다.
+   */
+  myOrg(accessToken: string): Promise<MyOrgOutcome>;
 }
 
 /** 내 메뉴 결과 — `ok` 면 삐용 화면코드 목록(대문자 그대로). */
 export type MyMenusOutcome = { kind: 'ok'; screens: string[] } | { kind: 'rejected' };
+
+/** 지금 계정의 단체 — `ok` 면 삐용 단체 ID. */
+export type MyOrgOutcome = { kind: 'ok'; orgId: number } | { kind: 'rejected' };
 
 /** 동작 어휘 4종 — ACL-10. APPROVE·EXPORT 는 쓰지 않는다. 런타임 검사와 타입이 한 원천이다. */
 export const ACL_ACTIONS = ['VIEW', 'CREATE', 'UPDATE', 'DELETE'] as const;

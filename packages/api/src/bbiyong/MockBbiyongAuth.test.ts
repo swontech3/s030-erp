@@ -20,3 +20,13 @@ describe('MockBbiyongAuth.myMenus', () => {
     expect(await auth.myMenus('mock-access.9999.1')).toEqual({ kind: 'rejected' });
   });
 });
+
+describe('MockBbiyongAuth.myOrg', () => {
+  it('★ mock 토큰의 계정 단체(my-orgs 의 지금 계정 자리) · 모양이 아니거나 없는 계정이면 rejected', async () => {
+    const auth = new MockBbiyongAuth();
+    expect(await auth.myOrg(mockAccess('operator@s-wontech.co.kr'))).toEqual({ kind: 'ok', orgId: 1 });
+    expect(await auth.myOrg(mockAccess('tenant@test.com'))).toEqual({ kind: 'ok', orgId: 9001 });
+    expect(await auth.myOrg('eyJ.real')).toEqual({ kind: 'rejected' });
+    expect(await auth.myOrg('mock-access.9999.1')).toEqual({ kind: 'rejected' });
+  });
+});

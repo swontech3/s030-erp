@@ -1036,6 +1036,19 @@ export async function findMemberByLinkId(client: ScopedClient, linkMemberId: num
   return rows[0] ?? null;
 }
 
+/** 삐용 회원번호의 직원이 속한 입주사의 삐용 단체 ID — 받기의 「대상 회사」(2026-10-25). 없으면 null. */
+export async function findOrgIdByMemberLinkId(client: ScopedClient, linkMemberId: number): Promise<number | null> {
+  const { rows } = await q<{ link_s020_org_id: number | null }>(
+    client,
+    `SELECT c.link_s020_org_id
+       FROM public.tb_s080_members m
+       JOIN public.tb_s080_companies c ON c.company_id = m.company_id
+      WHERE m.link_s020_member_id = $1`,
+    [linkMemberId],
+  );
+  return rows[0]?.link_s020_org_id ?? null;
+}
+
 /** 같은 회사의 **다른 활성** 구성원이 이 이메일을 쓰는가 — 대소문자 · 앞뒤 공백은 같게 본다. */
 export async function isMemberEmailTaken(
   client: ScopedClient,

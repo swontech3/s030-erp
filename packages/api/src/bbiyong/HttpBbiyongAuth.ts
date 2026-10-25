@@ -30,6 +30,7 @@ import {
   type BbiyongLoginResult,
   type BbiyongProfile,
   type MyMenusOutcome,
+  type MyOrgOutcome,
 } from './types.ts';
 
 export { INVALID_CREDENTIALS_MESSAGE, ORG_SELECT_MESSAGE, RELOGIN_MESSAGE } from './types.ts';
@@ -316,6 +317,27 @@ export class HttpBbiyongAuth implements BbiyongAuth {
       throw err;
     }
     return parseMyMenus(body);
+  }
+
+  /**
+   * 지금 계정의 단체 — 받은 토큰 그대로 my-orgs 를 부른다(재발급 없음, `BbiyongAuth.myOrg`).
+   * ★ 거절 · 연결 처리는 `myMenus` 와 같다. 지금 계정 줄을 못 찾으면 `rejected`(`parseMyOrgs`).
+   */
+  async myOrg(accessToken: string): Promise<MyOrgOutcome> {
+    let body: unknown;
+    try {
+      body = await this.#call(
+        `${this.#baseUrl}${BBIYONG.MY_ORGS_PATH}`,
+        { method: 'GET', headers: { authorization: `Bearer ${accessToken}` } },
+        'my-orgs',
+      );
+    } catch (err) {
+      if (err instanceof BbiyongTokenExpiredError) return { kind: 'rejected' };
+      if (err instanceof BbiyongUnavailableError && err.httpStatus === 403) return { kind: 'rejected' };
+      throw err;
+    }
+    const me = parseMyOrgs(body);
+    return me ? { kind: 'ok', orgId: me.orgId } : { kind: 'rejected' };
   }
 
   /**

@@ -21,6 +21,7 @@ import {
   type BbiyongLoginResult,
   type BbiyongProfile,
   type MyMenusOutcome,
+  type MyOrgOutcome,
 } from './types.ts';
 
 interface MockAccount extends Omit<BbiyongLoginResult, 'accessToken' | 'refreshToken'> {
@@ -139,6 +140,12 @@ export function findMockAccount(memberId: number): MockAccount | undefined {
   return MOCK_ACCOUNTS.find((a) => a.memberId === memberId);
 }
 
+/** mock 토큰(`mock-access.<회원번호>.<시각>`)의 계정. 모양이 아니거나 계정이 없으면 undefined(삐용의 401 자리). */
+function accountOfMockToken(accessToken: string): MockAccount | undefined {
+  const m = /^mock-access\.(\d+)\.\d+$/.exec(accessToken);
+  return m ? findMockAccount(Number(m[1])) : undefined;
+}
+
 export class MockBbiyongAuth implements BbiyongAuth {
   /**
    * 토큰 확인 — `mock-access.{memberId}.…` 모양의 토큰만 그 mock 계정으로 받는다(2026-10-22).
@@ -168,14 +175,18 @@ export class MockBbiyongAuth implements BbiyongAuth {
   }
 
   /**
-   * 내 메뉴 — mock 토큰(`mock-access.<회원번호>.<시각>`)의 회원번호로 계정을 찾아 `bbiyongMenus` 를 준다.
-   * 모양이 아니거나 계정이 없으면 `rejected`(삐용의 401 자리).
+   * 내 메뉴 — mock 토큰의 계정(`accountOfMockToken`)에서 `bbiyongMenus` 를 준다. 없으면 `rejected`.
    */
   async myMenus(accessToken: string): Promise<MyMenusOutcome> {
-    const m = /^mock-access\.(\d+)\.\d+$/.exec(accessToken);
-    const account = m ? findMockAccount(Number(m[1])) : undefined;
+    const account = accountOfMockToken(accessToken);
     if (!account) return { kind: 'rejected' };
     return { kind: 'ok', screens: [...(account.bbiyongMenus ?? [])] };
+  }
+
+  /** 지금 계정의 단체 — 내 메뉴와 같은 토큰 규칙으로 계정을 찾아 그 `orgId` 를 준다(my-orgs 의 자리). */
+  async myOrg(accessToken: string): Promise<MyOrgOutcome> {
+    const account = accountOfMockToken(accessToken);
+    return account ? { kind: 'ok', orgId: account.orgId } : { kind: 'rejected' };
   }
 
   async signOut(_refreshToken: string): Promise<void> {

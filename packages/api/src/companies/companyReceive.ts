@@ -3,7 +3,8 @@
  * 「보내기」(`companyOrgSync.ts`)의 짝이고, 법무 받기(`legal/legalOrgReceive.ts`)와 같은 모양이다.
  * 삐용 팀에 넘기는 규격은 `doc/연동규격_입주사_회사정보_받기.md`.
  *
- *   · 부르는 쪽 확인: 실어 온 삐용 토큰의 「내 메뉴」에 단체관리가 있어야 한다(`bbiyong/receiveCaller.ts`)
+ *   · 부르는 쪽 확인: 실어 온 삐용 토큰이 운영사이거나, 지금 계정의 단체가 본문 `orgId` 와 같아야 한다
+ *     (`bbiyong/receiveCaller.ts`)
  *   · 회사 찾기: **단체 ID**(`link_s020_org_id`)로 찾는다. 없으면 아무것도 안 하고 **성공**으로 답한다
  *   · 받는 칸: 회사명 · 사업자번호 · 법인번호 · 업태 · 종목. **주소는 받지 않는다**(보내도 보지 않는다)
  *   · **받은 칸만** 바꾸고 빈 값은 「안 바꿈」. 번호는 숫자로 받아 ERP 저장 모양(하이픈)으로 저장한다
@@ -12,8 +13,7 @@
  */
 import { isDigitMaskComplete, maskValue, DIGIT_MASK_RULE, type DigitMaskKind } from '@swonbiz/shared/domain/masked-caret';
 import type { CompanyFromBbiyong } from '../db/companies.ts';
-import type { MyMenusOutcome } from '../bbiyong/types.ts';
-import { checkReceiveCaller, type CallerRefused } from '../bbiyong/receiveCaller.ts';
+import { checkReceiveCaller, type CallerRefused, type ReceiveCallerDeps } from '../bbiyong/receiveCaller.ts';
 
 /** 받는 본문의 칸 → [ERP 칸, 이름, 숫자 칸 종류]. 칸 이름은 `erp-patch-org` 와 같다. */
 const RECEIVE_FIELDS: Readonly<Record<string, readonly [keyof CompanyFromBbiyong, string, DigitMaskKind | null]>> = {
@@ -76,9 +76,8 @@ export type CompanyReceiveOutcome =
   | { status: 409; body: { error: 'duplicate'; message: string } }
   | CallerRefused;
 
-export interface CompanyReceiveDeps {
-  /** 삐용 「내 메뉴」 — 받은 토큰 그대로(`BbiyongAuth.myMenus`). */
-  myMenus(accessToken: string): Promise<MyMenusOutcome>;
+/** 부르는 쪽 확인(`ReceiveCallerDeps` — 삐용 내 메뉴 · 지금 계정의 단체) + 쓰기. */
+export interface CompanyReceiveDeps extends ReceiveCallerDeps {
   /**
    * 운영사 스코프 트랜잭션 하나에서: 단체 ID 의 입주사가 없으면 `not_found`, 바꿨으면 `applied`,
    * 사업자번호가 겹치면 `duplicate`(아무것도 쓰지 않는다). ★ 삐용에 보내지 않는다.
@@ -86,16 +85,24 @@ export interface CompanyReceiveDeps {
   apply(orgId: number, fields: CompanyFromBbiyong): Promise<'applied' | 'not_found' | 'duplicate'>;
 }
 
-/** 받기 한 번 — 토큰 확인 → 본문 → 쓰기. */
+/**
+ * 받기 한 번 — 토큰 확인 → 본문 → 쓰기.
+ * ★ 대상 회사 = 본문 `orgId`. 본문이 틀려 읽지 못하면 대상을 모른다(운영사만 400 을 받는다).
+ */
 export async function receiveCompany(
   authorization: string | undefined,
   raw: unknown,
   deps: CompanyReceiveDeps,
 ): Promise<CompanyReceiveOutcome> {
-  const refused = await checkReceiveCaller(authorization, deps.myMenus, '입주사 회사 정보 받기');
+  const parsed = parseCompanyReceiveBody(raw);
+  const refused = await checkReceiveCaller(
+    authorization,
+    deps,
+    async () => (parsed.ok ? parsed.orgId : null),
+    '입주사 회사 정보 받기',
+  );
   if (refused) return refused;
 
-  const parsed = parseCompanyReceiveBody(raw);
   if (!parsed.ok) {
     return { status: 400, body: { error: 'invalid_request', message: parsed.errors[0]!.message, errors: parsed.errors } };
   }

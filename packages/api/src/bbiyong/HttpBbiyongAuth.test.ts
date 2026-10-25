@@ -271,3 +271,28 @@ describe('HttpBbiyongAuth.myMenus', () => {
     await expect(auth.myMenus('eyJ.in')).rejects.toBeInstanceOf(BbiyongUnavailableError);
   });
 });
+
+// =============================================================================
+// 5. 지금 계정의 단체 — 「받기」가 운영사가 아닌 토큰의 회사를 확인한다 (2026-10-25)
+// =============================================================================
+describe('HttpBbiyongAuth.myOrg', () => {
+  it('받은 토큰을 Bearer 로 싣고 GET my-orgs — 지금 계정(current) 줄의 단체', async () => {
+    const { impl, calls } = stubFetch(json(MY_ORGS_BODY));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+    await expect(auth.myOrg('eyJ.in')).resolves.toEqual({ kind: 'ok', orgId: 1 });
+    expect(calls[0]!.url).toBe(`${BASE}/rest/v1/s021200010/my-orgs`);
+    expect(calls[0]!.init.method).toBe('GET');
+    expect(new Headers(calls[0]!.init.headers).get('authorization')).toBe('Bearer eyJ.in');
+  });
+  it('★ 지금 계정 줄이 없거나 실패 본문 · HTTP 401 · 403 은 rejected · 그 밖의 HTTP 비정상은 던진다', async () => {
+    const noCurrent = { ...MY_ORGS_BODY, data: MY_ORGS_BODY.data.map((r) => ({ ...r, current: false })) };
+    for (const res of [json(noCurrent), json({ status: 403, result: 'fail', data: [] }), new Response('', { status: 401 }), new Response('', { status: 403 })]) {
+      const { impl } = stubFetch(res);
+      const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+      await expect(auth.myOrg('eyJ.in')).resolves.toEqual({ kind: 'rejected' });
+    }
+    const { impl } = stubFetch(new Response('', { status: 502 }));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+    await expect(auth.myOrg('eyJ.in')).rejects.toBeInstanceOf(BbiyongUnavailableError);
+  });
+});
