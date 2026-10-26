@@ -15,7 +15,8 @@
     "@swonbiz/shared": "^0.1.0",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.3",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",
