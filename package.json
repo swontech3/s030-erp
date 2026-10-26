@@ -33,7 +33,8 @@
     "verify:corp-change-transition": "tsx scripts/verify-corp-change-transition.js",
     "verify:corp-change-print": "tsx scripts/verify-corp-change-print.js",
     "verify:biz-purpose": "tsx scripts/verify-biz-purpose.js",
-    "verify:tax-settings": "tsx scripts/verify-tax-settings.js"
+    "verify:tax-settings": "tsx scripts/verify-tax-settings.js",
+    "verify:tax-uploads": "tsx scripts/verify-tax-uploads.js"
   },
   "devDependencies": {
     "tsx": "^4.23.13",

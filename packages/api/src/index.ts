@@ -37,6 +37,8 @@ import { registerBizRecommendRoutes } from './routes/bizRecommend.ts';
 import { registerIncorporationRoutes } from './routes/incorporations.ts';
 import { registerDocFormSettingRoutes } from './routes/docFormSettings.ts';
 import { registerTaxSettingRoutes } from './routes/taxSettings.ts';
+import { registerSpreadsheetBodyParser, registerTaxUploadRoutes } from './routes/taxUploads.ts';
+import { registerTaxVendorRoutes } from './routes/taxVendors.ts';
 import { closePool } from './db/pool.ts';
 import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
 
@@ -106,6 +108,8 @@ app.addContentTypeParser(
   { parseAs: 'buffer', bodyLimit: MAX_FILE_BYTES },
   (_req, body, done) => done(null, body),
 );
+// ★ 세무 자료 올리기의 엑셀 본문(xls · xlsx, 5MB) — 위 사진 · PDF 와 형식이 겹치지 않아 따로 등록한다.
+registerSpreadsheetBodyParser(app);
 
 // ★ 순서가 중요하다 — 훅을 먼저 걸어야 이후 등록되는 모든 라우트가 인증을 거친다.
 //   라우트를 먼저 등록해도 onRequest 훅은 전역이라 걸리지만, 읽는 사람이 헷갈린다.
@@ -170,6 +174,9 @@ registerIncorporationRoutes(app);
 registerDocFormSettingRoutes(app);
 // ★ 세무 설정(s050100010, 세무 S05) — 운영사 · 회사 모두 **자기 단체만**(org_id = 세션 단체 ID 를 직접 건다).
 registerTaxSettingRoutes(app);
+// ★ 세무 자료 올리기(s050200010) · 거래처(s050100020) — 같은 규칙(자기 단체만). 엑셀은 세무 전용 창구로 받는다.
+registerTaxUploadRoutes(app);
+registerTaxVendorRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,
