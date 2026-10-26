@@ -151,6 +151,17 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
     column: 'card_co_code',
     label: '세무 사업용 카드',
   },
+
+  // --- 세무 자료 올리기 (s050200010) · 거래처 (s050100020) — 2026-10-26 추가. 203_tax_uploads.sql ---
+  { category: 'TAX_KIND', useTp: '000', table: 'tb_s050_upload_files', column: 'kind', label: '세무 올린 파일' },
+  { category: 'TAX_KIND', useTp: '000', table: 'tb_s050_vendors', column: 'first_kind', label: '세무 거래처' },
+  { category: 'TAX_KIND', useTp: '000', table: 'tb_s050_import_maps', column: 'kind', label: '세무 대응표' },
+  { category: 'TAX_INV_DIR', useTp: '000', table: 'tb_s050_upload_files', column: 'direction', label: '세무 올린 파일' },
+  { category: 'TAX_INV_DIR', useTp: '000', table: 'tb_s050_invoices', column: 'direction', label: '세무 세금계산서' },
+  { category: 'TAX_INV_DIR', useTp: '000', table: 'tb_s050_vendors', column: 'first_direction', label: '세무 거래처' },
+  { category: 'TAX_INV_CLASS', useTp: '000', table: 'tb_s050_invoices', column: 'inv_class', label: '세무 세금계산서' },
+  { category: 'TAX_INV_TYPE', useTp: '000', table: 'tb_s050_invoices', column: 'inv_type', label: '세무 세금계산서' },
+  { category: 'TAX_VENDOR_TP', useTp: '000', table: 'tb_s050_vendors', column: 'vendor_tp', label: '세무 거래처' },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */
@@ -269,6 +280,38 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     codes: ['B', 'C'],
     source: 'supabase/migrations/201_tax_settings.sql (ck_s050_fin_accounts_kind · ck_s050_fin_accounts_number)',
     label: '세무 계좌·카드 번호 검사',
+  },
+  /** 세무 자료 올리기 · 거래처 — 2026-10-26 추가. 매입 · 매출 판정과 DB CHECK 가 P · S 에 기댄다. */
+  {
+    category: 'TAX_INV_DIR',
+    useTp: '000',
+    codes: ['P', 'S'],
+    source: 'supabase/migrations/203_tax_uploads.sql (ck_s050_upload_files_direction · ck_s050_invoices_direction)',
+    label: '세무 계산서 매입·매출 판정',
+  },
+  /** 대응표의 값 바꾸기표(jsonb)가 원본 글자를 이 코드값으로 바꾼다 — 칸이 아니라 jsonb 안이라 여기 박는다. */
+  {
+    category: 'TAX_INV_CLASS',
+    useTp: '000',
+    codes: ['TAX'],
+    source: 'supabase/migrations/204_tax_upload_codes.sql (tb_s050_import_maps.columns.invClass)',
+    label: '세무 대응표 계산서 종류',
+  },
+  /** 위와 같다. 「일반」(GEN)이 아닌 줄은 넣지 않는다 — 수정 · 취소 거르기가 GEN 에 기댄다. */
+  {
+    category: 'TAX_INV_TYPE',
+    useTp: '000',
+    codes: ['GEN'],
+    source: 'supabase/migrations/204_tax_upload_codes.sql (tb_s050_import_maps.columns.invType)',
+    label: '세무 대응표 계산서 세부 종류',
+  },
+  /** 업로드가 세금계산서 거래처를 M 으로 만들고 올린다. DB CHECK 도 M · G 에 기댄다. */
+  {
+    category: 'TAX_VENDOR_TP',
+    useTp: '000',
+    codes: ['M', 'G'],
+    source: 'supabase/migrations/203_tax_uploads.sql (ck_s050_vendors_tp)',
+    label: '세무 거래처 주거래처 승격',
   },
 ] as const;
 
