@@ -1036,22 +1036,24 @@ export async function findMemberByLinkId(client: ScopedClient, linkMemberId: num
   return rows[0] ?? null;
 }
 
-/** 삐용 회원번호의 직원이 속한 입주사의 삐용 단체 ID — 받기의 「대상 회사」(2026-10-25). 회사에 단체 ID 가 없으면 null,
- * 그 회원번호의 직원이 없으면 `'not_found'`(직원 받기가 본문 `orgId` 를 보는 경우 — 삐용 통합 시험 C1). */
-export async function findOrgIdByMemberLinkId(
+/** 삐용 회원번호의 직원이 속한 입주사의 삐용 단체 ID — 받기의 「대상 회사」(2026-10-25). 회사에 단체 ID 가 없으면 `orgId` null,
+ * 그 회원번호의 직원이 없으면 `'not_found'`(직원 받기가 본문 `orgId` 를 보는 경우 — 삐용 통합 시험 C1).
+ * `representative` 는 그 직원이 **활성 대표**인가 — 직원 받기가 회사 수정 키(`ORG_SELF`)도 보는 경우(삐용 통합 시험 C4). */
+export async function findMemberOrgByLinkId(
   client: ScopedClient,
   linkMemberId: number,
-): Promise<number | null | 'not_found'> {
-  const { rows } = await q<{ link_s020_org_id: number | null }>(
+): Promise<{ orgId: number | null; representative: boolean } | 'not_found'> {
+  const { rows } = await q<{ link_s020_org_id: number | null; representative: boolean }>(
     client,
-    `SELECT c.link_s020_org_id
+    `SELECT c.link_s020_org_id,
+            (m.status = 'active' AND m.is_representative = $2) AS representative
        FROM public.tb_s080_members m
        JOIN public.tb_s080_companies c ON c.company_id = m.company_id
       WHERE m.link_s020_member_id = $1`,
-    [linkMemberId],
+    [linkMemberId, MEMBER_ROLE.REPRESENTATIVE],
   );
   if (rows.length === 0) return 'not_found';
-  return rows[0]!.link_s020_org_id ?? null;
+  return { orgId: rows[0]!.link_s020_org_id ?? null, representative: rows[0]!.representative === true };
 }
 
 /** 같은 회사의 **다른 활성** 구성원이 이 이메일을 쓰는가 — 대소문자 · 앞뒤 공백은 같게 본다. */

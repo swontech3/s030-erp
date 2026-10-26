@@ -20,7 +20,7 @@ import { MEMBER_ROLE } from '@swonbiz/shared/domain/member-payload';
 import {
   findCompanyIdByOrgId,
   findMemberByLinkId,
-  findOrgIdByMemberLinkId,
+  findMemberOrgByLinkId,
   isMemberEmailTaken,
   patchCompanyFromBbiyong,
   patchMemberFromBbiyong,
@@ -90,9 +90,10 @@ export async function applyMemberFromBbiyong(
 const defaultMemberDeps: MemberReceiveDeps = {
   myMenus: (token) => bbiyongAuth.myMenus(token),
   myOrg: (token) => bbiyongAuth.myOrg(token),
-  orgIdOfMember: (linkMemberId) =>
-    withCompanyScope(RECEIVE_SCOPE, (client) => findOrgIdByMemberLinkId(client, linkMemberId)),
+  orgOfMember: (linkMemberId) =>
+    withCompanyScope(RECEIVE_SCOPE, (client) => findMemberOrgByLinkId(client, linkMemberId)),
   memberGrantName: () => receiveGrantName(MEMBER_SELF_GRANT),
+  orgGrantName: () => receiveGrantName(ORG_SELF_GRANT),
   apply: (linkMemberId, fields) =>
     withCompanyScope(RECEIVE_SCOPE, (client) => applyMemberFromBbiyong(client, linkMemberId, fields)),
 };

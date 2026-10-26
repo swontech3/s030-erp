@@ -8,6 +8,8 @@
  *   · ★ 그 회원번호의 직원이 ERP 에 **없으면**(삐용 통합 시험 C1, 2026-10-25) 대상 = 본문 `orgId` 이고,
  *     내 메뉴에 직원 수정 키(공통 코드 `BBIYONG_EDIT_GRANT` 의 `MEMBER_SELF`)가 있어야 받는다 — 받으면
  *     `not_found`. 키가 없거나 · 남의 회사거나 · 본문 `orgId` 가 없으면 403. 직원이 있으면 본문 `orgId` 는 보지 않는다
+ *   · ★ 운영사가 아닐 때 키(삐용 통합 시험 C4, 2026-10-26): 그 직원이 회사의 **활성 대표**이거나 ERP 에 없으면
+ *     회사 수정 키(`ORG_SELF`) 또는 직원 수정 키(`MEMBER_SELF`) 중 하나, 대표가 아닌 직원이면 `MEMBER_SELF` 만
  *   · 직원 찾기: **삐용 회원번호**(`link_s020_member_id`)로 찾는다. 없으면 아무것도 안 하고 **성공**
  *   · 받는 칸: 이름 · 이메일 · 연락처. **받은 칸만** 바꾸고 빈 값은 「안 바꿈」. 연락처는 숫자로 받아
  *     ERP 저장 모양(하이픈)으로 저장한다
@@ -81,10 +83,15 @@ export type MemberReceiveOutcome =
 
 /** 부르는 쪽 확인(`ReceiveCallerDeps` — 삐용 내 메뉴 · 지금 계정의 단체) + 대상 찾기 + 쓰기. */
 export interface MemberReceiveDeps extends ReceiveCallerDeps {
-  /** 회원번호의 직원이 속한 입주사의 삐용 단체 ID(`link_s020_org_id`). 연결이 없으면 null, 직원이 없으면 `'not_found'`. */
-  orgIdOfMember(memberId: number): Promise<number | null | 'not_found'>;
+  /**
+   * 회원번호의 직원이 속한 입주사의 삐용 단체 ID(`link_s020_org_id`, 연결이 없으면 null)와 그 직원이 활성 대표인가.
+   * 직원이 없으면 `'not_found'`.
+   */
+  orgOfMember(memberId: number): Promise<{ orgId: number | null; representative: boolean } | 'not_found'>;
   /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `MEMBER_SELF` 줄 이름(`화면코드:키`). 없으면 null. */
   memberGrantName(): Promise<string | null>;
+  /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `ORG_SELF` 줄 이름(`화면코드:키`). 없으면 null. */
+  orgGrantName(): Promise<string | null>;
   /**
    * 운영사 스코프 트랜잭션 하나에서: 회원번호의 직원이 없으면 `not_found`, 이메일이 같은 회사 다른 활성
    * 직원과 겹치면 `email_taken`(아무것도 쓰지 않는다), 바꿨으면 `applied`(활성 대표면 `ceo_name` 도).
@@ -98,8 +105,9 @@ const EMAIL_TAKEN = '같은 회사의 다른 직원이 쓰는 이메일입니다
 /**
  * 받기 한 번 — 토큰 확인 → 본문 → 쓰기.
  * ★ 대상 회사 = `memberId` 의 직원이 속한 회사의 단체 ID. 본문이 틀리면 대상을 모른다(운영사만 400 을 받는다).
- *   직원이 없으면 본문 `orgId`. 운영사가 아니면 직원이 있든 없든 직원 수정 키(`MEMBER_SELF`)가 있을 때만
- *   (키가 없거나 코드 줄이 틀리면 대상을 모른다, C1 · C3).
+ *   직원이 없으면 본문 `orgId`. 운영사가 아니면 키가 있을 때만 — 활성 대표 · ERP 에 없는 직원은 `ORG_SELF` 또는
+ *   `MEMBER_SELF`, 대표가 아닌 직원은 `MEMBER_SELF`(키가 없거나 코드 줄이 틀리면 대상을 모른다, C1 · C3 · C4).
+ *   ★ 키가 둘 다 없으면 직원을 묻지 않는다.
  */
 export async function receiveMember(
   authorization: string | undefined,
@@ -112,10 +120,16 @@ export async function receiveMember(
     deps,
     async (menus) => {
       if (!parsed.ok) return null;
-      const grant = parseEditGrant(await deps.memberGrantName());
-      if (!grant || !hasEditGrant(menus, grant)) return null;
-      const org = await deps.orgIdOfMember(parsed.memberId);
-      return org === 'not_found' ? parsed.orgId : org;
+      const held = (name: string | null) => {
+        const grant = parseEditGrant(name);
+        return grant !== null && hasEditGrant(menus, grant);
+      };
+      const memberKey = held(await deps.memberGrantName());
+      const orgKey = held(await deps.orgGrantName());
+      if (!memberKey && !orgKey) return null;
+      const member = await deps.orgOfMember(parsed.memberId);
+      if (member === 'not_found') return parsed.orgId;
+      return memberKey || member.representative ? member.orgId : null;
     },
     '입주사 직원 정보 받기',
   );

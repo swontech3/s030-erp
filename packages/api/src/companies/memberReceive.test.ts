@@ -11,25 +11,37 @@ const OK_MENUS: MyMenusOutcome = { kind: 'ok', screens: ['S021100010'] };
 /** 회사 계정 — 단체관리 없음 · 대역 코드 줄(MEMBER_SELF = S021100031:F003)의 화면 · 키 있음. */
 const KEYED: MyMenusOutcome = { kind: 'ok', screens: ['S021100031'], keys: { S021100031: ['F003'] } };
 
-/** 직원 851 은 단체 324 의 입주사 직원이다(대역). 852 는 ERP 에 있지만 회사에 단체 ID 가 없다. 그 밖은 없다. */
-const ORG_OF_MEMBER: Record<number, number | null> = { 851: 324, 852: null };
+/** 회사 계정 — 단체관리 없음 · 대역 코드 줄(ORG_SELF = S021100021:F002)의 화면 · 키만 있음. */
+const ORG_KEYED: MyMenusOutcome = { kind: 'ok', screens: ['S021100021'], keys: { S021100021: ['F002'] } };
+
+/**
+ * 직원 851 은 단체 324 의 입주사 직원(대표 아님), 853 은 단체 324 의 활성 대표다(대역).
+ * 852 는 ERP 에 있지만 회사에 단체 ID 가 없다. 그 밖은 없다.
+ */
+const ORG_OF_MEMBER: Record<number, { orgId: number | null; representative: boolean }> = {
+  851: { orgId: 324, representative: false },
+  852: { orgId: null, representative: false },
+  853: { orgId: 324, representative: true },
+};
 
 function deps(
   menus: MyMenusOutcome = OK_MENUS,
   result: 'applied' | 'not_found' | 'email_taken' = 'applied',
   org: MyOrgOutcome = { kind: 'rejected' },
   grantName: string | null = 'S021100031:F003',
+  orgGrantName: string | null = null,
 ) {
   const applied: { memberId: number; fields: MemberFromBbiyong }[] = [];
   const asked: number[] = [];
   const d: MemberReceiveDeps = {
     myMenus: async () => menus,
     myOrg: async () => org,
-    orgIdOfMember: async (memberId) => {
+    orgOfMember: async (memberId) => {
       asked.push(memberId);
       return memberId in ORG_OF_MEMBER ? ORG_OF_MEMBER[memberId]! : 'not_found';
     },
     memberGrantName: async () => grantName,
+    orgGrantName: async () => orgGrantName,
     apply: async (memberId, fields) => {
       applied.push({ memberId, fields });
       return result;
@@ -142,6 +154,48 @@ describe('receiveMember', () => {
       expect((await receiveMember('Bearer t', { memberId: 851, orgId: 9003, memberName: 'x' }, deps(KEYED, 'applied', own).d)).status).toBe(403);
       // 852 는 회사에 단체 ID 가 없다 — 대상을 모르니 403
       expect((await receiveMember('Bearer t', { memberId: 852, orgId: 9003, memberName: 'x' }, deps(KEYED, 'applied', own).d)).status).toBe(403);
+    });
+  });
+  describe('★★ 활성 대표 · ERP 에 없는 직원은 회사 수정 키(ORG_SELF)로도 받는다(삐용 통합 시험 C4)', () => {
+    const own = { kind: 'ok', orgId: 324 } as const;
+    const ORG_GRANT = 'S021100021:F002';
+    const BOTH: MyMenusOutcome = { kind: 'ok', screens: ['S021100021', 'S021100031'], keys: { S021100021: ['F002'], S021100031: ['F003'] } };
+    const NONE: MyMenusOutcome = { kind: 'ok', screens: [] };
+    const CEO = { memberId: 853, memberName: '대표2' };
+
+    it('대표 + ORG_SELF 만 → 받음 / MEMBER_SELF 만 → 받음 / 둘 다 없음 → 403', async () => {
+      const orgOnly = deps(ORG_KEYED, 'applied', own, 'S021100031:F003', ORG_GRANT);
+      expect(await receiveMember('Bearer t', CEO, orgOnly.d)).toEqual({ status: 200, body: { ok: true, applied: true, skipped: null } });
+      expect(orgOnly.applied).toEqual([{ memberId: 853, fields: { name: '대표2' } }]);
+      const memberOnly = deps(KEYED, 'applied', own, 'S021100031:F003', ORG_GRANT);
+      expect((await receiveMember('Bearer t', CEO, memberOnly.d)).status).toBe(200);
+      const none = deps(NONE, 'applied', own, 'S021100031:F003', ORG_GRANT);
+      expect((await receiveMember('Bearer t', CEO, none.d)).status).toBe(403);
+      expect([...none.applied, ...none.asked]).toEqual([]);
+    });
+    it('대표 아닌 직원 + ORG_SELF 만 → 403 / MEMBER_SELF 있음 → 받음', async () => {
+      const orgOnly = deps(ORG_KEYED, 'applied', own, 'S021100031:F003', ORG_GRANT);
+      expect((await receiveMember('Bearer t', body, orgOnly.d)).status).toBe(403);
+      expect(orgOnly.applied).toEqual([]);
+      const memberKey = deps(KEYED, 'applied', own, 'S021100031:F003', ORG_GRANT);
+      expect((await receiveMember('Bearer t', body, memberKey.d)).status).toBe(200);
+      const both = deps(BOTH, 'applied', own, 'S021100031:F003', ORG_GRANT);
+      expect((await receiveMember('Bearer t', body, both.d)).status).toBe(200);
+    });
+    it('ERP 에 없는 직원 + ORG_SELF 만 · MEMBER_SELF 만 → 200 not_found(쓰는 것 없이)', async () => {
+      const notInErp = { memberId: 999, orgId: 324, memberName: '새직원' };
+      const notFound = { status: 200, body: { ok: true, applied: false, skipped: 'not_found' } };
+      expect(await receiveMember('Bearer t', notInErp, deps(ORG_KEYED, 'not_found', own, 'S021100031:F003', ORG_GRANT).d)).toEqual(notFound);
+      expect(await receiveMember('Bearer t', notInErp, deps(KEYED, 'not_found', own, 'S021100031:F003', ORG_GRANT).d)).toEqual(notFound);
+    });
+    it('남의 회사 → 403 — 대표 + ORG_SELF 여도 · 운영사 → 받음', async () => {
+      const other = deps(BOTH, 'applied', { kind: 'ok', orgId: 325 }, 'S021100031:F003', ORG_GRANT);
+      expect((await receiveMember('Bearer t', CEO, other.d)).status).toBe(403);
+      expect((await receiveMember('Bearer t', body, other.d)).status).toBe(403);
+      expect(other.applied).toEqual([]);
+      const operator = deps(OK_MENUS, 'applied', { kind: 'rejected' }, null, null);
+      expect((await receiveMember('Bearer t', CEO, operator.d)).status).toBe(200);
+      expect(operator.asked).toEqual([]);
     });
   });
   it('★★ 이메일이 같은 회사 다른 직원과 겹치면 400', async () => {
