@@ -29,9 +29,11 @@
  * =============================================================================
  * 회사 정보는 첫 저장(POST) · PATCH 본문의 `company` 로만 저장한다 — 건 · 변경 내용과 같은
  * 트랜잭션이다. 단체 기준 경로(`PUT /legal/corp-changes/company-info`)는 지웠다.
- * ★★ 회사 정보는 **운영사만** 저장한다(결정 2026-10-22). 저장이 커밋되면 삐용에 본점 주소 · 사업자번호 ·
- *    법인번호를 보내고(`legal/legalOrgSync.ts`), 그 결과를 저장 응답의 `companySync` 에 싣는다 — 실패해도
- *    저장은 그대로이고 DB 에 남기지 않는다(화면 배너만).
+ * ★★ 회사 정보는 **운영사 또는 수정 권한이 있는 그 회사 사용자**만 저장한다(결정 2026-10-22 → 넓힘 2026-10-25,
+ *    `legal/companyEditGrant.ts`). 권한은 요청마다 트랜잭션 **밖에서** 한 번 정해(`companyEditor`) 저장 판정과
+ *    응답의 `canEditCompany`(화면 칸 잠금)에 같이 쓴다. 저장이 커밋되면 삐용에 본점 주소 · 사업자번호 ·
+ *    법인번호를 그 사용자의 토큰으로 보내고(`legal/legalOrgSync.ts`), 그 결과를 저장 응답의 `companySync` 에
+ *    싣는다 — 실패해도 저장은 그대로이고 DB 에 남기지 않는다(화면 배너만).
  * 비입주사 회사 정보의 빈 칸은 삐용 값으로 **채워 보여 주기만** 한다(`applyCompanyDefaults`) —
  * 삐용 호출은 DB 트랜잭션 **밖에서** 한다(`withCompanyDefaults`). 입주사는 부르지 않는다.
  *
@@ -80,6 +82,7 @@ import {
   type Parsed,
 } from '@swonbiz/shared/domain/corp-change-detail';
 import { pushLegalOrg } from '../legal/legalOrgSync.ts';
+import { canEditLegalCompany } from '../legal/companyEditGrant.ts';
 import { callBbiyong } from '../session/bbiyongToken.ts';
 import { bbiyongAuth, bbiyongOrg } from '../bbiyong/index.ts';
 import {
@@ -113,6 +116,10 @@ export interface CorpChangeDeps {
    * null = 보낼 값이 없어 부르지 않았다.
    */
   pushCompany(session: ErpSession, orgCode: string | null, company: LegalOrgInput): Promise<LegalOrgSyncResult | null>;
+  /**
+   * 이 세션이 비입주사 회사 정보를 고칠 수 있는가(`canEditLegalCompany`) — 트랜잭션 **밖에서** 부른다(삐용 호출).
+   */
+  companyEditor(session: ErpSession): Promise<boolean>;
 }
 
 /**
@@ -152,6 +159,7 @@ const defaultDeps: CorpChangeDeps = {
   run: (session, fn) => withCompanyScope(scopeOfSession(session), fn),
   companyDefaults: readCompanyDefaults,
   pushCompany: (session, orgCode, company) => pushLegalOrg(session, orgCode, company),
+  companyEditor: (session) => canEditLegalCompany(session),
 };
 
 export function registerCorpChangeRoutes(app: FastifyInstance, deps: CorpChangeDeps = defaultDeps): void {
@@ -205,8 +213,9 @@ export function registerCorpChangeRoutes(app: FastifyInstance, deps: CorpChangeD
     const session = requireSession(req);
     const parsed = parseFirstSave(req.body, session);
     if (!parsed.ok) return refuse(reply, parsed);
-    const result = await deps.run(session, (client) => createCorpChange(client, session, parsed.value));
-    // ★ 커밋 뒤 — 회사 정보를 실었고 저장됐으면 삐용에 보낸다(운영사만 여기까지 온다 · `checkCompanyWrite`).
+    const editor = parsed.value.company ? await deps.companyEditor(session) : false;
+    const result = await deps.run(session, (client) => createCorpChange(client, session, parsed.value, editor));
+    // ★ 커밋 뒤 — 회사 정보를 실었고 저장됐으면 삐용에 보낸다(권한 있는 사람만 여기까지 온다 · `checkCompanyWrite`).
     if (!result.ok || !parsed.value.company) return send(reply, result, 201);
     const companySync = await deps.pushCompany(session, parsed.value.orgCode, parsed.value.company);
     return send(reply, { ok: true, value: { ...result.value, companySync } }, 201);
@@ -221,13 +230,15 @@ export function registerCorpChangeRoutes(app: FastifyInstance, deps: CorpChangeD
     const q = req.query ?? {};
     const parsed = parseCreateBody({ changeType: q.changeType, orgId: q.orgId, orgCode: q.orgCode }, session);
     if (!parsed.ok) return refuse(reply, parsed);
-    const result = await deps.run(session, (client) => readCorpChangeDraft(client, session, parsed.value));
+    const editor = await deps.companyEditor(session);
+    const result = await deps.run(session, (client) => readCorpChangeDraft(client, session, parsed.value, editor));
     return send(reply, await withCompanyDefaults(session, result));
   });
 
   app.get<{ Params: { id: string } }>('/legal/corp-changes/:id', async (req, reply) => {
     const session = requireSession(req);
-    const result = await deps.run(session, (client) => readCorpChangeDetail(client, session, req.params.id));
+    const editor = await deps.companyEditor(session);
+    const result = await deps.run(session, (client) => readCorpChangeDetail(client, session, req.params.id, editor));
     return send(reply, await withCompanyDefaults(session, result));
   });
 
@@ -237,7 +248,8 @@ export function registerCorpChangeRoutes(app: FastifyInstance, deps: CorpChangeD
    */
   app.post<{ Params: { id: string }; Body: unknown }>('/legal/corp-changes/:id/transition', async (req, reply) => {
     const session = requireSession(req);
-    const result = await deps.run(session, (client) => transitionCorpChange(client, session, req.params.id, req.body));
+    const editor = await deps.companyEditor(session);
+    const result = await deps.run(session, (client) => transitionCorpChange(client, session, req.params.id, req.body, editor));
     return send(reply, await withCompanyDefaults(session, result));
   });
 
@@ -253,7 +265,8 @@ export function registerCorpChangeRoutes(app: FastifyInstance, deps: CorpChangeD
 
   app.patch<{ Params: { id: string }; Body: unknown }>('/legal/corp-changes/:id', async (req, reply) => {
     const session = requireSession(req);
-    const result = await deps.run(session, (client) => saveCorpChangePayload(client, session, req.params.id, req.body));
+    const editor = await deps.companyEditor(session);
+    const result = await deps.run(session, (client) => saveCorpChangePayload(client, session, req.params.id, req.body, editor));
     // ★ 커밋 뒤 삐용에 보낸다. 저장된 값은 처리 함수가 읽은 것과 같은 함수(`parseCompanyPart`)로 다시 읽는다 —
     //   저장이 성공했다면 이 읽기도 성공한 것이다. 단체코드는 건의 것(운영사가 팝업에서 고른 값).
     const body = typeof req.body === 'object' && req.body !== null ? (req.body as Record<string, unknown>) : {};

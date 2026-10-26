@@ -3,13 +3,22 @@
  * ★ DB · 삐용에 붙지 않는다. 내 메뉴와 쓰기는 대역이다.
  */
 import { describe, expect, it } from 'vitest';
-import { BbiyongUnavailableError, type MyMenusOutcome } from '../bbiyong/types.ts';
+import { BbiyongUnavailableError, type MyMenusOutcome, type MyOrgOutcome } from '../bbiyong/types.ts';
 import type { LegalOrgFromBbiyong } from '../db/corpChanges.ts';
 import { bearerOf, parseReceiveBody, receiveLegalOrg, type ReceiveDeps } from './legalOrgReceive.ts';
 
 const OK_MENUS: MyMenusOutcome = { kind: 'ok', screens: ['S021000000', 'S021100010'] };
+/** 운영사가 아닌 토큰 — 단체관리 없음. */
+const COMPANY_MENUS: MyMenusOutcome = { kind: 'ok', screens: ['S021000000'] };
+/** 회사 계정 — 단체관리 없음 · 「내 단체 정보」 수정 키 있음(대역 코드 줄 ORG_SELF = S021100021:F002). */
+const KEYED: MyMenusOutcome = { kind: 'ok', screens: ['S021000000', 'S021100021'], keys: { S021100021: ['F002'] } };
 
-function deps(menus: MyMenusOutcome | Error = OK_MENUS, result: 'applied' | 'tenant' | 'not_found' = 'applied') {
+function deps(
+  menus: MyMenusOutcome | Error = OK_MENUS,
+  result: 'applied' | 'tenant' | 'not_found' = 'applied',
+  org: MyOrgOutcome = { kind: 'rejected' },
+  grantName: string | null = 'S021100021:F002',
+) {
   const tokens: string[] = [];
   const applied: { orgId: number; fields: LegalOrgFromBbiyong }[] = [];
   const d: ReceiveDeps = {
@@ -18,6 +27,8 @@ function deps(menus: MyMenusOutcome | Error = OK_MENUS, result: 'applied' | 'ten
       if (menus instanceof Error) throw menus;
       return menus;
     },
+    myOrg: async () => org,
+    orgGrantName: async () => grantName,
     apply: async (orgId, fields) => {
       applied.push({ orgId, fields });
       return result;
@@ -88,15 +99,36 @@ describe('receiveLegalOrg', () => {
     expect(v.applied).toEqual([{ orgId: 9003, fields: { headAddress: '서울', bizNumber: '105-87-68687' } }]);
   });
 
-  it('★★ 토큰이 없거나 · 거절되거나 · 단체관리가 없으면 403 — 본문도 쓰기도 보지 않는다', async () => {
+  it('★★ 토큰이 없거나 · 거절되거나 · 운영사도 그 회사도 아니면 403 — 칸 오류도 쓰기도 보이지 않는다', async () => {
     const none = deps();
     expect((await receiveLegalOrg(undefined, body, none.d)).status).toBe(403);
     expect(none.tokens).toEqual([]);
     const rejected = deps({ kind: 'rejected' });
     expect((await receiveLegalOrg('Bearer eyJ.in', body, rejected.d)).status).toBe(403);
-    const noMenu = deps({ kind: 'ok', screens: ['S021000000'] });
+    const noMenu = deps(COMPANY_MENUS);
     expect((await receiveLegalOrg('Bearer eyJ.in', { orgId: 'x' }, noMenu.d)).status).toBe(403);
     expect([...rejected.applied, ...noMenu.applied]).toEqual([]);
+  });
+
+  it('★★ 운영사가 아니면 대상 = 본문 orgId — 지금 계정의 단체와 같을 때만 받는다', async () => {
+    const own = deps(KEYED, 'applied', { kind: 'ok', orgId: 9003 });
+    expect((await receiveLegalOrg('Bearer eyJ.in', body, own.d)).status).toBe(200);
+    expect(own.applied).toEqual([{ orgId: 9003, fields: { headAddress: '서울', bizNumber: '105-87-68687' } }]);
+    const other = deps(KEYED, 'applied', { kind: 'ok', orgId: 9001 });
+    expect((await receiveLegalOrg('Bearer eyJ.in', body, other.d)).status).toBe(403);
+    expect(other.applied).toEqual([]);
+  });
+
+  it('★★ 운영사가 아니면 단체 수정 키(ORG_SELF)가 있을 때만 — 키 없음 · 화면 없음 · 코드 줄 없음 · 모양 틀림은 403(C3)', async () => {
+    const own = { kind: 'ok', orgId: 9003 } as const;
+    const cases = [
+      deps(COMPANY_MENUS, 'applied', own),
+      deps({ kind: 'ok', screens: ['S021100021'], keys: { S021100021: ['F001'] } }, 'applied', own),
+      deps(KEYED, 'applied', own, null),
+      deps(KEYED, 'applied', own, 'S021100021'),
+    ];
+    for (const v of cases) expect((await receiveLegalOrg('Bearer eyJ.in', body, v.d)).status).toBe(403);
+    expect(cases.flatMap((v) => v.applied)).toEqual([]);
   });
 
   it('삐용에 못 붙으면 503 · 쓰지 않는다', async () => {

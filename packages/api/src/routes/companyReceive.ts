@@ -20,6 +20,7 @@ import { MEMBER_ROLE } from '@swonbiz/shared/domain/member-payload';
 import {
   findCompanyIdByOrgId,
   findMemberByLinkId,
+  findMemberOrgByLinkId,
   isMemberEmailTaken,
   patchCompanyFromBbiyong,
   patchMemberFromBbiyong,
@@ -29,6 +30,7 @@ import {
 import { withCompanyScope } from '../db/withCompanyScope.ts';
 import { receiveCompany, type CompanyReceiveDeps } from '../companies/companyReceive.ts';
 import { receiveMember, type MemberReceiveDeps } from '../companies/memberReceive.ts';
+import { MEMBER_SELF_GRANT, ORG_SELF_GRANT, receiveGrantName } from '../legal/companyEditGrant.ts';
 
 /** `updated_by` 에 남기는 값 — 삐용이 보낸 줄이라는 표시(회원번호는 내 메뉴가 주지 않는다). */
 export const RECEIVE_ACTOR = 'bbiyong';
@@ -42,6 +44,8 @@ const isUniqueViolation = (err: unknown): boolean =>
 
 const defaultCompanyDeps: CompanyReceiveDeps = {
   myMenus: (token) => bbiyongAuth.myMenus(token),
+  myOrg: (token) => bbiyongAuth.myOrg(token),
+  orgGrantName: () => receiveGrantName(ORG_SELF_GRANT),
   // ★★ try/catch 가 트랜잭션 **밖**이어야 한다 — 안에서 삼키면 abort 된 트랜잭션에 COMMIT 을 부른다.
   apply: async (orgId, fields) => {
     try {
@@ -85,6 +89,11 @@ export async function applyMemberFromBbiyong(
 
 const defaultMemberDeps: MemberReceiveDeps = {
   myMenus: (token) => bbiyongAuth.myMenus(token),
+  myOrg: (token) => bbiyongAuth.myOrg(token),
+  orgOfMember: (linkMemberId) =>
+    withCompanyScope(RECEIVE_SCOPE, (client) => findMemberOrgByLinkId(client, linkMemberId)),
+  memberGrantName: () => receiveGrantName(MEMBER_SELF_GRANT),
+  orgGrantName: () => receiveGrantName(ORG_SELF_GRANT),
   apply: (linkMemberId, fields) =>
     withCompanyScope(RECEIVE_SCOPE, (client) => applyMemberFromBbiyong(client, linkMemberId, fields)),
 };

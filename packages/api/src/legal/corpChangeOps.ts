@@ -132,7 +132,8 @@ async function orgCodeFor(client: ScopedClient, session: ErpSession, target: Org
 async function companyView(
   client: ScopedClient,
   org: { orgId: number; orgCode: string | null },
-): Promise<{ company: CorpChangeCompanyInfo; memberTypes: CodeOption[] }> {
+  companyEditor: boolean,
+): Promise<{ company: CorpChangeCompanyInfo; memberTypes: CodeOption[]; canEditCompany: boolean }> {
   // ★ 한 클라이언트(한 트랜잭션)라 차례로 부른다 — pg 클라이언트는 쿼리를 동시에 돌리지 않는다.
   const company = await readCompanySource(client, org.orgId);
   // listCodes 는 파티션을 돌려주지 않으므로 MEMBER_TYPE 두 파티션은 따로 읽는다.
@@ -165,6 +166,8 @@ async function companyView(
       defaultedFields: [],
     },
     memberTypes: legalTypes.map((c) => ({ code: c.code, name: c.name })),
+    // 입주사는 누구도 여기서 고치지 않는다(409 — `checkCompanyWrite`).
+    canEditCompany: companyEditor && !company.isTenant,
   };
 }
 
@@ -194,8 +197,9 @@ async function codeNames(
  * 회사 정보를 쓰기 **전에** 거절할 것을 다 본다 — 이 함수가 통과해야 건 · 변경 내용도 쓴다.
  * 쓰는 쪽이 판정 뒤에 쓰므로, 회사 정보가 틀리면 건 · 변경 내용도 남지 않는다.
  *
- * ★★ **운영사만** 고친다(결정 2026-10-22, 회사 사용자는 읽기만 — 나중에 열 예정). 회사 세션이 `company` 를
- *    실어 오면 **403** — DB 를 읽기 전에 거절한다. RLS(037)는 그대로 둔다(코드에서만 막는다).
+ * ★★ **운영사 또는 수정 권한이 있는 그 회사 사용자**만 고친다(결정 2026-10-22 → 넓힘 2026-10-25,
+ *    `companyEditGrant.ts`). 권한은 라우트가 트랜잭션 밖에서 정해 `companyEditor` 로 넘긴다. 없으면
+ *    **403** — DB 를 읽기 전에 거절한다. RLS(037)는 그대로 둔다(코드에서만 막는다).
  * ★★ 입주사 단체(`link_s020_org_id` 에 있다)면 **409** — 법무는 ERP 에 쓰지 않는다. 입주사
  *    정보는 입주사 화면에서 고친다.
  * ★ 회사유형은 `MEMBER_TYPE` 002 에 있어야 한다(400, 자리 `company.memberType`).
@@ -203,11 +207,11 @@ async function codeNames(
  */
 async function checkCompanyWrite(
   client: ScopedClient,
-  session: ErpSession,
+  companyEditor: boolean,
   orgId: number,
   company: LegalOrgInput,
 ): Promise<OpError | null> {
-  if (session.role !== 'operator') return fail(403, 'operator_only', '회사 정보는 운영사만 고칠 수 있습니다');
+  if (!companyEditor) return fail(403, 'operator_only', '회사 정보는 운영사 또는 수정 권한이 있는 회사 사용자만 고칠 수 있습니다');
   const source = await readCompanySource(client, orgId);
   if (source.isTenant) return fail(409, 'tenant_company', '입주사 정보는 ERP 입주사 화면에서 고칩니다');
 
@@ -234,9 +238,10 @@ export async function readCorpChangeDraft(
   client: ScopedClient,
   session: ErpSession,
   input: CorpChangeCreateInput,
+  companyEditor = session.role === 'operator',
 ): Promise<OpResult<CorpChangeDraftResponse>> {
   const orgCode = await orgCodeFor(client, session, input);
-  const view = await companyView(client, { orgId: input.orgId, orgCode });
+  const view = await companyView(client, { orgId: input.orgId, orgCode }, companyEditor);
   const names = await codeNames(client, input.changeType, INITIAL_CORP_CHANGE_STATUS);
   return {
     ok: true,
@@ -262,10 +267,11 @@ export async function createCorpChange(
   client: ScopedClient,
   session: ErpSession,
   input: FirstSaveInput,
+  companyEditor = session.role === 'operator',
 ): Promise<OpResult<{ id: string }>> {
   // ★ 회사 정보 판정이 먼저다 — 틀리면 건도 만들지 않는다(쓰기 전에 돌려준다).
   if (input.company) {
-    const refused = await checkCompanyWrite(client, session, input.orgId, input.company);
+    const refused = await checkCompanyWrite(client, companyEditor, input.orgId, input.company);
     if (refused) return refused;
   }
 
@@ -301,6 +307,7 @@ export async function readCorpChangeDetail(
   client: ScopedClient,
   session: ErpSession,
   id: string,
+  companyEditor = session.role === 'operator',
 ): Promise<OpResult<CorpChangeDetailResponse>> {
   const row = await getCorpChange(client, id);
   if (!row) return NOT_FOUND;
@@ -310,7 +317,7 @@ export async function readCorpChangeDetail(
   const changeType: CorpChangeType = row.changeType;
 
   // ★ 회사 정보는 **이 건의 org_id** 로만 읽는다(RLS 를 통과한 값 — db 머리말 ⚠).
-  const view = await companyView(client, row);
+  const view = await companyView(client, row, companyEditor);
   const officers = CHANGE_TYPE_DEFS[changeType].usesOfficers ? await listOfficers(client, row.id) : [];
   const names = await codeNames(client, changeType, row.status);
   // ★ 복원 대상은 취소(X)일 때만 뜻이 있다. 다른 상태에 남은 값은 내려보내지 않는다.
@@ -387,6 +394,7 @@ export async function transitionCorpChange(
   session: ErpSession,
   id: string,
   body: unknown,
+  companyEditor = session.role === 'operator',
 ): Promise<OpResult<CorpChangeDetailResponse>> {
   const parsed = parseTransitionBody(body);
   if (!parsed.ok) return fail(400, 'invalid_request', parsed.message, parsed.errors);
@@ -441,7 +449,7 @@ export async function transitionCorpChange(
   });
   // 잠가 두었으므로 생기지 않는다. 생기면 판정 없이 쓴 것이 없도록 멈춘다.
   if (!changed) return STALE;
-  return readCorpChangeDetail(client, session, id);
+  return readCorpChangeDetail(client, session, id, companyEditor);
 }
 
 /**
@@ -486,6 +494,7 @@ export async function saveCorpChangePayload(
   session: ErpSession,
   id: string,
   body: unknown,
+  companyEditor = session.role === 'operator',
 ): Promise<OpResult<CorpChangeDetailResponse>> {
   const locked = await lockEditable(client, id);
   if (!locked.ok) return locked;
@@ -507,14 +516,14 @@ export async function saveCorpChangePayload(
   if (!parsed.ok || !company.ok) return fail(400, 'invalid_request', errors[0]!.message, errors);
 
   if (company.value) {
-    const refused = await checkCompanyWrite(client, session, row.orgId, company.value);
+    const refused = await checkCompanyWrite(client, companyEditor, row.orgId, company.value);
     if (refused) return refused;
   }
 
   const actor = actorOf(session);
   await updatePayload(client, { id, payload: parsed.value, actor });
   if (company.value) await upsertLegalOrg(client, { orgId: row.orgId, input: company.value, actor });
-  return readCorpChangeDetail(client, session, id);
+  return readCorpChangeDetail(client, session, id, companyEditor);
 }
 
 // =============================================================================

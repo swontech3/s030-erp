@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { ErpSession } from '@swonbiz/shared';
 import type { LegalOrgInput } from '@swonbiz/shared/domain/corp-change-detail';
 import type { BbiyongOrg, BbiyongOrgLegalPatch, OrgOpOutcome } from '../bbiyong/types.ts';
+import { MockBbiyongOrg } from '../bbiyong/MockBbiyongOrg.ts';
 import { legalOrgPatchOf, pushLegalOrg } from './legalOrgSync.ts';
 
 const EMPTY: LegalOrgInput = {
@@ -85,6 +86,11 @@ describe('pushLegalOrg', () => {
     const v = via();
     expect(await pushLegalOrg(session, 'Z01', FULL, v.via)).toEqual({ kind: 'ok' });
     expect(v.sent.map((s) => [s.patch.orgCode, s.token])).toEqual([['Z01', 'tok']]);
+  });
+  it('★ 수정 권한이 있는 회사 사용자도 그 사람의 토큰으로 보낸다 — 모의 삐용에서 ok(2026-10-25)', async () => {
+    const company = { ...session, s020OrgId: 9003, role: 'tenant' } as ErpSession;
+    const call = async <T,>(_sid: string, fn: (token: string) => Promise<T>) => fn('company-tok');
+    expect(await pushLegalOrg(company, 'Z99', FULL, { org: new MockBbiyongOrg(), call })).toEqual({ kind: 'ok' });
   });
   it('보낼 값이 없으면 부르지 않는다(null)', async () => {
     const v = via();

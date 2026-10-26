@@ -30,6 +30,7 @@ import {
   type BbiyongLoginResult,
   type BbiyongProfile,
   type MyMenusOutcome,
+  type MyOrgOutcome,
 } from './types.ts';
 
 export { INVALID_CREDENTIALS_MESSAGE, ORG_SELECT_MESSAGE, RELOGIN_MESSAGE } from './types.ts';
@@ -156,6 +157,22 @@ export function parseMyMenus(body: unknown): MyMenusOutcome {
     .map((v) => (typeof v === 'string' ? v : asRecord(v)?.menuCode))
     .filter((v): v is string => typeof v === 'string');
   return { kind: 'ok', screens };
+}
+
+/**
+ * my-menus 의 기능 키 — 화면코드 → `keys`(2026-10-25, 법무 회사 정보 수정 열기). `parseMyMenus` 는 그대로 두고
+ * 키만 따로 읽는다. 키를 실은 화면이 하나도 없으면(옛 모양) null.
+ */
+export function parseMyMenuKeys(body: unknown): Record<string, string[]> | null {
+  const data = asRecord(body)?.data;
+  if (!Array.isArray(data)) return null;
+  const keys: Record<string, string[]> = {};
+  for (const v of data) {
+    const row = asRecord(v);
+    if (typeof row?.menuCode !== 'string' || !Array.isArray(row.keys)) continue;
+    keys[row.menuCode] = row.keys.filter((k): k is string => typeof k === 'string');
+  }
+  return Object.keys(keys).length > 0 ? keys : null;
 }
 
 // =============================================================================
@@ -315,7 +332,30 @@ export class HttpBbiyongAuth implements BbiyongAuth {
       if (err instanceof BbiyongUnavailableError && err.httpStatus === 403) return { kind: 'rejected' };
       throw err;
     }
-    return parseMyMenus(body);
+    const out = parseMyMenus(body);
+    const keys = out.kind === 'ok' ? parseMyMenuKeys(body) : null;
+    return out.kind === 'ok' && keys ? { ...out, keys } : out;
+  }
+
+  /**
+   * 지금 계정의 단체 — 받은 토큰 그대로 my-orgs 를 부른다(재발급 없음, `BbiyongAuth.myOrg`).
+   * ★ 거절 · 연결 처리는 `myMenus` 와 같다. 지금 계정 줄을 못 찾으면 `rejected`(`parseMyOrgs`).
+   */
+  async myOrg(accessToken: string): Promise<MyOrgOutcome> {
+    let body: unknown;
+    try {
+      body = await this.#call(
+        `${this.#baseUrl}${BBIYONG.MY_ORGS_PATH}`,
+        { method: 'GET', headers: { authorization: `Bearer ${accessToken}` } },
+        'my-orgs',
+      );
+    } catch (err) {
+      if (err instanceof BbiyongTokenExpiredError) return { kind: 'rejected' };
+      if (err instanceof BbiyongUnavailableError && err.httpStatus === 403) return { kind: 'rejected' };
+      throw err;
+    }
+    const me = parseMyOrgs(body);
+    return me ? { kind: 'ok', orgId: me.orgId } : { kind: 'rejected' };
   }
 
   /**

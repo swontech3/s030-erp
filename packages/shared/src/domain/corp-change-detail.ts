@@ -617,6 +617,11 @@ export interface CorpChangeDraftResponse {
   company: CorpChangeCompanyInfo;
   /** 비입주사 회사유형 선택지 — MEMBER_TYPE 002(코드표 순서 · 이름). */
   memberTypes: CodeOption[];
+  /**
+   * 이 세션이 비입주사 회사 정보를 고칠 수 있는가 — 운영사 또는 수정 권한이 있는 그 회사 사용자(2026-10-25).
+   * 입주사면 늘 false. 화면은 **이 값으로만** 회사 칸을 연다 — 서버가 저장을 받을 때와 같은 판정이다.
+   */
+  canEditCompany: boolean;
 }
 
 export interface CorpChangeDetailResponse extends CorpChangeDraftResponse {

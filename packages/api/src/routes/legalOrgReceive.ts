@@ -14,12 +14,15 @@ import { bbiyongAuth } from '../bbiyong/index.ts';
 import { isTenantOrg, patchLegalOrgFromBbiyong } from '../db/corpChanges.ts';
 import { withCompanyScope } from '../db/withCompanyScope.ts';
 import { receiveLegalOrg, type ReceiveDeps } from '../legal/legalOrgReceive.ts';
+import { ORG_SELF_GRANT, receiveGrantName } from '../legal/companyEditGrant.ts';
 
 /** `updated_by` 에 남기는 값 — 삐용이 보낸 줄이라는 표시(회원번호는 내 메뉴가 주지 않는다). */
 const RECEIVE_ACTOR = 'bbiyong';
 
 const defaultDeps: ReceiveDeps = {
   myMenus: (token) => bbiyongAuth.myMenus(token),
+  myOrg: (token) => bbiyongAuth.myOrg(token),
+  orgGrantName: () => receiveGrantName(ORG_SELF_GRANT),
   // ★ 운영사 스코프 — 법무 회사 정보는 운영사가 전부 본다(037 RLS).
   apply: (orgId, fields) =>
     withCompanyScope({ role: 'operator', companyId: null, orgId: null }, async (client) => {

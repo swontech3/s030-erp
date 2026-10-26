@@ -63,6 +63,7 @@ function fakeDeps(): CorpChangeDeps & { filters: CorpChangeListFilter[]; who: nu
     },
     companyDefaults: async () => null,
     pushCompany: async () => null,
+    companyEditor: async (s) => s.role === 'operator',
   };
 }
 
@@ -212,11 +213,15 @@ interface Seen {
   params: unknown[];
 }
 
-/** SQL 로 답을 고르는 가짜 클라이언트. 답이 없으면 빈 줄. */
+/**
+ * SQL 로 답을 고르는 가짜 클라이언트. 답이 없으면 빈 줄.
+ * @param companyGranted 회사 세션에 회사 정보 수정 권한이 있는가(`companyEditor` 대역 — 운영사는 늘 있다)
+ */
 function fakeDb(
   answers: { match: RegExp; rows: unknown[] }[] = [],
   defaults: BbiyongCompanyDefaults | null = null,
   sync: LegalOrgSyncResult | null = { kind: 'ok' },
+  companyGranted = false,
 ) {
   const seen: Seen[] = [];
   const asked: { role: string; orgId: number }[] = [];
@@ -245,6 +250,7 @@ function fakeDb(
       pushed.push({ orgCode, company, runsBefore: runs });
       return sync;
     },
+    companyEditor: async (s) => s.role === 'operator' || companyGranted,
   };
   return { deps, seen, asked, pushed, runs: () => runs };
 }
@@ -1535,5 +1541,81 @@ describe('출력 이력 — /legal/corp-changes/:id/prints', () => {
     const none = fakeDb([]);
     const b = await build(session('tenant', 9003), none.deps);
     expect((await b.inject({ method: 'GET', url: URL })).statusCode).toBe(404);
+  });
+});
+
+// =============================================================================
+// 회사 사용자 중 수정 권한 있는 사람에게 열기(2026-10-25) — 권한(`companyEditor`)은 대역
+// =============================================================================
+describe('비입주사 회사 정보 — 운영사 또는 수정 권한(F002)이 있는 그 회사 사용자', () => {
+  const company = { legalName: '주식회사 한빛', memberType: 'R', headZipCode: '06097', headAddress: '서울 강남구 테헤란로 1' };
+  const codes = { match: /FROM public\.tb_s080_codes_line/, rows: [{ category: 'MEMBER_TYPE', code: 'R', name: '주식회사' }] };
+  const TENANT = { match: /FROM public\.tb_s080_companies\s+WHERE link_s020_org_id/, rows: [{ company_id: 'c-1' }] };
+  const UPSERT_ORG = /INSERT INTO public\.tb_s080_legal_orgs/;
+  const UPD_PAYLOAD = /UPDATE public\.tb_s080_corp_changes\s+SET payload/;
+
+  it('★★ 운영사 — 칸이 열리고(canEditCompany) 저장 · 삐용 반영', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' }), codes]);
+    const a = await build(session('operator', 1), db.deps);
+    expect((await a.inject({ method: 'GET', url: '/legal/corp-changes/cc-1' })).json().canEditCompany).toBe(true);
+    const res = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: { newName: '새' }, company } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ canEditCompany: true, companySync: { kind: 'ok' } });
+    expect(db.seen.some((s) => UPSERT_ORG.test(s.sql))).toBe(true);
+    expect(db.pushed.map((p) => p.orgCode)).toEqual(['Z99']);
+  });
+
+  it('★★ 자기 회사 F002 사용자 — 칸이 열리고 첫 저장 · PATCH 모두 저장 · 삐용 반영', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' }), codes], null, { kind: 'ok' }, true);
+    const a = await build(session('tenant', 9003), db.deps);
+    expect((await a.inject({ method: 'GET', url: '/legal/corp-changes/cc-1' })).json().canEditCompany).toBe(true);
+    expect((await a.inject({ method: 'GET', url: '/legal/corp-changes/draft?changeType=NAME' })).json().canEditCompany).toBe(true);
+
+    const patched = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: { newName: '새' }, company } });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json()).toMatchObject({ canEditCompany: true, companySync: { kind: 'ok' } });
+    expect(db.seen.filter((s) => UPSERT_ORG.test(s.sql)).map((s) => s.params[0])).toEqual([9003]);
+
+    const created = await a.inject({ method: 'POST', url: '/legal/corp-changes', payload: { changeType: 'NAME', payload: {}, company } });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({ companySync: { kind: 'ok' } });
+    expect(db.seen.filter((s) => UPSERT_ORG.test(s.sql))).toHaveLength(2);
+    expect(db.pushed).toHaveLength(2);
+  });
+
+  it('★★ 같은 회사 F002 없는 사용자 — 칸 잠김 · 회사 정보를 실으면 403(건도 회사 정보도 안 바뀜 · 삐용에 안 보냄)', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' }), codes]);
+    const a = await build(session('tenant', 9003), db.deps);
+    expect((await a.inject({ method: 'GET', url: '/legal/corp-changes/cc-1' })).json().canEditCompany).toBe(false);
+    const res = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: { newName: '새' }, company } });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().message).toBe('회사 정보는 운영사 또는 수정 권한이 있는 회사 사용자만 고칠 수 있습니다');
+    expect(db.seen.some((s) => UPD_PAYLOAD.test(s.sql) || UPSERT_ORG.test(s.sql))).toBe(false);
+    expect(db.pushed).toEqual([]);
+  });
+
+  it('★★ 남의 회사 — F002 가 있어도 남의 단체로는 첫 저장 · 임시 모드 모두 403', async () => {
+    const db = fakeDb([codes], null, { kind: 'ok' }, true);
+    const a = await build(session('tenant', 9003), db.deps);
+    const created = await a.inject({ method: 'POST', url: '/legal/corp-changes', payload: { changeType: 'NAME', orgId: 9001, payload: {}, company } });
+    expect(created.statusCode).toBe(403);
+    expect((await a.inject({ method: 'GET', url: '/legal/corp-changes/draft?changeType=NAME&orgId=9001' })).statusCode).toBe(403);
+    expect(db.runs()).toBe(0);
+    expect(db.pushed).toEqual([]);
+  });
+
+  it('입주사 단체 — 권한이 있어도 칸은 잠긴다(입주사 화면에서 고친다)', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'NAME' }), TENANT, codes]);
+    const a = await build(session('operator', 1), db.deps);
+    expect((await a.inject({ method: 'GET', url: '/legal/corp-changes/cc-1' })).json().canEditCompany).toBe(false);
+  });
+
+  it('회사 정보를 안 실은 첫 저장은 권한을 묻지 않는다', async () => {
+    const db = fakeDb([codes]);
+    let asked = 0;
+    const a = await build(session('tenant', 9003), { ...db.deps, companyEditor: async () => (asked += 1) > 0 });
+    const res = await a.inject({ method: 'POST', url: '/legal/corp-changes', payload: { changeType: 'NAME', payload: {} } });
+    expect(res.statusCode).toBe(201);
+    expect(asked).toBe(0);
   });
 });

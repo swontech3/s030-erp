@@ -6,7 +6,7 @@
  *   shared `readSignInTokens` 시험(packages/shared/src/bbiyongSignIn.test.ts)으로 옮겼다.
  */
 import { describe, it, expect } from 'vitest';
-import { HttpBbiyongAuth, parseReIssue, parseMyMenus } from './HttpBbiyongAuth.ts';
+import { HttpBbiyongAuth, parseReIssue, parseMyMenus, parseMyMenuKeys } from './HttpBbiyongAuth.ts';
 import {
   BbiyongAuthError,
   BbiyongReloginRequiredError,
@@ -250,6 +250,36 @@ describe('parseMyMenus', () => {
   });
 });
 
+describe('parseMyMenuKeys — 화면별 기능 키(2026-10-25, 법무 회사 정보 수정 열기)', () => {
+  it('★ 객체 배열의 menuCode → keys · 글자가 아닌 키는 버린다 · 키 없는 줄은 빠진다', () => {
+    const data = [
+      { menuCode: 'S021100021', keys: ['F001', 'F002', 3], menuNm: '내 단체 정보' },
+      { menuCode: 'S021100010', keys: [] },
+      { menuCode: 'S021000000' },
+      { keys: ['F001'] },
+    ];
+    expect(parseMyMenuKeys({ status: 200, result: 'success', massage: null, data, error: [] })).toEqual({
+      S021100021: ['F001', 'F002'],
+      S021100010: [],
+    });
+  });
+  it('옛 모양(문자열 배열) · 깨진 본문은 null', () => {
+    expect(parseMyMenuKeys({ status: 200, result: 'success', data: ['S021100010'] })).toBeNull();
+    expect(parseMyMenuKeys({ status: 200, result: 'success', data: null })).toBeNull();
+    expect(parseMyMenuKeys('x')).toBeNull();
+  });
+  it('★ myMenus — 화면코드 목록은 그대로 두고 keys 를 덧붙인다', async () => {
+    const data = [{ menuCode: 'S021100021', keys: ['F001', 'F002'] }];
+    const { impl } = stubFetch(json({ status: 200, result: 'success', massage: null, data, error: [] }));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+    await expect(auth.myMenus('eyJ.in')).resolves.toEqual({
+      kind: 'ok',
+      screens: ['S021100021'],
+      keys: { S021100021: ['F001', 'F002'] },
+    });
+  });
+});
+
 describe('HttpBbiyongAuth.myMenus', () => {
   it('받은 토큰을 Bearer 로 싣고 GET my-menus 를 부른다', async () => {
     const { impl, calls } = stubFetch(json({ status: 200, result: 'success', massage: null, data: ['S021100010'], error: [] }));
@@ -269,5 +299,30 @@ describe('HttpBbiyongAuth.myMenus', () => {
     const { impl } = stubFetch(new Response('', { status: 502 }));
     const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
     await expect(auth.myMenus('eyJ.in')).rejects.toBeInstanceOf(BbiyongUnavailableError);
+  });
+});
+
+// =============================================================================
+// 5. 지금 계정의 단체 — 「받기」가 운영사가 아닌 토큰의 회사를 확인한다 (2026-10-25)
+// =============================================================================
+describe('HttpBbiyongAuth.myOrg', () => {
+  it('받은 토큰을 Bearer 로 싣고 GET my-orgs — 지금 계정(current) 줄의 단체', async () => {
+    const { impl, calls } = stubFetch(json(MY_ORGS_BODY));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+    await expect(auth.myOrg('eyJ.in')).resolves.toEqual({ kind: 'ok', orgId: 1 });
+    expect(calls[0]!.url).toBe(`${BASE}/rest/v1/s021200010/my-orgs`);
+    expect(calls[0]!.init.method).toBe('GET');
+    expect(new Headers(calls[0]!.init.headers).get('authorization')).toBe('Bearer eyJ.in');
+  });
+  it('★ 지금 계정 줄이 없거나 실패 본문 · HTTP 401 · 403 은 rejected · 그 밖의 HTTP 비정상은 던진다', async () => {
+    const noCurrent = { ...MY_ORGS_BODY, data: MY_ORGS_BODY.data.map((r) => ({ ...r, current: false })) };
+    for (const res of [json(noCurrent), json({ status: 403, result: 'fail', data: [] }), new Response('', { status: 401 }), new Response('', { status: 403 })]) {
+      const { impl } = stubFetch(res);
+      const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+      await expect(auth.myOrg('eyJ.in')).resolves.toEqual({ kind: 'rejected' });
+    }
+    const { impl } = stubFetch(new Response('', { status: 502 }));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+    await expect(auth.myOrg('eyJ.in')).rejects.toBeInstanceOf(BbiyongUnavailableError);
   });
 });
