@@ -22,6 +22,7 @@ const PREP: AiPrep = {
     { bizCode: '552304', bizType: '숙박 및 음식점업', itemName: '커피 음료점', ksic: [], matchedBy: [{ kind: 'item' }] },
   ],
   truncated: false,
+  enabled: true,
   candidates: [cand('552303', '커피 전문점', '커피 전문점 운영업'), cand('552304', '커피 음료점', '커피 음료점')],
   settings: { model: 'claude-sonnet-5-5', maxPicks: 5, reasonMax: 100, maxTokens: 1000 },
 };
@@ -42,6 +43,13 @@ const answering = (text: string): AiPick & { calls: number } => {
 };
 
 describe('runAiPick', () => {
+  it('★ 꺼져 있으면(ENABLED ≠ Y) 키가 있어도 부르지 않고 일반 추천만', async () => {
+    const ai = answering(JSON.stringify({ picks: [{ bizCode: '552303', reason: '커피' }] }));
+    const r = await runAiPick({ ...PREP, enabled: false, candidates: [], settings: null }, '카페', ai, quietLog());
+    expect(r).toEqual({ ...general, ai: { ok: false, message: AI_FAIL_MESSAGE.disabled } });
+    expect(ai.calls).toBe(0);
+  });
+
   it('★ 후보 밖 업종코드는 버리고, 문구는 AI 가 무엇을 주든 서버 문구', async () => {
     const ai = answering(
       JSON.stringify({

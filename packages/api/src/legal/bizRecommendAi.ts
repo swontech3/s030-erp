@@ -11,6 +11,7 @@
  * Claude 는 우리가 통제하지 못하는 바깥이다. 키가 없거나, 느리거나, 깨진 답을 주면
  * 일반 추천을 그대로 두고 안내만 단다 — `ai: { ok: false, message }`.
  *
+ * ★ 공통 코드 `AI_SETTING` 의 `ENABLED` 가 `Y` 가 아니면 부르지 않는다 — 일반 추천만(2026-10-27, 이번 이행은 꺼 둔다).
  * ★ DB 트랜잭션 밖에서 부른다 — 후보 · 설정 · 문구를 먼저 읽고 닫은 뒤에 부른다(접속을 잡아 두지 않는다).
  * ★ 키 값은 로그에 남기지 않는다.
  */
@@ -28,10 +29,12 @@ import type { BizRecommendCandidate } from '@swonbiz/shared/domain/biz-purpose-r
 /** 바꿔 끼우는 자리 — 지시(system) · 내용(user) · 설정 → AI 의 답 글. 실패는 던진다(부른 쪽이 접는다). */
 export type AiPick = (req: { system: string; user: string; settings: AiSettings }) => Promise<string>;
 
-/** 읽어 둔 것 — 일반 추천 · AI 에게 보낼 후보(서버 문구 포함) · 설정(없으면 null). */
+/** 읽어 둔 것 — 일반 추천 · 켜짐 여부 · AI 에게 보낼 후보(서버 문구 포함) · 설정(없으면 null). */
 export interface AiPrep {
   items: BizRecommendCandidate[];
   truncated: boolean;
+  /** 공통 코드 `AI_SETTING` 의 `ENABLED` 가 `Y` — 아니면 후보 · 설정을 읽지 않는다(빈 값) */
+  enabled: boolean;
   candidates: AiCandidate[];
   settings: AiSettings | null;
 }
@@ -86,6 +89,8 @@ export async function runAiPick(prep: AiPrep, q: string, aiPick: AiPick | null, 
   const general = { items: prep.items, truncated: prep.truncated };
   const fail = (message: string): BizRecommendAiResult => ({ ...general, ai: { ok: false, message } });
 
+  // ★ 꺼져 있으면 키가 있어도 부르지 않는다(2026-10-27)
+  if (!prep.enabled) return fail(AI_FAIL_MESSAGE.disabled);
   if (prep.candidates.length === 0) return fail(AI_FAIL_MESSAGE.noCandidates);
   if (!prep.settings) {
     log.warn({}, 'AI 추천을 건너뛴다 — 공통 코드 AI_SETTING 이 없거나 모양이 틀렸다');

@@ -7,7 +7,7 @@
  */
 import type { BizPurposeItem } from '@swonbiz/shared/domain/biz-purpose';
 import type { BizRecommendCandidate, BizRecommendDetail } from '@swonbiz/shared/domain/biz-purpose-recommend';
-import type { AiPickItem, BizRecommendAiResult } from '@swonbiz/shared/domain/biz-purpose-recommend-ai';
+import type { AiPickItem, BizRecommendAiResult, BizRecommendPage } from '@swonbiz/shared/domain/biz-purpose-recommend-ai';
 
 export type { BizPurposeItem };
 
@@ -79,8 +79,8 @@ export const saveBizPurpose = (id: string, patch: { text?: string; active?: bool
 
 export type { BizRecommendCandidate, BizRecommendDetail };
 
-/** 업종 후보 — 사업 설명으로 찾는다(최대 20, 넘으면 `truncated`). */
-export function loadBizRecommend(q: string): Promise<{ items: BizRecommendCandidate[]; truncated: boolean }> {
+/** 업종 후보 — 사업 설명으로 찾는다(최대 20, 넘으면 `truncated`). `aiEnabled` 면 [AI 추천] 버튼을 보인다. */
+export function loadBizRecommend(q: string): Promise<BizRecommendPage> {
   return call(`/api/legal/biz-purposes/recommend?${new URLSearchParams({ q: q.trim() })}`);
 }
 

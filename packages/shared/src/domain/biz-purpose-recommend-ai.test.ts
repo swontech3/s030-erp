@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { checkAiPicks, parseAiSettings } from './biz-purpose-recommend-ai.ts';
+import { aiEnabledOf, checkAiPicks, parseAiSettings } from './biz-purpose-recommend-ai.ts';
+
+describe('aiEnabledOf — ENABLED 가 Y 일 때만 켜진다', () => {
+  it('Y(앞뒤 공백 무시)만 true · N · 소문자 · 없음은 false', () => {
+    expect(aiEnabledOf([{ code: 'ENABLED', name: ' Y ' }])).toBe(true);
+    expect(aiEnabledOf([{ code: 'ENABLED', name: 'N' }])).toBe(false);
+    expect(aiEnabledOf([{ code: 'ENABLED', name: 'y' }])).toBe(false);
+    expect(aiEnabledOf([{ code: 'MODEL', name: 'Y' }])).toBe(false);
+  });
+});
 
 const ALLOWED = new Set(['552303', '552304', '525101']);
 const S = { maxPicks: 2, reasonMax: 10 };

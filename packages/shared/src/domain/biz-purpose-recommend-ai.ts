@@ -10,7 +10,7 @@
  *   · AI 는 「후보 안에서 고르기」만 한다. 후보 밖 업종코드는 버린다
  *   · 사업목적 문구는 **서버 문구로 고정** — AI 에게 문구를 받지 않는다(업종코드 · 이유만)
  *   · 인허가는 지금처럼 고른 업종의 상세(`GET /recommend/:bizCode`)가 「검토됨」만 준다 — AI 에게 묻지 않는다
- *   · 설정값은 공통 코드 `AI_SETTING`(파티션 000): MODEL · MAX_PICKS · REASON_MAX · MAX_TOKENS
+ *   · 설정값은 공통 코드 `AI_SETTING`(파티션 000): MODEL · MAX_PICKS · REASON_MAX · MAX_TOKENS · ENABLED(Y 일 때만 켜짐)
  *   · 실패(키 없음 · 호출 실패 · 시간 초과 · 검사에서 남는 줄 없음)는 일반 추천 그대로 + 안내
  *
  * ★ 서버 검사 — 하나라도 어기면 그 줄을 버린다. 남는 줄이 없으면 실패다.
@@ -52,6 +52,13 @@ export interface AiPickItem {
   purpose: BizRecommendDetail['purpose'];
 }
 
+/** `GET /legal/biz-purposes/recommend` 응답 — 일반 추천 + [AI 추천] 버튼을 보일지(`ENABLED` 가 `Y`). */
+export interface BizRecommendPage {
+  items: BizRecommendCandidate[];
+  truncated: boolean;
+  aiEnabled: boolean;
+}
+
 /** `POST /legal/biz-purposes/recommend/ai` 응답 — 일반 추천은 늘 같이 온다. */
 export interface BizRecommendAiResult {
   items: BizRecommendCandidate[];
@@ -59,8 +66,17 @@ export interface BizRecommendAiResult {
   ai: { ok: true; picks: AiPickItem[] } | { ok: false; message: string };
 }
 
+/**
+ * 켜고 끄기 — 공통 코드 `AI_SETTING` 의 `ENABLED` 가 `Y` 일 때만 켜진다(2026-10-27 — 이번 이행은 `N`,
+ * 로컬 LLM 준비 후 켠다). 꺼져 있으면 화면은 [AI 추천] 버튼을 그리지 않고, AI 주소는 일반 추천만 준다(키가 있어도).
+ */
+export function aiEnabledOf(rows: readonly { code: string; name: string }[]): boolean {
+  return rows.find((r) => r.code === 'ENABLED')?.name.trim() === 'Y';
+}
+
 /** 실패 안내 — 화면은 일반 추천을 그대로 두고 이 글을 띄운다. */
 export const AI_FAIL_MESSAGE = {
+  disabled: 'AI 추천을 쓰지 않습니다 — 일반 추천만 보입니다',
   noCandidates: '업종 후보가 없어 AI 추천을 하지 않았습니다',
   noSettings: 'AI 설정(공통 코드 AI_SETTING)이 없어 AI 추천을 하지 못했습니다 — 일반 추천만 보입니다',
   noKey: 'AI 추천을 쓸 수 없습니다(키 없음) — 일반 추천만 보입니다',

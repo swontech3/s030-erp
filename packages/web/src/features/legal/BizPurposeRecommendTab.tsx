@@ -14,6 +14,7 @@
  * ★ 새 스타일 없음 — 팝업 틀(`org-lookup.module.css`)과 팝업 파일(`biz-purpose-picker.module.css`)만 쓴다.
  * ★ [AI 추천](2026-10-27) — 누를 때만 부른다. AI 가 후보 안에서 고른 업종만 그 순서로 보이고 줄마다 「AI 이유」.
  *   고른 뒤 상세 · 인허가(「검토됨」만) · 문구(서버 문구)는 일반 추천과 같다. AI 가 안 되면 일반 추천 그대로 + 안내.
+ *   버튼은 일반 추천 응답의 `aiEnabled` 가 true 일 때만 보인다(공통 코드 `AI_SETTING` 의 `ENABLED` = Y, 2026-10-27 — 이번 이행은 끔).
  */
 import { useRef, useState } from 'react';
 import type { BizMatchKind } from '@swonbiz/shared/domain/biz-purpose-recommend';
@@ -72,6 +73,8 @@ export function BizPurposeRecommendTab({ have, checked, onToggle }: Props) {
   const [query, setQuery] = useState('');
   const [cands, setCands] = useState<Candidates>({ state: 'idle' });
   const [detail, setDetail] = useState<Detail>({ state: 'none' });
+  /** [AI 추천] 버튼을 보일지 — 일반 추천 응답의 `aiEnabled`(공통 코드 `AI_SETTING` 의 `ENABLED` 가 `Y`). 처음엔 숨긴다 */
+  const [aiEnabled, setAiEnabled] = useState(false);
   /** 늦게 온 응답이 새 결과를 덮지 않게 — 마지막 요청만 그린다. */
   const seq = useRef(0);
   const detailSeq = useRef(0);
@@ -96,8 +99,10 @@ export function BizPurposeRecommendTab({ have, checked, onToggle }: Props) {
         return;
       }
       const page = await loadBizRecommend(q);
-      if (mine === seq.current)
+      if (mine === seq.current) {
         setCands({ state: 'ok', items: page.items, truncated: page.truncated, reasons: null, aiNotice: null });
+        setAiEnabled(page.aiEnabled);
+      }
     } catch (err) {
       if (mine === seq.current)
         setCands({
@@ -156,14 +161,16 @@ export function BizPurposeRecommendTab({ have, checked, onToggle }: Props) {
         >
           검색
         </button>
-        <button
-          type="button"
-          className={`${base.btn} ${base.btnGhost} ${base.btnSearch}`}
-          disabled={query.trim() === '' || cands.state === 'loading'}
-          onClick={() => void search(query, true)}
-        >
-          AI 추천
-        </button>
+        {aiEnabled ? (
+          <button
+            type="button"
+            className={`${base.btn} ${base.btnGhost} ${base.btnSearch}`}
+            disabled={query.trim() === '' || cands.state === 'loading'}
+            onClick={() => void search(query, true)}
+          >
+            AI 추천
+          </button>
+        ) : null}
       </form>
 
       <div className={base.list}>
