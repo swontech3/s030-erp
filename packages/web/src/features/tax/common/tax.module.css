@@ -178,6 +178,7 @@
 /* ── 목록 위 버튼 줄 ── */
 .tbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border); }
 .tbar .sm { margin-left: 4px; }
+.tbarSep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
 
 /* ── 자료 종류 카드 ── */
 .kind { display: flex; flex-direction: column; gap: 10px; padding: 16px; min-height: 178px; }

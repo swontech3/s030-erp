@@ -6,7 +6,9 @@
  *
  *   작업할 달 줄 · 제목 + 배지 · 자료 카드 9장(4열) · 올린 파일 카드
  *   ★ 동작하는 카드는 「매입·매출 계산서」 하나다. 나머지 8장(삐용 경비 포함)은 「준비 중」 — 회색, [올리기] 막힘.
- *   ★ 1-2 에서 그리지 않는 것: 회색 안내 띠 · 「이번 달 없음」 · 「삐용 경비」 줄 · [보기] · 중복 의심 표 · 다음 단계 줄.
+ *   ★ 1-2 에서 그리지 않는 것: 회색 안내 띠 · 「이번 달 없음」 · 「삐용 경비」 줄 · 중복 의심 표 · 다음 단계 줄.
+ *   ★ [보기](1-3, 2026-10-27) — 한 줄만 골랐고 계산서 파일일 때만 눌린다. 거래 분류 「전체」 보기 + 그 파일 줄만으로 간다
+ *     (`/tax/classify?month=&view=all&file=`, 결과서 0-7). 다른 자료는 받을 화면이 아직 없어 막는다.
  *     짝 맞추기가 없어 「짝이 풀립니다」 문장도 뺐다.
  *
  * ★★ 이름 · 설명 · 선택지는 **API 가 준 코드 값으로만** 그린다(자료 종류 · 계산서 구분 · 뺀 줄 종류 · 사업자 유형).
@@ -15,6 +17,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Icon, type IconName } from '@/components/ds';
 import t from '../common/tax.module.css';
 import { TaxConfirmDialog } from '../common/TaxConfirmDialog';
@@ -52,6 +55,7 @@ const KIND_ICON: Record<string, IconName> = {
 type Confirm = { ids: string[]; names: string[]; check: TaxUploadDeleteResult } | null;
 
 export function TaxUploadsView({ month }: { month: string }) {
+  const router = useRouter();
   const [data, setData] = useState<TaxUploadsResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sel, setSel] = useState<string[]>([]);
@@ -206,11 +210,20 @@ export function TaxUploadsView({ month }: { month: string }) {
           <span className={t.cardHSub}>같은 파일은 다시 올릴 수 없습니다</span>
         </div>
         <div className={t.tbar}>
+          <button
+            type="button"
+            className={`${t.btn} ${t.btnSm}`}
+            disabled={!(sel.length === 1 && data.files.find((f) => f.id === sel[0])?.kind === KIND_INVOICE)}
+            onClick={() => router.push(`/tax/classify?month=${month}&view=all&file=${encodeURIComponent(sel[0]!)}`)}
+          >
+            <Icon name="eye" size={16} />
+            보기
+          </button>
           <button type="button" className={`${t.btn} ${t.btnSm} ${t.btnDanger}`} disabled={sel.length === 0} onClick={askDelete}>
             <Icon name="trash-2" size={16} />
             삭제{sel.length ? ` (${sel.length})` : ''}
           </button>
-          <span className={t.sm}>{sel.length ? `${sel.length}개 선택` : '지울 파일을 줄에서 고르세요 · 여러 개 고를 수 있습니다'}</span>
+          <span className={t.sm}>{sel.length ? `${sel.length}개 선택` : '줄을 고르세요 · [보기]는 한 줄, 지우기는 여러 줄'}</span>
         </div>
         {failed ? (
           <div style={{ padding: '0 16px 12px' }}>

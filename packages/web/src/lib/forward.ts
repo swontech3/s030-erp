@@ -297,3 +297,51 @@ export async function forwardDelete(request: Request, path: string): Promise<Nex
   }
   return passThrough(res.body, res.status);
 }
+
+/**
+ * **파일 내려받기**를 그대로 넘긴다 — ERP 공통 「엑셀 내려받기」(세무 1-3, 2026-10-27).
+ * Fastify 가 만든 파일(`lib/xlsxExport.ts`)의 바이트 · 형식 · 내려받기 이름을 고치지 않고 돌려준다.
+ *
+ * ★ GET 이라 CSRF 검사는 없다(`forwardGetJson` 과 같다). 세션은 반드시 넘긴다.
+ * ★ 실패(4xx)는 본문이 JSON 이다 — `passThrough` 로 넘겨 401 이면 쿠키를 지우는 규칙도 같게 한다.
+ */
+export async function forwardGetFile(path: string): Promise<NextResponse> {
+  const sid = await readSid();
+  if (!sid) {
+    return NextResponse.json({ message: '세션이 만료되었습니다. 다시 로그인해 주세요' }, { status: 401 });
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${apiBaseUrl()}${path}`, {
+      headers: { cookie: `${SESSION_COOKIE}=${encodeURIComponent(sid)}` },
+      cache: 'no-store',
+    });
+  } catch (err) {
+    console.error(`[forward] FILE ${path} 실패:`, (err as Error).message);
+    return NextResponse.json(
+      { message: '서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요' },
+      { status: 503 },
+    );
+  }
+
+  if (!res.ok) {
+    if (res.status >= 500) {
+      return NextResponse.json({ message: '서버 오류가 났습니다. 잠시 후 다시 시도해 주세요' }, { status: res.status });
+    }
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      body = { message: '서버 응답을 읽지 못했습니다' };
+    }
+    return passThrough(body, res.status);
+  }
+
+  const headers = new Headers({ 'cache-control': 'no-store' });
+  for (const h of ['content-type', 'content-disposition']) {
+    const v = res.headers.get(h);
+    if (v) headers.set(h, v);
+  }
+  return new NextResponse(await res.arrayBuffer(), { status: 200, headers });
+}

@@ -36,6 +36,7 @@ import { registerBizPurposeRoutes } from './routes/bizPurposes.ts';
 import { registerBizRecommendRoutes } from './routes/bizRecommend.ts';
 import { registerIncorporationRoutes } from './routes/incorporations.ts';
 import { registerDocFormSettingRoutes } from './routes/docFormSettings.ts';
+import { registerTaxClassifyRoutes } from './routes/taxClassify.ts';
 import { registerTaxSettingRoutes } from './routes/taxSettings.ts';
 import { registerSpreadsheetBodyParser, registerTaxUploadRoutes } from './routes/taxUploads.ts';
 import { registerTaxVendorRoutes } from './routes/taxVendors.ts';
@@ -177,6 +178,7 @@ registerTaxSettingRoutes(app);
 // ★ 세무 자료 올리기(s050200010) · 거래처(s050100020) — 같은 규칙(자기 단체만). 엑셀은 세무 전용 창구로 받는다.
 registerTaxUploadRoutes(app);
 registerTaxVendorRoutes(app);
+registerTaxClassifyRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,

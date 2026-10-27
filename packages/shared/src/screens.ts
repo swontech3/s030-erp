@@ -194,6 +194,13 @@ export const SCREENS = {
    * 미리보기는 팝업이다(화면 번호 없음).
    */
   s050200010: { route: '/tax/uploads', name: '자료 올리기', group: '020' },
+
+  // --- 030 정리하기 ---
+  /**
+   * 거래 분류 — 항목이 빈 매입 계산서에 출금 항목을 붙인다(1-3). 「전체」 보기는 그 달 매입 · 매출을 읽기만 + 엑셀.
+   * 자료 올리기 [보기]가 `?view=all&file=` 로 들어온다. 은행 · 현금 · 짝 남은 금액은 뒤 단계.
+   */
+  s050300010: { route: '/tax/classify', name: '거래 분류', group: '030' },
 } as const satisfies Record<string, ScreenMeta>;
 
 export type ScreenId = keyof typeof SCREENS;

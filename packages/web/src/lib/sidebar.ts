@@ -52,6 +52,7 @@ const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
   s050100010: 'settings', // 세무 설정 — 세무 서비스(s05)
   s050100020: 'building-2', // 거래처 — 세무 서비스(s05)
   s050200010: 'upload', // 자료 올리기 — 세무 서비스(s05)
+  s050300010: 'file-pen-line', // 거래 분류 — 세무 서비스(s05). 시안에 메뉴 아이콘이 없어 가까운 것
 };
 
 export interface NavItem {

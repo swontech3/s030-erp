@@ -162,6 +162,11 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
   { category: 'TAX_INV_CLASS', useTp: '000', table: 'tb_s050_invoices', column: 'inv_class', label: '세무 세금계산서' },
   { category: 'TAX_INV_TYPE', useTp: '000', table: 'tb_s050_invoices', column: 'inv_type', label: '세무 세금계산서' },
   { category: 'TAX_VENDOR_TP', useTp: '000', table: 'tb_s050_vendors', column: 'vendor_tp', label: '세무 거래처' },
+
+  // --- 세무 거래 분류 (s050300010) — 2026-10-27 추가. 207_tax_classify.sql ---
+  // ★ 파티션 = 사업자 유형(001 법인 · 002 개인 일반과세자). 사업자 유형을 바꾼 회사의 옛 항목도 막히게 둘 다 적는다.
+  { category: 'TAX_ITEM_OUT', useTp: '001', table: 'tb_s050_invoices', column: 'item_code', label: '세무 거래 분류' },
+  { category: 'TAX_ITEM_OUT', useTp: '002', table: 'tb_s050_invoices', column: 'item_code', label: '세무 거래 분류' },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */
