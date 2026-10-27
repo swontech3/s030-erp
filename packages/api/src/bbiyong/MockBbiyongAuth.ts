@@ -141,6 +141,9 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
   },
 ];
 
+/** 모의 모드에 mock 토큰이 아닌 토큰이 왔을 때(화면 로그인) — `verifySession`. */
+export const MOCK_SCREEN_LOGIN_MESSAGE = '모의 모드에서는 화면 로그인이 되지 않습니다 — BBIYONG_MOCK=false 로';
+
 export function findMockAccount(memberId: number): MockAccount | undefined {
   return MOCK_ACCOUNTS.find((a) => a.memberId === memberId);
 }
@@ -157,10 +160,13 @@ export class MockBbiyongAuth implements BbiyongAuth {
    *
    * ★ 2026-10-22 부터 로그인 화면은 **브라우저가 삐용을 직접** 부른다(규격서 Q6). 그래서 MOCK 모드에서
    *   화면 로그인은 되지 않는다 — 이 메서드는 시험 · 대본이 mock 토큰으로 세션을 만들 때 쓴다.
+   * ★ mock 토큰이 아니면(화면이 진짜 삐용 토큰을 보낸 것) 그렇게 안내한다(2026-10-27) — 「비밀번호가
+   *   올바르지 않습니다」로 두면 맞는 비밀번호를 계속 의심하게 된다.
    */
   async verifySession(accessToken: string, refreshToken: string): Promise<BbiyongLoginResult> {
     const [kind, id] = accessToken.split('.');
-    const account = kind === 'mock-access' ? findMockAccount(Number(id)) : undefined;
+    if (kind !== 'mock-access') throw new BbiyongAuthError(MOCK_SCREEN_LOGIN_MESSAGE);
+    const account = findMockAccount(Number(id));
     if (!account) throw new BbiyongAuthError(INVALID_CREDENTIALS_MESSAGE);
     return {
       memberId: account.memberId,

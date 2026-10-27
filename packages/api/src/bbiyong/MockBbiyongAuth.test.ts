@@ -2,7 +2,8 @@
  * MockBbiyongAuth — 내 메뉴(법무 회사 정보 「받기」의 토큰 확인, 2026-10-23).
  */
 import { describe, expect, it } from 'vitest';
-import { MOCK_ACCOUNTS, MockBbiyongAuth } from './MockBbiyongAuth.ts';
+import { MOCK_ACCOUNTS, MOCK_SCREEN_LOGIN_MESSAGE, MockBbiyongAuth } from './MockBbiyongAuth.ts';
+import { INVALID_CREDENTIALS_MESSAGE } from './types.ts';
 
 // ★ 비밀번호 로그인(signIn)은 없다(규격서 Q6) — mock 토큰 = mock-access.{회원번호}.{시각}
 const mockAccess = (email: string) =>
@@ -34,5 +35,17 @@ describe('MockBbiyongAuth.myOrg', () => {
     expect(await auth.myOrg(mockAccess('tenant@test.com'))).toEqual({ kind: 'ok', orgId: 9001 });
     expect(await auth.myOrg('eyJ.real')).toEqual({ kind: 'rejected' });
     expect(await auth.myOrg('mock-access.9999.1')).toEqual({ kind: 'rejected' });
+  });
+});
+
+describe('MockBbiyongAuth.verifySession', () => {
+  it('mock 토큰이면 그 계정', async () => {
+    const auth = new MockBbiyongAuth();
+    await expect(auth.verifySession(mockAccess('admin@s-wontech.co.kr'), 'mock-refresh.1001.1')).resolves.toMatchObject({ memberId: 1001 });
+  });
+  it('★ mock 토큰이 아니면(화면이 진짜 삐용 토큰을 보냄) 모의 모드 안내 · 없는 계정은 비밀번호 문구 그대로', async () => {
+    const auth = new MockBbiyongAuth();
+    await expect(auth.verifySession('eyJ.real.token', 'eyJ.r')).rejects.toThrow(MOCK_SCREEN_LOGIN_MESSAGE);
+    await expect(auth.verifySession('mock-access.9999.1', 'r')).rejects.toThrow(INVALID_CREDENTIALS_MESSAGE);
   });
 });
