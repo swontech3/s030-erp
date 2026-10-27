@@ -20,11 +20,11 @@ const session = (role: ScopeRole): ErpSession => ({
   lastActiveAt: null,
 });
 
-const LIST: TaxUploadsResponse = { month: '2026-09', cards: [], files: [], codes: { kinds: [], invDirs: [] } };
+const LIST: TaxUploadsResponse = { month: '2026-09', bizTypeName: null, cards: [], files: [], codes: { kinds: [], invDirs: [] } };
 const EXCLUDED = { nonGeneral: 0, noBizNo: 0, badAmount: 0, noApproval: 0, dupInFile: 0, otherClass: 0, badDate: 0 };
 const PREVIEW: TaxUploadPreview = {
   kind: 'INVOICE', fileName: 'a.xls', direction: 'S', sameFile: null, totalRows: 0, byMonth: [], sample: [],
-  toInsert: 0, alreadyUploaded: 0, excluded: EXCLUDED, warnings: [],
+  toInsert: 0, alreadyUploaded: 0, excluded: EXCLUDED, skipReasons: [], warnings: [],
 };
 const XLS = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0]);
 const XLS_TYPE = 'application/vnd.ms-excel';
@@ -38,7 +38,10 @@ function fakeDeps(over: Partial<TaxUploadsDeps> = {}) {
       calls.push(['upload', s.s020OrgId, kind, name]);
       return { ok: false, status: 409, error: 'same_file', message: '이미 올린 파일입니다' };
     },
-    remove: async (s, ids) => { calls.push(['remove', s.s020OrgId, ids]); return { ok: false, status: 404, error: 'not_found', message: '없는 파일입니다' }; },
+    remove: async (s, ids, dryRun) => {
+      calls.push([dryRun ? 'check' : 'remove', s.s020OrgId, ids]);
+      return { ok: false, status: 404, error: 'not_found', message: '없는 파일입니다' };
+    },
     ...over,
   };
   return { deps, calls };
@@ -170,5 +173,30 @@ describe('POST /tax/uploads/delete', () => {
     const res = await a.inject({ method: 'POST', url: '/tax/uploads/delete', payload: { ids: ['f1', 'f1', 'f2'] } });
     expect(res.statusCode).toBe(404);
     expect(calls).toEqual([['remove', 9001, ['f1', 'f2']]]);
+  });
+});
+
+describe('POST /tax/uploads/delete-check — 지우기 전 확인(지우지 않음)', () => {
+  it('지우기와 같은 처리를 확인으로만 부른다', async () => {
+    const DATA = { deletedFiles: 1, deletedRows: 3, laterFilesWithSkips: [] };
+    const { deps, calls } = fakeDeps({
+      remove: async (s, ids, dryRun) => {
+        calls.push([dryRun ? 'check' : 'remove', s.s020OrgId, ids]);
+        return { ok: true, data: DATA };
+      },
+    });
+    const a = await build('operator', deps);
+    const res = await a.inject({ method: 'POST', url: '/tax/uploads/delete-check', payload: { ids: ['f1'] } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(DATA);
+    expect(calls).toEqual([['check', 1, ['f1']]]);
+  });
+
+  it('ids 가 없으면 400', async () => {
+    const { deps, calls } = fakeDeps();
+    const a = await build('tenant', deps);
+    const res = await a.inject({ method: 'POST', url: '/tax/uploads/delete-check', payload: { ids: [] } });
+    expect(res.statusCode).toBe(400);
+    expect(calls).toEqual([]);
   });
 });

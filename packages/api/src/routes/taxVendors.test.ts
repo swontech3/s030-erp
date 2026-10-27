@@ -25,6 +25,9 @@ const VENDOR: TaxVendorView = {
 };
 const LIST: TaxVendorsResponse = { month: '2026-09', vendors: [VENDOR], sameBizNoGroups: [], codes: { vendorTps: [], kinds: [], invDirs: [] } };
 const NOT_FOUND = { ok: false as const, status: 404 as const, error: 'not_found', message: '없는 거래처입니다' };
+const HAS_INVOICES = {
+  ok: false as const, status: 409 as const, error: 'vendor_has_invoices', message: '거래가 있는 거래처는 지울 수 없습니다',
+};
 
 function fakeDeps(over: Partial<TaxVendorsDeps> = {}) {
   const calls: unknown[][] = [];
@@ -34,6 +37,7 @@ function fakeDeps(over: Partial<TaxVendorsDeps> = {}) {
     edit: async (s, id, edit) => { calls.push(['edit', s.s020OrgId, id, edit]); return { ok: true, data: VENDOR }; },
     setType: async (s, ids, tp) => { calls.push(['type', s.s020OrgId, ids, tp]); return { ok: true, data: { updated: ids.length } }; },
     merge: async (s, keepId, ids) => { calls.push(['merge', s.s020OrgId, keepId, ids]); return NOT_FOUND; },
+    remove: async (s, ids) => { calls.push(['remove', s.s020OrgId, ids]); return { ok: true, data: { deleted: ids.length } }; },
     ...over,
   };
   return { deps, calls };
@@ -129,5 +133,41 @@ describe('POST /tax/vendors/merge', () => {
     const res = await a.inject({ method: 'POST', url: '/tax/vendors/merge', payload: { keepId: 'v1', ids: ['v2'] } });
     expect(res.statusCode).toBe(404);
     expect(calls).toEqual([['merge', 9001, 'v1', ['v2']]]);
+  });
+});
+
+describe('POST /tax/vendors/delete', () => {
+  it('고른 거래처를 세션 단체로 지운다', async () => {
+    const { deps, calls } = fakeDeps();
+    const a = await build('operator', deps);
+    const res = await a.inject({ method: 'POST', url: '/tax/vendors/delete', payload: { ids: ['v1', 'v2'] } });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.json()).toEqual({ deleted: 2 });
+    expect(calls).toEqual([['remove', 1, ['v1', 'v2']]]);
+  });
+
+  it('고른 거래처가 없으면 400, 지우지 않는다', async () => {
+    const { deps, calls } = fakeDeps();
+    const a = await build('tenant', deps);
+    const res = await a.inject({ method: 'POST', url: '/tax/vendors/delete', payload: { ids: [] } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ error: 'invalid_request', errors: [{ field: 'ids' }] });
+    expect(calls).toEqual([]);
+  });
+
+  it('남의 단체 · 없는 id 는 404', async () => {
+    const { deps } = fakeDeps({ remove: async () => NOT_FOUND });
+    const a = await build('tenant', deps);
+    const res = await a.inject({ method: 'POST', url: '/tax/vendors/delete', payload: { ids: ['other'] } });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('거래가 있는 거래처가 하나라도 있으면 409', async () => {
+    const { deps } = fakeDeps({ remove: async () => HAS_INVOICES });
+    const a = await build('tenant', deps);
+    const res = await a.inject({ method: 'POST', url: '/tax/vendors/delete', payload: { ids: ['v1', 'v2'] } });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'vendor_has_invoices', message: '거래가 있는 거래처는 지울 수 없습니다' });
   });
 });

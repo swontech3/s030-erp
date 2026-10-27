@@ -313,6 +313,14 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     source: 'supabase/migrations/203_tax_uploads.sql (ck_s050_vendors_tp)',
     label: '세무 거래처 주거래처 승격',
   },
+  /** 뺀 줄 종류(205) — 코드값이 API 응답의 키(`InvoiceExcluded`)와 같아야 화면이 이름을 찾는다. 담는 칸은 없다. */
+  {
+    category: 'TAX_SKIP_REASON',
+    useTp: '000',
+    codes: ['nonGeneral', 'noBizNo', 'badAmount', 'noApproval', 'dupInFile', 'otherClass', 'badDate'],
+    source: 'packages/shared/src/domain/tax-uploads.ts (InvoiceExcluded)',
+    label: '세무 뺀 줄 종류',
+  },
 ] as const;
 
 /**

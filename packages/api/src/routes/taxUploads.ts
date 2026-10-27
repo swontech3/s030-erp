@@ -5,6 +5,7 @@
  *   POST /tax/uploads/preview?kind=INVOICE 저장하지 않고 검사 결과(매입/매출 · 달별 줄 수 · 앞 5줄 · 넣을/건너뛸/뺀 줄 · 같은 파일 · 경고)
  *   POST /tax/uploads?kind=INVOICE         한 트랜잭션 — 올린 파일 기록 → 거래처 자동 등록 · 승격 → 계산서 넣기
  *   POST /tax/uploads/delete { ids[] }     파일 지우기(그 줄도 함께)
+ *   POST /tax/uploads/delete-check { ids[] } 지우기 전 확인 — 지우기와 같은 계산(빠질 줄 · 겹쳤을 수 있는 파일), 지우지 않음
  *
  * ★★★ 운영사 세션도 **자기 단체만** — 모든 조회 · 저장에 `org_id = 세션 단체 ID` 를 직접 건다(`db/taxUploads.ts`).
  *     DB 연결은 `scopeOfSession` — 회사 세션은 RLS(203)가 한 번 더 막는다. 역할로 403 을 내지 않는다(세무 설정과 같다).
@@ -18,11 +19,12 @@ import { createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { ErpSession } from '@swonbiz/shared';
 import { digitsOnly, formatBizNumber } from '@swonbiz/shared/domain/tax-number';
-import { TAX_CODE_USE_TP, TAX_KIND_CATEGORY } from '@swonbiz/shared/domain/tax-settings';
+import { TAX_BIZ_TP_CATEGORY, TAX_CODE_USE_TP, TAX_KIND_CATEGORY } from '@swonbiz/shared/domain/tax-settings';
 import {
   SPREADSHEET_MIME_TYPES,
   TAX_INV_DIR_CATEGORY,
   TAX_KIND_INVOICE,
+  TAX_SKIP_REASON_CATEGORY,
   TAX_UPLOADABLE_KINDS,
   TAX_UPLOAD_MAX_BYTES,
   TAX_VENDOR_MAIN,
@@ -46,7 +48,7 @@ import { requireSession } from '../session/hook.ts';
 import { scopeOfSession, withCompanyScope, type ScopedClient } from '../db/withCompanyScope.ts';
 import { listCodes } from '../db/lookups.ts';
 import { readCompanySource } from '../db/corpChanges.ts';
-import { readTaxSettingsRow } from '../db/taxSettings.ts';
+import { listCodeDescriptions, readTaxSettingsRow } from '../db/taxSettings.ts';
 import {
   countFilesByKind,
   countInvoicesOfFiles,
@@ -85,13 +87,19 @@ export async function loadCodeNames(client: ScopedClient, categories: readonly s
 /* ── 읽기 ────────────────────────────────────────────────────────────────── */
 
 export async function listUploadsOp(client: ScopedClient, orgId: number, month: string): Promise<TaxUploadsResponse> {
-  const codes = await loadCodeNames(client, [TAX_KIND_CATEGORY, TAX_INV_DIR_CATEGORY]);
+  const codes = await loadCodeNames(client, [TAX_KIND_CATEGORY, TAX_INV_DIR_CATEGORY, TAX_BIZ_TP_CATEGORY]);
+  const descs = await listCodeDescriptions(client, [TAX_KIND_CATEGORY], TAX_CODE_USE_TP);
   const settings = await readTaxSettingsRow(client, orgId);
   const counts = await countFilesByKind(client, orgId, month);
   const files = await listUploadFiles(client, orgId, month);
-  const kinds = codes.get(TAX_KIND_CATEGORY) ?? [];
+  const kinds = (codes.get(TAX_KIND_CATEGORY) ?? []).map((k) => ({
+    ...k,
+    description: descs.find((d) => d.code === k.code)?.description ?? null,
+  }));
+  const bizType = settings ? (codes.get(TAX_BIZ_TP_CATEGORY) ?? []).find((b) => b.code === settings.bizType) : undefined;
   return {
     month,
+    bizTypeName: bizType?.name ?? null,
     cards: kinds.map((k) => ({
       kind: k.code,
       enabled: TAX_UPLOADABLE_KINDS.includes(k.code),
@@ -161,6 +169,7 @@ export async function previewUploadOp(
   const p = await prepareInvoiceUpload(client, orgId, bytes);
   if (!p.ok) return p;
   const d = p.data;
+  const codes = await loadCodeNames(client, [TAX_SKIP_REASON_CATEGORY]);
   return {
     ok: true,
     data: {
@@ -174,6 +183,7 @@ export async function previewUploadOp(
       toInsert: d.newRows.length,
       alreadyUploaded: d.alreadyUploaded,
       excluded: d.excluded,
+      skipReasons: codes.get(TAX_SKIP_REASON_CATEGORY) ?? [],
       warnings: d.warnings,
     },
   };
@@ -263,13 +273,21 @@ export async function uploadInvoicesOp(
 
 /* ── 지우기 ──────────────────────────────────────────────────────────────── */
 
-/** 이 단체의 파일이 아닌 id 가 하나라도 있으면 **쓰기 전에** 404. */
-export async function deleteUploadsOp(client: ScopedClient, orgId: number, ids: readonly string[]): Promise<TaxOp<TaxUploadDeleteResult>> {
+/**
+ * 이 단체의 파일이 아닌 id 가 하나라도 있으면 **쓰기 전에** 404.
+ * ★ `dryRun` 이면 같은 계산만 하고 지우지 않는다 — 지우기 전 확인 창이 이것을 부른다(확인과 실제가 같은 계산).
+ */
+export async function deleteUploadsOp(
+  client: ScopedClient,
+  orgId: number,
+  ids: readonly string[],
+  dryRun = false,
+): Promise<TaxOp<TaxUploadDeleteResult>> {
   const locked = await lockUploadFiles(client, orgId, ids);
   if (locked.length !== ids.length) return fail(404, 'not_found', '없는 파일입니다');
   const deletedRows = await countInvoicesOfFiles(client, orgId, ids);
   const later = await laterFilesWithSkips(client, orgId, ids);
-  const deletedFiles = await deleteUploadFiles(client, orgId, ids);
+  const deletedFiles = dryRun ? locked.length : await deleteUploadFiles(client, orgId, ids);
   return { ok: true, data: { deletedFiles, deletedRows, laterFilesWithSkips: later } };
 }
 
@@ -280,7 +298,8 @@ export interface TaxUploadsDeps {
   list(session: ErpSession, month: string): Promise<TaxUploadsResponse>;
   preview(session: ErpSession, kind: string, fileName: string, bytes: Uint8Array): Promise<TaxOp<TaxUploadPreview>>;
   upload(session: ErpSession, kind: string, fileName: string, bytes: Uint8Array): Promise<TaxOp<TaxUploadResult>>;
-  remove(session: ErpSession, ids: string[]): Promise<TaxOp<TaxUploadDeleteResult>>;
+  /** `dryRun` = 지우기 전 확인(같은 계산, 지우지 않음). */
+  remove(session: ErpSession, ids: string[], dryRun: boolean): Promise<TaxOp<TaxUploadDeleteResult>>;
 }
 
 const run = <T>(session: ErpSession, fn: (client: ScopedClient) => Promise<T>) =>
@@ -315,7 +334,7 @@ const defaultDeps: TaxUploadsDeps = {
   preview: (session, kind, name, bytes) => runOp(session, (c) => previewUploadOp(c, session.s020OrgId, kind, name, bytes)),
   upload: (session, kind, name, bytes) =>
     runOp(session, (c) => uploadInvoicesOp(c, session.s020OrgId, kind, name, bytes, String(session.s020MemberId))),
-  remove: (session, ids) => runOp(session, (c) => deleteUploadsOp(c, session.s020OrgId, ids)),
+  remove: (session, ids, dryRun) => runOp(session, (c) => deleteUploadsOp(c, session.s020OrgId, ids, dryRun)),
 };
 
 /**
@@ -380,15 +399,20 @@ export function registerTaxUploadRoutes(app: FastifyInstance, deps: TaxUploadsDe
   fileRoute('/tax/uploads/preview', deps.preview);
   fileRoute('/tax/uploads', deps.upload);
 
-  app.post<{ Body: unknown }>('/tax/uploads/delete', async (req, reply) => {
-    const session = requireSession(req);
-    reply.header('Cache-Control', 'no-store');
-    const parsed = parseFileIds(req.body);
-    if (!parsed.ok) {
-      return reply.code(400).send({ error: 'invalid_request', message: parsed.errors[0]!.message, errors: parsed.errors });
-    }
-    const r = await deps.remove(session, parsed.value);
-    if (!r.ok) return reply.code(r.status).send({ error: r.error, message: r.message });
-    return reply.send(r.data);
-  });
+  /** 지우기 · 지우기 전 확인 — 같은 처리(`deleteUploadsOp`)를 확인이면 지우지 않고 부른다. */
+  const deleteRoute = (path: string, dryRun: boolean) =>
+    app.post<{ Body: unknown }>(path, async (req, reply) => {
+      const session = requireSession(req);
+      reply.header('Cache-Control', 'no-store');
+      const parsed = parseFileIds(req.body);
+      if (!parsed.ok) {
+        return reply.code(400).send({ error: 'invalid_request', message: parsed.errors[0]!.message, errors: parsed.errors });
+      }
+      const r = await deps.remove(session, parsed.value, dryRun);
+      if (!r.ok) return reply.code(r.status).send({ error: r.error, message: r.message });
+      return reply.send(r.data);
+    });
+
+  deleteRoute('/tax/uploads/delete', false);
+  deleteRoute('/tax/uploads/delete-check', true);
 }

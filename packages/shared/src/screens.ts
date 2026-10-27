@@ -182,6 +182,18 @@ export const SCREENS = {
    * ★ 운영사 · 회사 모두 **자기 단체만** — Fastify `/tax/settings` 가 org_id = 세션 단체 ID 를 직접 건다.
    */
   s050100010: { route: '/tax/settings', name: '세무 설정', group: '010' },
+  /**
+   * 거래처 — 매입 · 매출로 나누지 않는 한 목록. 업로드 때 사업자번호로 자동으로 생긴다(203 · 204, 1-2).
+   * 고치기 · 합치기는 팝업이다(화면 번호 없음).
+   */
+  s050100020: { route: '/tax/vendors', name: '거래처', group: '010' },
+
+  // --- 020 자료 모으기 ---
+  /**
+   * 자료 올리기 — 세무 전용 엑셀 창구. 1-2 는 홈택스 전자세금계산서 매입 · 매출만 동작한다(나머지 카드는 「준비 중」).
+   * 미리보기는 팝업이다(화면 번호 없음).
+   */
+  s050200010: { route: '/tax/uploads', name: '자료 올리기', group: '020' },
 } as const satisfies Record<string, ScreenMeta>;
 
 export type ScreenId = keyof typeof SCREENS;

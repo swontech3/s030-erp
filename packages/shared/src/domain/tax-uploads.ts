@@ -20,6 +20,8 @@ export const TAX_INV_DIR_CATEGORY = 'TAX_INV_DIR';
 export const TAX_INV_CLASS_CATEGORY = 'TAX_INV_CLASS';
 export const TAX_INV_TYPE_CATEGORY = 'TAX_INV_TYPE';
 export const TAX_VENDOR_TP_CATEGORY = 'TAX_VENDOR_TP';
+/** 뺀 줄 종류(205) — 코드값 = `InvoiceExcluded` 의 키. ★ 고정 코드. */
+export const TAX_SKIP_REASON_CATEGORY = 'TAX_SKIP_REASON';
 
 /** 자료 종류 — 1-2 에서 올릴 수 있는 것은 세금계산서뿐이다(TAX_KIND 코드값). */
 export const TAX_KIND_INVOICE = 'INVOICE';
@@ -305,6 +307,38 @@ export function detectSpreadsheetFormat(bytes: Uint8Array): 'xls' | 'xlsx' | nul
   return null;
 }
 
+/* ── 작업할 달 — 주소 `?month=` 로 세무 화면끼리 잇는다(결정 2026-10-26) ── */
+
+/** 그 날의 달(`YYYY-MM`, 기기 시각). */
+export const thisMonthOf = (d: Date): string => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+
+/** 달 더하기 · 빼기. */
+export function addMonths(month: string, n: number): string {
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  const idx = y * 12 + (m - 1) + n;
+  return `${Math.floor(idx / 12)}-${pad((idx % 12) + 1)}`;
+}
+
+/** 지난달 — 작업할 달의 처음 값(결과서 0-2). */
+export const previousMonthOf = (d: Date): string => addMonths(thisMonthOf(d), -1);
+
+/** 주소의 달 — 없거나 틀리거나 이번 달보다 뒤면 지난달. */
+export function workMonthOf(raw: unknown, today: Date): string {
+  const m = parseMonth(raw);
+  return m && m <= thisMonthOf(today) ? m : previousMonthOf(today);
+}
+
+/**
+ * 이름 뒤 「로 / 으로」 — 코드 이름(주거래처 · 일반)을 버튼 · 토스트 문구에 붙일 때. 받침이 없거나 ㄹ 이면 「로」.
+ * 한글이 아닌 글자로 끝나면 「(으)로」.
+ */
+export function withRo(name: string): string {
+  const code = name.charCodeAt(name.length - 1) - 0xac00;
+  if (Number.isNaN(code) || code < 0 || code > 11171) return `${name}(으)로`;
+  const jong = code % 28;
+  return jong === 0 || jong === 8 ? `${name}로` : `${name}으로`;
+}
+
 /** 줄의 달(`YYYY-MM`). */
 export const monthOfDate = (date: string): string => date.slice(0, 7);
 
@@ -424,6 +458,14 @@ export function parseVendorMerge(raw: unknown): VendorMergeParsed {
   return keepId && ids && !ids.includes(keepId) ? { ok: true, value: { keepId, ids } } : { ok: false, errors };
 }
 
+export type VendorIdsParsed = { ok: true; value: string[] } | { ok: false; errors: TaxFieldError[] };
+
+/** 거래처 지우기 `{ ids[] }`. */
+export function parseVendorIds(raw: unknown): VendorIdsParsed {
+  const ids = isObj(raw) ? idsOf(raw.ids) : null;
+  return ids ? { ok: true, value: ids } : { ok: false, errors: [{ field: 'ids', message: '지울 거래처를 고르세요' }] };
+}
+
 export type FileIdsParsed = { ok: true; value: string[] } | { ok: false; errors: TaxFieldError[] };
 
 /** 파일 지우기 `{ ids[] }`. */
@@ -463,9 +505,12 @@ export interface TaxUploadKindCard {
 
 export interface TaxUploadsResponse {
   month: string;
+  /** 사업자 유형 이름(작업할 달 줄 오른쪽 안내) — 세무 설정을 아직 안 했으면 null. */
+  bizTypeName: string | null;
   cards: TaxUploadKindCard[];
   files: TaxUploadFileView[];
-  codes: { kinds: TaxCodeName[]; invDirs: TaxCodeName[] };
+  /** 자료 종류는 설명(카드 설명 — 코드 설명 칸, 비어 있으면 null)까지. */
+  codes: { kinds: (TaxCodeName & { description: string | null })[]; invDirs: TaxCodeName[] };
 }
 
 export interface TaxUploadPreview {
@@ -482,6 +527,8 @@ export interface TaxUploadPreview {
   /** 이미 올린 승인번호라 건너뛸 줄. */
   alreadyUploaded: number;
   excluded: InvoiceExcluded;
+  /** 뺀 줄 종류의 이름 — 코드 표(TAX_SKIP_REASON)에서, 코드값 = `excluded` 의 키. */
+  skipReasons: TaxCodeName[];
   warnings: TaxUploadWarning[];
 }
 

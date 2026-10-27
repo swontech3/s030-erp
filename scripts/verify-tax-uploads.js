@@ -5,7 +5,7 @@
  *
  * ★★ 표 구조 · RLS · UNIQUE · FK 는 `scripts/verify-203.js` 가, 코드 · 대응표는 `verify-204.js` 가 잰다.
  *    여기는 그 위의 앱 처리다: 회사별 막기 · 같은 파일 409 · 겹친 파일은 새 줄만 · 거래처 자동 등록 · 승격 ·
- *    덮지 않기 · 사용자가 내린 일반은 그대로 · 먼저 생긴 곳에 붙임 · 합치기 · 파일 지우기.
+ *    덮지 않기 · 사용자가 내린 일반은 그대로 · 먼저 생긴 곳에 붙임 · 합치기 · 파일 지우기 · 거래처 지우기.
  * ★★ API 의 풀(`db/pool.ts`)로 접속한다 — erp_app. 라우트가 쓰는 처리(`routes/taxUploads.ts` ·
  *    `routes/taxVendors.ts` 의 …Op)를 그대로 부른다.
  * ★ 엑셀은 SheetJS 로 **지어낸 값**을 써서 만든다 — 원본 샘플(doc/data-src/)을 쓰지 않는다. 제목 줄은 DB 의 대응표에서 읽는다.
@@ -25,6 +25,7 @@ import {
   uploadInvoicesOp,
 } from '../packages/api/src/routes/taxUploads.ts';
 import {
+  deleteVendorsOp,
   editVendorOp,
   listVendorsOp,
   mergeVendorsOp,
@@ -111,9 +112,12 @@ async function main() {
       // ── 첫 파일 — 미리보기 · 올리기 · 자동 등록 ──
       const f1 = xls({ tag: 'f1', rows: [{ no: 1, partner: P.p1, name: '지어낸 가' }, { no: 2, partner: P.p1, name: '지어낸 가' }, { no: 3, partner: P.p2, name: '지어낸 나' }] });
       const pv1 = await previewUploadOp(c, ORG_A, 'INVOICE', 'f1.xls', f1);
-      check('U1', '미리보기 — 매출(S) · 넣을 3줄 · 9월 3줄 · 앞줄 · 「우리 번호 없음」 경고 · 쓰지 않는다',
+      check('U1', '미리보기 — 매출(S) · 넣을 3줄 · 9월 3줄 · 앞줄 · 「우리 번호 없음」 경고 · 뺀 줄 종류 이름(코드 표) · 쓰지 않는다',
         pv1.ok && pv1.data.direction === 'S' && pv1.data.toInsert === 3 && pv1.data.byMonth[0]?.count === 3 &&
         pv1.data.sample.length === 3 && pv1.data.warnings.some((w) => w.code === 'own_biz_no_unchecked') &&
+        // 뺀 줄 종류 이름은 코드 표(TAX_SKIP_REASON, 205)에서 — 키 순서 그대로 7개
+        pv1.data.skipReasons?.map((s) => s.code).join() === Object.keys(pv1.data.excluded).join() &&
+        pv1.data.skipReasons.every((s) => s.name.trim() !== '') &&
         (await vendorsOf(ORG_A)).length === 0,
         pv1.ok ? { dir: pv1.data.direction, toInsert: pv1.data.toInsert, byMonth: pv1.data.byMonth } : pv1);
       const up1 = await upload(ORG_A, 'f1.xls', f1);
@@ -188,7 +192,9 @@ async function main() {
       const inv = ups.cards.find((k) => k.kind === 'INVOICE');
       check('U11', '자료 올리기 목록 — 세금계산서 카드만 열림 · 그 달 파일 수 · 코드 이름은 코드 표에서',
         inv?.enabled === true && inv.fileCount === 6 && ups.cards.filter((k) => k.enabled).length === 1 &&
-        ups.files.length === 6 && ups.codes.invDirs.map((d) => d.code).join() === 'P,S',
+        ups.files.length === 6 && ups.codes.invDirs.map((d) => d.code).join() === 'P,S' &&
+        // 카드 설명은 코드 설명 칸에서(비어 있으면 null) · 사업자 유형 이름(설정이 없으면 null)
+        ups.codes.kinds.every((k) => 'description' in k) && 'bizTypeName' in ups && ups.bizTypeName === null,
         { inv, files: ups.files.length, dirs: ups.codes.invDirs });
 
       // ── 합치기 ──
@@ -203,16 +209,19 @@ async function main() {
         { merge: merge.ok ? merge.data.movedRows : merge, after });
 
       // ── 회사별 막기 ──
+      const aZero = await insertVendor(c, ORG_A, { name: '남의 단체가 지우려는 곳', bizNo: null, vendorTp: 'G', firstKind: 'BANK', firstDirection: null }, ACTOR);
       await applyCompanyScope(c, tenant(ORG_B));
       const bList = await vendorsOf(ORG_B);
       const bEdit = await editVendorOp(c, ORG_B, v1[0].id, { name: '가로챔' }, ACTOR);
       const bType = await setVendorTypeOp(c, ORG_B, [v1[0].id], 'G', ACTOR);
       const bMerge = await mergeVendorsOp(c, ORG_B, v1[0].id, [v2.id], ACTOR);
       const bDel = await deleteUploadsOp(c, ORG_B, [up1.data.file.id]);
-      check('U13', '★ 회사 B — A 의 거래처 · 파일이 안 보이고, A 의 id 로 고치기 · 구분 · 합치기 · 지우기는 404',
-        bList.length === 0 && [bEdit, bType, bMerge, bDel].every((r) => !r.ok && r.status === 404) &&
+      // 거래 0건인 A 의 거래처 — B 가 지우려 해도 404 · 그대로 남는다
+      const bVDel = await deleteVendorsOp(c, ORG_B, [aZero]);
+      check('U13', '★ 회사 B — A 의 거래처 · 파일이 안 보이고, A 의 id 로 고치기 · 구분 · 합치기 · 파일 지우기 · 거래처 지우기는 404',
+        bList.length === 0 && [bEdit, bType, bMerge, bDel, bVDel].every((r) => !r.ok && r.status === 404) &&
         (await listUploadsOp(c, ORG_B, MONTH)).files.length === 0,
-        [bEdit, bType, bMerge, bDel].map((r) => r.status));
+        [bEdit, bType, bMerge, bDel, bVDel].map((r) => r.status));
       const bUp = await upload(ORG_B, 'f1.xls', f1);
       check('U14', '같은 파일 · 같은 승인번호라도 다른 단체면 따로 들어간다', bUp.ok && bUp.data.insertedCount === 3, bUp.ok ? bUp.data.insertedCount : bUp);
       const crossWrite = await attempt(c, () => upload(ORG_A, 'b가-a에.xls', xls({ tag: 'x', rows: [{ no: 99, partner: P.p1, name: '가' }] })));
@@ -225,7 +234,11 @@ async function main() {
 
       // ── 파일 지우기 ──
       await applyCompanyScope(c, tenant(ORG_A));
+      const pre = await deleteUploadsOp(c, ORG_A, [up1.data.file.id], true);
+      const stillThere = (await listUploadsOp(c, ORG_A, MONTH)).files.some((f) => f.id === up1.data.file.id);
       const del = await deleteUploadsOp(c, ORG_A, [up1.data.file.id]);
+      check('U17a', '★ 지우기 전 확인 — 지우기와 같은 수(빠질 줄 · 겹쳤을 수 있는 파일)를 주고, 지우지 않는다',
+        pre.ok && stillThere && del.ok && JSON.stringify(pre.data) === JSON.stringify(del.data), { pre: pre.ok ? pre.data : pre });
       const gone = (await c.query(`SELECT count(*)::int n FROM public.tb_s050_invoices WHERE org_id = $1 AND approval_no = ANY($2)`,
         [ORG_A, ['V-TAXUP-1', 'V-TAXUP-2', 'V-TAXUP-3']])).rows[0].n;
       check('U17', '★ 파일 지우기 — 그 파일의 3줄이 빠지고, 뒤에 올린 겹친 파일(f2, 건너뛴 3줄)을 알린다 · 거래처는 남는다',
@@ -236,6 +249,27 @@ async function main() {
       const ghost = await deleteUploadsOp(c, ORG_A, [up2.data.file.id, 'v-tax-up-none']);
       check('U18', '없는 id 가 섞이면 404 · 아무것도 지우지 않는다',
         !ghost.ok && ghost.status === 404 && (await listUploadsOp(c, ORG_A, MONTH)).files.some((f) => f.id === up2.data.file.id));
+
+      // ── 거래처 지우기 — 거래 0건(전체 기간)만 ──
+      check('U19a', '★ 남의 단체가 지우려 한 거래 0건 거래처는 A 에 그대로 남아 있다',
+        (await vendorsOf(ORG_A)).some((v) => v.id === aZero));
+      const z2 = await insertVendor(c, ORG_A, { name: '거래 없는 곳', bizNo: null, vendorTp: 'G', firstKind: 'CASH', firstDirection: null }, ACTOR);
+      const v1c = (await vendorByBiz(ORG_A, P.p1))[0];
+      // 8월에는 거래가 없는 거래처 — 그 달 0건이어도 9월 거래가 있으니 막혀야 한다
+      const v1Aug = (await listVendorsOp(c, ORG_A, '2026-08')).vendors.find((v) => v.id === v1c.id);
+      const mixed = await deleteVendorsOp(c, ORG_A, [z2, v1c.id]);
+      const afterMixed = await vendorsOf(ORG_A);
+      check('U19', '★ 거래가 있는 거래처가 하나라도 섞이면 409 · 아무것도 지우지 않는다(이번 달 거래 0건이어도 전체 기간으로 본다)',
+        !mixed.ok && mixed.status === 409 && mixed.message === '거래가 있는 거래처는 지울 수 없습니다' &&
+        v1Aug?.monthCount === 0 && v1c.totalCount > 0 && afterMixed.some((v) => v.id === z2) && afterMixed.some((v) => v.id === v1c.id),
+        { mixed, v1Aug: v1Aug?.monthCount, v1Total: v1c.totalCount });
+      const vDel = await deleteVendorsOp(c, ORG_A, [z2, aZero]);
+      const afterDel = await vendorsOf(ORG_A);
+      check('U20', '★ 거래 0건 거래처 지우기 — 고른 2곳이 지워진다',
+        vDel.ok && vDel.data.deleted === 2 && !afterDel.some((v) => v.id === z2 || v.id === aZero),
+        vDel.ok ? vDel.data : vDel);
+      const vGhost = await deleteVendorsOp(c, ORG_A, [v1c.id, 'v-tax-up-none']);
+      check('U21', '없는 거래처 id 가 섞이면 404', !vGhost.ok && vGhost.status === 404, vGhost);
     } finally {
       await c.query('ROLLBACK');
     }

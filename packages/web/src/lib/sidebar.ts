@@ -50,6 +50,8 @@ const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
   s040900010: 'scale', // 설정(등기 설정) — 운영사 전용. 법무 서비스라 같은 저울이다
   s050000010: 'calculator', // 이번 달 할 일 — 세무 서비스(s05)
   s050100010: 'settings', // 세무 설정 — 세무 서비스(s05)
+  s050100020: 'building-2', // 거래처 — 세무 서비스(s05)
+  s050200010: 'upload', // 자료 올리기 — 세무 서비스(s05)
 };
 
 export interface NavItem {

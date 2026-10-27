@@ -6,10 +6,16 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  addMonths,
   convertInvoiceSheet,
   detectSpreadsheetFormat,
   parseMonth,
+  previousMonthOf,
+  thisMonthOf,
+  withRo,
+  workMonthOf,
   parseVendorEdit,
+  parseVendorIds,
   parseVendorMerge,
   parseVendorType,
   type InvoiceImportMap,
@@ -253,6 +259,33 @@ describe('convertInvoiceSheet — 줄 거르기', () => {
   });
 });
 
+describe('작업할 달 — 주소 ?month= (처음 값 지난달 · 끝 이번 달)', () => {
+  const today = new Date(2026, 9, 26); // 2026-10-26(그 기기 시각)
+  it('thisMonthOf · previousMonthOf · addMonths', () => {
+    expect(thisMonthOf(today)).toBe('2026-10');
+    expect(previousMonthOf(today)).toBe('2026-09');
+    expect(previousMonthOf(new Date(2026, 0, 5))).toBe('2025-12');
+    expect(addMonths('2026-12', 1)).toBe('2027-01');
+    expect(addMonths('2026-01', -1)).toBe('2025-12');
+  });
+  it('workMonthOf — 없거나 틀리거나 이번 달보다 뒤면 지난달', () => {
+    expect(workMonthOf(undefined, today)).toBe('2026-09');
+    expect(workMonthOf('2026-13', today)).toBe('2026-09');
+    expect(workMonthOf('2026-11', today)).toBe('2026-09');
+    expect(workMonthOf('2026-10', today)).toBe('2026-10');
+    expect(workMonthOf('2025-03', today)).toBe('2025-03');
+  });
+});
+
+describe('withRo — 이름 뒤 「로 / 으로」(받침에 따라)', () => {
+  it('받침 없거나 ㄹ 받침이면 「로」, 그 밖의 받침이면 「으로」', () => {
+    expect(withRo('주거래처')).toBe('주거래처로');
+    expect(withRo('일반')).toBe('일반으로');
+    expect(withRo('서울')).toBe('서울로');
+    expect(withRo('ABC')).toBe('ABC(으)로');
+  });
+});
+
 describe('parseMonth', () => {
   it('YYYY-MM 만 받는다', () => {
     expect(parseMonth('2026-09')).toBe('2026-09');
@@ -306,5 +339,14 @@ describe('parseVendorMerge — 합치기', () => {
     expect(parseVendorMerge({ keepId: 'k', ids: [] })).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
     expect(parseVendorMerge({ keepId: 'k', ids: ['k'] })).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
     expect(parseVendorMerge({ keepId: '', ids: ['a'] })).toMatchObject({ ok: false, errors: [{ field: 'keepId' }] });
+  });
+});
+
+describe('parseVendorIds — 거래처 지우기', () => {
+  it('하나 이상, 겹친 id 는 하나로', () => {
+    expect(parseVendorIds({ ids: ['a', 'a', 'b'] })).toEqual({ ok: true, value: ['a', 'b'] });
+    expect(parseVendorIds({ ids: [] })).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
+    expect(parseVendorIds({ ids: [1] })).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
+    expect(parseVendorIds(null)).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
   });
 });
