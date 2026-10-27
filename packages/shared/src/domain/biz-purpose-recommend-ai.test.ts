@@ -22,10 +22,10 @@ describe('checkAiPicks — 서버 검사', () => {
       { bizCode: '552304', reason: '안' },
     ]);
   });
-  it('④ 빈 이유 · 상한을 넘는 이유는 그 줄을 버린다', () => {
+  it('④ 빈 이유는 그 줄을 버리고, 상한을 넘는 이유는 그 길이로 자른다', () => {
     expect(
       checkAiPicks(raw([{ bizCode: '552303', reason: ' ' }, { bizCode: '552304', reason: '열한글자를넘는이유입니다' }]), ALLOWED, S),
-    ).toEqual([]);
+    ).toEqual([{ bizCode: '552304', reason: '열한글자를넘는이유입' }]);
   });
   it('⑤ 같은 업종은 첫 줄만 · MAX_PICKS 에서 자른다', () => {
     expect(

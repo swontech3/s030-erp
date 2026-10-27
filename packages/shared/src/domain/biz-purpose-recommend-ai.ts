@@ -17,7 +17,7 @@
  *   ① JSON 으로 읽히고 `{ picks: [{ bizCode, reason }] }` 모양인가(앞뒤 ``` 울타리 하나는 걷는다)
  *   ② 업종코드가 이번에 보낸 후보 안에 있는가
  *   ③ 문구 — AI 에게 받지 않는다. 서버 문구를 붙인다(라우트)
- *   ④ 이유가 비지 않고 `REASON_MAX` 자 이하인가
+ *   ④ 이유가 비지 않았는가 — `REASON_MAX` 자를 넘으면 버리지 않고 그 길이로 자른다(2026-10-27)
  *   ⑤ 같은 업종코드는 첫 줄만, `MAX_PICKS` 개에서 자른다
  */
 import type { BizRecommendCandidate, BizRecommendDetail } from './biz-purpose-recommend.ts';
@@ -141,9 +141,9 @@ export function checkAiPicks(
     const code = bizCode.trim();
     const why = reason.trim();
     if (!allowed.has(code)) continue;
-    if (why === '' || why.length > s.reasonMax) continue;
+    if (why === '') continue;
     if (out.some((o) => o.bizCode === code)) continue;
-    out.push({ bizCode: code, reason: why });
+    out.push({ bizCode: code, reason: [...why].slice(0, s.reasonMax).join('') });
     if (out.length >= s.maxPicks) break;
   }
   return out;
