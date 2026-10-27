@@ -30,7 +30,14 @@ export interface ApiResult<T> {
 
 export async function callApi<T>(
   path: string,
-  init: { method?: string; body?: unknown; erpSid?: string | null; headers?: Record<string, string> } = {},
+  init: {
+    method?: string;
+    body?: unknown;
+    erpSid?: string | null;
+    headers?: Record<string, string>;
+    /** 상한(기본 5초). ★ 바깥(AI)을 부르는 주소만 늘린다 — 사업목적 [AI 추천] */
+    timeoutMs?: number;
+  } = {},
 ): Promise<ApiResult<T>> {
   // ★ 공개 라우트(문의상담)가 클라이언트 IP·열람 토큰을 넘길 때 쓴다. 세션과 섞이지 않는다.
   const headers: Record<string, string> = { ...init.headers };
@@ -49,7 +56,7 @@ export async function callApi<T>(
     cache: 'no-store',
     // ★ 상한 없는 대기가 서버 컴포넌트 렌더를 통째로 멈추게 둔다(리뷰 2026-09-07).
     //   DB 가 잠기면 Fastify 가 응답을 못 하고, 그 동안 Next 워커가 하나씩 묶인다.
-    signal: AbortSignal.timeout(API_TIMEOUT_MS),
+    signal: AbortSignal.timeout(init.timeoutMs ?? API_TIMEOUT_MS),
   });
 
   const text = await res.text();

@@ -7,6 +7,7 @@
  */
 import type { BizPurposeItem } from '@swonbiz/shared/domain/biz-purpose';
 import type { BizRecommendCandidate, BizRecommendDetail } from '@swonbiz/shared/domain/biz-purpose-recommend';
+import type { AiPickItem, BizRecommendAiResult } from '@swonbiz/shared/domain/biz-purpose-recommend-ai';
 
 export type { BizPurposeItem };
 
@@ -88,3 +89,12 @@ export const loadBizRecommendDetail = (bizCode: string) =>
   call<{ item: BizRecommendDetail }>(`/api/legal/biz-purposes/recommend/${encodeURIComponent(bizCode)}`).then(
     (r) => r.item,
   );
+
+export type { AiPickItem, BizRecommendAiResult };
+
+/**
+ * [AI 추천](2026-10-27) — 일반 추천은 늘 같이 온다. AI 가 안 되면 `ai.ok = false` 와 안내 글.
+ * ★ 쓰기는 없지만 본문(설명)을 실어 보내므로 POST 다.
+ */
+export const loadBizRecommendAi = (q: string) =>
+  call<BizRecommendAiResult>('/api/legal/biz-purposes/recommend/ai', json('POST', { q: q.trim() }));

@@ -166,6 +166,13 @@ if (ocrCredentialsPath && !existsSync(ocrCredentialsPath)) {
  */
 const ntsServiceKey = process.env.DATA_GO_KR_KEY?.trim() || null;
 
+/**
+ * Claude API 키 — 사업목적 [AI 추천](결정 2026-10-27).
+ *
+ * ★ **없어도 기동한다.** 없으면 [AI 추천]만 「쓸 수 없습니다」 — 일반 추천은 그대로 나온다.
+ */
+const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim() || null;
+
 const key = Buffer.from(required('ERP_ENCRYPTION_KEY'), 'base64');
 if (key.length !== 32) {
   throw new Error(`ERP_ENCRYPTION_KEY 는 base64 로 32바이트여야 한다(현재 ${key.length}바이트).`);
@@ -206,6 +213,8 @@ export const env = {
    * 국세청 상태조회 인증키. `null` 이면 **그 기능만** 꺼진다 — 계약 등록은 그대로 된다.
    */
   ntsServiceKey,
+  /** Claude API 키. `null` 이면 [AI 추천]만 꺼진다. */
+  anthropicApiKey,
   port: Number(process.env.PORT ?? 3001),
   /**
    * 세션 유효기간 — 삐용 refresh 만료를 넘지 않아야 한다.

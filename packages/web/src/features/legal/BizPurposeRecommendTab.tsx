@@ -12,12 +12,15 @@
  * ★ 고른 문구는 팝업의 고른 목록(`checked`)에 같이 담긴다 — 넘기는 것은 문구 배열 그대로다.
  * ★ 팝업 틀의 바로 아래 자식으로 그린다(조각) — 목록이 상자 높이에 맞춰 줄고 스크롤되게(전체 탭과 같다).
  * ★ 새 스타일 없음 — 팝업 틀(`org-lookup.module.css`)과 팝업 파일(`biz-purpose-picker.module.css`)만 쓴다.
+ * ★ [AI 추천](2026-10-27) — 누를 때만 부른다. AI 가 후보 안에서 고른 업종만 그 순서로 보이고 줄마다 「AI 이유」.
+ *   고른 뒤 상세 · 인허가(「검토됨」만) · 문구(서버 문구)는 일반 추천과 같다. AI 가 안 되면 일반 추천 그대로 + 안내.
  */
 import { useRef, useState } from 'react';
 import type { BizMatchKind } from '@swonbiz/shared/domain/biz-purpose-recommend';
 import {
   BizPurposeError,
   loadBizRecommend,
+  loadBizRecommendAi,
   loadBizRecommendDetail,
   type BizRecommendCandidate,
   type BizRecommendDetail,
@@ -38,8 +41,16 @@ const matchLabel = (m: BizRecommendCandidate['matchedBy'][number]) =>
 
 type Candidates =
   | { state: 'idle' }
-  | { state: 'loading' }
-  | { state: 'ok'; items: BizRecommendCandidate[]; truncated: boolean }
+  | { state: 'loading'; ai: boolean }
+  | {
+      state: 'ok';
+      items: BizRecommendCandidate[];
+      truncated: boolean;
+      /** AI 가 고른 업종 → 이유(고른 순서). null 이면 일반 추천 */
+      reasons: ReadonlyMap<string, string> | null;
+      /** AI 가 안 됐을 때의 안내 */
+      aiNotice: string | null;
+    }
   | { state: 'error'; message: string };
 
 type Detail =
@@ -65,15 +76,28 @@ export function BizPurposeRecommendTab({ have, checked, onToggle }: Props) {
   const seq = useRef(0);
   const detailSeq = useRef(0);
 
-  const search = async (q: string) => {
+  const search = async (q: string, ai = false) => {
     if (q.trim() === '') return;
     const mine = ++seq.current;
     detailSeq.current++;
-    setCands({ state: 'loading' });
+    setCands({ state: 'loading', ai });
     setDetail({ state: 'none' });
     try {
+      if (ai) {
+        const r = await loadBizRecommendAi(q);
+        if (mine === seq.current)
+          setCands({
+            state: 'ok',
+            items: r.items,
+            truncated: r.truncated,
+            reasons: r.ai.ok ? new Map(r.ai.picks.map((p) => [p.bizCode, p.reason])) : null,
+            aiNotice: r.ai.ok ? null : r.ai.message,
+          });
+        return;
+      }
       const page = await loadBizRecommend(q);
-      if (mine === seq.current) setCands({ state: 'ok', items: page.items, truncated: page.truncated });
+      if (mine === seq.current)
+        setCands({ state: 'ok', items: page.items, truncated: page.truncated, reasons: null, aiNotice: null });
     } catch (err) {
       if (mine === seq.current)
         setCands({
@@ -100,6 +124,14 @@ export function BizPurposeRecommendTab({ have, checked, onToggle }: Props) {
   };
 
   const picked = detail.state === 'none' ? null : detail.state === 'ok' ? detail.item.bizCode : detail.bizCode;
+  const reasons = cands.state === 'ok' ? cands.reasons : null;
+  /** AI 가 고른 업종만, 고른 순서로 — 아니면 일반 추천 그대로 */
+  const rows =
+    cands.state !== 'ok'
+      ? []
+      : reasons
+        ? [...reasons.keys()].flatMap((code) => cands.items.filter((c) => c.bizCode === code))
+        : cands.items;
 
   return (
     <>
@@ -124,21 +156,39 @@ export function BizPurposeRecommendTab({ have, checked, onToggle }: Props) {
         >
           검색
         </button>
+        <button
+          type="button"
+          className={`${base.btn} ${base.btnGhost} ${base.btnSearch}`}
+          disabled={query.trim() === '' || cands.state === 'loading'}
+          onClick={() => void search(query, true)}
+        >
+          AI 추천
+        </button>
       </form>
 
       <div className={base.list}>
         {cands.state === 'idle' ? (
           <p className={base.note}>하는 사업을 적고 검색하세요. 업종 후보가 나옵니다.</p>
         ) : cands.state === 'loading' ? (
-          <p className={base.note}>찾는 중…</p>
+          <p className={base.note}>{cands.ai ? 'AI 가 고르는 중…' : '찾는 중…'}</p>
         ) : cands.state === 'error' ? (
           <p className={base.error} role="alert">
             {cands.message}
           </p>
         ) : cands.items.length === 0 ? (
-          <p className={base.note}>맞는 업종이 없습니다. 다른 말로 적어 보세요.</p>
+          <>
+            {cands.aiNotice ? <p className={base.note}>{cands.aiNotice}</p> : null}
+            <p className={base.note}>맞는 업종이 없습니다. 다른 말로 적어 보세요.</p>
+          </>
         ) : (
           <>
+            {cands.aiNotice ? (
+              <p className={base.note} role="status">
+                {cands.aiNotice}
+              </p>
+            ) : reasons ? (
+              <p className={base.note}>AI 가 업종 후보 안에서 고른 것입니다 — 전체 후보는 [검색]으로 봅니다.</p>
+            ) : null}
             <table className={base.table}>
               <thead>
                 <tr>
@@ -146,10 +196,11 @@ export function BizPurposeRecommendTab({ have, checked, onToggle }: Props) {
                   <th>업종코드</th>
                   <th>업태 · 종목</th>
                   <th>맞은 것</th>
+                  {reasons ? <th>AI 이유</th> : null}
                 </tr>
               </thead>
               <tbody>
-                {cands.items.map((c) => (
+                {rows.map((c) => (
                   <tr
                     key={c.bizCode}
                     className={`${base.row}${picked === c.bizCode ? ` ${base.rowOn}` : ''}`}
@@ -174,11 +225,12 @@ export function BizPurposeRecommendTab({ have, checked, onToggle }: Props) {
                         {c.matchedBy.map(matchLabel).join(' · ')}
                       </span>
                     </td>
+                    {reasons ? <td>{reasons.get(c.bizCode)}</td> : null}
                   </tr>
                 ))}
               </tbody>
             </table>
-            {cands.truncated ? (
+            {cands.truncated && !reasons ? (
               <p className={base.note}>앞의 {cands.items.length}개만 보입니다 — 설명을 더 자세히 적으세요</p>
             ) : null}
             <DetailView detail={detail} have={have} checked={checked} onToggle={onToggle} />

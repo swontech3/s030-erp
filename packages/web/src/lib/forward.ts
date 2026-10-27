@@ -145,6 +145,8 @@ export async function forwardJson(
   request: Request,
   path: string,
   method: 'POST' | 'PATCH' | 'PUT',
+  /** 상한 — 기본은 `callApi` 의 5초. 바깥(AI)을 부르는 주소만 넘긴다 */
+  timeoutMs?: number,
 ): Promise<NextResponse> {
   const blocked = rejectCrossSite(request, { requireJson: true });
   if (blocked) return blocked;
@@ -163,7 +165,7 @@ export async function forwardJson(
 
   let res;
   try {
-    res = await callApi<{ message?: string }>(path, { method, body, erpSid: sid });
+    res = await callApi<{ message?: string }>(path, { method, body, erpSid: sid, timeoutMs });
   } catch (err) {
     // Fastify 에 못 붙은 것은 입력 오류가 아니다 — 사용자 잘못으로 돌리지 않는다.
     console.error(`[forward] ${method} ${path} 실패:`, (err as Error).message);
