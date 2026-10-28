@@ -197,10 +197,11 @@ export const SCREENS = {
 
   // --- 030 정리하기 ---
   /**
-   * 거래 분류 — 항목이 빈 매입 계산서에 출금 항목을 붙인다(1-3). 「전체」 보기는 그 달 매입 · 매출을 읽기만 + 엑셀.
-   * 자료 올리기 [보기]가 `?view=all&file=` 로 들어온다. 은행 · 현금 · 짝 남은 금액은 뒤 단계.
+   * 매출 · 매입 항목 지정(옛 이름 거래 분류, 2026-10-28) — 항목이 빈 매입 계산서에 출금 항목을 붙인다(1-3).
+   * 탭 「미지정 건 · 지정 건 · 이번 달 자료 전체」. 「이번 달 자료 전체」는 그 달 매입 · 매출을 읽기만 + 엑셀.
+   * 자료 올리기 [보기]가 `?view=all&file=` 로 「이번 달 자료 전체」 탭에 들어온다. 은행 · 현금 · 짝 남은 금액은 뒤 단계.
    */
-  s050300010: { route: '/tax/classify', name: '거래 분류', group: '030' },
+  s050300010: { route: '/tax/classify', name: '매출 · 매입 항목 지정', group: '030' },
 } as const satisfies Record<string, ScreenMeta>;
 
 export type ScreenId = keyof typeof SCREENS;

@@ -206,7 +206,7 @@ export function TaxVendorsView({ month }: { month: string }) {
             onClick={() => setModal({ kind: 'delete', ids: sel })}
           >
             <Icon name="trash-2" size={16} />
-            삭제
+            삭제{sel.length ? ` (${sel.length})` : ''}
           </button>
           <button
             type="button"
@@ -237,8 +237,7 @@ export function TaxVendorsView({ month }: { month: string }) {
             합치기{sel.length >= 2 ? ` (${sel.length})` : ''}
           </button>
           <span className={t.sm}>
-            {sel.length ? `${sel.length}곳 선택` : '줄을 고르세요 · 고치기는 한 곳, 합치기는 두 곳 이상'}
-            {selHasDeals ? ` · ${DELETE_BLOCKED}` : ''}
+            {sel.length ? (selHasDeals ? DELETE_BLOCKED : '') : '줄을 고르세요 · 고치기는 한 곳, 합치기는 두 곳 이상'}
           </span>
         </div>
         {failed ? (

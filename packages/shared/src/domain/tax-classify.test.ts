@@ -86,16 +86,16 @@ describe('classifyDateRange — 줄을 고르는 날짜 [첫날, 끝 다음 날)
   });
 });
 
-describe('classifyExportFileName — 거래분류_YYYY-MM.xlsx', () => {
+describe('classifyExportFileName — 항목지정_YYYY-MM.xlsx', () => {
   const base = { month: '2026-09', view: 'all' as const, kind: 'all' as const, from: null, to: null, fileId: null };
   it('작업할 달', () => {
-    expect(classifyExportFileName(base)).toBe('거래분류_2026-09.xlsx');
+    expect(classifyExportFileName(base)).toBe('항목지정_2026-09.xlsx');
   });
   it('기간 직접 지정이면 YYYY-MM~YYYY-MM', () => {
-    expect(classifyExportFileName({ ...base, from: '2026-07-01', to: '2026-09-30' })).toBe('거래분류_2026-07~2026-09.xlsx');
+    expect(classifyExportFileName({ ...base, from: '2026-07-01', to: '2026-09-30' })).toBe('항목지정_2026-07~2026-09.xlsx');
   });
   it('파일로 들어왔으면 작업할 달 이름', () => {
-    expect(classifyExportFileName({ ...base, fileId: 'f1' })).toBe('거래분류_2026-09.xlsx');
+    expect(classifyExportFileName({ ...base, fileId: 'f1' })).toBe('항목지정_2026-09.xlsx');
   });
 });
 

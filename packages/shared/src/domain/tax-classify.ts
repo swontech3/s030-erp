@@ -103,10 +103,10 @@ export function classifyDateRange(q: ClassifyQuery): [string, string] | null {
   return [`${q.month}-01`, `${next}-01`];
 }
 
-/** 엑셀 파일 이름 — 거래분류_YYYY-MM.xlsx, 기간 직접 지정이면 거래분류_YYYY-MM~YYYY-MM.xlsx(결정). */
+/** 엑셀 파일 이름 — 항목지정_YYYY-MM.xlsx, 기간 직접 지정이면 항목지정_YYYY-MM~YYYY-MM.xlsx(결정). */
 export function classifyExportFileName(q: ClassifyQuery): string {
-  if (!q.fileId && q.from && q.to) return `거래분류_${q.from.slice(0, 7)}~${q.to.slice(0, 7)}.xlsx`;
-  return `거래분류_${q.month}.xlsx`;
+  if (!q.fileId && q.from && q.to) return `항목지정_${q.from.slice(0, 7)}~${q.to.slice(0, 7)}.xlsx`;
+  return `항목지정_${q.month}.xlsx`;
 }
 
 /** 주소 글자 — 화면 목록 · 엑셀이 같은 거르기를 쓴다. 처음 값(보기 left · 종류 all)은 싣지 않고, 파일이면 기간을 싣지 않는다. */

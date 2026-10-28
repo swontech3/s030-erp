@@ -145,7 +145,7 @@ async function main() {
       const sheet = ex.ok ? XLSX.read(ex.data.bytes, { type: 'array' }) : null;
       const aoa = sheet ? XLSX.utils.sheet_to_json(sheet.Sheets[sheet.SheetNames[0]], { header: 1 }) : [];
       check('K13', '★ 엑셀 — 파일 이름 · 시트 하나(자료 종류 이름) · 줄 = 화면 거르기 결과 · 항목 이름(수도광열비) · 매출은 「매출」',
-        ex.ok && ex.data.fileName === '거래분류_2026-09.xlsx' && sheet.SheetNames.length === 1 && aoa.length === 1 + 4 &&
+        ex.ok && ex.data.fileName === '항목지정_2026-09.xlsx' && sheet.SheetNames.length === 1 && aoa.length === 1 + 4 &&
         aoa[0].at(-1) === '항목' && aoa.some((r) => r.at(-1) === '수도광열비') && aoa.some((r) => r[0] === '매출' && r.at(-1) === '매출'),
         { name: ex.ok ? ex.data.fileName : ex, sheets: sheet?.SheetNames, rows: aoa.length });
 

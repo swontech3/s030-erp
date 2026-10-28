@@ -154,6 +154,14 @@
 .chipOn { border-color: var(--color-primary); background: var(--color-accent-bg); color: var(--color-primary-hover); font-weight: 700; }
 .chipOn b { color: var(--color-primary-hover); }
 
+/* ── 탭 — 시안 tax.css `.tabs` · `.tab` ── */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tab {
+  height: 44px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: transparent;
+  color: var(--text-muted); font-family: inherit; font-size: 14px; cursor: pointer; white-space: nowrap;
+}
+.tabOn { border-bottom-color: var(--color-primary); color: var(--text-heading); font-weight: 700; }
+
 /* ── 표 — 글자 왼쪽 · 숫자 오른쪽 ── */
 .tblWrap { overflow: hidden; border-radius: var(--radius-lg); }
 .tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
