@@ -45,13 +45,14 @@ async function codeChecks(q) {
 
   const lines = await q(`SELECT code, name, use_tp, sort_order, is_active FROM public.tb_s080_codes_line
     WHERE build_id = '1' AND category = $1 ORDER BY sort_order`, [CAT]);
-  const codes = lines.map((l) => l.code);
-  check('C3', `★ 고정 코드 — 코드값이 API 뺀 줄 키 ${keys.length}개와 빠짐없이 · 더하지 않고 같다(순서까지)`,
+  // 209 가 카드 · 현금 뺀 줄 종류를 8번부터 더했다 — 205 의 일곱(순서 1~7)만 계산서 키와 맞춰 본다(나머지는 verify-209)
+  const codes = lines.filter((l) => l.sort_order <= 7).map((l) => l.code);
+  check('C3', `★ 고정 코드 — 205 코드값(순서 1~7)이 API 계산서 뺀 줄 키 ${keys.length}개와 빠짐없이 · 더하지 않고 같다(순서까지)`,
     codes.join(',') === keys.join(','), `DB ${codes.join(',')} / API ${keys.join(',')}`);
   check('C4', '이름이 모두 차 있다(화면 문구)', lines.length > 0 && lines.every((l) => (l.name || '').trim() !== ''),
     lines.map((l) => `${l.code}=${l.name}`).join(' '));
   check('C5', '모두 000 파티션 · 켜짐', lines.every((l) => l.use_tp === '000' && l.is_active));
-  check('C6', '코드값 합계 7', lines.length === 7, String(lines.length));
+  check('C6', '205 코드값 7(순서 1~7)', codes.length === 7, String(codes.length));
 }
 
 (async () => {

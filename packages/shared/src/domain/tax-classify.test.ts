@@ -4,6 +4,7 @@ import {
   classifyDateRange,
   classifyExportFileName,
   classifyPlan,
+  classifyRowKey,
   classifySearch,
   itemPartitionOf,
   parseClassifyConfirm,
@@ -102,64 +103,78 @@ describe('classifyExportFileName — 항목지정_YYYY-MM.xlsx', () => {
 describe('parseClassifyConfirm — [확정] · [선택한 줄에 붙이기]', () => {
   const items = ['RENT', 'TEL'];
 
-  it('줄마다 항목 — 그대로', () => {
-    expect(parseClassifyConfirm({ rows: [{ id: 'a', itemCode: 'RENT' }, { id: 'b', itemCode: 'TEL' }] }, items)).toEqual({
+  it('줄마다 자료 종류 · 항목 — 그대로(1-4 결정 20 — kind 로 표를 고른다)', () => {
+    expect(
+      parseClassifyConfirm({ rows: [{ kind: 'INVOICE', id: 'a', itemCode: 'RENT' }, { kind: 'CARD', id: 'b', itemCode: 'TEL' }, { kind: 'CASH', id: 'c', itemCode: 'TEL' }] }, items),
+    ).toEqual({
       ok: true,
-      value: [{ id: 'a', itemCode: 'RENT' }, { id: 'b', itemCode: 'TEL' }],
+      value: [{ kind: 'INVOICE', id: 'a', itemCode: 'RENT' }, { kind: 'CARD', id: 'b', itemCode: 'TEL' }, { kind: 'CASH', id: 'c', itemCode: 'TEL' }],
     });
   });
 
-  it('고른 줄이 없거나 모양이 틀리면 rows 오류', () => {
+  it('고른 줄이 없거나 모양이 틀리면 rows 오류 — 자료 종류가 없거나 모르는 값이어도', () => {
     expect(parseClassifyConfirm({ rows: [] }, items)).toMatchObject({ ok: false, errors: [{ field: 'rows' }] });
-    expect(parseClassifyConfirm({ rows: [{ id: '', itemCode: 'RENT' }] }, items)).toMatchObject({ ok: false, errors: [{ field: 'rows' }] });
+    expect(parseClassifyConfirm({ rows: [{ kind: 'INVOICE', id: '', itemCode: 'RENT' }] }, items)).toMatchObject({ ok: false, errors: [{ field: 'rows' }] });
+    expect(parseClassifyConfirm({ rows: [{ id: 'a', itemCode: 'RENT' }] }, items)).toMatchObject({ ok: false, errors: [{ field: 'rows' }] });
+    expect(parseClassifyConfirm({ rows: [{ kind: 'BANK', id: 'a', itemCode: 'RENT' }] }, items)).toMatchObject({ ok: false, errors: [{ field: 'rows' }] });
     expect(parseClassifyConfirm(null, items)).toMatchObject({ ok: false, errors: [{ field: 'rows' }] });
   });
 
-  it('같은 줄을 두 번 보내면 rows 오류', () => {
-    expect(parseClassifyConfirm({ rows: [{ id: 'a', itemCode: 'RENT' }, { id: 'a', itemCode: 'TEL' }] }, items)).toMatchObject({
-      ok: false,
-      errors: [{ field: 'rows' }],
-    });
+  it('같은 줄을 두 번 보내면 rows 오류 — 종류가 다르면 같은 id 라도 다른 줄', () => {
+    expect(
+      parseClassifyConfirm({ rows: [{ kind: 'CARD', id: 'a', itemCode: 'RENT' }, { kind: 'CARD', id: 'a', itemCode: 'TEL' }] }, items),
+    ).toMatchObject({ ok: false, errors: [{ field: 'rows' }] });
+    expect(
+      parseClassifyConfirm({ rows: [{ kind: 'CARD', id: 'a', itemCode: 'RENT' }, { kind: 'CASH', id: 'a', itemCode: 'TEL' }] }, items),
+    ).toMatchObject({ ok: true });
   });
 
   it('그 회사 목록에 없는 항목은 itemCode 오류', () => {
-    expect(parseClassifyConfirm({ rows: [{ id: 'a', itemCode: 'ENTERTAIN' }] }, items)).toMatchObject({
+    expect(parseClassifyConfirm({ rows: [{ kind: 'INVOICE', id: 'a', itemCode: 'ENTERTAIN' }] }, items)).toMatchObject({
       ok: false,
       errors: [{ field: 'itemCode', message: '없는 항목입니다' }],
     });
   });
 
   it('사업자 유형이 없어 목록이 비면 — 세무 설정 안내', () => {
-    expect(parseClassifyConfirm({ rows: [{ id: 'a', itemCode: 'RENT' }] }, [])).toMatchObject({
+    expect(parseClassifyConfirm({ rows: [{ kind: 'INVOICE', id: 'a', itemCode: 'RENT' }] }, [])).toMatchObject({
       ok: false,
       errors: [{ field: 'itemCode', message: '세무 설정에서 사업자 유형을 먼저 고르세요' }],
     });
   });
 });
 
+describe('classifyRowKey — 화면이 줄을 가리키는 열쇠(세 표의 id 가 겹쳐도 갈린다)', () => {
+  it('자료 종류:id', () => {
+    expect(classifyRowKey({ kind: 'CARD', id: 'x' })).toBe('CARD:x');
+    expect(classifyRowKey({ kind: 'CASH', id: 'x' })).not.toBe(classifyRowKey({ kind: 'CARD', id: 'x' }));
+  });
+});
+
 describe('classifyPlan — 목록 위 버튼이 할 일', () => {
   const rows = [
-    { id: 'a', itemCode: null, suggestedItemCode: 'RENT' }, // 골라 둔 항목 있음
-    { id: 'b', itemCode: null, suggestedItemCode: null }, // 항목 없음
-    { id: 'c', itemCode: 'TEL', suggestedItemCode: null }, // 확정함
-    { id: 'd', itemCode: 'AD', suggestedItemCode: null }, // 확정했고 [고치기] 중
+    { kind: 'INVOICE' as const, id: 'a', itemCode: null, suggestedItemCode: 'RENT' }, // 골라 둔 항목 있음
+    { kind: 'CARD' as const, id: 'b', itemCode: null, suggestedItemCode: null }, // 항목 없음
+    { kind: 'CASH' as const, id: 'c', itemCode: 'TEL', suggestedItemCode: null }, // 확정함
+    { kind: 'INVOICE' as const, id: 'd', itemCode: 'AD', suggestedItemCode: null }, // 확정했고 [고치기] 중
   ];
+  const [A, B, C, D] = ['INVOICE:a', 'CARD:b', 'CASH:c', 'INVOICE:d'];
 
   it('[확정] — 아직 확정 안 된 줄 중 항목이 있는 줄(고른 값 > 골라 둔 값), 없는 줄은 건너뜀', () => {
-    expect(classifyPlan(rows, ['a', 'b', 'c'], {}, new Set())).toEqual({
-      confirm: [{ id: 'a', itemCode: 'RENT' }],
+    expect(classifyPlan(rows, [A, B, C], {}, new Set())).toEqual({
+      confirm: [{ kind: 'INVOICE', id: 'a', itemCode: 'RENT' }],
       skipped: 1,
-      reopen: ['c'],
+      reopen: [C],
     });
-    expect(classifyPlan(rows, ['a', 'b'], { a: 'MEAL', b: 'AD' }, new Set()).confirm).toEqual([
-      { id: 'a', itemCode: 'MEAL' },
-      { id: 'b', itemCode: 'AD' },
+    expect(classifyPlan(rows, [A, B], { [A]: 'MEAL', [B]: 'AD' }, new Set()).confirm).toEqual([
+      { kind: 'INVOICE', id: 'a', itemCode: 'MEAL' },
+      { kind: 'CARD', id: 'b', itemCode: 'AD' },
     ]);
   });
 
   it('[고치기] 중인 줄은 다시 확정 대상 — 처음 값은 지금 항목, 고르면 덮는다', () => {
-    expect(classifyPlan(rows, ['d'], {}, new Set(['d']))).toEqual({ confirm: [{ id: 'd', itemCode: 'AD' }], skipped: 0, reopen: [] });
-    expect(classifyPlan(rows, ['d'], { d: 'TEL' }, new Set(['d'])).confirm).toEqual([{ id: 'd', itemCode: 'TEL' }]);
+    expect(classifyPlan(rows, [D], {}, new Set([D]))).toEqual({ confirm: [{ kind: 'INVOICE', id: 'd', itemCode: 'AD' }], skipped: 0, reopen: [] });
+    expect(classifyPlan(rows, [D], { [D]: 'TEL' }, new Set([D])).confirm).toEqual([{ kind: 'INVOICE', id: 'd', itemCode: 'TEL' }]);
   });
 
   it('고른 줄이 없으면 할 일 없음', () => {

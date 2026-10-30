@@ -87,7 +87,9 @@ async function codeChecks(q) {
 
 async function mapChecks(q, lines) {
   const rows = await q(`SELECT id, kind, name, header_row, header_signature, columns, is_active FROM public.tb_s050_import_maps`);
-  check('M1', `대응표는 ${MAP_ID} 한 줄`, rows.length === 1 && rows[0].id === MAP_ID, rows.map((r) => r.id).join(','));
+  // 209 가 카드 · 현금 대응표를 더했다 — 계산서(INVOICE) 대응표만 센다(카드 · 현금은 verify-209)
+  const inv = rows.filter((r) => r.kind === 'INVOICE');
+  check('M1', `계산서 대응표는 ${MAP_ID} 한 줄`, inv.length === 1 && inv[0].id === MAP_ID, inv.map((r) => r.id).join(','));
   const m = rows.find((r) => r.id === MAP_ID);
   if (!m) return;
 

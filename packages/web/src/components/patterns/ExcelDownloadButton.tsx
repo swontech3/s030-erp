@@ -33,9 +33,11 @@ interface Props {
   className?: string;
   disabled?: boolean;
   onError?: (message: string) => void;
+  /** 버튼 글자 — 안 주면 「엑셀 내려받기」(세무 1-4, 2026-10-30 — 현금 경비 「양식 내려받기」). */
+  label?: string;
 }
 
-export function ExcelDownloadButton({ href, className, disabled = false, onError }: Props) {
+export function ExcelDownloadButton({ href, className, disabled = false, onError, label = '엑셀 내려받기' }: Props) {
   const [busy, setBusy] = useState(false);
 
   const download = async () => {
@@ -72,7 +74,7 @@ export function ExcelDownloadButton({ href, className, disabled = false, onError
   return (
     <button type="button" className={className} disabled={disabled || busy} onClick={download}>
       <Icon name="save" size={14} />
-      엑셀 내려받기
+      {label}
     </button>
   );
 }

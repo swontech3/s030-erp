@@ -7,6 +7,8 @@
  *   - 항목은 코드 TAX_ITEM_OUT, 파티션 = 사업자 유형(아래 바꿈표). 이름은 두 파티션 모두에서 찾는다
  *   - 파일로 들어오면 「전체」 보기 + 그 파일 줄 전부(기간 거르기 없음)
  *   - [고치기]는 화면 안에서만 — 다시 확정하면 덮는다
+ * ★ 1-4(2026-10-30): 카드 사용 내역 · 현금 경비 줄도 항목을 붙인다. 미지정 건 = 그 달 (매입 계산서 + 카드 줄 + 현금 매입 줄) 중
+ *   항목이 빈 줄. 현금 매출 줄은 매출 계산서처럼 항목이 없다. 표가 셋이라 줄은 (kind, id) 로 가리킨다.
  */
 import { TAX_INV_DIR_PURCHASE, TAX_INV_DIR_SALES, parseMonth, type TaxCodeName, type TaxFieldError } from './tax-uploads.ts';
 
@@ -29,8 +31,8 @@ export function itemPartitionOf(bizType: string | null): string | null {
 
 export type ClassifyView = 'left' | 'all';
 /**
- * 「전체」 보기의 자료 종류 칩 — 결과서 S05-05 순서. 매입 · 매출은 계산서 구분 코드값(P · S).
- * 카드 · 현금 · 삐용 경비 · 은행은 아직 자료가 없어 늘 0건(뒤 단계).
+ * 「전체」 보기의 자료 종류 칩 — 결과서 S05-05 순서. 매입 · 매출은 계산서 구분 코드값(P · S), 카드 · 현금은 자료 종류 코드값(1-4).
+ * 삐용 경비 · 은행은 아직 자료가 없어 늘 0건(뒤 단계).
  */
 export const CLASSIFY_KINDS = ['all', TAX_INV_DIR_PURCHASE, TAX_INV_DIR_SALES, 'CARD', 'CASH', 'PPIYONG', 'BANK'] as const;
 export type ClassifyKind = (typeof CLASSIFY_KINDS)[number];
@@ -124,14 +126,22 @@ export function classifySearch(q: ClassifyQuery): string {
 
 /* ── 본문 ────────────────────────────────────────────────────────────────── */
 
+/** 항목을 붙이는 자료 — 계산서(매입) · 카드 사용 내역 · 현금 경비(매입). 표가 셋이라 줄은 (kind, id) 로 가리킨다(1-4). */
+export const CLASSIFY_ROW_KINDS = ['INVOICE', 'CARD', 'CASH'] as const;
+export type ClassifyRowKind = (typeof CLASSIFY_ROW_KINDS)[number];
+
+/** 화면이 줄을 가리키는 열쇠 — 세 표의 id 가 겹쳐도 갈린다. */
+export const classifyRowKey = (r: { kind: string; id: string }): string => `${r.kind}:${r.id}`;
+
 export interface ClassifyConfirmRow {
+  kind: ClassifyRowKind;
   id: string;
   itemCode: string;
 }
 export type ClassifyConfirmParsed = { ok: true; value: ClassifyConfirmRow[] } | { ok: false; errors: TaxFieldError[] };
 
 /**
- * [확정] · [선택한 줄에 붙이기] `{ rows: [{ id, itemCode }] }` — 붙이기는 모든 줄이 같은 itemCode.
+ * [확정] · [선택한 줄에 붙이기] `{ rows: [{ kind, id, itemCode }] }` — 붙이기는 모든 줄이 같은 itemCode.
  * `itemCodes` = 그 회사 사업자 유형 파티션의 켜진 항목. 비었으면 세무 설정이 없는 것.
  */
 export function parseClassifyConfirm(raw: unknown, itemCodes: readonly string[]): ClassifyConfirmParsed {
@@ -139,10 +149,18 @@ export function parseClassifyConfirm(raw: unknown, itemCodes: readonly string[])
   const shapeOk =
     Array.isArray(rows) &&
     rows.length > 0 &&
-    rows.every((r) => typeof r === 'object' && r !== null && text((r as Record<string, unknown>).id) && text((r as Record<string, unknown>).itemCode));
+    rows.every((r) => {
+      if (typeof r !== 'object' || r === null) return false;
+      const o = r as Record<string, unknown>;
+      return (CLASSIFY_ROW_KINDS as readonly unknown[]).includes(o.kind) && text(o.id) && text(o.itemCode);
+    });
   if (!shapeOk) return { ok: false, errors: [{ field: 'rows', message: '항목을 붙일 줄을 고르세요' }] };
-  const value = (rows as Record<string, unknown>[]).map((r) => ({ id: text(r.id)!, itemCode: text(r.itemCode)! }));
-  if (new Set(value.map((r) => r.id)).size !== value.length) {
+  const value = (rows as Record<string, unknown>[]).map((r) => ({
+    kind: r.kind as ClassifyRowKind,
+    id: text(r.id)!,
+    itemCode: text(r.itemCode)!,
+  }));
+  if (new Set(value.map(classifyRowKey)).size !== value.length) {
     return { ok: false, errors: [{ field: 'rows', message: '같은 줄이 두 번 들어 있습니다' }] };
   }
   if (itemCodes.length === 0) {
@@ -157,13 +175,14 @@ export function parseClassifyConfirm(raw: unknown, itemCodes: readonly string[])
 /* ── 화면 — 목록 위 버튼(결과서 S05-05 5번) ───────────────────────────────── */
 
 export interface ClassifyPlanRow {
+  kind: ClassifyRowKind;
   id: string;
   itemCode: string | null;
   suggestedItemCode: string | null;
 }
 
 /**
- * 고른 줄로 할 일.
+ * 고른 줄로 할 일. `selected` · `picks` · `editing` · `reopen` 은 줄 열쇠(`classifyRowKey`)로 가리킨다.
  *   confirm — [확정 (N)]: 아직 확정 안 된 줄(또는 [고치기] 중인 줄) 중 항목이 있는 줄. 항목 = 고른 값 > (고치기 중이면 지금 항목 · 아니면 골라 둔 값)
  *   skipped — 항목이 없어 건너뛸 줄 수(토스트 「· N줄은 항목이 없어 건너뜀」)
  *   reopen  — [고치기 (N)]: 확정했고 아직 고치기 중이 아닌 줄(화면 안에서만 선택 칸으로)
@@ -178,14 +197,15 @@ export function classifyPlan(
   const reopen: string[] = [];
   let skipped = 0;
   for (const r of rows) {
-    if (!selected.includes(r.id)) continue;
-    const open = r.itemCode === null || editing.has(r.id);
+    const key = classifyRowKey(r);
+    if (!selected.includes(key)) continue;
+    const open = r.itemCode === null || editing.has(key);
     if (!open) {
-      reopen.push(r.id);
+      reopen.push(key);
       continue;
     }
-    const code = picks[r.id] || (editing.has(r.id) ? r.itemCode : r.suggestedItemCode);
-    if (code) confirm.push({ id: r.id, itemCode: code });
+    const code = picks[key] || (editing.has(key) ? r.itemCode : r.suggestedItemCode);
+    if (code) confirm.push({ kind: r.kind, id: r.id, itemCode: code });
     else skipped++;
   }
   return { confirm, skipped, reopen };
@@ -206,31 +226,49 @@ export interface TaxItemOption extends TaxCodeName {
 }
 
 export interface TaxClassifyRow {
+  /** 자료 종류 — 계산서 · 카드 사용 내역 · 현금 경비(1-4). 줄은 (kind, id) 로 가리킨다. */
+  kind: ClassifyRowKind;
   id: string;
-  /** 계산서 구분 — P 매입 · S 매출. */
+  /** P 매입 · S 매출 — 카드는 늘 P(취소 줄도), 현금은 매입액 P · 매출액 S. */
   direction: string;
+  /** 계산서 작성일 · 카드 사용일 · 현금 날짜. */
   writeDate: string;
-  approvalNo: string;
-  vendorId: string;
-  /** 거래처 표의 이름(고친 이름이 모든 달에 보인다). */
+  /** 승인번호 — 계산서만. */
+  approvalNo: string | null;
+  /** 거래처 — 계산서 · 카드(가맹점 번호가 있을 때). 현금은 null(거래처는 글만). */
+  vendorId: string | null;
+  /** 거래처 표의 이름(고친 이름이 모든 달에 보인다) · 거래처 없는 카드 줄은 파일의 가맹점명 · 현금은 거래처 글(없으면 빈 글자). */
   vendorName: string;
-  /** 계산서의 사업자번호(숫자 10자리). */
-  bizNo: string;
-  supplyAmount: number;
-  taxAmount: number;
+  /** 현금 품명 — 계산서 · 카드는 null. */
+  description: string | null;
+  /** 사업자번호(숫자 10자리) — 계산서 · 카드(있을 때). */
+  bizNo: string | null;
+  /** 공급가액 · 세액 — 계산서 · 카드. 현금은 null. */
+  supplyAmount: number | null;
+  taxAmount: number | null;
+  /** 합계(현금은 금액). 카드 취소 줄은 음수. */
   totalAmount: number;
-  invClass: string;
+  /** 계산서 종류 — 계산서만. */
+  invClass: string | null;
+  /** 카드 끝 4자리 · 세무 설정의 카드 별칭(끝 4자리로 찾음, 없으면 null) — 카드만. */
+  cardLast4: string | null;
+  cardAlias: string | null;
+  /** 카드 공제 여부(TAX_CARD_DEDUCT) — 카드만, 모르면 null. */
+  vatDeduct: string | null;
+  /** 현금 지급방법(TAX_PAY_METHOD) · 증빙(TAX_PROOF) — 현금만. */
+  payMethod: string | null;
+  proof: string | null;
   fileId: string;
   /** 확정한 항목 — 비었으면 「분류 필요」(매입만). 매출은 늘 null. */
   itemCode: string | null;
-  /** 그 거래처의 가장 최근 확정 항목 — 골라 두기만(확정 아님). 이미 확정한 줄 · 매출은 null. */
+  /** 지난번 항목 — 계산서 · 카드는 그 거래처, 현금은 같은 거래처 글의 가장 최근 확정 항목. 골라 두기만(확정 아님). */
   suggestedItemCode: string | null;
 }
 
 export interface TaxClassifyCounts {
-  /** 확인할 줄 — 그 달 항목이 빈 매입 계산서(서버 한 곳에서 센다). */
+  /** 확인할 줄 — 그 달 항목이 빈 매입(계산서 · 카드 · 현금 매입) 줄(서버 한 곳 `countClassify` 에서 센다). */
   left: number;
-  /** 그 달 매입 계산서 전부(「모두」 칩). */
+  /** 그 달 매입(계산서 · 카드 · 현금 매입) 줄 전부. */
   total: number;
   /** 「전체」 보기 자료 종류 칩 — 기간 · 파일 거르기 뒤, 종류 거르기 전. */
   kinds: Record<ClassifyKind, number>;
@@ -253,5 +291,7 @@ export interface TaxClassifyResponse {
     /** 이름 찾기 — 두 파티션 모두. */
     itemNames: TaxCodeName[];
     invDirs: TaxCodeName[];
+    /** 자료 종류(TAX_KIND) 이름 — 카드 · 현금 칩 · 출처 칸(판단 16, 1-4). */
+    kinds: TaxCodeName[];
   };
 }

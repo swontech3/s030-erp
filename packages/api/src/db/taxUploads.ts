@@ -7,10 +7,11 @@
  *     `orgId` 는 라우트가 **세션의 단체 ID**(`s020OrgId`)로만 넣는다. 화면이 준 값을 넣지 않는다.
  * ★ 대응표(`tb_s050_import_maps`)는 공용이라 단체 조건이 없다(203 — RLS 없음 · erp_app 읽기만).
  * ★ 계산서 FK 는 (org_id, file_id) · (org_id, vendor_id) 로 단체까지 묶여 있다 — 남의 단체 id 는 DB 가 막는다.
+ * ★ 1-4(2026-10-30): 올린 파일의 줄은 세 표(계산서 · 카드 208 · 현금 208)에 있다 — 파일 목록 · 파일 수 · 지울 줄 수 ·
+ *   거래처 건수 · 합치기는 세 표를 함께 본다(`FILE_ROWS_SQL`). 현금 줄은 거래처를 가리키지 않는다.
  */
 import { randomUUID } from 'node:crypto';
 import type {
-  InvoiceImportMap,
   InvoiceMapColumns,
   InvoiceStdRow,
   TaxUploadFileView,
@@ -34,11 +35,28 @@ export function monthRange(month: string): [string, string] {
   return [`${month}-01`, `${next}-01`];
 }
 
+/**
+ * 세 표의 (단체, 파일, 날짜) — 계산서 작성일 · 카드 사용일 · 현금 날짜. 파일 목록 · 파일 수가 이것으로 그 달을 본다.
+ * ★ 바깥 질의가 `org_id = $1` 을 건다(이 조각은 단체를 거르지 않는다).
+ */
+const FILE_ROWS_SQL = `(SELECT org_id, file_id, write_date AS d FROM public.tb_s050_invoices
+                       UNION ALL SELECT org_id, file_id, use_date FROM public.tb_s050_card_txns
+                       UNION ALL SELECT org_id, file_id, use_date FROM public.tb_s050_cash_txns)`;
+
 /* ── 대응표 ──────────────────────────────────────────────────────────────── */
 
-/** 켜진 대응표 — 자료 종류마다 하나(1-2 는 세금계산서 한 줄). 없으면 null. */
-export async function loadImportMap(client: ScopedClient, kind: string): Promise<InvoiceImportMap | null> {
-  const { rows } = await q<{ id: string; kind: string; header_row: number; header_signature: string[]; columns: InvoiceMapColumns }>(
+/** `tb_s050_import_maps` 한 줄 — 칸 모양(`columns`)은 자료 종류마다 다르다(계산서 · 카드 · 현금). */
+export interface ImportMapRow<C> {
+  id: string;
+  kind: string;
+  headerRow: number;
+  headerSignature: readonly string[];
+  columns: C;
+}
+
+/** 켜진 대응표 — 자료 종류마다 하나. 없으면 null. 칸 모양은 부르는 쪽이 정한다(기본 계산서). */
+export async function loadImportMap<C = InvoiceMapColumns>(client: ScopedClient, kind: string): Promise<ImportMapRow<C> | null> {
+  const { rows } = await q<{ id: string; kind: string; header_row: number; header_signature: string[]; columns: C }>(
     client,
     `SELECT id, kind, header_row, header_signature, columns
        FROM public.tb_s050_import_maps
@@ -56,7 +74,7 @@ export async function loadImportMap(client: ScopedClient, kind: string): Promise
 interface FileRow {
   id: string;
   kind: string;
-  direction: string;
+  direction: string | null;
   file_name: string;
   row_count: number;
   inserted_count: number;
@@ -93,8 +111,8 @@ export async function listUploadFiles(client: ScopedClient, orgId: number, month
     `SELECT ${FILE_COLS}
        FROM public.tb_s050_upload_files f
       WHERE f.org_id = $1
-        AND (EXISTS (SELECT 1 FROM public.tb_s050_invoices i
-                      WHERE i.org_id = f.org_id AND i.file_id = f.id AND i.write_date >= $2::date AND i.write_date < $3::date)
+        AND (EXISTS (SELECT 1 FROM ${FILE_ROWS_SQL} i
+                      WHERE i.org_id = f.org_id AND i.file_id = f.id AND i.d >= $2::date AND i.d < $3::date)
              OR (f.inserted_count = 0 AND f.uploaded_at >= $2::date AND f.uploaded_at < $3::date))
       ORDER BY f.uploaded_at DESC, f.id`,
     [orgId, from, to],
@@ -109,8 +127,8 @@ export async function countFilesByKind(client: ScopedClient, orgId: number, mont
     client,
     `SELECT f.kind, count(DISTINCT f.id)::int AS n
        FROM public.tb_s050_upload_files f
-       JOIN public.tb_s050_invoices i ON i.org_id = f.org_id AND i.file_id = f.id
-      WHERE f.org_id = $1 AND i.write_date >= $2::date AND i.write_date < $3::date
+       JOIN ${FILE_ROWS_SQL} i ON i.org_id = f.org_id AND i.file_id = f.id
+      WHERE f.org_id = $1 AND i.d >= $2::date AND i.d < $3::date
       GROUP BY f.kind`,
     [orgId, from, to],
   );
@@ -136,7 +154,8 @@ export async function existingApprovalNos(client: ScopedClient, orgId: number, a
 export interface NewUploadFile {
   kind: string;
   mapId: string;
-  direction: string;
+  /** 계산서 파일만 P · S — 카드 · 현금 파일은 null(208 CHECK). */
+  direction: string | null;
   fileName: string;
   fileHash: string;
   fileSize: number;
@@ -201,10 +220,11 @@ export async function lockUploadFiles(
   return rows.map((r) => ({ id: r.id, uploadedAt: iso(r.uploaded_at) }));
 }
 
-export async function countInvoicesOfFiles(client: ScopedClient, orgId: number, ids: readonly string[]): Promise<number> {
+/** 그 파일들로 들어온 줄 수 — 계산서 · 카드 · 현금 세 표. 파일을 지우면 모두 CASCADE 로 빠진다. */
+export async function countRowsOfFiles(client: ScopedClient, orgId: number, ids: readonly string[]): Promise<number> {
   const { rows } = await q<{ n: number }>(
     client,
-    `SELECT count(*)::int AS n FROM public.tb_s050_invoices WHERE org_id = $1 AND file_id = ANY($2::text[])`,
+    `SELECT count(*)::int AS n FROM ${FILE_ROWS_SQL} i WHERE i.org_id = $1 AND i.file_id = ANY($2::text[])`,
     [orgId, ids],
   );
   return rows[0]?.n ?? 0;
@@ -231,7 +251,7 @@ export async function laterFilesWithSkips(
   return rows.map((r) => ({ id: r.id, fileName: r.file_name, skippedRows: r.skipped }));
 }
 
-/** 파일 지우기 — 그 파일의 계산서 줄은 FK CASCADE 로 함께 지워진다. */
+/** 파일 지우기 — 그 파일의 계산서 · 카드 · 현금 줄은 FK CASCADE 로 함께 지워진다. */
 export async function deleteUploadFiles(client: ScopedClient, orgId: number, ids: readonly string[]): Promise<number> {
   const r = await q(client, `DELETE FROM public.tb_s050_upload_files WHERE org_id = $1 AND id = ANY($2::text[])`, [orgId, ids]);
   return r.rowCount ?? 0;
@@ -318,10 +338,12 @@ export async function listVendors(
   const { rows } = await q<VendorRow>(
     client,
     `SELECT v.id, v.name, v.biz_no, v.vendor_tp, v.tp_set_by_user, v.first_kind, v.first_direction,
-            count(i.id) FILTER (WHERE i.write_date >= $2::date AND i.write_date < $3::date)::int AS month_count,
-            count(i.id)::int AS total_count
+            count(i.vendor_id) FILTER (WHERE i.d >= $2::date AND i.d < $3::date)::int AS month_count,
+            count(i.vendor_id)::int AS total_count
        FROM public.tb_s050_vendors v
-       LEFT JOIN public.tb_s050_invoices i ON i.org_id = v.org_id AND i.vendor_id = v.id
+       LEFT JOIN (SELECT org_id, vendor_id, write_date AS d FROM public.tb_s050_invoices
+                  UNION ALL SELECT org_id, vendor_id, use_date FROM public.tb_s050_card_txns) i
+              ON i.org_id = v.org_id AND i.vendor_id = v.id
       WHERE v.org_id = $1 AND ($4::text[] IS NULL OR v.id = ANY($4::text[]))
       GROUP BY v.id
       ORDER BY v.created_at, v.id`,
@@ -377,14 +399,18 @@ export async function setVendorType(client: ScopedClient, orgId: number, ids: re
   return r.rowCount ?? 0;
 }
 
-/** 합치기 ① — 계산서를 남길 곳으로 옮긴다. 옮긴 줄 수. */
+/** 합치기 ① — 계산서 · 카드 줄(1-4)을 남길 곳으로 옮긴다. 옮긴 줄 수. */
 export async function moveInvoicesToVendor(client: ScopedClient, orgId: number, keepId: string, fromIds: readonly string[]): Promise<number> {
-  const r = await q(
-    client,
-    `UPDATE public.tb_s050_invoices SET vendor_id = $2 WHERE org_id = $1 AND vendor_id = ANY($3::text[])`,
-    [orgId, keepId, fromIds],
-  );
-  return r.rowCount ?? 0;
+  let moved = 0;
+  for (const table of ['tb_s050_invoices', 'tb_s050_card_txns']) {
+    const r = await q(
+      client,
+      `UPDATE public.${table} SET vendor_id = $2 WHERE org_id = $1 AND vendor_id = ANY($3::text[])`,
+      [orgId, keepId, fromIds],
+    );
+    moved += r.rowCount ?? 0;
+  }
+  return moved;
 }
 
 /** 합치기 ② — 남길 곳의 구분 · 번호. */

@@ -6,6 +6,9 @@
  *   POST /tax/uploads?kind=INVOICE         한 트랜잭션 — 올린 파일 기록 → 거래처 자동 등록 · 승격 → 계산서 넣기
  *   POST /tax/uploads/delete { ids[] }     파일 지우기(그 줄도 함께)
  *   POST /tax/uploads/delete-check { ids[] } 지우기 전 확인 — 지우기와 같은 계산(빠질 줄 · 겹쳤을 수 있는 파일), 지우지 않음
+ *   GET  /tax/uploads/template?kind=CASH   현금 경비 표준 양식(1-4) — 1줄 안내 · 2줄 제목 줄 + 항목 · 지급방법 · 증빙 목록 시트
+ *
+ * ★ 1-4(2026-10-30): kind=CARD(홈택스 사업용 신용카드) · CASH(현금 경비 표준 양식)도 받는다 — 처리는 `taxCardCash.ts`.
  *
  * ★★★ 운영사 세션도 **자기 단체만** — 모든 조회 · 저장에 `org_id = 세션 단체 ID` 를 직접 건다(`db/taxUploads.ts`).
  *     DB 연결은 `scopeOfSession` — 회사 세션은 RLS(203)가 한 번 더 막는다. 역할로 403 을 내지 않는다(세무 설정과 같다).
@@ -51,7 +54,7 @@ import { readCompanySource } from '../db/corpChanges.ts';
 import { listCodeDescriptions, readTaxSettingsRow } from '../db/taxSettings.ts';
 import {
   countFilesByKind,
-  countInvoicesOfFiles,
+  countRowsOfFiles,
   deleteUploadFiles,
   existingApprovalNos,
   findFileByHash,
@@ -67,6 +70,8 @@ import {
   promoteVendor,
 } from '../db/taxUploads.ts';
 import { readSheetRows } from '../tax/readSheet.ts';
+import { sendXlsx } from '../lib/xlsxExport.ts';
+import { cashTemplateOp, previewCardCashOp, uploadCardCashOp } from './taxCardCash.ts';
 
 /* ── 결과 모양 ───────────────────────────────────────────────────────────── */
 
@@ -82,6 +87,16 @@ export async function loadCodeNames(client: ScopedClient, categories: readonly s
   const by = new Map<string, TaxCodeName[]>(categories.map((c) => [c, []]));
   for (const r of rows) by.get(r.category)?.push({ code: r.code, name: r.name });
   return by;
+}
+
+/**
+ * 뺀 줄 종류의 이름 — 코드 표(TAX_SKIP_REASON)에서 **그 자료의 `excluded` 키만**, 코드 표 순서로.
+ * ★ 209 가 카드 · 현금 종류를 더해 한 분류에 세 자료의 키가 섞여 있다 — 계산서 미리보기에 카드 이름이 끼지 않게 거른다.
+ */
+export async function skipReasonsFor(client: ScopedClient, excluded: object): Promise<TaxCodeName[]> {
+  const keys = Object.keys(excluded);
+  const codes = await loadCodeNames(client, [TAX_SKIP_REASON_CATEGORY]);
+  return (codes.get(TAX_SKIP_REASON_CATEGORY) ?? []).filter((c) => keys.includes(c.code));
 }
 
 /* ── 읽기 ────────────────────────────────────────────────────────────────── */
@@ -166,14 +181,14 @@ export async function previewUploadOp(
   fileName: string,
   bytes: Uint8Array,
 ): Promise<TaxOp<TaxUploadPreview>> {
+  if (kind === 'CARD' || kind === 'CASH') return previewCardCashOp(client, orgId, kind, fileName, bytes);
   const p = await prepareInvoiceUpload(client, orgId, bytes);
   if (!p.ok) return p;
   const d = p.data;
-  const codes = await loadCodeNames(client, [TAX_SKIP_REASON_CATEGORY]);
   return {
     ok: true,
     data: {
-      kind,
+      kind: TAX_KIND_INVOICE,
       fileName,
       direction: d.direction,
       sameFile: d.sameFile ? { id: d.sameFile.id, fileName: d.sameFile.fileName, uploadedAt: d.sameFile.uploadedAt } : null,
@@ -183,13 +198,26 @@ export async function previewUploadOp(
       toInsert: d.newRows.length,
       alreadyUploaded: d.alreadyUploaded,
       excluded: d.excluded,
-      skipReasons: codes.get(TAX_SKIP_REASON_CATEGORY) ?? [],
+      skipReasons: await skipReasonsFor(client, d.excluded),
       warnings: d.warnings,
     },
   };
 }
 
 /* ── 올리기 ──────────────────────────────────────────────────────────────── */
+
+/** 올리기 — 자료 종류로 나눈다(계산서 · 카드 · 현금). 한 트랜잭션 안에서 부른다. */
+export function uploadOp(
+  client: ScopedClient,
+  orgId: number,
+  kind: string,
+  fileName: string,
+  bytes: Uint8Array,
+  actor: string,
+): Promise<TaxOp<TaxUploadResult>> {
+  if (kind === 'CARD' || kind === 'CASH') return uploadCardCashOp(client, orgId, kind, fileName, bytes, actor);
+  return uploadInvoicesOp(client, orgId, kind, fileName, bytes, actor);
+}
 
 /** 한 트랜잭션 안에서 부른다. 같은 단체의 올리기는 한 줄로 선다(`lockOrgUploads`). */
 export async function uploadInvoicesOp(
@@ -285,7 +313,7 @@ export async function deleteUploadsOp(
 ): Promise<TaxOp<TaxUploadDeleteResult>> {
   const locked = await lockUploadFiles(client, orgId, ids);
   if (locked.length !== ids.length) return fail(404, 'not_found', '없는 파일입니다');
-  const deletedRows = await countInvoicesOfFiles(client, orgId, ids);
+  const deletedRows = await countRowsOfFiles(client, orgId, ids);
   const later = await laterFilesWithSkips(client, orgId, ids);
   const deletedFiles = dryRun ? locked.length : await deleteUploadFiles(client, orgId, ids);
   return { ok: true, data: { deletedFiles, deletedRows, laterFilesWithSkips: later } };
@@ -300,6 +328,8 @@ export interface TaxUploadsDeps {
   upload(session: ErpSession, kind: string, fileName: string, bytes: Uint8Array): Promise<TaxOp<TaxUploadResult>>;
   /** `dryRun` = 지우기 전 확인(같은 계산, 지우지 않음). */
   remove(session: ErpSession, ids: string[], dryRun: boolean): Promise<TaxOp<TaxUploadDeleteResult>>;
+  /** 표준 양식 내려받기 — 지금은 현금 경비(CASH)뿐. */
+  template(session: ErpSession, kind: string): Promise<TaxOp<{ fileName: string; bytes: Uint8Array }>>;
 }
 
 const run = <T>(session: ErpSession, fn: (client: ScopedClient) => Promise<T>) =>
@@ -333,9 +363,13 @@ const defaultDeps: TaxUploadsDeps = {
   list: (session, month) => run(session, (c) => listUploadsOp(c, session.s020OrgId, month)),
   preview: (session, kind, name, bytes) => runOp(session, (c) => previewUploadOp(c, session.s020OrgId, kind, name, bytes)),
   upload: (session, kind, name, bytes) =>
-    runOp(session, (c) => uploadInvoicesOp(c, session.s020OrgId, kind, name, bytes, String(session.s020MemberId))),
+    runOp(session, (c) => uploadOp(c, session.s020OrgId, kind, name, bytes, String(session.s020MemberId))),
   remove: (session, ids, dryRun) => runOp(session, (c) => deleteUploadsOp(c, session.s020OrgId, ids, dryRun)),
+  template: (session) => runOp(session, (c) => cashTemplateOp(c, session.s020OrgId)),
 };
+
+/** 표준 양식이 있는 자료 종류 — 계산서 · 카드는 홈택스 파일 그대로라 양식이 없다. */
+const TEMPLATE_KINDS: readonly string[] = ['CASH'];
 
 /**
  * 엑셀 본문 해석 — xls · xlsx 본문 형식을 바이트 그대로, 5MB 까지.
@@ -415,4 +449,14 @@ export function registerTaxUploadRoutes(app: FastifyInstance, deps: TaxUploadsDe
 
   deleteRoute('/tax/uploads/delete', false);
   deleteRoute('/tax/uploads/delete-check', true);
+
+  app.get<{ Querystring: { kind?: string } }>('/tax/uploads/template', async (req, reply) => {
+    const session = requireSession(req);
+    reply.header('Cache-Control', 'no-store');
+    const kind = req.query.kind ?? '';
+    if (!TEMPLATE_KINDS.includes(kind)) return reply.code(400).send(badRequest('kind', '표준 양식이 없는 자료 종류입니다'));
+    const r = await deps.template(session, kind);
+    if (!r.ok) return reply.code(r.status).send({ error: r.error, message: r.message });
+    return sendXlsx(reply, r.data.fileName, r.data.bytes);
+  });
 }

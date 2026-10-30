@@ -15,6 +15,7 @@
  * ★ 상대 사업자번호 끝자리가 틀리면 넣되 경고한다(결정 3).
  */
 import { digitsOnly, formatBizNumber, isBizNumberChecksumOk, isBizNumberLength } from './tax-number.ts';
+import type { CardExcluded, CardStdRow, CashExcluded, CashStdRow } from './tax-card-cash.ts';
 
 export const TAX_INV_DIR_CATEGORY = 'TAX_INV_DIR';
 export const TAX_INV_CLASS_CATEGORY = 'TAX_INV_CLASS';
@@ -23,9 +24,9 @@ export const TAX_VENDOR_TP_CATEGORY = 'TAX_VENDOR_TP';
 /** 뺀 줄 종류(205) — 코드값 = `InvoiceExcluded` 의 키. ★ 고정 코드. */
 export const TAX_SKIP_REASON_CATEGORY = 'TAX_SKIP_REASON';
 
-/** 자료 종류 — 1-2 에서 올릴 수 있는 것은 세금계산서뿐이다(TAX_KIND 코드값). */
+/** 자료 종류 — 올릴 수 있는 것(TAX_KIND 코드값). 1-2 세금계산서 · 1-4 카드 사용 내역 · 현금 경비(tax-card-cash.ts). */
 export const TAX_KIND_INVOICE = 'INVOICE';
-export const TAX_UPLOADABLE_KINDS: readonly string[] = [TAX_KIND_INVOICE];
+export const TAX_UPLOADABLE_KINDS: readonly string[] = [TAX_KIND_INVOICE, 'CARD', 'CASH'];
 
 /** 매입 · 매출 — ★ 고정 코드(code-usage.ts `PINNED_CODES`). 203 CHECK 가 기댄다. */
 export const TAX_INV_DIR_PURCHASE = 'P';
@@ -110,7 +111,15 @@ export interface InvoiceExcluded {
 }
 
 export interface TaxUploadWarning {
-  code: 'own_biz_no_unchecked' | 'partner_biz_no_checksum';
+  code:
+    | 'own_biz_no_unchecked'
+    | 'partner_biz_no_checksum'
+    // 카드 · 현금(1-4, tax-card-cash.ts) — 줄은 넣고 알린다
+    | 'card_deduct_unknown'
+    | 'card_unregistered'
+    | 'cash_item_unknown'
+    | 'cash_proof_unknown'
+    | 'cash_sales_item_ignored';
   message: string;
   count?: number;
 }
@@ -142,20 +151,20 @@ export type InvoiceConverted =
     }
   | { ok: false; error: TaxUploadError };
 
-/* ── 칸 읽기 ─────────────────────────────────────────────────────────────── */
+/* ── 칸 읽기 — 카드 · 현금 변환(tax-card-cash.ts)도 쓴다 ─────────────────────── */
 
-const textOf = (v: unknown): string => {
+export const textOf = (v: unknown): string => {
   if (v === null || v === undefined) return '';
   if (v instanceof Date) return v.toISOString();
   return String(v).trim();
 };
 
-const cell = (row: readonly unknown[] | undefined, colNo: number): unknown => (row ? row[colNo - 1] : undefined);
+export const cell = (row: readonly unknown[] | undefined, colNo: number): unknown => (row ? row[colNo - 1] : undefined);
 
-const isBlankRow = (row: readonly unknown[] | undefined): boolean => !row || row.every((v) => textOf(v) === '');
+export const isBlankRow = (row: readonly unknown[] | undefined): boolean => !row || row.every((v) => textOf(v) === '');
 
 /** 금액 — 숫자 칸이거나 숫자 · 쉼표 글자. 원 단위 정수만. */
-function amountOf(v: unknown): number | null {
+export function amountOf(v: unknown): number | null {
   if (typeof v === 'number') return Number.isSafeInteger(v) ? v : null;
   const t = textOf(v).replace(/,/g, '');
   if (!/^-?\d+$/.test(t)) return null;
@@ -170,7 +179,7 @@ function isRealDate(y: number, m: number, d: number): boolean {
 }
 
 /** 작성일 — `YYYY-MM-DD` · `YYYYMMDD` · `YYYY.MM.DD` 글자이거나 날짜 값. */
-function dateOf(v: unknown): string | null {
+export function dateOf(v: unknown): string | null {
   if (v instanceof Date) {
     if (Number.isNaN(v.getTime())) return null;
     return `${v.getUTCFullYear()}-${pad(v.getUTCMonth() + 1)}-${pad(v.getUTCDate())}`;
@@ -196,6 +205,30 @@ function labeledDigits(row: readonly unknown[] | undefined, label: string): stri
 /* ── 변환 ────────────────────────────────────────────────────────────────── */
 
 /**
+ * 제목 줄 확인 → 자료 줄. 제목 줄은 이름 전체가 똑같아야 한다(앞뒤 공백 걷고). 뒤쪽 빈 칸은 엑셀이 붙이기도 하므로 걷는다.
+ * 자료 줄은 제목 줄 아래, 빈 줄은 뺀다. 카드 · 현금 변환도 쓴다.
+ */
+export function readDataRows(
+  sheetRows: readonly (readonly unknown[])[],
+  headerRow: number,
+  headerSignature: readonly string[],
+): { ok: true; data: (readonly unknown[])[] } | { ok: false; error: TaxUploadError } {
+  const fail = (code: TaxUploadErrorCode, message: string) => ({ ok: false as const, error: { code, message } });
+  const header = [...(sheetRows[headerRow - 1] ?? [])].map(textOf);
+  while (header.length > 0 && header[header.length - 1] === '') header.pop();
+  const want = headerSignature.map((s) => s.trim());
+  if (header.length !== want.length || header.some((h, i) => h !== want[i])) {
+    return fail('format_mismatch', '양식이 맞지 않습니다');
+  }
+  const data = sheetRows.slice(headerRow).filter((r) => !isBlankRow(r));
+  if (data.length > TAX_UPLOAD_MAX_ROWS) {
+    return fail('too_many_rows', `한 파일은 ${TAX_UPLOAD_MAX_ROWS.toLocaleString('ko-KR')}줄까지 올릴 수 있습니다`);
+  }
+  if (data.length === 0) return fail('no_rows', '올릴 줄이 없습니다');
+  return { ok: true, data };
+}
+
+/**
  * 시트 행(1줄 = 배열, 0번 = 엑셀 1줄) → 표준 양식.
  * `dbOwnBizNo` 는 DB 의 우리 회사 사업자번호(숫자만, 없으면 null).
  */
@@ -207,20 +240,10 @@ export function convertInvoiceSheet(
   const fail = (code: TaxUploadErrorCode, message: string): InvoiceConverted => ({ ok: false, error: { code, message } });
   const c = map.columns;
 
-  // 1. 제목 줄 — 이름 전체가 똑같아야(앞뒤 공백 걷고). 뒤쪽 빈 칸은 엑셀이 붙이기도 하므로 걷는다.
-  const header = [...(sheetRows[map.headerRow - 1] ?? [])].map(textOf);
-  while (header.length > 0 && header[header.length - 1] === '') header.pop();
-  const want = map.headerSignature.map((s) => s.trim());
-  if (header.length !== want.length || header.some((h, i) => h !== want[i])) {
-    return fail('format_mismatch', '양식이 맞지 않습니다');
-  }
-
-  // 2. 자료 줄 — 제목 줄 아래, 빈 줄은 뺀다
-  const data = sheetRows.slice(map.headerRow).filter((r) => !isBlankRow(r));
-  if (data.length > TAX_UPLOAD_MAX_ROWS) {
-    return fail('too_many_rows', `한 파일은 ${TAX_UPLOAD_MAX_ROWS.toLocaleString('ko-KR')}줄까지 올릴 수 있습니다`);
-  }
-  if (data.length === 0) return fail('no_rows', '올릴 줄이 없습니다');
+  // 1 · 2. 제목 줄 · 자료 줄
+  const read = readDataRows(sheetRows, map.headerRow, map.headerSignature);
+  if (!read.ok) return read;
+  const data = read.data;
 
   // 3. 우리 회사 번호 — 파일 1줄의 이름표 오른쪽
   const ownBizNo = labeledDigits(sheetRows[c.ownBizNo.row - 1], c.ownBizNo.label);
@@ -484,7 +507,8 @@ export interface TaxCodeName {
 export interface TaxUploadFileView {
   id: string;
   kind: string;
-  direction: string;
+  /** 계산서 파일만 P · S — 카드 · 현금 파일은 null(208). */
+  direction: string | null;
   fileName: string;
   /** 파일의 자료 줄 수. */
   rowCount: number;
@@ -495,7 +519,7 @@ export interface TaxUploadFileView {
 
 export interface TaxUploadKindCard {
   kind: string;
-  /** 1-2 에서 올릴 수 있는가 — 아니면 「준비 중」. */
+  /** 올릴 수 있는가(`TAX_UPLOADABLE_KINDS`) — 아니면 「준비 중」. */
   enabled: boolean;
   /** 세무 설정의 「쓰지 않는 자료」. */
   unused: boolean;
@@ -513,30 +537,32 @@ export interface TaxUploadsResponse {
   codes: { kinds: (TaxCodeName & { description: string | null })[]; invDirs: TaxCodeName[] };
 }
 
-export interface TaxUploadPreview {
-  kind: string;
+/** 자료 종류마다 다른 부분 — 계산서는 매입/매출 · 계산서 줄, 카드 · 현금은 매입/매출 없이 그 줄. */
+export type TaxUploadKindPart =
+  | { kind: 'INVOICE'; direction: TaxInvDir; sample: InvoiceStdRow[]; excluded: InvoiceExcluded }
+  | { kind: 'CARD'; direction: null; sample: CardStdRow[]; excluded: CardExcluded }
+  | { kind: 'CASH'; direction: null; sample: CashStdRow[]; excluded: CashExcluded };
+
+export type TaxUploadPreview = TaxUploadKindPart & {
   fileName: string;
-  direction: TaxInvDir;
   /** 같은 파일(지문)이 이미 있으면 그 파일 — 올리기는 409. */
   sameFile: { id: string; fileName: string; uploadedAt: string } | null;
   totalRows: number;
-  /** 넣을 줄의 달별 수(이미 올린 승인번호는 뺀 뒤). */
+  /** 넣을 줄의 달별 수(이미 올린 줄은 뺀 뒤). */
   byMonth: { month: string; count: number }[];
-  sample: InvoiceStdRow[];
   toInsert: number;
-  /** 이미 올린 승인번호라 건너뛸 줄. */
+  /** 이미 올린 줄이라 건너뛸 줄 — 계산서는 승인번호, 카드 · 현금은 개수 맞추기. */
   alreadyUploaded: number;
-  excluded: InvoiceExcluded;
-  /** 뺀 줄 종류의 이름 — 코드 표(TAX_SKIP_REASON)에서, 코드값 = `excluded` 의 키. */
+  /** 뺀 줄 종류의 이름 — 코드 표(TAX_SKIP_REASON)에서 **이 자료의 `excluded` 키만**(코드값 = 키, 순서 = 코드 표). */
   skipReasons: TaxCodeName[];
   warnings: TaxUploadWarning[];
-}
+};
 
 export interface TaxUploadResult {
   file: TaxUploadFileView;
   insertedCount: number;
   alreadyUploaded: number;
-  excluded: InvoiceExcluded;
+  excluded: InvoiceExcluded | CardExcluded | CashExcluded;
   vendorsCreated: number;
   vendorsPromoted: number;
   warnings: TaxUploadWarning[];

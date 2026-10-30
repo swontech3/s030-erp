@@ -14,8 +14,14 @@ import type {
 
 export type { TaxUploadDeleteResult, TaxUploadPreview, TaxUploadResult, TaxUploadsResponse };
 
-/** 1-2 에서 올릴 수 있는 자료 종류(TAX_KIND 코드값). 나머지 카드는 「준비 중」. */
+/** 자료 종류(TAX_KIND 코드값). 올릴 수 있는지는 서버가 카드마다 준다(`cards[].enabled`). */
 export const KIND_INVOICE = 'INVOICE';
+export const KIND_CASH = 'CASH';
+/** [보기]로 항목 지정 「이번 달 자료 전체」에 보낼 수 있는 파일 — 계산서 · 카드 · 현금(1-4). */
+export const VIEWABLE_KINDS: readonly string[] = [KIND_INVOICE, 'CARD', KIND_CASH];
+
+/** 표준 양식 내려받기 주소 — 지금은 현금 경비뿐(1-4). */
+export const templateHref = (kind: string) => `/api/tax/uploads/template?kind=${encodeURIComponent(kind)}`;
 
 /** 불러오기 · 올리기 실패. `status` 409 = 같은 파일. */
 export class TaxUploadError extends Error {

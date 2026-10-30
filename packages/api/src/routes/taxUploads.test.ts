@@ -42,6 +42,10 @@ function fakeDeps(over: Partial<TaxUploadsDeps> = {}) {
       calls.push([dryRun ? 'check' : 'remove', s.s020OrgId, ids]);
       return { ok: false, status: 404, error: 'not_found', message: '없는 파일입니다' };
     },
+    template: async (s, kind) => {
+      calls.push(['template', s.s020OrgId, kind]);
+      return { ok: true, data: { fileName: '현금경비_양식.xlsx', bytes: new Uint8Array([0x50, 0x4b, 3, 4]) } };
+    },
     ...over,
   };
   return { deps, calls };
@@ -99,10 +103,20 @@ describe('POST /tax/uploads/preview · /tax/uploads — 엑셀 본문', () => {
     expect(calls).toEqual([['preview', 9001, 'INVOICE', '매출 목록.xls', XLS.length]]);
   });
 
-  it('1-2 에서 올릴 수 없는 종류 · 종류 없음은 400', async () => {
+  it('★ 카드 사용 내역 · 현금 경비도 받는다(1-4) — 종류를 그대로 넘긴다', async () => {
     const { deps, calls } = fakeDeps();
     const a = await build('tenant', deps);
-    for (const url of ['/tax/uploads/preview?kind=CARD', '/tax/uploads/preview', '/tax/uploads?kind=BANK']) {
+    const card = await post(a, '/tax/uploads/preview?kind=CARD', { 'content-type': XLS_TYPE, 'x-file-name': 'card.xls' }, XLS);
+    const cash = await post(a, '/tax/uploads?kind=CASH', { 'content-type': XLS_TYPE, 'x-file-name': 'cash.xls' }, XLS);
+    expect(card.statusCode).toBe(200);
+    expect(cash.statusCode).toBe(409);
+    expect(calls).toEqual([['preview', 9001, 'CARD', 'card.xls', XLS.length], ['upload', 9001, 'CASH', 'cash.xls']]);
+  });
+
+  it('아직 올릴 수 없는 종류 · 종류 없음은 400', async () => {
+    const { deps, calls } = fakeDeps();
+    const a = await build('tenant', deps);
+    for (const url of ['/tax/uploads/preview?kind=BANK', '/tax/uploads/preview', '/tax/uploads?kind=NTAX']) {
       const res = await post(a, url, { 'content-type': XLS_TYPE, 'x-file-name': 'a.xls' }, XLS);
       expect(res.statusCode).toBe(400);
       expect(res.json()).toMatchObject({ errors: [{ field: 'kind' }] });
@@ -152,6 +166,29 @@ describe('POST /tax/uploads/preview · /tax/uploads — 엑셀 본문', () => {
     expect(res.statusCode).toBe(409);
     expect(res.json()).toMatchObject({ error: 'same_file' });
     expect(calls).toEqual([['upload', 1, 'INVOICE', 'a.xls']]);
+  });
+});
+
+describe('GET /tax/uploads/template — 표준 양식 내려받기(1-4)', () => {
+  it('현금 경비 양식을 세션 단체로 만들어 엑셀로 보낸다', async () => {
+    const { deps, calls } = fakeDeps();
+    const a = await build('tenant', deps);
+    const res = await a.inject({ method: 'GET', url: '/tax/uploads/template?kind=CASH' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(res.headers['content-disposition']).toContain(`filename*=UTF-8''${encodeURIComponent('현금경비_양식.xlsx')}`);
+    expect(calls).toEqual([['template', 9001, 'CASH']]);
+  });
+
+  it('표준 양식이 없는 종류(홈택스 파일 그대로인 계산서 · 카드) · 종류 없음은 400', async () => {
+    const { deps, calls } = fakeDeps();
+    const a = await build('tenant', deps);
+    for (const url of ['/tax/uploads/template?kind=CARD', '/tax/uploads/template?kind=INVOICE', '/tax/uploads/template']) {
+      const res = await a.inject({ method: 'GET', url });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toMatchObject({ errors: [{ field: 'kind' }] });
+    }
+    expect(calls).toEqual([]);
   });
 });
 

@@ -167,6 +167,16 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
   // ★ 파티션 = 사업자 유형(001 법인 · 002 개인 일반과세자). 사업자 유형을 바꾼 회사의 옛 항목도 막히게 둘 다 적는다.
   { category: 'TAX_ITEM_OUT', useTp: '001', table: 'tb_s050_invoices', column: 'item_code', label: '세무 거래 분류' },
   { category: 'TAX_ITEM_OUT', useTp: '002', table: 'tb_s050_invoices', column: 'item_code', label: '세무 거래 분류' },
+
+  // --- 세무 카드 사용 내역 · 현금 경비 (s050200010) — 2026-10-30 추가. 208_tax_card_cash.sql ---
+  { category: 'TAX_ITEM_OUT', useTp: '001', table: 'tb_s050_card_txns', column: 'item_code', label: '세무 카드 항목' },
+  { category: 'TAX_ITEM_OUT', useTp: '002', table: 'tb_s050_card_txns', column: 'item_code', label: '세무 카드 항목' },
+  { category: 'TAX_ITEM_OUT', useTp: '001', table: 'tb_s050_cash_txns', column: 'item_code', label: '세무 현금 항목' },
+  { category: 'TAX_ITEM_OUT', useTp: '002', table: 'tb_s050_cash_txns', column: 'item_code', label: '세무 현금 항목' },
+  { category: 'TAX_CARD_DEDUCT', useTp: '000', table: 'tb_s050_card_txns', column: 'vat_deduct', label: '세무 카드 사용 내역' },
+  { category: 'TAX_INV_DIR', useTp: '000', table: 'tb_s050_cash_txns', column: 'direction', label: '세무 현금 경비' },
+  { category: 'TAX_PAY_METHOD', useTp: '000', table: 'tb_s050_cash_txns', column: 'pay_method', label: '세무 현금 경비' },
+  { category: 'TAX_PROOF', useTp: '000', table: 'tb_s050_cash_txns', column: 'proof', label: '세무 현금 경비' },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */
@@ -325,6 +335,30 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     codes: ['nonGeneral', 'noBizNo', 'badAmount', 'noApproval', 'dupInFile', 'otherClass', 'badDate'],
     source: 'packages/shared/src/domain/tax-uploads.ts (InvoiceExcluded)',
     label: '세무 뺀 줄 종류',
+  },
+  /** 카드 · 현금 뺀 줄 종류(209) — 위와 같은 이유. 날짜 · 금액은 205 의 badDate · badAmount 를 함께 쓴다. */
+  {
+    category: 'TAX_SKIP_REASON',
+    useTp: '000',
+    codes: ['noCardNo', 'noDescription', 'noAmount', 'bothAmounts', 'badPayMethod'],
+    source: 'packages/shared/src/domain/tax-card-cash.ts (CardExcluded · CashExcluded)',
+    label: '세무 카드 · 현금 뺀 줄 종류',
+  },
+  /** 카드 공제 여부 — 208 CHECK 와 대응표 바꾸기표(jsonb `vatDeduct.values`)가 Y · N 에 기댄다. 2026-10-30 추가. */
+  {
+    category: 'TAX_CARD_DEDUCT',
+    useTp: '000',
+    codes: ['Y', 'N'],
+    source: 'supabase/migrations/208_tax_card_cash.sql (ck_s050_card_txns_vat_deduct) · 209 (HOMETAX_BIZ_CARD.vatDeduct)',
+    label: '세무 카드 공제 여부',
+  },
+  /** 계좌이체(직원 정산) — 은행 짝 맞추기가 직원 정산 줄을 이 값으로 찾는다(대표 결정 2026-10-30). */
+  {
+    category: 'TAX_PAY_METHOD',
+    useTp: '000',
+    codes: ['TRANSFER'],
+    source: 'packages/shared/src/domain/tax-card-cash.ts (TAX_PAY_METHOD_TRANSFER)',
+    label: '세무 지급방법 직원 정산',
   },
 ] as const;
 

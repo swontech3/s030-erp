@@ -6,14 +6,16 @@
  *
  *   작업할 달 줄 · 제목 + 배지 「지정 건 / 전체 매입 완료」 · 회색 안내 띠 · 표 카드(탭 → 목록 위 버튼 줄 → 표)
  *   탭(결정 2026-10-28 — 옛 「확인할 줄만 / 전체」 + 「남은 줄 / 모두」 두 줄 칩을 합침):
- *   「미지정 건」: 항목이 빈 매입 계산서에 항목 붙이기 — [확정 (N)] · 항목 선택 + [선택한 줄에 붙이기]
- *   「지정 건」: 확정한 매입 계산서 — [고치기 (N)] → 다시 [확정 (N)]
- *   「이번 달 자료 전체」(주소 view=all): 거른 매입 · 매출 읽기만 — 자료 종류 칩 · [엑셀 내려받기] + 기간 · 파일 띠 [모두 보기]
+ *   「미지정 건」: 항목이 빈 매입 줄(계산서 · 카드 · 현금 매입, 1-4)에 항목 붙이기 — [확정 (N)] · 항목 선택 + [선택한 줄에 붙이기]
+ *   「지정 건」: 확정한 매입 줄 — [고치기 (N)] → 다시 [확정 (N)]
+ *   「이번 달 자료 전체」(주소 view=all): 거른 계산서 · 카드 · 현금 읽기만 — 자료 종류 칩 · [엑셀 내려받기] + 기간 · 파일 띠 [모두 보기]
  *   ★ 미지정 · 지정 탭은 같은 서버 응답(view=left)을 화면에서 나눠 보일 뿐 — 숫자는 서버가 센 left · total(지정 = total − left).
  *
- * ★ 뒤 단계(그리지 않음): 은행 · 현금 · 짝 남은 금액 줄, 입금 항목, 「입금·출금 섞임」 막기, 은행 줄 안내 문구, 다음 단계 줄.
- * ★★ 항목 이름 · 풀이 · 계산서 구분 · 사업자 유형 이름은 **API 가 준 코드 값으로만** 그린다. 예외는 아직 자료가 없는
- *    자료 종류 칩 「카드 · 현금 · 삐용 경비 · 은행(짝 없는 줄)」 — 시안 글자 그대로(결정 2026-10-27, 그 자료 단계에서 코드 표로).
+ * ★ 뒤 단계(그리지 않음): 은행 · 짝 남은 금액 줄, 입금 항목(현금 매출은 매출 계산서처럼 항목 없음), 「입금·출금 섞임」 막기,
+ *   은행 줄 안내 문구, 다음 단계 줄.
+ * ★ 줄은 「자료 종류:id」(`classifyRowKey`)로 가리킨다 — 표가 셋이라 id 만으로는 갈리지 않는다(1-4). 확정 본문에 kind 를 싣는다.
+ * ★★ 항목 이름 · 풀이 · 계산서 구분 · 사업자 유형 · 자료 종류 이름은 **API 가 준 코드 값으로만** 그린다. 카드 · 현금 칩 · 출처는
+ *    자료 종류 코드(TAX_KIND) 이름(판단 16, 1-4). 예외는 아직 자료가 없는 칩 「삐용 경비 · 은행(짝 없는 줄)」 — 시안 글자 그대로.
  * ★ 사업자 유형이 없으면(세무 설정 전) 항목 선택 · 확정 · 붙이기를 막고 안내한다(결정 2026-10-27). 「전체」 보기 · 엑셀은 된다.
  * ★ 거래처 기억 — 서버가 준 「골라 둔 항목」을 선택 칸에 미리 넣기만. 확정은 사업주가 [확정]으로.
  * ★ [고치기]는 화면 안에서만 — 다시 [확정]하면 덮는다(결정). 고른 값 · 고치기 중 표시는 다시 불러오면 지운다.
@@ -26,9 +28,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   CLASSIFY_KINDS,
   classifyPlan,
+  classifyRowKey,
   withEulReul,
   type ClassifyKind,
   type ClassifyView,
+  type TaxClassifyRow,
 } from '@swonbiz/shared/domain/tax-classify';
 import { TAX_INV_DIR_PURCHASE, TAX_INV_DIR_SALES } from '@swonbiz/shared/domain/tax-uploads';
 import { Icon } from '@/components/ds';
@@ -48,17 +52,15 @@ import {
   type TaxClassifyResponse,
 } from './tax-classify-model';
 
-/** 아직 자료가 없는 자료 종류 칩 — 시안 글자(결정 2026-10-27). 매입 · 매출은 코드 이름. */
+/** 아직 자료가 없는 자료 종류 칩 — 시안 글자(결정 2026-10-27). 매입 · 매출은 계산서 구분 이름, 카드 · 현금은 자료 종류 이름. */
 const LATER_KIND_LABEL: Partial<Record<ClassifyKind, string>> = {
-  CARD: '카드',
-  CASH: '현금',
   PPIYONG: '삐용 경비',
   BANK: '은행(짝 없는 줄)',
 };
 
-/** 설명 문구 — N 은 서버가 센 그 달 매입 계산서 수(결정 2026-10-28). */
+/** 설명 문구 — N 은 서버가 센 그 달 매입 줄 수(계산서 · 카드 · 현금 매입, 1-4 「다르게 해야 할 곳」 5). */
 const desc = (total: number) =>
-  `이번 달 매입 계산서 ${total}줄에 「무엇에 쓴 돈인지」 골라 주세요. 다 고르면 손익 · 부가세에 반영됩니다.`;
+  `이번 달 매입 ${total}줄(계산서 · 카드 · 현금)에 「무엇에 쓴 돈인지」 골라 주세요. 다 고르면 손익 · 부가세에 반영됩니다.`;
 
 /** 탭 — 미지정 · 지정은 view=left, 이번 달 자료 전체는 view=all. */
 type ClassifyTab = 'todo' | 'done' | 'all';
@@ -137,7 +139,18 @@ export function TaxClassifyView({ month, initialView, fileId: initialFile }: Pro
 
   const dirName = (code: string) => data.codes.invDirs.find((d) => d.code === code)?.name ?? code;
   const itemName = (code: string) => data.codes.itemNames.find((i) => i.code === code)?.name ?? code;
+  const kindName = (code: string) => data.codes.kinds.find((k) => k.code === code)?.name ?? code;
   const canClassify = data.bizType !== null && data.codes.items.length > 0;
+  /** 출처 칸 — 계산서는 「매입 계산서」, 카드는 별칭(없으면 「끝 4821」), 현금은 자료 종류 이름. ★ 카드는 끝 4자리만. */
+  const sourceOf = (r: TaxClassifyRow) =>
+    r.kind === 'CARD'
+      ? (r.cardAlias ?? `${kindName('CARD')} · 끝 ${r.cardLast4}`)
+      : r.kind === 'CASH'
+        ? kindName('CASH')
+        : `${dirName(r.direction)} 계산서`;
+  /** 내용 칸 — 현금은 품명(거래처 글이 있으면 뒤에), 나머지는 거래처 이름. */
+  const contentOf = (r: TaxClassifyRow) =>
+    r.kind === 'CASH' ? `${r.description ?? ''}${r.vendorName ? ` · ${r.vendorName}` : ''}` : r.vendorName;
   const isLeft = view === 'left';
   const doneCount = data.counts.total - data.counts.left;
 
@@ -170,7 +183,7 @@ export function TaxClassifyView({ month, initialView, fileId: initialFile }: Pro
   /* ── 「미지정 건」 · 「지정 건」 ── */
   const plan = classifyPlan(data.rows, sel, picks, editing);
   const leftRows = data.rows.filter((r) => (tab === 'todo' ? r.itemCode === null : r.itemCode !== null));
-  const toggle = (id: string) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const toggle = (key: string) => setSel((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
 
   const runConfirm = async () => {
     setFailed(null);
@@ -186,7 +199,8 @@ export function TaxClassifyView({ month, initialView, fileId: initialFile }: Pro
   const runBulk = async () => {
     setFailed(null);
     try {
-      const r = await confirmRows(sel.map((id) => ({ id, itemCode: bulk })));
+      const picked = data.rows.filter((x) => sel.includes(classifyRowKey(x)));
+      const r = await confirmRows(picked.map((x) => ({ kind: x.kind, id: x.id, itemCode: bulk })));
       const name = itemName(bulk);
       notify(`${r.confirmed}줄에 「${name}」${withEulReul(name).slice(name.length)} 붙였습니다`);
       await reload();
@@ -218,7 +232,11 @@ export function TaxClassifyView({ month, initialView, fileId: initialFile }: Pro
   );
 
   const kindLabel = (k: ClassifyKind) =>
-    k === 'all' ? '전체' : k === TAX_INV_DIR_PURCHASE || k === TAX_INV_DIR_SALES ? dirName(k) : (LATER_KIND_LABEL[k] ?? k);
+    k === 'all'
+      ? '전체'
+      : k === TAX_INV_DIR_PURCHASE || k === TAX_INV_DIR_SALES
+        ? dirName(k)
+        : (LATER_KIND_LABEL[k] ?? kindName(k));
 
   const errorBanner = failed ? (
     <div style={{ padding: '0 16px 12px' }}>
@@ -371,27 +389,30 @@ export function TaxClassifyView({ month, initialView, fileId: initialFile }: Pro
                     </tr>
                   ) : (
                     leftRows.map((r) => {
-                      const on = sel.includes(r.id);
-                      const open = r.itemCode === null || editing.has(r.id);
-                      const pick = picks[r.id];
-                      const value = pick ?? (editing.has(r.id) ? (r.itemCode ?? '') : (r.suggestedItemCode ?? ''));
-                      const suggested = !pick && !editing.has(r.id) && !!r.suggestedItemCode;
+                      const rk = classifyRowKey(r);
+                      const on = sel.includes(rk);
+                      const open = r.itemCode === null || editing.has(rk);
+                      const pick = picks[rk];
+                      const value = pick ?? (editing.has(rk) ? (r.itemCode ?? '') : (r.suggestedItemCode ?? ''));
+                      const suggested = !pick && !editing.has(rk) && !!r.suggestedItemCode;
                       return (
-                        <tr key={r.id} className={`${t.clickable} ${on ? t.pick : ''}`} onClick={() => toggle(r.id)}>
+                        <tr key={rk} className={`${t.clickable} ${on ? t.pick : ''}`} onClick={() => toggle(rk)}>
                           <td>
                             <input
                               type="checkbox"
                               className={t.rowchk}
                               checked={on}
                               aria-label="선택"
-                              onChange={() => toggle(r.id)}
+                              onChange={() => toggle(rk)}
                               onClick={(e) => e.stopPropagation()}
                             />
                           </td>
                           <td className={t.tnum}>{shortDate(r.writeDate)}</td>
-                          <td className={`${t.mut} ${t.ell}`}>{dirName(r.direction)} 계산서</td>
-                          <td className={t.ell} title={r.vendorName}>
-                            {r.vendorName}
+                          <td className={`${t.mut} ${t.ell}`} title={sourceOf(r)}>
+                            {sourceOf(r)}
+                          </td>
+                          <td className={t.ell} title={contentOf(r)}>
+                            {contentOf(r)}
                           </td>
                           <td className={t.num}>{won(r.totalAmount)}</td>
                           <td>
@@ -403,7 +424,7 @@ export function TaxClassifyView({ month, initialView, fileId: initialFile }: Pro
                                   value={value}
                                   disabled={!canClassify}
                                   aria-label="항목"
-                                  onChange={(e) => setPicks((p) => ({ ...p, [r.id]: e.target.value }))}
+                                  onChange={(e) => setPicks((p) => ({ ...p, [rk]: e.target.value }))}
                                 >
                                   {itemOptions}
                                 </select>
@@ -506,11 +527,13 @@ export function TaxClassifyView({ month, initialView, fileId: initialFile }: Pro
                     </tr>
                   ) : (
                     data.rows.map((r) => (
-                      <tr key={r.id}>
+                      <tr key={classifyRowKey(r)}>
                         <td className={t.tnum}>{shortDate(r.writeDate)}</td>
-                        <td className={t.mut}>{dirName(r.direction)}</td>
-                        <td className={t.ell} title={r.vendorName}>
-                          {r.vendorName}
+                        <td className={`${t.mut} ${t.ell}`} title={sourceOf(r)}>
+                          {r.kind === 'INVOICE' ? dirName(r.direction) : sourceOf(r)}
+                        </td>
+                        <td className={t.ell} title={contentOf(r)}>
+                          {contentOf(r)}
                         </td>
                         <td className={t.num}>
                           {r.direction === TAX_INV_DIR_SALES ? '+' : ''}
