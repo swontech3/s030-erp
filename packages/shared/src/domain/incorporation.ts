@@ -7,7 +7,10 @@
  * =============================================================================
  * ★★ 범위 (결정 2026-10-11)
  * =============================================================================
- *   · **주식회사 · 발기설립만**(`R_PROMOTER`). 유한회사 · 모집설립은 나중
+ *   · **주식회사 · 발기설립**(`R_PROMOTER`) — 모집설립은 나중
+ *   · **유한회사 설립**(`U_P`, 결정 2026-10-31) — 자본금 10억 미만 · 사원 1~2명. 칸은 새로 만들지 않고 기존 칸의
+ *     이름표만 바꿔 쓴다: 발기인 → 사원 · 인수 주식 수 → 출자좌수 · 1주의 금액 → 1좌의 금액(`incorpTermsOf` ·
+ *     `incorpFieldDefsOf`). 수권 · 발행 주식 수 · 공고방법 칸은 유한회사에 없어 보이지 않는다(정관 36조에 자리가 없다)
  *   · 사람은 발기인 · 이사 · 감사 · 대표이사 체크(겹쳐 체크 가능) + 인수수량 + 취임일
  *   · 사업목적은 텍스트 칸 하나(한 줄에 하나 — 법인변경과 같은 `purposeLines`), 고르기 팝업을 쓴다
  *   · 정관이 고정 배치라 **사업목적 최대 20줄 · 발기인 최대 5명** — 넘으면 작성완료(P→E) 때 거절
@@ -38,16 +41,42 @@ import {
   type TransitionCheck,
 } from './corp-change.ts';
 
-/** 회사유형 — 주식회사만(공통코드 `MEMBER_TYPE` 의 R). */
-export const INCORP_ENTITY_TYPE = 'R';
+/**
+ * 회사 형태 — 공통코드 `MEMBER_TYPE` 파티션 `001`(법인설립용) 중 앱이 다루는 둘(결정 2026-10-31).
+ * 이름은 코드표에서 읽는다. ★ 앱이 박아 둔 코드값이라 `code-usage.ts` 의 `PINNED_CODES` 에 올라 있다.
+ */
+export const INCORP_ENTITY_TYPES = ['R', 'A'] as const;
+export type IncorpEntityType = (typeof INCORP_ENTITY_TYPES)[number];
+export const INCORP_ENTITY_CATEGORY = 'MEMBER_TYPE';
+export const INCORP_ENTITY_USE_TP = '001';
+/** 회사 형태 기본값 — 주식회사(R). 형태를 보내지 않은 첫 저장 · 형태가 없던 스냅샷도 R 이다. */
+export const INCORP_ENTITY_TYPE: IncorpEntityType = 'R';
+/** 유한회사(A). */
+export const INCORP_LTD_ENTITY_TYPE: IncorpEntityType = 'A';
+
+export function isIncorpEntityType(v: unknown): v is IncorpEntityType {
+  return typeof v === 'string' && (INCORP_ENTITY_TYPES as readonly string[]).includes(v);
+}
+
 /** 설립 구분 — 공통코드 `LAW_EST_TP` 의 「주식회사 발기설립」. 등기 설정(`tb_s080_doc_form_settings`)의 줄 키이기도 하다. */
 export const INCORP_METHOD = 'R_PROMOTER';
+/** 설립 구분 — 「유한회사 발기설립」(`LAW_EST_TP` U_P, 결정 2026-10-31). */
+export const INCORP_LTD_METHOD = 'U_P';
 export const INCORP_METHOD_CATEGORY = 'LAW_EST_TP';
 export const INCORP_METHOD_USE_TP = '000';
+
+/** 회사 형태 → 설립 구분 코드(등기 설정의 줄 키 · 등기의 목적 이름). */
+export function incorpMethodOf(entity: IncorpEntityType): string {
+  return entity === INCORP_LTD_ENTITY_TYPE ? INCORP_LTD_METHOD : INCORP_METHOD;
+}
 
 /** 정관 고정 배치의 한도(결정 3). */
 export const INCORP_PURPOSE_MAX = 20;
 export const INCORP_FOUNDER_MAX = 5;
+/** 유한회사 사원 한도 — 대상이 사원 1~2명이다(결정 2026-10-31). 정관(유한회사)의 표 · 서명란도 2명으로 높이를 잡았다. */
+export const INCORP_LTD_MEMBER_MAX = 2;
+/** 유한회사 정관은 자본금 10억 원 미만(공증 면제) 기준이다(결정 2026-10-31) — 넘으면 경고만. */
+export const INCORP_LTD_CAPITAL_LIMIT = 1_000_000_000;
 
 /**
  * 금액 · 주식 수의 상한. DB 칸은 bigint 다(042, 결정 2026-10-11) — 앱은 JS 가 정확히 셀 수 있는
@@ -117,6 +146,53 @@ export const INCORP_FIELD_DEFS: readonly IncorpFieldDef[] = [
     hint: `설립 때 목적 전체를 한 줄에 하나씩 적습니다(최대 ${INCORP_PURPOSE_MAX}줄). 「위 각 호에 부대되는 일체의 사업」은 서류가 붙입니다`,
   },
 ];
+
+// =============================================================================
+// 회사 형태별 이름표 — 칸은 같고 이름만 바뀐다(결정 2026-10-31)
+// =============================================================================
+
+export interface IncorpTerms {
+  /** 발기인 · 사원 — 사람의 역할 이름. */
+  founder: string;
+  /** 인수 주식 수 · 출자좌수 — 사람의 수 칸. */
+  units: string;
+  /** 주 · 좌 — 수 뒤에 붙는 말. */
+  unitWord: string;
+  /** 자본·주식 · 자본·출자 — 화면 묶음 이름. */
+  capitalSection: string;
+}
+
+const STOCK_TERMS: IncorpTerms = { founder: '발기인', units: '인수 주식 수', unitWord: '주', capitalSection: '자본·주식' };
+const LTD_TERMS: IncorpTerms = { founder: '사원', units: '출자좌수', unitWord: '좌', capitalSection: '자본·출자' };
+
+export function incorpTermsOf(entity: IncorpEntityType = INCORP_ENTITY_TYPE): IncorpTerms {
+  return entity === INCORP_LTD_ENTITY_TYPE ? LTD_TERMS : STOCK_TERMS;
+}
+
+/** 유한회사에 없는 칸 — 수권 · 발행 주식 수 · 공고방법(정관 36조에 자리가 없다, 결정 2026-10-31). */
+const LTD_HIDDEN: ReadonlySet<string> = new Set(['unitsAuthorized', 'unitsIssued', 'publicNoticeMethod']);
+
+const LTD_FIELD_DEFS: readonly IncorpFieldDef[] = INCORP_FIELD_DEFS.filter((d) => !LTD_HIDDEN.has(d.name)).map((d) =>
+  d.name === 'nameKo'
+    ? { ...d, hint: '입력한 그대로 서류에 씁니다 — 「유한회사」를 넣어 적습니다' }
+    : d.name === 'parValue'
+      ? { ...d, label: '1좌의 금액' }
+      : d,
+);
+
+/**
+ * 회사 형태의 칸 — 주식회사는 `INCORP_FIELD_DEFS` 그대로(같은 배열), 유한회사는 없는 칸을 빼고 이름표를 바꾼 것.
+ * ★ 저장 모양(`parseIncorpInfo`)은 형태와 상관없이 `INCORP_FIELD_DEFS` 전체다 — 안 보이는 칸은 null 로 오간다.
+ */
+export function incorpFieldDefsOf(entity: IncorpEntityType = INCORP_ENTITY_TYPE): readonly IncorpFieldDef[] {
+  return entity === INCORP_LTD_ENTITY_TYPE ? LTD_FIELD_DEFS : INCORP_FIELD_DEFS;
+}
+
+/** 유한회사 상호에 「유한회사」가 없을 때의 안내 — 막지 않는다(결정 2026-10-31). 있거나 비면 null. */
+export function ltdNameNotice(nameKo: string | null | undefined): string | null {
+  const name = (nameKo ?? '').trim();
+  return name !== '' && !name.includes('유한회사') ? '상호에 「유한회사」가 없습니다 — 입력한 그대로 서류에 쓰입니다' : null;
+}
 
 /** 회사 · 자본 · 설립 정보 — 검증에 넘기는 모양(이번에 **저장될** 값). 숫자 칸은 숫자 또는 null. */
 export interface IncorporationInfo {
@@ -231,15 +307,20 @@ function checkInfoField(def: IncorpFieldDef, value: unknown): CorpChangeFieldErr
 }
 
 /** 사람 한 명 검증. `index` 는 오류 자리(`persons.{index}.name`)에 들어간다. */
-export function validateIncorporationPerson(p: IncorporationPersonInput, index: number): CorpChangeFieldError[] {
+export function validateIncorporationPerson(
+  p: IncorporationPersonInput,
+  index: number,
+  entity: IncorpEntityType = INCORP_ENTITY_TYPE,
+): CorpChangeFieldError[] {
+  const t = incorpTermsOf(entity);
   const at = (key: string) => `persons.${index}.${key}`;
   const errors: CorpChangeFieldError[] = [];
   if (isBlank(p.name)) errors.push({ field: at('name'), message: '성명을 입력하세요' });
   if (!p.isFounder && !p.isDirector && !p.isAuditor && !p.isRepresentative) {
-    errors.push({ field: at('roles'), message: '발기인 · 이사 · 감사 · 대표이사 중 하나 이상 체크하세요' });
+    errors.push({ field: at('roles'), message: `${t.founder} · 이사 · 감사 · 대표이사 중 하나 이상 체크하세요` });
   }
   if (p.unitsSubscribed !== null && p.unitsSubscribed !== undefined && !isCount(p.unitsSubscribed)) {
-    errors.push({ field: at('unitsSubscribed'), message: '인수 주식 수는 0 이상의 정수로 입력하세요' });
+    errors.push({ field: at('unitsSubscribed'), message: `${t.units}는 0 이상의 정수로 입력하세요` });
   }
   if (!isBlank(p.appointmentDate) && (typeof p.appointmentDate !== 'string' || parseDay(p.appointmentDate) === null)) {
     errors.push({ field: at('appointmentDate'), message: '취임일은 날짜(YYYY-MM-DD)로 입력하세요' });
@@ -252,8 +333,10 @@ export function validateIncorporationPerson(p: IncorporationPersonInput, index: 
 /**
  * 서류작성완료(P→E) 검증. 오류가 없으면 빈 배열.
  * 칸 → 사람 → 서로 맞물리는 값(자본금 · 주식 수 · 인수수량 합 · 한도) 순으로 본다.
+ * 유한회사(`entity` A)는 `validateLtdIncorporation` — 칸 · 이름표 · 한도 · 자본금 맞추기가 다르다.
  */
-export function validateIncorporation(content: IncorporationContent): CorpChangeFieldError[] {
+export function validateIncorporation(content: IncorporationContent, entity: IncorpEntityType = INCORP_ENTITY_TYPE): CorpChangeFieldError[] {
+  if (entity === INCORP_LTD_ENTITY_TYPE) return validateLtdIncorporation(content);
   const { info, persons } = content;
   const errors = INCORP_FIELD_DEFS.flatMap((d) => checkInfoField(d, info[d.name]));
 
@@ -291,13 +374,72 @@ export function validateIncorporation(content: IncorporationContent): CorpChange
   return errors;
 }
 
+/** 사원 출자좌수 합(사원 = `isFounder`). 수가 아닌 값은 0 으로 센다. */
+const memberUnits = (persons: readonly IncorporationPersonInput[]) =>
+  persons.filter((p) => p.isFounder).reduce((s, p) => s + (isCount(p.unitsSubscribed) ? p.unitsSubscribed : 0), 0);
+
+/**
+ * 유한회사 작성완료 검증(결정 2026-10-31) — 주식회사와 다른 곳:
+ *   · 칸은 `incorpFieldDefsOf('A')`(수권 · 발행 주식 수 · 공고방법 없음)
+ *   · 사원 1명 이상 · 2명까지(대상 1~2명 · 정관 표 높이)
+ *   · 자본금 = 1좌의 금액 × 사원 출자좌수 합(정관 제4조 · 제5조 · 제6조가 맞물린다)
+ */
+function validateLtdIncorporation(content: IncorporationContent): CorpChangeFieldError[] {
+  const { info, persons } = content;
+  const errors = LTD_FIELD_DEFS.flatMap((d) => checkInfoField(d, info[d.name]));
+
+  if (typeof info.purposes === 'string' && !isBlank(info.purposes)) {
+    const n = purposeLines(info.purposes).length;
+    if (n > INCORP_PURPOSE_MAX) {
+      errors.push({ field: 'purposes', message: `사업목적은 ${INCORP_PURPOSE_MAX}줄까지입니다(지금 ${n}줄) — 정관에 들어가는 줄 수입니다` });
+    }
+  }
+
+  persons.forEach((p, i) => errors.push(...validateIncorporationPerson(p, i, INCORP_LTD_ENTITY_TYPE)));
+  const members = persons.filter((p) => p.isFounder);
+  if (members.length === 0) errors.push({ field: 'persons', message: '사원을 1명 이상 등록하세요' });
+  if (members.length > INCORP_LTD_MEMBER_MAX) {
+    errors.push({ field: 'persons', message: `사원은 ${INCORP_LTD_MEMBER_MAX}명까지입니다(지금 ${members.length}명) — 유한회사 설립은 사원 1~2명이 대상입니다` });
+  }
+  if (!persons.some((p) => p.isRepresentative)) errors.push({ field: 'persons', message: '대표이사를 1명 이상 등록하세요' });
+
+  const { capitalAmount, parValue } = info;
+  if (isCount(capitalAmount) && isCount(parValue) && members.length > 0 && members.every((p) => isCount(p.unitsSubscribed ?? 0))) {
+    const units = memberUnits(persons);
+    if (capitalAmount !== parValue * units) {
+      errors.push({ field: 'capitalAmount', message: ltdCapitalMismatch(capitalAmount, parValue, units) });
+    }
+  }
+  return errors;
+}
+
+const won = (n: number) => n.toLocaleString('ko-KR');
+const ltdCapitalMismatch = (capital: number, par: number, units: number) =>
+  `자본금(${won(capital)}원)이 1좌의 금액 × 사원 출자좌수 합(${won(par)}원 × ${won(units)}좌 = ${won(par * units)}원)과 다릅니다`;
+
 /**
  * 경고 — **막지 않는다.** 레거시의 두 가지를 그대로 옮겼다.
  *   · 1주의 금액이 100원 미만
  *   · 자본금이 10억 원 이상인데 감사가 없다
+ * 유한회사(A, 결정 2026-10-31) — 저장할 때 알린다:
+ *   · 1좌의 금액이 100원 미만(상법 제546조)
+ *   · 자본금 ≠ 1좌의 금액 × 사원 출자좌수 합(작성완료 때는 거절)
+ *   · 자본금 10억 원 이상(정관이 공증 면제 기준). 감사 경고는 없다(감사는 기본 없음)
  */
-export function incorporationWarnings(content: IncorporationContent): string[] {
+export function incorporationWarnings(content: IncorporationContent, entity: IncorpEntityType = INCORP_ENTITY_TYPE): string[] {
   const { info, persons } = content;
+  if (entity === INCORP_LTD_ENTITY_TYPE) {
+    const out: string[] = [];
+    if (isCount(info.parValue) && info.parValue > 0 && info.parValue < 100) out.push('1좌의 금액이 100원 미만입니다');
+    if (isCount(info.capitalAmount) && isCount(info.parValue) && persons.some((p) => p.isFounder)) {
+      const units = memberUnits(persons);
+      if (info.capitalAmount !== info.parValue * units) out.push(ltdCapitalMismatch(info.capitalAmount, info.parValue, units));
+    }
+    if (isCount(info.capitalAmount) && info.capitalAmount >= INCORP_LTD_CAPITAL_LIMIT) {
+      out.push('자본금이 10억 원 이상입니다 — 유한회사 정관은 10억 원 미만(공증 면제) 기준입니다');
+    }
+    return out;
+  }
   const out: string[] = [];
   if (isCount(info.parValue) && info.parValue > 0 && info.parValue < 100) out.push('1주의 금액이 100원 미만입니다');
   if (isCount(info.capitalAmount) && info.capitalAmount >= 1_000_000_000 && !persons.some((p) => p.isAuditor)) {
@@ -317,7 +459,9 @@ export function checkIncorporationTransition(req: {
   role: ScopeRole;
   statusBeforeCancel?: string | null;
   content?: IncorporationContent;
+  /** 회사 형태 — 없으면 주식회사. */
+  entityType?: IncorpEntityType;
 }): TransitionCheck {
-  const { content, ...rest } = req;
-  return checkLegalTransition({ ...rest, validate: content ? () => validateIncorporation(content) : undefined });
+  const { content, entityType, ...rest } = req;
+  return checkLegalTransition({ ...rest, validate: content ? () => validateIncorporation(content, entityType) : undefined });
 }

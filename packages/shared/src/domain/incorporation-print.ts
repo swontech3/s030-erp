@@ -33,7 +33,7 @@ import {
 } from './corp-change-print.ts';
 import { personsForIncorpMark, type IncorpMarkUnit, type LegalFormMark } from './legal-form-mark.ts';
 import { sidoOf } from './korea-sido.ts';
-import { closingTimeOf, isTimeOfDay } from './incorporation.ts';
+import { INCORP_ENTITY_TYPE, closingTimeOf, isIncorpEntityType, isTimeOfDay } from './incorporation.ts';
 import { incorporationTax, metroSurchargeOf, type IncorpTaxSetting } from './incorporation-tax.ts';
 import type { IncorpInfoInput, IncorpSnapshotPerson, IncorporationSnapshot } from './incorporation-detail.ts';
 
@@ -286,6 +286,8 @@ export function readIncorporationSnapshot(raw: unknown): IncorporationSnapshot |
   );
   return {
     version: 1,
+    // 회사 형태 — 2026-10-31 전 스냅샷에는 없다(주식회사)
+    entityType: isIncorpEntityType(raw.entityType) ? raw.entityType : INCORP_ENTITY_TYPE,
     composedName: str(raw.composedName) ?? '',
     companyTypePosition: str(raw.companyTypePosition) ?? 'F',
     info,

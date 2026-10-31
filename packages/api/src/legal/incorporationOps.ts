@@ -10,6 +10,8 @@
  *
  * ★★ ERP 회사표에 쓰지 않는다(결정 2026-10-11). 완료(E→C)도 상태만 바꾼다 — ERP 반영은 링크 안내.
  * ★ 상호 표기위치는 코드표 `NAME_POSITION` 에 있는 값만(F · B). 비면 기본값 F 로 저장한다(결정 2026-10-11).
+ * ★ 회사 형태(결정 2026-10-31)는 코드표 `MEMBER_TYPE`/001 에 켜져 있는 R · A 만 — 새 건을 만들 때만 받는다.
+ *   형태가 이름표 · 검증 · 경고 · 상호 합치기를 가른다(shared `incorporation.ts`).
  */
 import { randomUUID } from 'node:crypto';
 import type { ErpSession } from '@swonbiz/shared';
@@ -26,7 +28,15 @@ import {
 } from '@swonbiz/shared/domain/corp-change';
 import { STALE_STATUS_MESSAGE, parseSeenStatus, parseTransitionBody } from '@swonbiz/shared/domain/corp-change-transition';
 import { maskRrn, type OrgTarget } from '@swonbiz/shared/domain/corp-change-detail';
-import { checkIncorporationTransition, incorporationWarnings, type IncorporationPersonInput } from '@swonbiz/shared/domain/incorporation';
+import {
+  INCORP_ENTITY_CATEGORY,
+  INCORP_ENTITY_TYPE,
+  INCORP_ENTITY_USE_TP,
+  checkIncorporationTransition,
+  incorporationWarnings,
+  isIncorpEntityType,
+  type IncorporationPersonInput,
+} from '@swonbiz/shared/domain/incorporation';
 import {
   DEFAULT_NAME_POSITION,
   NAME_POSITION_CATEGORY,
@@ -96,6 +106,13 @@ async function namePositions(client: ScopedClient): Promise<CodeOption[]> {
   }));
 }
 
+/** 회사 형태 선택지 — 코드표 `MEMBER_TYPE`/001 에 켜진 것 중 앱이 다루는 R · A(코드표 순서). */
+async function entityTypes(client: ScopedClient): Promise<CodeOption[]> {
+  return (await listCodes(client, [{ category: INCORP_ENTITY_CATEGORY, useTp: INCORP_ENTITY_USE_TP }]))
+    .filter((c) => isIncorpEntityType(c.code))
+    .map((c) => ({ code: c.code, name: c.name }));
+}
+
 async function statusName(client: ScopedClient, status: string): Promise<string> {
   const codes = await listCodes(client, [{ category: CORP_CHANGE_STATUS_CATEGORY, useTp: CORP_CHANGE_CODE_USE_TP }]);
   return codes.find((c) => c.code === status)?.name ?? status;
@@ -138,7 +155,7 @@ export async function listIncorporationItems(client: ScopedClient, f: Incorporat
     id: r.id,
     orgId: r.org_id,
     orgCode: r.org_code,
-    composedName: composeIncorporationName(r.name_ko, r.company_type_position) || null,
+    composedName: composeIncorporationName(r.name_ko, r.company_type_position, isIncorpEntityType(r.entity_type) ? r.entity_type : INCORP_ENTITY_TYPE) || null,
     status: r.status,
     createdOn: r.created_on,
     plannedDate: r.planned_date,
@@ -167,6 +184,8 @@ export async function readIncorporationDraft(
       displayName: incorporationDisplayName('', { orgId: target.orgId, orgCode }),
       namePositions: await namePositions(client),
       defaultNamePosition: DEFAULT_NAME_POSITION,
+      entityTypes: await entityTypes(client),
+      defaultEntityType: INCORP_ENTITY_TYPE,
     },
   };
 }
@@ -180,6 +199,11 @@ export async function createIncorporation(
   session: ErpSession,
   input: IncorpFirstSaveInput,
 ): Promise<OpResult<{ id: string }>> {
+  // 회사 형태 — 기본값(R)이 아니면 코드표에 켜져 있어야 한다(위치와 같은 규칙, 자리 `entityType`)
+  if (input.entityType !== INCORP_ENTITY_TYPE && !(await entityTypes(client)).some((c) => c.code === input.entityType)) {
+    const message = '회사 형태가 올바르지 않습니다';
+    return fail(400, 'invalid_request', message, [{ field: 'entityType', message }]);
+  }
   const settled = await settlePosition(client, input.info);
   if (!settled.ok) return settled;
 
@@ -189,6 +213,7 @@ export async function createIncorporation(
     status: INITIAL_CORP_CHANGE_STATUS,
     orgId: input.orgId,
     orgCode: await orgCodeFor(client, session, input),
+    entityType: input.entityType,
     info: settled.value,
     actor: actorOf(session),
   });
@@ -220,7 +245,8 @@ export async function readIncorporationDetail(
 
 async function detailOf(client: ScopedClient, session: ErpSession, row: IncorporationRow): Promise<IncorporationDetailResponse> {
   const persons = await listIncorpPersons(client, row.id);
-  const composedName = composeIncorporationName(row.info.nameKo, row.info.companyTypePosition);
+  const composedName = composeIncorporationName(row.info.nameKo, row.info.companyTypePosition, row.entityType);
+  const types = await entityTypes(client);
   const statusBeforeCancel: CorpChangeStatus | null =
     row.status === 'X' && isCorpChangeStatus(row.statusBeforeCancel) ? row.statusBeforeCancel : null;
   return {
@@ -232,6 +258,10 @@ async function detailOf(client: ScopedClient, session: ErpSession, row: Incorpor
     displayName: incorporationDisplayName(composedName, row),
     namePositions: await namePositions(client),
     defaultNamePosition: DEFAULT_NAME_POSITION,
+    entityTypes: types,
+    defaultEntityType: INCORP_ENTITY_TYPE,
+    entityType: row.entityType,
+    entityTypeName: types.find((c) => c.code === row.entityType)?.name ?? row.entityType,
     info: row.info,
     composedName,
     persons,
@@ -245,7 +275,7 @@ async function detailOf(client: ScopedClient, session: ErpSession, row: Incorpor
     cancelReason: row.status === 'X' ? row.cancelReason : null,
     writtenOn: row.writtenOn,
     completedOn: row.completedOn,
-    warnings: incorporationWarnings({ info: row.info, persons: persons.map(personForValidation) }),
+    warnings: incorporationWarnings({ info: row.info, persons: persons.map(personForValidation) }, row.entityType),
   };
 }
 
@@ -304,6 +334,7 @@ export async function transitionIncorporation(
     role: session.role,
     statusBeforeCancel: row.statusBeforeCancel,
     content: completing ? { info: row.info, persons: persons.map(personForValidation) } : undefined,
+    entityType: row.entityType,
   });
   if (!check.ok) {
     const status = REFUSAL_STATUS[check.code];
@@ -316,7 +347,7 @@ export async function transitionIncorporation(
     to,
     actor: actorOf(session),
     cancelReason: to === 'X' ? cancelReason : null,
-    snapshot: completing ? buildIncorporationSnapshot(row.info, persons) : undefined,
+    snapshot: completing ? buildIncorporationSnapshot(row.info, persons, row.entityType) : undefined,
   });
   if (!changed) return STALE;
   return readIncorporationDetail(client, session, id);

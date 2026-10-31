@@ -126,6 +126,11 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
    * `domain/corp-change-detail.ts` 의 `LEGAL_MEMBER_TYPE_USE_TP`.
    */
   { category: 'MEMBER_TYPE', useTp: '002', table: 'tb_s080_legal_orgs', column: 'member_type', label: '법무 회사유형' },
+  /**
+   * 법인설립 회사 형태(2026-10-31) — 파티션 **001**(법인설립용). 새 건을 만들 때 고른다.
+   * `domain/incorporation.ts` 의 `INCORP_ENTITY_USE_TP`.
+   */
+  { category: 'MEMBER_TYPE', useTp: '001', table: 'tb_s080_incorporations', column: 'entity_type', label: '법인설립 회사 형태' },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */
@@ -217,6 +222,24 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     codes: ['R', 'A'],
     source: 'packages/shared/src/domain/legal-form-mark.ts (LEGAL_FORM_COMPANY_TYPES)',
     label: '법무 양식 회사유형',
+  },
+  /**
+   * 법인설립 회사 형태 · 설립 구분 — 형태마다 이름표 · 검증 · 서류 묶음이, 구분마다 등기 설정 줄이 박혀 있다.
+   * ★ 2026-10-31 추가(유한회사 설립).
+   */
+  {
+    category: 'MEMBER_TYPE',
+    useTp: '001',
+    codes: ['R', 'A'],
+    source: 'packages/shared/src/domain/incorporation.ts (INCORP_ENTITY_TYPES)',
+    label: '법인설립 회사 형태',
+  },
+  {
+    category: 'LAW_EST_TP',
+    useTp: '000',
+    codes: ['R_PROMOTER', 'U_P'],
+    source: 'packages/shared/src/domain/incorporation.ts (INCORP_METHOD · INCORP_LTD_METHOD)',
+    label: '법인설립 설립 구분',
   },
 ] as const;
 

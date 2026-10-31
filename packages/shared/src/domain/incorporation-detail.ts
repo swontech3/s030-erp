@@ -12,13 +12,24 @@
  * ★ 회사 세션은 자기 단체로만(`parseOrgTarget` — 남의 단체는 403).
  * ★ 상호는 「순수 상호 + 회사유형 + 위치(앞 F / 뒤 B)」를 합친다(결정 2026-10-11, `composeIncorporationName`).
  *   위치 선택지는 코드표 `NAME_POSITION`, 기본값은 앞(F).
+ *   ★ 유한회사(A)는 **입력값 그대로**다(결정 2026-10-31) — 위치를 쓰지 않는다. 「유한회사」가 없으면 화면이 안내만.
+ * ★ 회사 형태(주식회사 R · 유한회사 A, 코드표 `MEMBER_TYPE`/001)는 **새 건을 만들 때만** 고른다(첫 저장의 `entityType`).
+ *   저장된 건은 바꾸지 않는다. 보내지 않으면 주식회사(지금까지와 같다).
  */
 import type { ScopeRole } from '../session.ts';
 import { parseDay } from './day.ts';
 import { validateRrn, type CorpChangeFieldError, type CorpChangeStatus } from './corp-change.ts';
 import { maskRrn, normalizeRrn, parseOrgTarget, type OrgTarget, type Parsed } from './corp-change-detail.ts';
 import type { CodeOption } from './corp-change-list.ts';
-import { INCORP_FIELD_DEFS, INCORP_INT_MAX, type IncorporationInfo } from './incorporation.ts';
+import {
+  INCORP_ENTITY_TYPE,
+  INCORP_FIELD_DEFS,
+  INCORP_INT_MAX,
+  INCORP_LTD_ENTITY_TYPE,
+  isIncorpEntityType,
+  type IncorpEntityType,
+  type IncorporationInfo,
+} from './incorporation.ts';
 
 export { maskRrn };
 
@@ -61,10 +72,16 @@ function countOrNull(v: unknown): number | null | undefined {
 /**
  * 서류의 상호 — 순수 상호 + 「주식회사」를 위치대로. F 「주식회사 한가람」 · B 「한가람 주식회사」.
  * 위치가 F · B 가 아니면 기본값(F). 순수 상호가 비면 빈 글자(서류는 빈칸).
+ * 유한회사(A)는 입력값 그대로(앞뒤 공백만 뗀다, 결정 2026-10-31).
  */
-export function composeIncorporationName(nameKo: string | null | undefined, position: string | null | undefined): string {
+export function composeIncorporationName(
+  nameKo: string | null | undefined,
+  position: string | null | undefined,
+  entity: IncorpEntityType = INCORP_ENTITY_TYPE,
+): string {
   const name = (nameKo ?? '').trim();
   if (name === '') return '';
+  if (entity === INCORP_LTD_ENTITY_TYPE) return name;
   const pos = position === 'B' || position === 'F' ? position : DEFAULT_NAME_POSITION;
   return pos === 'F' ? `${INCORP_ENTITY_NAME} ${name}` : `${name} ${INCORP_ENTITY_NAME}`;
 }
@@ -252,12 +269,14 @@ export function parseIncorpPersonBody(raw: unknown, at?: string): Parsed<IncorpP
 }
 
 export interface IncorpFirstSaveInput extends OrgTarget {
+  /** 회사 형태 — 보내지 않으면 주식회사(R). 코드표에 켜져 있는지는 서버가 본다. */
+  entityType: IncorpEntityType;
   info: IncorpInfoInput;
   persons: IncorpPersonInput[];
 }
 
 /**
- * 첫 [저장] 본문 `{ orgId?, orgCode?, info, persons[] }` — 하나라도 틀리면 아무것도 만들지 않는다.
+ * 첫 [저장] 본문 `{ orgId?, orgCode?, entityType?, info, persons[] }` — 하나라도 틀리면 아무것도 만들지 않는다.
  * 남의 단체(403)가 먼저다.
  */
 export function parseIncorpFirstSave(
@@ -269,6 +288,12 @@ export function parseIncorpFirstSave(
   if (!org.ok) return org;
 
   const errors: CorpChangeFieldError[] = [];
+  const rawEntity = body.entityType;
+  let entityType: IncorpEntityType = INCORP_ENTITY_TYPE;
+  if (rawEntity !== undefined && rawEntity !== null) {
+    if (isIncorpEntityType(rawEntity)) entityType = rawEntity;
+    else errors.push({ field: 'entityType', message: '회사 형태는 주식회사 · 유한회사 중 하나입니다' });
+  }
   const info = parseIncorpInfo(body.info ?? {});
   if (!info.ok) errors.push(...(info.errors ?? [{ field: 'info', message: info.message }]));
 
@@ -283,7 +308,7 @@ export function parseIncorpFirstSave(
     });
   }
   if (errors.length > 0 || !info.ok) return badAt(errors);
-  return { ok: true, value: { ...org.value, info: info.value, persons } };
+  return { ok: true, value: { ...org.value, entityType, info: info.value, persons } };
 }
 
 // =============================================================================
@@ -319,10 +344,18 @@ export interface IncorporationDraftResponse {
   namePositions: CodeOption[];
   /** 위치 기본값(F). */
   defaultNamePosition: string;
+  /** 회사 형태 선택지 — 코드표 `MEMBER_TYPE`/001 중 앱이 다루는 R · A(켜진 것만, 코드표 순서). */
+  entityTypes: CodeOption[];
+  /** 형태 기본값(R). */
+  defaultEntityType: IncorpEntityType;
 }
 
 export interface IncorporationDetailResponse extends IncorporationDraftResponse {
   id: string;
+  /** 이 건의 회사 형태 — 만들 때 고른 것(바꾸지 않는다). */
+  entityType: IncorpEntityType;
+  /** 형태 이름(코드표), 없으면 코드값. */
+  entityTypeName: string;
   info: IncorpInfoInput;
   /** 서류에 들어갈 상호(합친 것). 순수 상호가 비면 ''. */
   composedName: string;
@@ -355,6 +388,8 @@ export function incorporationDisplayName(composed: string, org: { orgId: number;
 /** ★ 주민번호는 넣지 않는다 — 출력 응답을 만들 때만 DB 암호문에서 꺼낸다(법인변경 Q4 와 같다). */
 export interface IncorporationSnapshot {
   version: 1;
+  /** 회사 형태(2026-10-31 추가). 이 칸이 없던 스냅샷은 주식회사로 읽는다. */
+  entityType: IncorpEntityType;
   composedName: string;
   companyTypePosition: string;
   info: IncorpInfoInput;
@@ -364,11 +399,16 @@ export interface IncorporationSnapshot {
 export type IncorpSnapshotPerson = Omit<IncorpPersonView, 'id' | 'rrnMasked' | 'sortOrder'>;
 
 /** 작성완료 스냅샷 — 사람은 목록 순서 그대로(주민번호 · 마스킹 없음). */
-export function buildIncorporationSnapshot(info: IncorpInfoInput, persons: readonly IncorpPersonView[]): IncorporationSnapshot {
+export function buildIncorporationSnapshot(
+  info: IncorpInfoInput,
+  persons: readonly IncorpPersonView[],
+  entity: IncorpEntityType = INCORP_ENTITY_TYPE,
+): IncorporationSnapshot {
   const position = info.companyTypePosition === 'B' ? 'B' : DEFAULT_NAME_POSITION;
   return {
     version: 1,
-    composedName: composeIncorporationName(info.nameKo, position),
+    entityType: entity,
+    composedName: composeIncorporationName(info.nameKo, position, entity),
     companyTypePosition: position,
     info: { ...info, companyTypePosition: position },
     persons: persons.map(({ id: _id, rrnMasked: _m, sortOrder: _s, ...rest }) => rest),

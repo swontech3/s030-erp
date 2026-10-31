@@ -5,9 +5,13 @@ import {
   INCORP_PURPOSE_MAX,
   checkIncorporationTransition,
   closingTimeOf,
+  incorpFieldDefsOf,
+  incorpMethodOf,
+  incorpTermsOf,
   incorporationWarnings,
   isMonthDay,
   isTimeOfDay,
+  ltdNameNotice,
   validateIncorporation,
   type IncorporationContent,
   type IncorporationPersonInput,
@@ -168,5 +172,85 @@ describe('checkIncorporationTransition — 법인변경과 같은 규칙', () =>
       { from: 'S', to: 'P', role: 'operator' as const },
     ];
     for (const c of cases) expect(checkIncorporationTransition(c)).toEqual(checkTransition(c));
+  });
+});
+
+// =============================================================================
+// 유한회사(결정 2026-10-31) — 이름표만 바뀌고 칸은 같다. 주식회사 판정은 그대로
+// =============================================================================
+describe('유한회사 — 칸 · 이름표', () => {
+  it('주식회사 칸은 INCORP_FIELD_DEFS 그대로(같은 배열)', () => {
+    expect(incorpFieldDefsOf('R')).toBe(INCORP_FIELD_DEFS);
+    expect(incorpFieldDefsOf()).toBe(INCORP_FIELD_DEFS);
+  });
+  it('유한회사 — 수권 · 발행 주식 수 · 공고방법 없음 · 1주 → 1좌', () => {
+    const names = incorpFieldDefsOf('A').map((d) => d.name);
+    expect(names).not.toEqual(expect.arrayContaining(['unitsAuthorized']));
+    expect(names).not.toContain('unitsIssued');
+    expect(names).not.toContain('publicNoticeMethod');
+    expect(incorpFieldDefsOf('A').find((d) => d.name === 'parValue')?.label).toBe('1좌의 금액');
+    expect(incorpTermsOf('A')).toMatchObject({ founder: '사원', units: '출자좌수', unitWord: '좌' });
+    expect(incorpTermsOf('R')).toMatchObject({ founder: '발기인', units: '인수 주식 수', unitWord: '주' });
+  });
+  it('설립 구분 — R → R_PROMOTER · A → U_P', () => {
+    expect(incorpMethodOf('R')).toBe('R_PROMOTER');
+    expect(incorpMethodOf('A')).toBe('U_P');
+  });
+  it('상호에 「유한회사」가 없으면 안내만', () => {
+    expect(ltdNameNotice('한가람')).toMatch(/유한회사/);
+    expect(ltdNameNotice('유한회사 한가람')).toBeNull();
+    expect(ltdNameNotice('한가람 유한회사')).toBeNull();
+    expect(ltdNameNotice('  ')).toBeNull();
+  });
+});
+
+describe('유한회사 — 작성완료 검증', () => {
+  const M1: IncorporationPersonInput = { name: '홍길동', isFounder: true, isDirector: true, isRepresentative: true, unitsSubscribed: 1_000 };
+  const M2: IncorporationPersonInput = { name: '김철수', isFounder: true, unitsSubscribed: 1_000 };
+  // 자본금 2천만 = 1좌 1만 × (1,000 + 1,000)좌. 수권 · 발행 수 · 공고방법은 비어 있다
+  const LTD: IncorporationContent = {
+    info: { ...OK.info, nameKo: '유한회사 스원', capitalAmount: 20_000_000, parValue: 10_000, unitsAuthorized: null, unitsIssued: null },
+    persons: [M1, M2],
+  };
+  const ltdFields = (c: IncorporationContent) => validateIncorporation(c, 'A').map((e) => e.field);
+
+  it('사원 1명 · 2명 — 통과(수권 · 발행 주식 수 칸은 보지 않는다)', () => {
+    expect(validateIncorporation(LTD, 'A')).toEqual([]);
+    expect(validateIncorporation({ ...LTD, info: { ...LTD.info, capitalAmount: 10_000_000 }, persons: [M1] }, 'A')).toEqual([]);
+  });
+  it('★ 자본금 ≠ 1좌의 금액 × 사원 출자좌수 합 — 거절', () => {
+    const e = validateIncorporation({ ...LTD, info: { ...LTD.info, capitalAmount: 30_000_000 } }, 'A');
+    expect(e.map((x) => x.field)).toEqual(['capitalAmount']);
+    expect(e[0]!.message).toContain('10,000원 × 2,000좌 = 20,000,000원');
+  });
+  it('★ 사원 3명이면 거절 · 0명이면 거절 — 사원 말로', () => {
+    const three = [M1, M2, { ...M2, name: '이영희' }];
+    expect(validateIncorporation({ ...LTD, info: { ...LTD.info, capitalAmount: 30_000_000 }, persons: three }, 'A').map((e) => e.message)).toEqual([
+      '사원은 2명까지입니다(지금 3명) — 유한회사 설립은 사원 1~2명이 대상입니다',
+    ]);
+    expect(validateIncorporation({ ...LTD, persons: [{ name: '김이사', isDirector: true, isRepresentative: true }] }, 'A').map((e) => e.message)).toEqual([
+      '사원을 1명 이상 등록하세요',
+    ]);
+  });
+  it('역할 없는 사람 — 「사원 · 이사 · 감사 · 대표이사」', () => {
+    const e = validateIncorporation({ ...LTD, persons: [M1, M2, { name: '무역할' }] }, 'A');
+    expect(e.find((x) => x.field === 'persons.2.roles')?.message).toBe('사원 · 이사 · 감사 · 대표이사 중 하나 이상 체크하세요');
+  });
+  it('주식회사 판정은 형태를 안 주면 그대로', () => {
+    expect(fields(LTD)).toEqual(expect.arrayContaining(['unitsAuthorized', 'unitsIssued']));
+    expect(ltdFields(LTD)).toEqual([]);
+  });
+  it('전이 판정에 형태가 넘어간다', () => {
+    expect(checkIncorporationTransition({ from: 'P', to: 'E', role: 'tenant', content: LTD, entityType: 'A' })).toMatchObject({ ok: true });
+    expect(checkIncorporationTransition({ from: 'P', to: 'E', role: 'tenant', content: LTD })).toMatchObject({ ok: false, code: 'invalid' });
+  });
+  it('경고 — 1좌 100원 미만 · 자본금 안 맞음(저장 때 알림) · 10억 이상. 감사 경고는 없다', () => {
+    expect(incorporationWarnings(LTD, 'A')).toEqual([]);
+    expect(incorporationWarnings({ ...LTD, info: { ...LTD.info, parValue: 50, capitalAmount: 100_000 } }, 'A')).toEqual(['1좌의 금액이 100원 미만입니다']);
+    expect(incorporationWarnings({ ...LTD, info: { ...LTD.info, capitalAmount: 25_000_000 } }, 'A')).toEqual([
+      '자본금(25,000,000원)이 1좌의 금액 × 사원 출자좌수 합(10,000원 × 2,000좌 = 20,000,000원)과 다릅니다',
+    ]);
+    const big = { ...LTD, info: { ...LTD.info, capitalAmount: 1_000_000_000, parValue: 500_000 } };
+    expect(incorporationWarnings(big, 'A')).toEqual(['자본금이 10억 원 이상입니다 — 유한회사 정관은 10억 원 미만(공증 면제) 기준입니다']);
   });
 });

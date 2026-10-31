@@ -17,7 +17,7 @@ import type {
   IncorpPersonView,
   IncorporationListFilter,
 } from '@swonbiz/shared/domain/incorporation-detail';
-import { INCORP_ENTITY_TYPE } from '@swonbiz/shared/domain/incorporation';
+import { INCORP_ENTITY_TYPE, isIncorpEntityType, type IncorpEntityType } from '@swonbiz/shared/domain/incorporation';
 import type { IncorpPrintLogItem } from '@swonbiz/shared/domain/incorporation-print';
 import type { ScopedClient } from './withCompanyScope.ts';
 import type { RrnStored } from './corpChanges.ts';
@@ -31,8 +31,14 @@ const q = <T>(client: ScopedClient, sql: string, params?: unknown[]): Promise<Ro
 
 /** 운영사 하나(법인변경 · 표양식과 같다). */
 const OPERATOR_ID = 1;
-/** 레거시 칸 값 — 발기설립. 설립 구분 코드(`LAW_EST_TP` R_PROMOTER)는 회사유형 R + 이 값이다. */
+/**
+ * 레거시 칸 값 — 발기설립. 설립 구분 코드는 회사 형태로 정한다(`incorpMethodOf` — R → R_PROMOTER · A → U_P).
+ * 유한회사도 발기설립이라 이 칸은 같은 값이다(결정 2026-10-31).
+ */
 const ESTABLISHMENT_METHOD = 'PROMOTER';
+
+/** 회사 형태 칸 — 앱이 다루는 값(R · A)이 아니면 주식회사로 읽는다(형태를 고르기 전의 건은 모두 R). */
+const entityOf = (v: unknown): IncorpEntityType => (isIncorpEntityType(v) ? v : INCORP_ENTITY_TYPE);
 
 /** bigint · numeric 이 글자로 온다 — 숫자로. */
 const num = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
@@ -45,6 +51,7 @@ interface ListRow {
   id: string;
   org_id: number;
   org_code: string | null;
+  entity_type: string;
   name_ko: string | null;
   company_type_position: string | null;
   status: string;
@@ -66,7 +73,7 @@ export async function listIncorporations(
   if (!f.includeCancelled) where.push(`status <> 'X'`);
   const { rows } = await q<ListRow>(
     client,
-    `SELECT id, org_id, org_code, name_ko, company_type_position, status,
+    `SELECT id, org_id, org_code, entity_type, name_ko, company_type_position, status,
             to_char(created_at, 'YYYY-MM-DD') AS created_on,
             to_char(planned_date, 'YYYY-MM-DD') AS planned_date
        FROM public.tb_s080_incorporations
@@ -85,6 +92,8 @@ export interface IncorporationRow {
   id: string;
   orgId: number;
   orgCode: string | null;
+  /** 회사 형태 — 만들 때 고른 것. */
+  entityType: IncorpEntityType;
   status: string;
   info: IncorpInfoInput;
   createdOn: string;
@@ -94,7 +103,7 @@ export interface IncorporationRow {
   completedOn: string | null;
 }
 
-const INC_COLUMNS = `id, org_id, org_code, status,
+const INC_COLUMNS = `id, org_id, org_code, entity_type, status,
        name_ko, name_en, company_type_position,
        head_zip_code, head_address, head_address_detail,
        capital_amount, par_value, units_authorized, units_issued,
@@ -110,6 +119,7 @@ interface IncRow {
   id: string;
   org_id: number;
   org_code: string | null;
+  entity_type: string;
   status: string;
   name_ko: string | null;
   name_en: string | null;
@@ -141,6 +151,7 @@ const toRow = (r: IncRow): IncorporationRow => ({
   id: r.id,
   orgId: r.org_id,
   orgCode: r.org_code,
+  entityType: entityOf(r.entity_type),
   status: r.status,
   info: {
     nameKo: r.name_ko,
@@ -194,10 +205,18 @@ const infoParams = (i: IncorpInfoInput): unknown[] => [
   i.meetingTime, i.paymentBank, i.ceoPhone, i.metroSurcharge,
 ];
 
-/** 새 건 — 첫 [저장] 때만(법인변경과 같다). 회사유형 R · 발기설립 고정. */
+/** 새 건 — 첫 [저장] 때만(법인변경과 같다). 회사 형태는 고른 것(R · A) · 발기설립. */
 export async function insertIncorporation(
   client: ScopedClient,
-  args: { id: string; status: string; orgId: number; orgCode: string | null; info: IncorpInfoInput; actor: string },
+  args: {
+    id: string;
+    status: string;
+    orgId: number;
+    orgCode: string | null;
+    entityType: IncorpEntityType;
+    info: IncorpInfoInput;
+    actor: string;
+  },
 ): Promise<void> {
   await q(
     client,
@@ -212,7 +231,7 @@ export async function insertIncorporation(
              $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21::date, $22,
              $23, $24, $25, $26,
              now(), now(), $27, $27)`,
-    [args.id, args.status, OPERATOR_ID, args.orgId, args.orgCode, INCORP_ENTITY_TYPE, ESTABLISHMENT_METHOD, ...infoParams(args.info), args.actor],
+    [args.id, args.status, OPERATOR_ID, args.orgId, args.orgCode, args.entityType, ESTABLISHMENT_METHOD, ...infoParams(args.info), args.actor],
   );
 }
 

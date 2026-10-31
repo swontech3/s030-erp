@@ -119,3 +119,26 @@ describe('buildIncorporationSnapshot', () => {
     expect(Object.keys(snap.persons[0]!)).not.toEqual(expect.arrayContaining(['id', 'rrnMasked', 'sortOrder']));
   });
 });
+
+describe('유한회사 — 상호 · 첫 저장 · 스냅샷(결정 2026-10-31)', () => {
+  it('상호는 입력값 그대로(위치 무시) · 주식회사는 그대로 합친다', () => {
+    expect(composeIncorporationName(' 유한회사 한가람 ', 'B', 'A')).toBe('유한회사 한가람');
+    expect(composeIncorporationName('한가람', 'F', 'A')).toBe('한가람');
+    expect(composeIncorporationName('한가람', 'B', 'R')).toBe('한가람 주식회사');
+  });
+  it('첫 저장의 회사 형태 — 없으면 R · A 받음 · 그 밖은 칸 오류', () => {
+    const none = parseIncorpFirstSave({ orgId: 9003, info: {} }, OP);
+    expect(none.ok && none.value.entityType).toBe('R');
+    const ltd = parseIncorpFirstSave({ orgId: 9003, entityType: 'A', info: {} }, OP);
+    expect(ltd.ok && ltd.value.entityType).toBe('A');
+    const bad = parseIncorpFirstSave({ orgId: 9003, entityType: 'C', info: {} }, OP);
+    expect(bad.ok ? [] : bad.errors!.map((e) => e.field)).toEqual(['entityType']);
+  });
+  it('스냅샷에 형태가 들고, 상호는 형태대로', () => {
+    const info = parseIncorpInfo({ nameKo: '유한회사 한가람' });
+    const snap = buildIncorporationSnapshot(info.ok ? info.value : (null as never), [], 'A');
+    expect(snap.entityType).toBe('A');
+    expect(snap.composedName).toBe('유한회사 한가람');
+    expect(buildIncorporationSnapshot(info.ok ? info.value : (null as never), []).entityType).toBe('R');
+  });
+});
