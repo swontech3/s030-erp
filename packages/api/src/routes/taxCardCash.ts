@@ -12,7 +12,6 @@
  *   현금 거래처는 거래처 표에 넣지 않는다(글로만).
  */
 import { createHash } from 'node:crypto';
-import * as XLSX from 'xlsx';
 import { formatBizNumber } from '@swonbiz/shared/domain/tax-number';
 import {
   CASH_TEMPLATE_FILE_NAME,
@@ -56,6 +55,7 @@ import {
 } from '../db/taxUploads.ts';
 import { cardKeyCounts, cashKeyCounts, insertCardRows, insertCashRows, registeredCardLast4 } from '../db/taxCardCash.ts';
 import { readSheetRows } from '../tax/readSheet.ts';
+import { buildXlsxTemplate, type TemplateColumn, type TemplateList } from '../lib/xlsxTemplate.ts';
 import { loadItems } from './taxClassify.ts';
 import { loadCodeNames, skipReasonsFor, type TaxOp, type TaxOpFail } from './taxUploads.ts';
 
@@ -245,47 +245,54 @@ export async function uploadCardCashOp(
   };
 }
 
-/* ── 현금 경비 양식 내려받기(판단 14 · 15 · 210) ──────────────────────────── */
+/* ── 현금 경비 양식 내려받기(판단 14 · 15 · 210 · 드롭다운) ──────────────────────────── */
 
-/** 양식에서 날짜 · 금액 서식을 걸어 두는 자료 줄 수(2~1,001줄). 그 아래도 적을 수 있다 — 서식만 없다. */
+/** 양식에서 날짜 · 금액 서식과 드롭다운 · 검사를 걸어 두는 자료 줄 수(2~1,001줄). 그 아래도 적을 수 있다 — 서식 · 규칙만 없다. */
 export const CASH_TEMPLATE_DATA_ROWS = 1000;
-const DATE_FORMAT = 'yyyy-mm-dd';
-const AMOUNT_FORMAT = '#,##0';
 
 /**
- * 현금 경비 표준 양식 파일 — SheetJS 로 직접 만든다(칸 서식 때문 — 공통 부품 `xlsxExport` 는 칸 서식을 다루지 않아 그대로 둔다).
- * ★ 드롭다운(데이터 유효성 검사)은 없다 — SheetJS 무료판은 쓸 수 없고 ExcelJS 는 라이선스 문제로 미뤘다(2026-10-31). 목록 시트만.
+ * 현금 경비 표준 양식 파일 — ERP 공통 양식 만들기(`lib/xlsxTemplate.ts`)로 만든다(2026-10-31 드롭다운).
  *   「현금 경비」(첫 시트 — 올리기는 첫 시트를 읽는다) 1줄 제목 줄(대응표 TAX_CASH_STD 그대로) · 자료 줄 없음 ·
- *               자료 줄 2~1,001줄의 날짜 칸 날짜 서식 · 금액 칸 「#,##0」(빈 칸에 서식만)
+ *               자료 줄 2~1,001줄 — 날짜 칸 날짜 서식 + 날짜만 · 금액 칸 「#,##0」 + 0 보다 큰 정수만 ·
+ *               구분 · 항목 · 결제방법 · 증빙 칸 드롭다운(그 목록 시트). 칸 자리는 대응표 칸 번호를 따른다
  *   「안내」     안내 문구 한 줄씩
  *   「구분 목록」 · 「항목 목록」(그 회사 출금 항목 · 풀이) · 「결제방법 목록」 · 「증빙 목록」 — 코드 표 이름 그대로.
  *               머리 · 시트 이름은 제목 줄의 그 칸 이름(코드 관리 · 대응표와 함께 바뀐다)
+ * ★ 항목 목록이 비면(세무 설정 전) 항목 칸 규칙을 뺀다 — 목록 시트의 안내 한 줄은 드롭다운 값이 아니다(대표 2026-10-31).
+ *   다른 목록도 비면(코드 표가 빈 때) 그 칸 규칙을 뺀다 — 양식은 그대로 내려준다.
+ * ★ 붙여넣기는 엑셀 규칙을 피한다 — 올릴 때 서버 검사(`convertCashSheet`)가 그대로 막는다.
  */
 export function buildCashTemplate(
   signature: readonly string[],
   columns: CashMapColumns,
   names: Omit<CashCodeNames, 'items'> & { items: readonly TaxItemOption[] },
 ): Uint8Array {
-  const wb = XLSX.utils.book_new();
-  const form = XLSX.utils.aoa_to_sheet([[...signature]]);
-  for (let r = 1; r <= CASH_TEMPLATE_DATA_ROWS; r++) {
-    form[XLSX.utils.encode_cell({ r, c: columns.useDate - 1 })] = { t: 'z', z: DATE_FORMAT };
-    form[XLSX.utils.encode_cell({ r, c: columns.amount - 1 })] = { t: 'z', z: AMOUNT_FORMAT };
-  }
-  form['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: CASH_TEMPLATE_DATA_ROWS, c: signature.length - 1 } });
-  XLSX.utils.book_append_sheet(wb, form, '현금 경비');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(CASH_TEMPLATE_GUIDE.map((l) => [l])), '안내');
-
   const head = (col: number) => signature[col - 1] ?? '';
-  const list = (col: number, rows: readonly TaxCodeName[]) =>
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[head(col)], ...rows.map((x) => [x.name])]), `${head(col)} 목록`);
-  list(columns.direction, names.directions);
+  const listName = (col: number) => `${head(col)} 목록`;
+  const nameRows = (rows: readonly TaxCodeName[]) => rows.map((x) => [x.name]);
   // 사업자 유형이 없으면(세무 설정 전) 항목이 비어 있다 — 안내 한 줄만 두고 양식은 그대로 내려준다(대표 2026-10-30)
-  const items = names.items.length > 0 ? names.items.map((x) => [x.name, x.description ?? '']) : [[NO_ITEMS_NOTE, '']];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[head(columns.item), '풀이'], ...items]), `${head(columns.item)} 목록`);
-  list(columns.payMethod, names.payMethods);
-  list(columns.proof, names.proofs);
-  return new Uint8Array(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', sheetStubs: true }));
+  const itemRows = names.items.length > 0 ? names.items.map((x) => [x.name, x.description ?? '']) : [[NO_ITEMS_NOTE, '']];
+  const lists: TemplateList[] = [
+    { name: listName(columns.direction), header: [head(columns.direction)], rows: nameRows(names.directions) },
+    { name: listName(columns.item), header: [head(columns.item), '풀이'], rows: itemRows },
+    { name: listName(columns.payMethod), header: [head(columns.payMethod)], rows: nameRows(names.payMethods) },
+    { name: listName(columns.proof), header: [head(columns.proof)], rows: nameRows(names.proofs) },
+  ];
+  const listCheck = (col: number, values: readonly unknown[]): TemplateColumn['check'] =>
+    values.length > 0 ? { type: 'list', sheet: listName(col) } : undefined;
+  const byCol = new Map<number, Omit<TemplateColumn, 'header'>>([
+    [columns.useDate, { format: 'date', check: { type: 'date' } }],
+    [columns.direction, { check: listCheck(columns.direction, names.directions) }],
+    [columns.item, { check: listCheck(columns.item, names.items) }],
+    [columns.amount, { format: 'amount', check: { type: 'positiveInt', errorTitle: '금액이 아님', error: '0 보다 큰 원 단위 정수만 적습니다.' } }],
+    [columns.payMethod, { check: listCheck(columns.payMethod, names.payMethods) }],
+    [columns.proof, { check: listCheck(columns.proof, names.proofs) }],
+  ]);
+  return buildXlsxTemplate({
+    form: { name: '현금 경비', dataRows: CASH_TEMPLATE_DATA_ROWS, columns: signature.map((header, i) => ({ header, ...byCol.get(i + 1) })) },
+    extraSheets: [{ name: '안내', rows: CASH_TEMPLATE_GUIDE.map((l) => [l]) }],
+    lists,
+  });
 }
 
 /** 현금 경비 양식 — 그 회사 항목 목록으로 만든다. 세무 설정 전이면 항목 목록 시트에 안내 한 줄(막지 않는다). */
