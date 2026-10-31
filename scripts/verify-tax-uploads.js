@@ -9,6 +9,7 @@
  * ★★ API 의 풀(`db/pool.ts`)로 접속한다 — erp_app. 라우트가 쓰는 처리(`routes/taxUploads.ts` ·
  *    `routes/taxVendors.ts` 의 …Op)를 그대로 부른다.
  * ★ 엑셀은 SheetJS 로 **지어낸 값**을 써서 만든다 — 원본 샘플(doc/data-src/)을 쓰지 않는다. 제목 줄은 DB 의 대응표에서 읽는다.
+ * ★ 1-4 보완(2026-10-31): 미리보기의 「이미 올린 줄 위치」(alreadyWhere) — 계산서 · 카드 · 현금, 여러 파일, 다른 단체.
  * ★ 1-4(2026-10-30): 카드 사용 내역 · 현금 경비 — 끝 4자리만 남기기 · 개수 맞추기 · 같은 결제 두 번 · 경고 ·
  *   가맹점 거래처(일반) · 현금 항목(파일) · 목록 · 양식 내려받기 · 거래처 지우기 막기 · 합치기 · 파일 지우기(C · X 줄).
  * ★ 시험 행은 **한 트랜잭션 안에서 넣고 ROLLBACK 한다.** DB 에 남는 것이 없다(마지막 Z1 이 센다).
@@ -144,6 +145,7 @@ async function main() {
       const invoiceVendor = async (orgId, no) =>
         (await c.query(`SELECT vendor_id FROM public.tb_s050_invoices WHERE org_id = $1 AND approval_no = $2`, [orgId, `V-TAXUP-${no}`])).rows[0]?.vendor_id ?? null;
       const upload = (orgId, name, bytes) => uploadInvoicesOp(c, orgId, 'INVOICE', name, bytes, ACTOR);
+      const where = (pv) => (pv.ok ? JSON.stringify(pv.data.alreadyWhere) : 'X');
 
       // ── 첫 파일 — 미리보기 · 올리기 · 자동 등록 ──
       const f1 = xls({ tag: 'f1', rows: [{ no: 1, partner: P.p1, name: '지어낸 가' }, { no: 2, partner: P.p1, name: '지어낸 가' }, { no: 3, partner: P.p2, name: '지어낸 나' }] });
@@ -181,6 +183,8 @@ async function main() {
         up2.ok && up2.data.insertedCount === 2 && up2.data.alreadyUploaded === 3 && up2.data.file.rowCount === 5 &&
         (await invoiceVendor(ORG_A, 1)) === v1[0].id,
         up2.ok ? up2.data : up2);
+      check('U4b', '★ 이미 올린 줄 위치 — 건너뛸 3줄은 「9월 · f1.xls」(그 줄 날짜의 달 · 승인번호가 들어 있는 파일)',
+        where(pv2) === JSON.stringify([{ month: '2026-09', fileName: 'f1.xls', count: 3 }]), where(pv2));
 
       // ── 승격 · 사용자가 내린 일반은 그대로 ──
       const g4 = await insertVendor(c, ORG_A, { name: '미리 있던 일반', bizNo: P.p4, vendorTp: 'G', firstKind: 'BANK', firstDirection: null }, ACTOR);
@@ -359,6 +363,13 @@ async function main() {
         !sameCard.ok && sameCard.status === 409 && cpv2.ok && cpv2.data.toInsert === 2 && cpv2.data.alreadyUploaded === 4 &&
         cup2.ok && cup2.data.insertedCount === 2 && cup2.data.alreadyUploaded === 4,
         { same: sameCard.status, pv: cpv2.ok ? [cpv2.data.toInsert, cpv2.data.alreadyUploaded] : cpv2, up: cup2.ok ? cup2.data.insertedCount : cup2 });
+      check('C5b', '★ 카드 이미 올린 줄 위치 — 「9월 · k1.xls」 4줄', where(cpv2) === JSON.stringify([{ month: '2026-09', fileName: 'k1.xls', count: 4 }]), where(cpv2));
+      const k3 = cardXls({ tag: 'k3', rows: [...cardRows1.slice(0, 4), twin, twin, { card: FULL, biz: dash(P.p3), total: 990, date: '2026-10-02' }] });
+      const cpv3 = await previewUploadOp(c, ORG_A, 'CARD', 'k3.xls', k3);
+      check('C5c', '★ 여러 파일에 걸치면 파일마다 한 줄 — 「9월 · k1.xls」 4 · 「9월 · k2.xls」 2(같은 날 두 줄), 새 10월 줄은 넣을 줄',
+        cpv3.ok && cpv3.data.toInsert === 1 && cpv3.data.alreadyUploaded === 6 &&
+        where(cpv3) === JSON.stringify([{ month: '2026-09', fileName: 'k1.xls', count: 4 }, { month: '2026-09', fileName: 'k2.xls', count: 2 }]),
+        where(cpv3));
 
       // ══ 현금 경비(1-4) ══
       await c.query(`INSERT INTO public.tb_s050_settings (org_id, biz_type, withholding_cycle, tax_emails, unused_kinds)
@@ -397,6 +408,7 @@ async function main() {
       const xpv2 = await previewUploadOp(c, ORG_A, 'CASH', 'x2.xlsx', x2);
       check('X3', '★ 현금 개수 맞추기 — 고친 파일을 다시 올리면 이미 올린 4줄은 건너뛰고 새 1줄만',
         xpv2.ok && xpv2.data.toInsert === 1 && xpv2.data.alreadyUploaded === 4, xpv2.ok ? [xpv2.data.toInsert, xpv2.data.alreadyUploaded] : xpv2);
+      check('X3b', '★ 현금 이미 올린 줄 위치 — 「9월 · x1.xlsx」 4줄', where(xpv2) === JSON.stringify([{ month: '2026-09', fileName: 'x1.xlsx', count: 4 }]), where(xpv2));
 
       const ups2 = await listUploadsOp(c, ORG_A, MONTH);
       const kc = (k) => ups2.cards.find((x) => x.kind === k)?.fileCount;
@@ -431,8 +443,8 @@ async function main() {
 
       await applyCompanyScope(c, tenant(ORG_B));
       const bCard = await previewUploadOp(c, ORG_B, 'CARD', 'k1.xls', k1);
-      check('X9', '★ 회사 B — 같은 카드 파일도 B 에는 새 줄 4(개수 맞추기는 단체마다) · B 에 등록된 카드가 없어 4줄 경고',
-        bCard.ok && bCard.data.toInsert === 4 && bCard.data.sameFile === null &&
+      check('X9', '★ 회사 B — 같은 카드 파일도 B 에는 새 줄 4(개수 맞추기 · 이미 올린 줄 위치는 단체마다) · B 에 등록된 카드가 없어 4줄 경고',
+        bCard.ok && bCard.data.toInsert === 4 && bCard.data.sameFile === null && bCard.data.alreadyWhere?.length === 0 &&
         bCard.data.warnings.find((w) => w.code === 'card_unregistered')?.count === 4, bCard.ok ? bCard.data.warnings : bCard);
       await applyCompanyScope(c, tenant(ORG_A));
     } finally {

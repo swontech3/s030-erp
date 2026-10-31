@@ -3,7 +3,8 @@
  *
  * ★★★ 모든 질의가 `org_id = $1`(세션 단체 ID)을 직접 건다 — 운영사 세션도 RLS 가 모든 단체를 보여 주기 때문이다(203 머리말).
  * ★★ 카드번호는 끝 4자리만 다룬다 — 이 파일에 전체 번호가 들어올 길이 없다(shared `convertCardSheet` 가 이미 걸렀다).
- * ★ 중복 막기는 「개수 맞추기」 — 여기는 열쇠마다 DB 에 몇 줄 있는지만 센다. 열쇠는 shared 의 `cardDedupKey` · `cashDedupKey`.
+ * ★ 중복 막기는 「개수 맞추기」 — 여기는 열쇠마다 DB 줄이 든 파일 이름(먼저 올린 줄부터)만 읽는다. 줄 수 = 이름 수.
+ *   열쇠는 shared 의 `cardDedupKey` · `cashDedupKey`. 파일 이름은 미리보기의 「이미 올린 줄 위치」에 쓴다(1-4 보완).
  * ★ 금액은 bigint 라 pg 가 글자로 준다 — 원 단위 정수라 Number 로 바꿔도 잃지 않는다.
  */
 import { cardDedupKey, cashDedupKey, type CardStdRow, type CashStdRow } from '@swonbiz/shared/domain/tax-card-cash';
@@ -29,19 +30,21 @@ export async function registeredCardLast4(client: ScopedClient, orgId: number): 
 
 const datesOf = (rows: readonly { useDate: string }[]) => [...new Set(rows.map((r) => r.useDate))];
 
-/** 카드 열쇠마다 DB 에 있는 줄 수 — 파일의 사용일들만 본다. */
-export async function cardKeyCounts(client: ScopedClient, orgId: number, rows: readonly CardStdRow[]): Promise<Map<string, number>> {
+/** 카드 열쇠마다 DB 줄이 든 파일 이름(먼저 올린 줄부터) — 파일의 사용일들만 본다. */
+export async function cardKeyFiles(client: ScopedClient, orgId: number, rows: readonly CardStdRow[]): Promise<Map<string, string[]>> {
   if (rows.length === 0) return new Map();
-  const { rows: got } = await q<{ card_last4: string; use_date: string; biz: string | null; total: string; n: number }>(
+  const { rows: got } = await q<{ card_last4: string; use_date: string; biz: string | null; total: string; files: string[] }>(
     client,
-    `SELECT card_last4, to_char(use_date, 'YYYY-MM-DD') AS use_date, merchant_biz_no_src AS biz, total_amount AS total, count(*)::int AS n
-       FROM public.tb_s050_card_txns
-      WHERE org_id = $1 AND use_date = ANY($2::date[])
+    `SELECT t.card_last4, to_char(t.use_date, 'YYYY-MM-DD') AS use_date, t.merchant_biz_no_src AS biz, t.total_amount AS total,
+            array_agg(f.file_name ORDER BY f.uploaded_at, f.id, t.id) AS files
+       FROM public.tb_s050_card_txns t
+       JOIN public.tb_s050_upload_files f ON f.id = t.file_id AND f.org_id = $1
+      WHERE t.org_id = $1 AND t.use_date = ANY($2::date[])
       GROUP BY 1, 2, 3, 4`,
     [orgId, datesOf(rows)],
   );
   return new Map(
-    got.map((r) => [cardDedupKey({ ...EMPTY_CARD, cardLast4: r.card_last4, useDate: r.use_date, merchantBizNo: r.biz, totalAmount: Number(r.total) }), r.n]),
+    got.map((r) => [cardDedupKey({ ...EMPTY_CARD, cardLast4: r.card_last4, useDate: r.use_date, merchantBizNo: r.biz, totalAmount: Number(r.total) }), r.files]),
   );
 }
 const EMPTY_CARD: CardStdRow = {
@@ -49,14 +52,16 @@ const EMPTY_CARD: CardStdRow = {
   supplyAmount: 0, taxAmount: 0, nontaxAmount: 0, totalAmount: 0, vatDeduct: null, deductNote: null,
 };
 
-/** 현금 열쇠마다 DB 에 있는 줄 수 — 파일의 날짜들만 본다. */
-export async function cashKeyCounts(client: ScopedClient, orgId: number, rows: readonly CashStdRow[]): Promise<Map<string, number>> {
+/** 현금 열쇠마다 DB 줄이 든 파일 이름(먼저 올린 줄부터) — 파일의 날짜들만 본다. */
+export async function cashKeyFiles(client: ScopedClient, orgId: number, rows: readonly CashStdRow[]): Promise<Map<string, string[]>> {
   if (rows.length === 0) return new Map();
-  const { rows: got } = await q<{ use_date: string; description: string; vendor: string | null; direction: string; amount: string; pay_method: string; n: number }>(
+  const { rows: got } = await q<{ use_date: string; description: string; vendor: string | null; direction: string; amount: string; pay_method: string; files: string[] }>(
     client,
-    `SELECT to_char(use_date, 'YYYY-MM-DD') AS use_date, description, vendor_name_src AS vendor, direction, amount, pay_method, count(*)::int AS n
-       FROM public.tb_s050_cash_txns
-      WHERE org_id = $1 AND use_date = ANY($2::date[])
+    `SELECT to_char(t.use_date, 'YYYY-MM-DD') AS use_date, t.description, t.vendor_name_src AS vendor, t.direction, t.amount, t.pay_method,
+            array_agg(f.file_name ORDER BY f.uploaded_at, f.id, t.id) AS files
+       FROM public.tb_s050_cash_txns t
+       JOIN public.tb_s050_upload_files f ON f.id = t.file_id AND f.org_id = $1
+      WHERE t.org_id = $1 AND t.use_date = ANY($2::date[])
       GROUP BY 1, 2, 3, 4, 5, 6`,
     [orgId, datesOf(rows)],
   );
@@ -66,7 +71,7 @@ export async function cashKeyCounts(client: ScopedClient, orgId: number, rows: r
         useDate: r.use_date, description: r.description, vendorName: r.vendor, direction: r.direction as TaxInvDir,
         amount: Number(r.amount), payMethod: r.pay_method, proof: null, itemCode: null,
       }),
-      r.n,
+      r.files,
     ]),
   );
 }

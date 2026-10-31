@@ -1,12 +1,13 @@
 /**
  * 207 검증 — 세무(S05) 거래 분류: 계산서 표 분류 칸 셋 · 출금 항목 코드(TAX_ITEM_OUT).
+ * ★ 211(2026-10-31) 뒤 값을 기대한다 — 개인 파티션에 접대비, 개인 18 · 법인 17.
  *
  * 사용: node scripts/verify-207.js .env packages/api/.env
  *
  * ★ 구조 · 권한은 postgres 로 읽는다(카탈로그). 코드 · 고치기는 erp_app 으로 접속해 잰다 — 앱과 같은 길
  *   (verify-203 과 같은 이유 — postgres 는 bypassrls).
  * ★ 시험 행은 erp_app 트랜잭션 안에서 넣고 ROLLBACK 한다. 남는 것이 없다.
- * ★★ 항목 목록(코드값 · 이름 · 풀이 · 순서)은 대표가 승인한 표(2026-10-27) 그대로 여기 적어 둔다 —
+ * ★★ 항목 목록(코드값 · 이름 · 풀이 · 순서)은 대표가 승인한 표(2026-10-27, 211 개인 접대비 2026-10-31) 그대로 여기 적어 둔다 —
  *    코드 관리에서 이름을 고치면 C 항목이 실패로 나온다(비고의 실제 값을 보고 판단).
  *
  * 종료코드: 0 = 전부 통과 / 1 = 실패 있음 / 2 = 실행 실패
@@ -30,30 +31,37 @@ const MAP_ID = 'HOMETAX_TAX_INVOICE';
 const ORG_A = 990001;
 const ORG_B = 990002;
 
-/** 승인된 항목 표 — [코드값, 이름, 풀이, 순서, 어디에(A 둘 다 · C 법인 · I 개인)]. */
+/**
+ * 승인된 항목 표 — [코드값, 이름, 풀이, 법인(001) 순서, 개인(002) 순서]. 순서가 null 이면 그 파티션에 없다.
+ * ★ 2026-10-31 211 — 개인에도 접대비(15). 개인 순서 15 접대비 · 16 거래처 경조사비 · 17 대표 인출 · 18 잘 모름(개인 18 · 법인 17 그대로).
+ */
 const ITEMS = [
-  ['RENT', '사무실 월세', null, 1, 'A'],
-  ['TEL', '통신비', null, 2, 'A'],
-  ['SUPPLY', '소모품비', '사무용품·작은 비품', 3, 'A'],
-  ['MEAL', '식대·회의비', '직원 식사·회의 다과', 4, 'A'],
-  ['TRAVEL', '교통·출장비', null, 5, 'A'],
-  ['DELIVERY', '택배·운송비', null, 6, 'A'],
-  ['AD', '광고비', null, 7, 'A'],
-  ['FEE', '수수료', '은행·플랫폼 수수료', 8, 'A'],
-  ['OUTSOURCE', '외주 용역비', null, 9, 'A'],
-  ['INSURANCE', '보험료', null, 10, 'A'],
-  ['REPAIR', '수선비', null, 11, 'A'],
-  ['EDU', '교육·도서비', null, 12, 'A'],
-  ['UTILITY', '수도광열비', '전기 · 수도 · 가스', 13, 'A'],
-  ['VEHICLE', '차량유지비', '주유 · 차량 수리 · 주차', 14, 'A'],
-  ['ENTERTAIN', '접대비', '거래처 식사·선물', 15, 'C'],
-  ['CONDOLENCE', '거래처 경조사비', null, 15, 'I'],
-  ['NONBIZ_TAXPRO', '사업과 무관 — 세무사 판단', '세무사가 처리 방법을 정합니다', 16, 'C'],
-  ['NONBIZ_OWNER', '사업과 무관 — 대표 인출', '대표가 개인 용도로 쓴 돈', 16, 'I'],
-  ['UNKNOWN', '잘 모름 — 세무사에게 묻기', null, 17, 'A'],
+  ['RENT', '사무실 월세', null, 1, 1],
+  ['TEL', '통신비', null, 2, 2],
+  ['SUPPLY', '소모품비', '사무용품·작은 비품', 3, 3],
+  ['MEAL', '식대·회의비', '직원 식사·회의 다과', 4, 4],
+  ['TRAVEL', '교통·출장비', null, 5, 5],
+  ['DELIVERY', '택배·운송비', null, 6, 6],
+  ['AD', '광고비', null, 7, 7],
+  ['FEE', '수수료', '은행·플랫폼 수수료', 8, 8],
+  ['OUTSOURCE', '외주 용역비', null, 9, 9],
+  ['INSURANCE', '보험료', null, 10, 10],
+  ['REPAIR', '수선비', null, 11, 11],
+  ['EDU', '교육·도서비', null, 12, 12],
+  ['UTILITY', '수도광열비', '전기 · 수도 · 가스', 13, 13],
+  ['VEHICLE', '차량유지비', '주유 · 차량 수리 · 주차', 14, 14],
+  ['ENTERTAIN', '접대비', '거래처 식사·선물', 15, 15],
+  ['CONDOLENCE', '거래처 경조사비', null, null, 16],
+  ['NONBIZ_TAXPRO', '사업과 무관 — 세무사 판단', '세무사가 처리 방법을 정합니다', 16, null],
+  ['NONBIZ_OWNER', '사업과 무관 — 대표 인출', '대표가 개인 용도로 쓴 돈', null, 17],
+  ['UNKNOWN', '잘 모름 — 세무사에게 묻기', null, 17, 18],
 ];
 const PARTS = [['001', 'C', '법인'], ['002', 'I', '개인 일반과세자']];
-const expectedOf = (biz) => ITEMS.filter((i) => i[4] === 'A' || i[4] === biz);
+/** 그 파티션의 [코드값, 이름, 풀이, 순서] — 순서대로. */
+const expectedOf = (biz) =>
+  ITEMS.map(([code, name, desc, c, i]) => [code, name, desc, biz === 'C' ? c : i])
+    .filter((x) => x[3] !== null)
+    .sort((x, y) => x[3] - y[3]);
 
 const results = [];
 const check = (id, what, cond, note = '') => results.push({ 항목: id, 내용: what, 결과: cond ? '통과' : '실패', 비고: note });
@@ -119,7 +127,7 @@ async function codeChecks(q) {
       got.map((l) => fmt(l.code, l.name, l.description, l.sort_order)).join(' / '));
   }
   check(`C${n++}`, '모두 켜짐(is_active)', lines.length > 0 && lines.every((l) => l.is_active));
-  check(`C${n++}`, '코드 줄 합계 34', lines.length === 34, String(lines.length));
+  check(`C${n++}`, '코드 줄 합계 35(법인 17 · 개인 18 — 211)', lines.length === 35, String(lines.length));
 }
 
 async function rowChecks(ec) {

@@ -153,16 +153,17 @@ async function main() {
         { name: ex.ok ? ex.data.fileName : ex, sheets: sheet?.SheetNames, rows: aoa.length });
 
       // ── 사업자 유형을 바꾼 회사 — 이름은 두 파티션에서, 골라 두기는 그 회사 목록에 있는 것만 ──
-      await confirmClassifyOp(c, ORG_A, [{ kind: 'INVOICE', id: 'vcls-p8', itemCode: 'ENTERTAIN' }], ACTOR); // 법인 전용 항목
+      await confirmClassifyOp(c, ORG_A, [{ kind: 'INVOICE', id: 'vcls-p8', itemCode: 'NONBIZ_TAXPRO' }], ACTOR); // 법인 전용 항목(211 부터 접대비는 개인에도 있다)
       await c.query(`UPDATE public.tb_s050_settings SET biz_type = 'I' WHERE org_id = $1`, [ORG_A]);
       await applyCompanyScope(c, OPERATOR);
       await c.query(`UPDATE public.tb_s050_invoices SET item_code = NULL, classified_at = NULL WHERE id = 'vcls-p3'`);
       await applyCompanyScope(c, tenant(ORG_A));
       const indiv = await listClassifyOp(c, ORG_A, query({ view: 'all', fileId: 'vcls-fp' }));
       const p3b = indiv.ok ? indiv.data.rows.find((r) => r.id === 'vcls-p3') : null;
-      check('K14', '★ 개인으로 바꾼 뒤 — 선택 항목은 개인 목록(접대비 없음) · 접대비 이름은 그대로 보임 · 법인 전용 항목은 골라 두지 않음',
-        indiv.ok && !indiv.data.codes.items.some((i) => i.code === 'ENTERTAIN') && indiv.data.codes.items.length === 17 &&
-        indiv.data.codes.itemNames.find((n) => n.code === 'ENTERTAIN')?.name === '접대비' && p3b?.suggestedItemCode === null,
+      check('K14', '★ 개인으로 바꾼 뒤 — 선택 항목은 개인 목록 18개(세무사 판단 없음 · 접대비 있음, 211) · 세무사 판단 이름은 그대로 보임 · 법인 전용 항목은 골라 두지 않음',
+        indiv.ok && !indiv.data.codes.items.some((i) => i.code === 'NONBIZ_TAXPRO') && indiv.data.codes.items.some((i) => i.code === 'ENTERTAIN') &&
+        indiv.data.codes.items.length === 18 &&
+        indiv.data.codes.itemNames.find((n) => n.code === 'NONBIZ_TAXPRO')?.name === '사업과 무관 — 세무사 판단' && p3b?.suggestedItemCode === null,
         { p3b, items: indiv.ok ? indiv.data.codes.items.length : indiv });
 
       // ── 거래처 합치기 뒤에도 기억이 따라온다 ──

@@ -561,6 +561,12 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
                   {skipped.length > 0
                     ? ` · 뺀 줄 ${skipped.map((s) => `${s.name} ${won(excludedOf(s.code))}`).join(' · ')}`
                     : ''}
+                  {/* 이미 올린 줄이 어디 있는지 — 서버가 정한 그대로(그 줄 날짜의 달 · 이미 올린 파일마다 한 줄) */}
+                  {p.alreadyWhere.map((w) => (
+                    <span key={`${w.month}|${w.fileName}`} className={t.sm} style={{ display: 'block' }}>
+                      {monthShort(w.month)} · {w.fileName} {won(w.count)}줄
+                    </span>
+                  ))}
                 </span>
               </div>
 

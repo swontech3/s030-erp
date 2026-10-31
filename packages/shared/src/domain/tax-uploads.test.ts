@@ -18,6 +18,7 @@ import {
   parseVendorIds,
   parseVendorMerge,
   parseVendorType,
+  summarizeAlreadyWhere,
   type InvoiceImportMap,
 } from './tax-uploads.ts';
 
@@ -348,5 +349,26 @@ describe('parseVendorIds — 거래처 지우기', () => {
     expect(parseVendorIds({ ids: [] })).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
     expect(parseVendorIds({ ids: [1] })).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
     expect(parseVendorIds(null)).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
+  });
+});
+
+describe('summarizeAlreadyWhere — 이미 올린 줄이 어디 있는지(그 줄 날짜의 달 · 이미 올린 파일)', () => {
+  it('달 · 파일마다 한 줄로 세고, 달 순서 → 처음 나온 파일 순서', () => {
+    expect(
+      summarizeAlreadyWhere([
+        { date: '2026-10-03', fileName: '현금경비_양식.xlsx' },
+        { date: '2026-09-30', fileName: '9월.xlsx' },
+        { date: '2026-10-05', fileName: '현금경비_양식.xlsx' },
+        { date: '2026-10-07', fileName: '추가.xlsx' },
+      ]),
+    ).toEqual([
+      { month: '2026-09', fileName: '9월.xlsx', count: 1 },
+      { month: '2026-10', fileName: '현금경비_양식.xlsx', count: 2 },
+      { month: '2026-10', fileName: '추가.xlsx', count: 1 },
+    ]);
+  });
+
+  it('건너뛴 줄이 없으면 빈 목록', () => {
+    expect(summarizeAlreadyWhere([])).toEqual([]);
   });
 });

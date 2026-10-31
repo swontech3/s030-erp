@@ -497,6 +497,28 @@ export function parseFileIds(raw: unknown): FileIdsParsed {
   return ids ? { ok: true, value: ids } : { ok: false, errors: [{ field: 'ids', message: '지울 파일을 고르세요' }] };
 }
 
+/* ── 이미 올린 줄이 어디 있는지 ──────────────────────────────────────────── */
+
+/** 건너뛸 줄 묶음 — 그 줄 날짜의 달(YYYY-MM) · 이미 올린 파일 이름 · 줄 수. */
+export interface TaxAlreadyWhere {
+  month: string;
+  fileName: string;
+  count: number;
+}
+
+/** 건너뛸 줄(그 줄 날짜 · 이미 들어 있는 파일)을 달 · 파일마다 센다 — 달 순서, 같은 달은 처음 나온 파일 순서. */
+export function summarizeAlreadyWhere(hits: readonly { date: string; fileName: string }[]): TaxAlreadyWhere[] {
+  const by = new Map<string, TaxAlreadyWhere>();
+  for (const h of hits) {
+    const month = h.date.slice(0, 7);
+    const k = JSON.stringify([month, h.fileName]);
+    const got = by.get(k);
+    if (got) got.count++;
+    else by.set(k, { month, fileName: h.fileName, count: 1 });
+  }
+  return [...by.values()].sort((a, b) => a.month.localeCompare(b.month));
+}
+
 /* ── 응답 모양 ───────────────────────────────────────────────────────────── */
 
 export interface TaxCodeName {
@@ -553,6 +575,8 @@ export type TaxUploadPreview = TaxUploadKindPart & {
   toInsert: number;
   /** 이미 올린 줄이라 건너뛸 줄 — 계산서는 승인번호, 카드 · 현금은 개수 맞추기. */
   alreadyUploaded: number;
+  /** 건너뛸 줄이 어디 있는지 — 그 줄 날짜의 달 · 이미 올린 파일마다 한 줄(`summarizeAlreadyWhere`). 이 단체 것만. */
+  alreadyWhere: TaxAlreadyWhere[];
   /** 뺀 줄 종류의 이름 — 코드 표(TAX_SKIP_REASON)에서 **이 자료의 `excluded` 키만**(코드값 = 키, 순서 = 코드 표). */
   skipReasons: TaxCodeName[];
   warnings: TaxUploadWarning[];

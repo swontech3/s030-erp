@@ -219,16 +219,31 @@ describe('pickNewByCount — 개수 맞추기(승인번호가 없는 자료의 �
 
   it('같은 열쇠가 파일에 n개 · DB 에 m개면 뒤쪽 n−m개만 넣는다', () => {
     const rows = [card(100), card(100), card(100), card(200)];
-    const existing = new Map([[cardDedupKey(card(100)), 2]]);
+    const existing = new Map([[cardDedupKey(card(100)), ['가.xlsx', '가.xlsx']]]);
     const r = pickNewByCount(rows, cardDedupKey, existing);
     expect(r.newRows).toEqual([card(100), card(200)]);
     expect(r.already).toBe(2);
   });
 
   it('DB 에 더 많으면 하나도 넣지 않는다 · 끝 4자리가 다르면 다른 열쇠', () => {
-    const r = pickNewByCount([card(100), card(100, '0001')], cardDedupKey, new Map([[cardDedupKey(card(100)), 5]]));
+    const r = pickNewByCount([card(100), card(100, '0001')], cardDedupKey, new Map([[cardDedupKey(card(100)), ['가.xlsx', '가.xlsx', '가.xlsx', '가.xlsx', '가.xlsx']]]));
     expect(r.newRows).toEqual([card(100, '0001')]);
     expect(r.already).toBe(1);
+  });
+
+  it('건너뛴 줄마다 그 줄이 이미 들어 있는 파일 이름 — DB 줄 순서(먼저 올린 것부터)대로 짝짓는다', () => {
+    const rows = [card(100), card(100), card(100), card(200)];
+    const existing = new Map([
+      [cardDedupKey(card(100)), ['9월_카드.xlsx', '10월_카드.xlsx']],
+      [cardDedupKey(card(200)), ['9월_카드.xlsx']],
+    ]);
+    const r = pickNewByCount(rows, cardDedupKey, existing);
+    expect(r.skipped).toEqual([
+      { row: card(100), fileName: '9월_카드.xlsx' },
+      { row: card(100), fileName: '10월_카드.xlsx' },
+      { row: card(200), fileName: '9월_카드.xlsx' },
+    ]);
+    expect(r.newRows).toEqual([card(100)]);
   });
 
   it('현금 열쇠 — 날짜 · 품명 · 거래처 · 매출/매입 · 금액 · 지급방법(항목 · 증빙은 열쇠가 아니다)', () => {

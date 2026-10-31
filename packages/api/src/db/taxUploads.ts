@@ -140,15 +140,22 @@ export async function lockOrgUploads(client: ScopedClient, orgId: number): Promi
   await q(client, `SELECT pg_advisory_xact_lock(hashtext('tb_s050_upload_files'), $1)`, [orgId]);
 }
 
-/** 이 단체에 이미 있는 승인번호. */
-export async function existingApprovalNos(client: ScopedClient, orgId: number, approvalNos: readonly string[]): Promise<Set<string>> {
-  if (approvalNos.length === 0) return new Set();
-  const { rows } = await q<{ approval_no: string }>(
+/** 이 단체에 이미 있는 승인번호 → 그 계산서 줄이 든 파일 이름(미리보기의 「이미 올린 줄 위치」). */
+export async function existingApprovalFiles(
+  client: ScopedClient,
+  orgId: number,
+  approvalNos: readonly string[],
+): Promise<Map<string, string>> {
+  if (approvalNos.length === 0) return new Map();
+  const { rows } = await q<{ approval_no: string; file_name: string }>(
     client,
-    `SELECT approval_no FROM public.tb_s050_invoices WHERE org_id = $1 AND approval_no = ANY($2::text[])`,
+    `SELECT i.approval_no, f.file_name
+       FROM public.tb_s050_invoices i
+       JOIN public.tb_s050_upload_files f ON f.id = i.file_id AND f.org_id = $1
+      WHERE i.org_id = $1 AND i.approval_no = ANY($2::text[])`,
     [orgId, approvalNos],
   );
-  return new Set(rows.map((r) => r.approval_no));
+  return new Map(rows.map((r) => [r.approval_no, r.file_name]));
 }
 
 export interface NewUploadFile {

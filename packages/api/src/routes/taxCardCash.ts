@@ -38,6 +38,8 @@ import type { TaxItemOption } from '@swonbiz/shared/domain/tax-classify';
 import {
   TAX_INV_DIR_CATEGORY,
   TAX_VENDOR_GENERAL,
+  summarizeAlreadyWhere,
+  type TaxAlreadyWhere,
   type TaxCodeName,
   type TaxUploadFileView,
   type TaxUploadPreview,
@@ -53,7 +55,7 @@ import {
   lockFirstVendorByBizNo,
   lockOrgUploads,
 } from '../db/taxUploads.ts';
-import { cardKeyCounts, cashKeyCounts, insertCardRows, insertCashRows, registeredCardLast4 } from '../db/taxCardCash.ts';
+import { cardKeyFiles, cashKeyFiles, insertCardRows, insertCashRows, registeredCardLast4 } from '../db/taxCardCash.ts';
 import { readSheetRows } from '../tax/readSheet.ts';
 import { buildXlsxTemplate, type TemplateColumn, type TemplateList } from '../lib/xlsxTemplate.ts';
 import { loadItems } from './taxClassify.ts';
@@ -72,11 +74,16 @@ interface Prepared<R, E> {
   rows: R[];
   newRows: R[];
   alreadyUploaded: number;
+  alreadyWhere: TaxAlreadyWhere[];
   excluded: E;
   warnings: TaxUploadWarning[];
   fileHash: string;
   sameFile: TaxUploadFileView | null;
 }
+
+/** 건너뛸 줄 → 「그 줄 날짜의 달 · 이미 올린 파일」 묶음. */
+const whereOf = (skipped: readonly { row: { useDate: string }; fileName: string }[]): TaxAlreadyWhere[] =>
+  summarizeAlreadyWhere(skipped.map((s) => ({ date: s.row.useDate, fileName: s.fileName })));
 
 type CardPrepared = Prepared<CardStdRow, CardExcluded>;
 type CashPrepared = Prepared<CashStdRow, CashExcluded>;
@@ -90,12 +97,12 @@ async function prepareCard(client: ScopedClient, orgId: number, bytes: Uint8Arra
   if (!map) return NO_MAP;
   const converted = convertCardSheet(sheet.rows, map, await registeredCardLast4(client, orgId));
   if (!converted.ok) return fail(400, converted.error.code, converted.error.message);
-  const { newRows, already } = pickNewByCount(converted.rows, cardDedupKey, await cardKeyCounts(client, orgId, converted.rows));
+  const { newRows, already, skipped } = pickNewByCount(converted.rows, cardDedupKey, await cardKeyFiles(client, orgId, converted.rows));
   const fileHash = createHash('sha256').update(bytes).digest('hex');
   return {
     ok: true,
     data: {
-      mapId: map.id, totalRows: converted.totalRows, rows: converted.rows, newRows, alreadyUploaded: already,
+      mapId: map.id, totalRows: converted.totalRows, rows: converted.rows, newRows, alreadyUploaded: already, alreadyWhere: whereOf(skipped),
       excluded: converted.excluded, warnings: converted.warnings, fileHash, sameFile: await findFileByHash(client, orgId, fileHash),
     },
   };
@@ -120,12 +127,12 @@ async function prepareCash(client: ScopedClient, orgId: number, bytes: Uint8Arra
   if (!map) return NO_MAP;
   const converted = convertCashSheet(sheet.rows, map, await cashNames(client, orgId));
   if (!converted.ok) return fail(400, converted.error.code, converted.error.message);
-  const { newRows, already } = pickNewByCount(converted.rows, cashDedupKey, await cashKeyCounts(client, orgId, converted.rows));
+  const { newRows, already, skipped } = pickNewByCount(converted.rows, cashDedupKey, await cashKeyFiles(client, orgId, converted.rows));
   const fileHash = createHash('sha256').update(bytes).digest('hex');
   return {
     ok: true,
     data: {
-      mapId: map.id, totalRows: converted.totalRows, rows: converted.rows, newRows, alreadyUploaded: already,
+      mapId: map.id, totalRows: converted.totalRows, rows: converted.rows, newRows, alreadyUploaded: already, alreadyWhere: whereOf(skipped),
       excluded: converted.excluded, warnings: converted.warnings, fileHash, sameFile: await findFileByHash(client, orgId, fileHash),
     },
   };
@@ -148,6 +155,7 @@ export async function previewCardCashOp(
     byMonth: countByUseMonth(d.newRows),
     toInsert: d.newRows.length,
     alreadyUploaded: d.alreadyUploaded,
+    alreadyWhere: d.alreadyWhere,
     warnings: d.warnings,
   });
   if (kind === TAX_KIND_CARD) {

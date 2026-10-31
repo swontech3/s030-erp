@@ -24,6 +24,8 @@ import type { ErpSession } from '@swonbiz/shared';
 import { digitsOnly, formatBizNumber } from '@swonbiz/shared/domain/tax-number';
 import { TAX_BIZ_TP_CATEGORY, TAX_CODE_USE_TP, TAX_KIND_CATEGORY } from '@swonbiz/shared/domain/tax-settings';
 import {
+  summarizeAlreadyWhere,
+  type TaxAlreadyWhere,
   SPREADSHEET_MIME_TYPES,
   TAX_INV_DIR_CATEGORY,
   TAX_KIND_INVOICE,
@@ -56,7 +58,7 @@ import {
   countFilesByKind,
   countRowsOfFiles,
   deleteUploadFiles,
-  existingApprovalNos,
+  existingApprovalFiles,
   findFileByHash,
   insertInvoices,
   insertUploadFile,
@@ -135,6 +137,7 @@ interface Prepared {
   rows: InvoiceStdRow[];
   newRows: InvoiceStdRow[];
   alreadyUploaded: number;
+  alreadyWhere: TaxAlreadyWhere[];
   excluded: InvoiceExcluded;
   warnings: TaxUploadWarning[];
   fileHash: string;
@@ -154,8 +157,14 @@ export async function prepareInvoiceUpload(client: ScopedClient, orgId: number, 
   const converted = convertInvoiceSheet(sheet.rows, map, dbOwn);
   if (!converted.ok) return fail(400, converted.error.code, converted.error.message);
 
-  const existing = await existingApprovalNos(client, orgId, converted.rows.map((r) => r.approvalNo));
+  const existing = await existingApprovalFiles(client, orgId, converted.rows.map((r) => r.approvalNo));
   const newRows = converted.rows.filter((r) => !existing.has(r.approvalNo));
+  const alreadyWhere = summarizeAlreadyWhere(
+    converted.rows.flatMap((r) => {
+      const fileName = existing.get(r.approvalNo);
+      return fileName === undefined ? [] : [{ date: r.writeDate, fileName }];
+    }),
+  );
   const fileHash = createHash('sha256').update(bytes).digest('hex');
   return {
     ok: true,
@@ -166,6 +175,7 @@ export async function prepareInvoiceUpload(client: ScopedClient, orgId: number, 
       rows: converted.rows,
       newRows,
       alreadyUploaded: converted.rows.length - newRows.length,
+      alreadyWhere,
       excluded: converted.excluded,
       warnings: converted.warnings,
       fileHash,
@@ -197,6 +207,7 @@ export async function previewUploadOp(
       sample: previewSample(d.rows),
       toInsert: d.newRows.length,
       alreadyUploaded: d.alreadyUploaded,
+      alreadyWhere: d.alreadyWhere,
       excluded: d.excluded,
       skipReasons: await skipReasonsFor(client, d.excluded),
       warnings: d.warnings,

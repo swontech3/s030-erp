@@ -24,7 +24,7 @@ const LIST: TaxUploadsResponse = { month: '2026-09', bizTypeName: null, cards: [
 const EXCLUDED = { nonGeneral: 0, noBizNo: 0, badAmount: 0, noApproval: 0, dupInFile: 0, otherClass: 0, badDate: 0 };
 const PREVIEW: TaxUploadPreview = {
   kind: 'INVOICE', fileName: 'a.xls', direction: 'S', sameFile: null, totalRows: 0, byMonth: [], sample: [],
-  toInsert: 0, alreadyUploaded: 0, excluded: EXCLUDED, skipReasons: [], warnings: [],
+  toInsert: 0, alreadyUploaded: 0, alreadyWhere: [], excluded: EXCLUDED, skipReasons: [], warnings: [],
 };
 const XLS = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0]);
 const XLS_TYPE = 'application/vnd.ms-excel';

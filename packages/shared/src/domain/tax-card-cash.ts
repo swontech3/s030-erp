@@ -323,21 +323,25 @@ export const cashDedupKey = (r: CashStdRow): string =>
 /**
  * 열쇠마다 파일 안 n개 · DB(`existing`) m개면 **뒤쪽** n−m개만 넣는다. 겹친 파일(1~96 뒤 1~120)은 겹친 줄을 건너뛰고,
  * 같은 날 같은 가게 같은 금액 두 번은 두 줄 그대로 남는다. `already` = 건너뛴 줄 수.
+ * `existing` 은 열쇠마다 DB 줄이 들어 있는 파일 이름(먼저 올린 줄부터) — 건너뛴 k번째 줄은 그 k번째 파일과 짝짓는다(`skipped`).
  */
 export function pickNewByCount<T>(
   rows: readonly T[],
   keyOf: (r: T) => string,
-  existing: ReadonlyMap<string, number>,
-): { newRows: T[]; already: number } {
+  existing: ReadonlyMap<string, readonly string[]>,
+): { newRows: T[]; already: number; skipped: { row: T; fileName: string }[] } {
   const used = new Map<string, number>();
   const newRows: T[] = [];
+  const skipped: { row: T; fileName: string }[] = [];
   for (const r of rows) {
     const k = keyOf(r);
     const n = used.get(k) ?? 0;
     used.set(k, n + 1);
-    if (n >= (existing.get(k) ?? 0)) newRows.push(r);
+    const fileName = existing.get(k)?.[n];
+    if (fileName === undefined) newRows.push(r);
+    else skipped.push({ row: r, fileName });
   }
-  return { newRows, already: rows.length - newRows.length };
+  return { newRows, already: skipped.length, skipped };
 }
 
 /** 사용일의 달별 줄 수 — 달 순서. */
