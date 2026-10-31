@@ -25,12 +25,7 @@ import { canPrintCorpChange } from '@swonbiz/shared/domain/corp-change';
 import { parsePrintInputs, parsePrintLogBody, pickDocFormSetting } from '@swonbiz/shared/domain/corp-change-print';
 import { incorpTaxSettingOf } from '@swonbiz/shared/domain/doc-form-setting';
 import { definitionTokens, migrateDefinition, type FormDefinition } from '@swonbiz/shared/domain/form-template';
-import {
-  INCORP_ENTITY_TYPE,
-  INCORP_METHOD,
-  INCORP_METHOD_CATEGORY,
-  INCORP_METHOD_USE_TP,
-} from '@swonbiz/shared/domain/incorporation';
+import { INCORP_METHOD_CATEGORY, INCORP_METHOD_USE_TP, incorpMethodOf } from '@swonbiz/shared/domain/incorporation';
 import {
   buildIncorpPrintDocuments,
   readIncorporationSnapshot,
@@ -39,7 +34,7 @@ import {
   type IncorpPrintPerson,
   type IncorporationPrintResponse,
 } from '@swonbiz/shared/domain/incorporation-print';
-import { personsForIncorpMark } from '@swonbiz/shared/domain/legal-form-mark';
+import { incorpMarkCompanyType, personsForIncorpMark } from '@swonbiz/shared/domain/legal-form-mark';
 import { decrypt } from '../lib/crypto.ts';
 import type { ScopedClient } from '../db/withCompanyScope.ts';
 import { listCodes } from '../db/lookups.ts';
@@ -121,14 +116,17 @@ export async function readIncorporationPrint(
     }
   }
 
+  // 설립 구분 — 회사 형태로 정한다(R → R_PROMOTER · A → U_P, 결정 2026-10-31). 서류 묶음도 형태로 가른다(shared)
+  const entity = snapshot.entityType;
+  const method = incorpMethodOf(entity);
   const documents = buildIncorpPrintDocuments(forms, {
     snapshot,
     persons,
-    // ★ 주식회사뿐이라 회사유형 줄(R)이 있으면 기본 줄 위에 덮는다(법인변경과 같은 고르기)
-    setting: pickDocFormSetting(settings, INCORP_METHOD, INCORP_ENTITY_TYPE),
-    // 세율 · 최소액 · 배수 · 수수료 — 발기설립 **기본 줄**의 taxes(2026-10-18, 090). 끈 줄 · 빈 값이면 세금 칸 빈칸
-    taxSetting: incorpTaxSettingOf(settings, INCORP_METHOD),
-    methodName: codes.find((c) => c.code === INCORP_METHOD)?.name ?? null,
+    // ★ 그 구분의 회사유형 줄(R · A)이 있으면 기본 줄 위에 덮는다(법인변경과 같은 고르기). 유한회사 줄이 없으면 설정 칸은 빈칸
+    setting: pickDocFormSetting(settings, method, entity),
+    // 세율 · 최소액 · 배수 · 수수료 — 그 구분 **기본 줄**의 taxes(2026-10-18, 090). 끈 줄 · 빈 값이면 세금 칸 빈칸
+    taxSetting: incorpTaxSettingOf(settings, method),
+    methodName: codes.find((c) => c.code === method)?.name ?? null,
     inputs: inputs.value,
   });
   return { ok: true, value: { id: row.id, status: row.status, documents } };
@@ -155,7 +153,10 @@ export async function recordIncorporationPrint(
   if (!snapshot) return NO_SNAPSHOT();
 
   const form = (await incorporationForms(client)).find((f) => f.id === input.formId);
-  if (!form) return fail(400, 'invalid_request', '이 건에 뜨는 서류가 아닙니다', 'formId');
+  // ★ 다른 회사 형태의 양식도 이 건에는 뜨지 않는다(결정 2026-10-31)
+  if (!form || form.mark.domain !== 'incorporation' || incorpMarkCompanyType(form.mark) !== snapshot.entityType) {
+    return fail(400, 'invalid_request', '이 건에 뜨는 서류가 아닙니다', 'formId');
+  }
 
   let personName: string | null = null;
   if (form.mark.domain === 'incorporation' && form.mark.unit !== 'case') {

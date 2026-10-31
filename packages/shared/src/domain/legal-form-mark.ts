@@ -23,10 +23,12 @@
  * =============================================================================
  * ★★ 법인설립 표시 (10-5, 2026-10-11) — `domain: 'incorporation'`
  * =============================================================================
- * 설립은 주식회사 · 발기설립 하나라 변경 구분 · 회사유형이 없다. 고르는 것은 출력 단위뿐이다:
+ * 설립에는 변경 구분이 없다. 고르는 것은 출력 단위와 회사 형태다:
  *   case     — 건마다 한 장(설립등기신청서 · 서면결의서 · 정관 등)
  *   officer  — 임원마다 한 장 — 이사 · 감사 · 대표이사 중 하나라도 체크된 사람(취임승낙서, 레거시 `splitRoles.officers`)
  *   founder  — 발기인마다 한 장(주식인수증)
+ *   companyType — 주식회사(R) · 유한회사(A)(결정 2026-10-31). **없으면 주식회사**다 — 그 전에 등록한 설립 양식은
+ *                 모두 주식회사 양식이라 정의를 고치지 않는다(`incorpMarkCompanyType`). 「전체」는 없다
  * 사람을 고르는 규칙은 `personsForIncorpMark` 한 곳이다.
  */
 import {
@@ -56,10 +58,17 @@ export type LegalMarkUnit = 'case' | 'officer';
 export const INCORP_MARK_UNITS = ['case', 'officer', 'founder'] as const;
 export type IncorpMarkUnit = (typeof INCORP_MARK_UNITS)[number];
 
-/** 법인설립 표시 — 단위 하나뿐이다(머리말 ★★). */
+/** 법인설립 표시 — 단위 · 회사 형태(머리말 ★★). */
 export interface IncorporationFormMark {
   domain: 'incorporation';
   unit: IncorpMarkUnit;
+  /** 주식회사 R · 유한회사 A. 없으면 주식회사(2026-10-31 전에 등록한 양식). */
+  companyType?: LegalFormCompanyType;
+}
+
+/** 법인설립 표시의 회사 형태 — 없으면 주식회사(R). */
+export function incorpMarkCompanyType(mark: IncorporationFormMark): LegalFormCompanyType {
+  return mark.companyType ?? 'R';
 }
 
 /** 법무 표시 — 업무(`domain`)로 모양이 갈린다. */
@@ -96,11 +105,14 @@ export function parseLegalMark(raw: unknown): { ok: true; value: LegalFormMark }
   const no = (message: string) => ({ ok: false as const, message });
   if (!isObj(raw)) return no('법무 표시가 객체가 아닙니다');
   if (raw.domain === 'incorporation') {
-    // ★ 단위만 본다 — 다른 키는 버린다(아는 칸만 담은 새 객체)
+    // ★ 단위 · 회사 형태만 본다 — 다른 키는 버린다(아는 칸만 담은 새 객체)
     if (!(INCORP_MARK_UNITS as readonly unknown[]).includes(raw.unit)) {
       return no('법인설립 표시의 출력 단위는 건마다 · 임원마다 · 발기인마다 중 하나입니다');
     }
-    return { ok: true, value: { domain: 'incorporation', unit: raw.unit as IncorpMarkUnit } };
+    const unit = raw.unit as IncorpMarkUnit;
+    if (raw.companyType === undefined) return { ok: true, value: { domain: 'incorporation', unit } };
+    if (!isLegalFormCompanyType(raw.companyType)) return no('법인설립 표시의 회사 형태는 주식회사 · 유한회사 중 하나입니다');
+    return { ok: true, value: { domain: 'incorporation', unit, companyType: raw.companyType } };
   }
   if (raw.domain !== 'corp-change') return no('법무 표시의 업무(domain)는 corp-change · incorporation 중 하나입니다');
 

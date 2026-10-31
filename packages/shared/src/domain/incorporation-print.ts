@@ -16,6 +16,11 @@
  *     「해당 사람 없음」 안내(`notice`)
  *
  * ★ 상호는 합친 상호(`composedName` — 순수 상호 + 주식회사 + 위치)다. 레거시는 「주식회사 ○○」로 앞 고정이었다.
+ *   유한회사는 입력값 그대로다(결정 2026-10-31).
+ * ★ 유한회사(결정 2026-10-31) — 정관(유한회사) 자리표시 3개(`contributionUnitAmount` · `articlesMemberTable` ·
+ *   `articlesMemberSignList`). 나머지는 기존 이름 그대로다(자본금 = `capitalAmount`). 사원 = 발기인 칸(`isFounder`),
+ *   출자좌수 = 인수 수 칸, 1좌의 금액 = 1주의 금액 칸.
+ * ★ 서류 묶음은 회사 형태로 가른다(`buildIncorpPrintDocuments`) — 양식 표시의 `companyType`, 없으면 주식회사 양식.
  * ★★ 주민번호는 이 함수에 **평문으로 들어와 출력값으로만 나간다** — 복호화 · no-store 는 API 몫(법인변경과 같다).
  *    목록 칸(이사 · 감사 · 발기인 …)에도 들어간다(레거시와 같다).
  * ★ 글자 모양(줄 앞 「- 」, 전각 공백 「　」 등)은 레거시 그대로다. 사람 여럿이 든 칸은 사람마다 줄을 잇는다
@@ -31,7 +36,13 @@ import {
   type EffectiveDocFormSetting,
   type PrintInputs,
 } from './corp-change-print.ts';
-import { personsForIncorpMark, type IncorpMarkUnit, type LegalFormMark } from './legal-form-mark.ts';
+import {
+  incorpMarkCompanyType,
+  personsForIncorpMark,
+  type IncorpMarkUnit,
+  type IncorporationFormMark,
+  type LegalFormMark,
+} from './legal-form-mark.ts';
 import { sidoOf } from './korea-sido.ts';
 import { INCORP_ENTITY_TYPE, closingTimeOf, isIncorpEntityType, isTimeOfDay } from './incorporation.ts';
 import { incorporationTax, metroSurchargeOf, type IncorpTaxSetting } from './incorporation-tax.ts';
@@ -97,6 +108,10 @@ export const INCORP_PRINT_FIELDS: readonly IncorpPrintField[] = [
   { name: 'reporterNameList', label: '검사인 직위와 성명(의사록)', source: 'case' },
   { name: 'reporterSignList', label: '검사인 기명날인(조사보고서)', source: 'case' },
   { name: 'articlesFounderList', label: '정관 발기인', source: 'case' },
+  // 유한회사 정관(결정 2026-10-31)
+  { name: 'contributionUnitAmount', label: '출자 1좌의 금액', source: 'case' },
+  { name: 'articlesMemberTable', label: '정관 사원별 출자좌수', source: 'case' },
+  { name: 'articlesMemberSignList', label: '정관 사원 서명란', source: 'case' },
   // 등기 설정
   { name: 'formLabel', label: '표시명', source: 'case' },
   { name: 'formNo', label: '양식호수', source: 'case' },
@@ -308,11 +323,11 @@ export interface IncorpPrintSource {
   snapshot: IncorporationSnapshot;
   /** 스냅샷 순서 그대로, 주민번호를 붙인 사람. */
   persons: readonly IncorpPrintPerson[];
-  /** 등기 설정(설립 · 발기설립 줄, `pickDocFormSetting`). null 이면 설정 칸은 빈칸. */
+  /** 등기 설정(설립 · 이 건의 설립 구분 줄, `pickDocFormSetting`). null 이면 설정 칸은 빈칸. */
   setting: EffectiveDocFormSetting | null;
   /** 설립 세금 설정(발기설립 기본 줄의 `taxes`, `readIncorpTaxSetting`). null 이면 세금 칸은 빈칸. */
   taxSetting: IncorpTaxSetting | null;
-  /** 설립 구분의 코드 이름(`LAW_EST_TP` R_PROMOTER) — 등기의 목적 설정이 비었을 때 쓴다. */
+  /** 설립 구분의 코드 이름(`LAW_EST_TP` R_PROMOTER · U_P) — 등기의 목적 설정이 비었을 때 쓴다. */
   methodName: string | null;
   inputs: PrintInputs;
 }
@@ -413,6 +428,13 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
     // 정관 말미 — 레거시 `ArticlesDoc`
     articlesFounderList: lines(founders.flatMap((p) => [`발기인　성명 : ${p.name} (${rrnOf(p)})　(인)`, `주소 : ${formatIncorpAddress(p)}`])),
 
+    // 유한회사 정관(결정 2026-10-31) — 사원 = 발기인 칸. 제5조 1좌의 금액 · 제6조 사원별 출자좌수 · 말미 서명란
+    contributionUnitAmount: count(info.parValue),
+    articlesMemberTable: lines(
+      founders.map((p) => `${p.name}　출자 ${formatAmount(p.unitsSubscribed || 0)}좌(금 ${formatAmount((info.parValue ?? 0) * (p.unitsSubscribed || 0))}원)`),
+    ),
+    articlesMemberSignList: lines(founders.flatMap((p) => [`사원　성명 : ${p.name} (${rrnOf(p)})　(인)`, `주소 : ${formatIncorpAddress(p)}`])),
+
     // 등기 설정 — 법인변경과 같은 규칙(결정 1 (가))
     formLabel: setting?.label ?? '',
     formNo: setting?.formNo ?? '',
@@ -492,16 +514,19 @@ const REPORTER_FIELDS = ['reporterList', 'reporterNameList', 'reporterSignList']
 const UNIT_ORDER: Record<IncorpMarkUnit, number> = { case: 0, officer: 1, founder: 2 };
 
 /**
- * 이 건에 뜨는 서류들 — 법인설립 표시가 붙은 양식만. 순서: 건마다 → 임원마다 → 발기인마다, 같은 단위 안에서는
- * 양식 이름 순.
+ * 이 건에 뜨는 서류들 — 법인설립 표시가 붙은 양식 중 **이 건의 회사 형태** 양식만(결정 2026-10-31,
+ * `incorpMarkCompanyType` — 표시에 형태가 없으면 주식회사 양식). 순서: 건마다 → 임원마다 → 발기인마다, 같은 단위
+ * 안에서는 양식 이름 순.
  * ★ 「해당 사람 없음」 안내는 양식이 조사보고인 칸(`REPORTER_FIELDS`)을 쓰는데 보고인이 없을 때만 붙는다.
  */
 export function buildIncorpPrintDocuments<D>(
   forms: readonly IncorpMarkedForm<D>[],
   src: IncorpPrintSource,
 ): IncorpPrintDocument<D>[] {
+  const entity = src.snapshot.entityType;
   const picked = forms
-    .filter((f): f is IncorpMarkedForm<D> & { mark: { domain: 'incorporation'; unit: IncorpMarkUnit } } => f.mark.domain === 'incorporation')
+    .filter((f): f is IncorpMarkedForm<D> & { mark: IncorporationFormMark } => f.mark.domain === 'incorporation')
+    .filter((f) => incorpMarkCompanyType(f.mark) === entity)
     .sort((a, b) => UNIT_ORDER[a.mark.unit] - UNIT_ORDER[b.mark.unit] || a.name.localeCompare(b.name, 'ko'));
   const noReporter = investigationReporters(src.persons).length === 0;
   return picked.map((f) => ({
