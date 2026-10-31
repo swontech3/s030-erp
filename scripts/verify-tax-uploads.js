@@ -105,10 +105,15 @@ function makeCardXls(header, { rows, tag }) {
   return new Uint8Array(XLSX.write(wb, { type: 'buffer', bookType: 'xls' }));
 }
 
-/** 지어낸 현금 경비 표준 양식(xlsx) — 1줄 안내 · 2줄 제목 줄. rows: [날짜, 품명, 거래처, 항목, 매출액, 매입액, 지급방법, 증빙]. */
+/**
+ * 지어낸 현금 경비 표준 양식(xlsx) — 1줄 제목 줄(210). rows: [날짜, 구분, 품명, 거래처, 항목, 금액, 결제방법, 증빙].
+ * 날짜가 숫자면 엑셀 날짜 값(일련값)으로 넣고 날짜 서식을 건다 — 사용자가 양식의 날짜 칸에 적은 것과 같다.
+ */
 function makeCashXlsx(header, rows) {
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  rows.forEach((r, i) => { if (typeof r[0] === 'number') ws[XLSX.utils.encode_cell({ r: i + 1, c: 0 })].z = 'yyyy-mm-dd'; });
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['지어낸 안내'], header, ...rows]), '현금 경비');
+  XLSX.utils.book_append_sheet(wb, ws, '현금 경비');
   return new Uint8Array(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }
 
@@ -360,33 +365,35 @@ async function main() {
         VALUES ($1, 'C', 'M', '[]'::jsonb, '{}')`, [ORG_A]);
       const cashMap = await loadImportMap(c, 'CASH');
       if (!cashMap) throw new Error('대응표 TAX_CASH_STD 가 없다 — 209 를 먼저');
+      // ★ 210 — 1줄 제목 · 구분 + 금액. 첫 줄 날짜는 엑셀 날짜 값(46278 = 2026-09-13) — 하루 밀리지 않는지(readSheet UTC)
       const cashRows1 = [
-        ['2026-09-13', '지어낸 점심', '지어낸 식당', '식대·회의비', '', 15000, '현금', '영수증'],
-        ['2026-09-14', '지어낸 판매', '지어낸 손님', '식대·회의비', 30000, '', '계좌이체(직원 정산)', ''],
-        ['2026-09-15', '지어낸 간식', '', '복리후생비', '', 4000, '대표 개인 돈', ''],
-        ['2026-09-16', '지어낸 문구', '', '', '', 2000, '현금', '카드전표'],
-        ['2026-09-17', '지어낸 택시', '', '', '', 9000, '', ''],
-        ['2026-09-18', '지어낸 둘다', '', '', 100, 100, '현금', ''],
+        [46278, '매입', '지어낸 점심', '지어낸 식당', '식대·회의비', 15000, '현금', '영수증'],
+        ['2026-09-14 15:20', '매출', '지어낸 판매', '지어낸 손님', '식대·회의비', 30000, '계좌이체', ''],
+        ['2026-09-15', '매입', '지어낸 간식', '', '복리후생비', 4000, '대표 개인 돈', ''],
+        ['2026-09-16', '매입', '지어낸 문구', '', '', 2000, '현금', '카드전표'],
+        ['2026-09-17', '매입', '지어낸 택시', '', '', 9000, '', ''],
+        ['2026-09-18', '환불', '지어낸 구분 틀림', '', '', 100, '현금', ''],
       ];
       const x1 = makeCashXlsx(cashMap.headerSignature, cashRows1);
       const xpv = await previewUploadOp(c, ORG_A, 'CASH', 'x1.xlsx', x1);
-      check('X1', '★ 현금 미리보기 — 넣을 4줄(매출 1 포함) · 뺀 줄(지급방법 · 둘 다) · 항목 모름 · 증빙 모름 · 매출 항목 무시 경고 · 뺀 줄 이름은 현금 키만',
+      check('X1', '★ 현금 미리보기 — 넣을 4줄(매출 1 포함) · 뺀 줄(결제방법 · 구분) · 항목 모름 · 증빙 모름 · 매출 항목 무시 경고 · 뺀 줄 이름은 현금 키만',
         xpv.ok && xpv.data.kind === 'CASH' && xpv.data.direction === null && xpv.data.toInsert === 4 &&
-        xpv.data.excluded.badPayMethod === 1 && xpv.data.excluded.bothAmounts === 1 &&
-        xpv.data.skipReasons.map((x) => x.code).join() === 'badAmount,badDate,noDescription,noAmount,bothAmounts,badPayMethod' &&
+        xpv.data.excluded.badPayMethod === 1 && xpv.data.excluded.badDirection === 1 &&
+        xpv.data.skipReasons.map((x) => x.code).join() === 'badAmount,badDate,noDescription,noAmount,badPayMethod,badDirection' &&
         xpv.data.warnings.map((w) => w.code).sort().join() === 'cash_item_unknown,cash_proof_unknown,cash_sales_item_ignored',
         xpv.ok ? { toInsert: xpv.data.toInsert, excluded: xpv.data.excluded, warnings: xpv.data.warnings.map((w) => w.code) } : xpv);
       const vCount = (await vendorsOf(ORG_A)).length;
       const xup = await uploadOp(c, ORG_A, 'CASH', 'x1.xlsx', x1, ACTOR);
-      const cashStored = (await c.query(`SELECT description, direction, item_code, classified_by, classified_at IS NOT NULL AS at, pay_method, proof
+      const cashStored = (await c.query(`SELECT use_date::text AS d, description, direction, item_code, classified_by, classified_at IS NOT NULL AS at, pay_method, proof
         FROM public.tb_s050_cash_txns WHERE org_id = $1 ORDER BY use_date`, [ORG_A])).rows;
-      check('X2', '★ 현금 올리기 — 4줄 · 파일에 적은 항목은 바로 지정 건(올린 사람 · 때) · 매출 줄은 항목 없음 · 거래처 표는 그대로',
+      check('X2', '★ 현금 올리기 — 4줄 · 엑셀 날짜 값 · 시각 붙은 날짜는 그 날 · 파일에 적은 항목은 바로 지정 건(올린 사람 · 때) · 매출 줄은 항목 없음 · 거래처 표는 그대로',
         xup.ok && xup.data.insertedCount === 4 && xup.data.vendorsCreated === 0 && (await vendorsOf(ORG_A)).length === vCount &&
+        cashStored[0]?.d === '2026-09-13' && cashStored[1]?.d === '2026-09-14' &&
         cashStored[0]?.item_code === 'MEAL' && cashStored[0].classified_by === ACTOR && cashStored[0].at && cashStored[0].proof === 'RECEIPT' &&
         cashStored[1]?.direction === 'S' && cashStored[1].item_code === null && cashStored[1].pay_method === 'TRANSFER' &&
         cashStored[2]?.item_code === null && cashStored[3]?.proof === null,
         cashStored);
-      const x2 = makeCashXlsx(cashMap.headerSignature, [...cashRows1, ['2026-09-19', '지어낸 우표', '', '', '', 500, '현금', '없음']]);
+      const x2 = makeCashXlsx(cashMap.headerSignature, [...cashRows1, ['2026-09-19', '매입', '지어낸 우표', '', '', 500, '현금', '없음']]);
       const xpv2 = await previewUploadOp(c, ORG_A, 'CASH', 'x2.xlsx', x2);
       check('X3', '★ 현금 개수 맞추기 — 고친 파일을 다시 올리면 이미 올린 4줄은 건너뛰고 새 1줄만',
         xpv2.ok && xpv2.data.toInsert === 1 && xpv2.data.alreadyUploaded === 4, xpv2.ok ? [xpv2.data.toInsert, xpv2.data.alreadyUploaded] : xpv2);
@@ -399,12 +406,16 @@ async function main() {
 
       const tpl = await cashTemplateOp(c, ORG_A);
       const twb = tpl.ok ? XLSX.read(tpl.data.bytes, { type: 'array' }) : null;
-      const head = twb ? XLSX.utils.sheet_to_json(twb.Sheets['현금 경비'], { header: 1, defval: '' })[1] : null;
+      const head = twb ? XLSX.utils.sheet_to_json(twb.Sheets['현금 경비'], { header: 1, defval: '' })[0] : null;
       const itemsAoa = twb ? XLSX.utils.sheet_to_json(twb.Sheets['항목 목록'], { header: 1 }) : [];
-      check('X5', '★ 양식 내려받기 — 파일 이름 · 시트 넷 · 2줄 제목 줄 = 대응표 그대로 · 항목 목록 = 그 회사(법인) 17개',
-        tpl.ok && tpl.data.fileName === '현금경비_양식.xlsx' && twb.SheetNames.length === 4 &&
-        JSON.stringify(head) === JSON.stringify(cashMap.headerSignature) && itemsAoa.length === 1 + 17,
-        { name: tpl.ok ? tpl.data.fileName : tpl, sheets: twb?.SheetNames, items: itemsAoa.length });
+      const listOf = (name) => (twb?.Sheets[name] ? XLSX.utils.sheet_to_json(twb.Sheets[name], { header: 1 }).flat() : []);
+      check('X5', '★ 양식 내려받기 — 파일 이름 · 시트 여섯(현금 경비 · 안내 · 구분 · 항목 · 결제방법 · 증빙 목록) · 1줄 제목 줄 = 대응표 그대로 · ' +
+        '항목 목록 = 그 회사(법인) 17개 · 구분 = 매입 · 매출 · 결제방법 = 코드 표 이름(계좌이체)',
+        tpl.ok && tpl.data.fileName === '현금경비_양식.xlsx' &&
+        twb.SheetNames.join() === '현금 경비,안내,구분 목록,항목 목록,결제방법 목록,증빙 목록' &&
+        JSON.stringify(head) === JSON.stringify(cashMap.headerSignature) && itemsAoa.length === 1 + 17 &&
+        listOf('구분 목록').join() === '구분,매입,매출' && listOf('결제방법 목록').join() === '결제방법,현금,계좌이체,대표 개인 돈',
+        { name: tpl.ok ? tpl.data.fileName : tpl, sheets: twb?.SheetNames, items: itemsAoa.length, dirs: listOf('구분 목록'), pays: listOf('결제방법 목록') });
 
       const delCardV = await deleteVendorsOp(c, ORG_A, [newV[0].id]);
       check('X6', '★ 카드 줄이 있는 거래처는 지울 수 없다(409)', !delCardV.ok && delCardV.status === 409, delCardV);

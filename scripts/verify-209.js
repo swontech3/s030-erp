@@ -28,20 +28,27 @@ const readEnv = (file) =>
 
 const apiEnv = readEnv(process.argv[3] || 'packages/api/.env');
 
-/** 승인된 새 분류 — [분류, 이름, [[코드값, 이름], …(순서대로)]]. */
+/**
+ * 승인된 새 분류 — [분류, 이름, [[코드값, 이름], …(순서대로)]].
+ * ★ 210(2026-10-31)이 TAX_PAY_METHOD 이름 「지급방법」→「결제방법」 · TRANSFER 「계좌이체(직원 정산)」→「계좌이체」로 고쳤다 — 210 뒤 값
+ */
 const NEW_CATS = [
-  ['TAX_PAY_METHOD', '지급방법', [['CASH', '현금'], ['TRANSFER', '계좌이체(직원 정산)'], ['OWNER', '대표 개인 돈']]],
+  ['TAX_PAY_METHOD', '결제방법', [['CASH', '현금'], ['TRANSFER', '계좌이체'], ['OWNER', '대표 개인 돈']]],
   ['TAX_PROOF', '증빙', [['RECEIPT', '영수증'], ['SIMPLE', '간이영수증'], ['CASHRCPT', '현금영수증'], ['PCARD', '개인카드 영수증'], ['NONE', '없음']]],
   ['TAX_CARD_DEDUCT', '카드 공제 여부', [['Y', '공제'], ['N', '불공제']]],
 ];
-/** 205 의 7개(그대로) + 209 가 더한 5개 — 순서까지. ★ 공제 여부를 모르는 줄은 빼지 않고 경고한다(대표 2026-10-30). */
+/**
+ * 205 의 7개(그대로) + 209 가 더한 것 — 순서까지. ★ 공제 여부를 모르는 줄은 빼지 않고 경고한다(대표 2026-10-30).
+ * ★ 210(2026-10-31)이 bothAmounts 를 지우고 badDirection 을 더했으며 noAmount · badPayMethod 이름을 고쳤다 — 210 뒤 값
+ *   (자세한 것은 verify-210 C4 · C5)
+ */
 const SKIP_OLD = ['nonGeneral', 'noBizNo', 'badAmount', 'noApproval', 'dupInFile', 'otherClass', 'badDate'];
 const SKIP_NEW = [
   ['noCardNo', '카드번호 없음'],
   ['noDescription', '품명 없음'],
-  ['noAmount', '매출액 · 매입액이 모두 빔'],
-  ['bothAmounts', '매출액 · 매입액을 모두 적음'],
-  ['badPayMethod', '지급방법이 비었거나 목록에 없음'],
+  ['noAmount', '금액이 빔'],
+  ['badPayMethod', '결제방법이 비었거나 목록에 없음'],
+  ['badDirection', '구분이 비었거나 목록에 없음'],
 ];
 const KIND_DESC = {
   CARD: '홈택스 사업용 신용카드 사용내역 엑셀 그대로 올립니다',
@@ -52,7 +59,8 @@ const CARD_MAP = 'HOMETAX_BIZ_CARD';
 const CASH_MAP = 'TAX_CASH_STD';
 const CARD_SIG = ['승인일자', '카드사', '카드번호', '가맹점사업자번호', '가맹점명', '공급가액', '세액', '비과세', '합계',
   '가맹점유형', '업태', '업종', '공제여부결정', '비고'];
-const CASH_SIG = ['날짜', '품명', '거래처', '항목', '매출액', '매입액', '지급방법', '증빙'];
+/** ★ 210(2026-10-31)이 현금 양식을 1줄 제목 · 구분 + 금액 한 칸으로 바꿨다 — 210 뒤 값(verify-210 M1 · M2 와 같다). */
+const CASH_SIG = ['날짜', '구분', '품명', '거래처', '항목', '금액', '결제방법', '증빙'];
 /** [대응표 칸 경로, 칸 번호(1부터), 제목 줄의 그 칸 이름]. */
 const CARD_COLUMNS = [
   ['useDate', 1, '승인일자'], ['cardNo', 3, '카드번호'], ['merchantBizNo', 4, '가맹점사업자번호'], ['merchantName', 5, '가맹점명'],
@@ -60,8 +68,8 @@ const CARD_COLUMNS = [
   ['vatDeduct.col', 13, '공제여부결정'], ['deductNote', 14, '비고'],
 ];
 const CASH_COLUMNS = [
-  ['useDate', 1, '날짜'], ['description', 2, '품명'], ['vendorName', 3, '거래처'], ['item', 4, '항목'],
-  ['salesAmount', 5, '매출액'], ['purchaseAmount', 6, '매입액'], ['payMethod', 7, '지급방법'], ['proof', 8, '증빙'],
+  ['useDate', 1, '날짜'], ['direction', 2, '구분'], ['description', 3, '품명'], ['vendorName', 4, '거래처'],
+  ['item', 5, '항목'], ['amount', 6, '금액'], ['payMethod', 7, '결제방법'], ['proof', 8, '증빙'],
 ];
 const at = (obj, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
 
@@ -87,11 +95,11 @@ async function codeChecks(q) {
   const skip = await q(`SELECT code, name, use_tp, sort_order, is_active FROM public.tb_s080_codes_line
     WHERE build_id = '1' AND category = 'TAX_SKIP_REASON' ORDER BY sort_order, code`);
   const wantSkip = [...SKIP_OLD, ...SKIP_NEW.map(([c]) => c)];
-  check(`C${n++}`, `TAX_SKIP_REASON — 205 의 7개 그대로 + 새 5개(순서 8~12)`,
+  check(`C${n++}`, `TAX_SKIP_REASON — 205 의 7개 그대로 + 카드 · 현금 5개(순서 8~12, 210 뒤)`,
     skip.map((l) => l.code).join(',') === wantSkip.join(',') && skip.every((l, i) => l.sort_order === i + 1 && l.use_tp === '000' && l.is_active),
     skip.map((l) => `${l.sort_order}.${l.code}`).join(' '));
   const newNames = SKIP_NEW.filter(([c, nm]) => skip.find((l) => l.code === c)?.name !== nm);
-  check(`C${n++}`, 'TAX_SKIP_REASON 새 5개의 이름이 승인 표 그대로', newNames.length === 0,
+  check(`C${n++}`, 'TAX_SKIP_REASON 카드 · 현금 5개의 이름이 승인 표 그대로(210 뒤)', newNames.length === 0,
     newNames.map(([c, nm]) => `${c}: 바람 ${nm} / 실제 ${skip.find((l) => l.code === c)?.name}`).join(' · '));
   const badDate = skip.find((l) => l.code === 'badDate')?.name;
   check(`C${n++}`, 'TAX_SKIP_REASON badDate 이름 — 「날짜가 맞지 않음」(카드 · 현금도 쓴다)', badDate === '날짜가 맞지 않음', String(badDate));
@@ -112,7 +120,7 @@ async function mapChecks(q, { deductCodes }) {
 
   const plan = [
     ['M2', CARD_MAP, 'CARD', '홈택스 사업용 신용카드 사용내역', 2, CARD_SIG, CARD_COLUMNS],
-    ['M3', CASH_MAP, 'CASH', '현금 경비 표준 양식', 2, CASH_SIG, CASH_COLUMNS],
+    ['M3', CASH_MAP, 'CASH', '현금 경비 표준 양식', 1, CASH_SIG, CASH_COLUMNS],
   ];
   for (const [id, mapId, kind, name, headerRow, sig, want] of plan) {
     const m = rows.find((r) => r.id === mapId);

@@ -19,6 +19,19 @@ interface Rows<T> {
 const q = <T>(client: ScopedClient, sql: string, params?: unknown[]): Promise<Rows<T>> =>
   client.query(sql, params) as Promise<Rows<T>>;
 
+/**
+ * 코드 분류 이름(`tb_s080_code_masters.name`) — 엑셀 칸 이름을 글자로 박지 않고 코드 표에서 읽는다(1-4 보완).
+ * ★ `listCodes` 처럼 건물(`build_id`)로 거르지 않는다(건물이 하나뿐).
+ */
+export async function listCategoryNames(client: ScopedClient, categories: readonly string[]): Promise<Map<string, string>> {
+  const { rows } = await q<{ category: string; name: string }>(
+    client,
+    `SELECT category, name FROM public.tb_s080_code_masters WHERE category = ANY($1::text[])`,
+    [categories],
+  );
+  return new Map(rows.map((r) => [r.category, r.name]));
+}
+
 /** 자료 종류 → 표. ★ 식별자라 파라미터로 묶을 수 없어 이 상수에서만 고른다. */
 const TABLE_OF: Readonly<Record<ClassifyRowKind, string>> = {
   INVOICE: 'tb_s050_invoices',

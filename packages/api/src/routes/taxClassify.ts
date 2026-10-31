@@ -57,6 +57,7 @@ import {
   countClassify,
   countInvoicesByDirection,
   findUploadFileById,
+  listCategoryNames,
   lastItemsOfCashVendors,
   lastItemsOfVendors,
   listClassifyCards,
@@ -250,7 +251,10 @@ export function cardExportSheet(
   };
 }
 
-/** 현금 경비 시트(1-4) — 날짜 · 품명 · 거래처 · 구분 · 금액 · 지급방법 · 증빙 · 항목(매출은 구분 이름). */
+/**
+ * 현금 경비 시트(1-4) — 날짜 · 품명 · 거래처 · 구분 · 금액 · 결제방법 · 증빙 · 항목(매출은 구분 이름).
+ * ★ 결제방법 · 증빙 칸 이름은 코드 분류(TAX_PAY_METHOD · TAX_PROOF) 이름 — 글자로 박지 않는다(1-4 보완).
+ */
 export function cashExportSheet(
   rows: readonly TaxClassifyRow[],
   names: {
@@ -259,6 +263,10 @@ export function cashExportSheet(
     invDirs: readonly TaxCodeName[];
     payMethods: readonly TaxCodeName[];
     proofs: readonly TaxCodeName[];
+    /** 코드 분류 TAX_PAY_METHOD 이름. */
+    payMethodHeader: string;
+    /** 코드 분류 TAX_PROOF 이름. */
+    proofHeader: string;
   },
 ): XlsxSheet<TaxClassifyRow> {
   return {
@@ -269,8 +277,8 @@ export function cashExportSheet(
       { header: '거래처', value: (r) => r.vendorName },
       { header: '구분', value: (r) => nameOf(names.invDirs, r.direction) },
       { header: '금액', value: (r) => r.totalAmount },
-      { header: '지급방법', value: (r) => (r.payMethod ? nameOf(names.payMethods, r.payMethod) : null) },
-      { header: '증빙', value: (r) => (r.proof ? nameOf(names.proofs, r.proof) : null) },
+      { header: names.payMethodHeader, value: (r) => (r.payMethod ? nameOf(names.payMethods, r.payMethod) : null) },
+      { header: names.proofHeader, value: (r) => (r.proof ? nameOf(names.proofs, r.proof) : null) },
       {
         header: '항목',
         value: (r) => (r.direction === TAX_INV_DIR_PURCHASE ? itemOrNeed(names.itemNames, r.itemCode) : nameOf(names.invDirs, r.direction)),
@@ -308,9 +316,12 @@ export async function exportClassifyOp(
     sheets.push(cardExportSheet(of('CARD'), { kindName: kindName('CARD'), itemNames, deducts: codes.get(TAX_CARD_DEDUCT_CATEGORY) ?? [] }));
   }
   if (k === 'all' || k === 'CASH') {
+    const heads = await listCategoryNames(client, [TAX_PAY_METHOD_CATEGORY, TAX_PROOF_CATEGORY]);
     sheets.push(cashExportSheet(of('CASH'), {
       kindName: kindName('CASH'), itemNames, invDirs,
       payMethods: codes.get(TAX_PAY_METHOD_CATEGORY) ?? [], proofs: codes.get(TAX_PROOF_CATEGORY) ?? [],
+      payMethodHeader: heads.get(TAX_PAY_METHOD_CATEGORY) ?? TAX_PAY_METHOD_CATEGORY,
+      proofHeader: heads.get(TAX_PROOF_CATEGORY) ?? TAX_PROOF_CATEGORY,
     }));
   }
   if (sheets.length === 0) {

@@ -336,11 +336,14 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     source: 'packages/shared/src/domain/tax-uploads.ts (InvoiceExcluded)',
     label: '세무 뺀 줄 종류',
   },
-  /** 카드 · 현금 뺀 줄 종류(209) — 위와 같은 이유. 날짜 · 금액은 205 의 badDate · badAmount 를 함께 쓴다. */
+  /**
+   * 카드 · 현금 뺀 줄 종류(209) — 위와 같은 이유. 날짜 · 금액은 205 의 badDate · badAmount 를 함께 쓴다.
+   * 210(2026-10-31): 현금 양식이 구분 + 금액 한 칸이 되어 bothAmounts 를 빼고 badDirection 을 더했다.
+   */
   {
     category: 'TAX_SKIP_REASON',
     useTp: '000',
-    codes: ['noCardNo', 'noDescription', 'noAmount', 'bothAmounts', 'badPayMethod'],
+    codes: ['noCardNo', 'noDescription', 'noAmount', 'badPayMethod', 'badDirection'],
     source: 'packages/shared/src/domain/tax-card-cash.ts (CardExcluded · CashExcluded)',
     label: '세무 카드 · 현금 뺀 줄 종류',
   },
@@ -352,13 +355,13 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     source: 'supabase/migrations/208_tax_card_cash.sql (ck_s050_card_txns_vat_deduct) · 209 (HOMETAX_BIZ_CARD.vatDeduct)',
     label: '세무 카드 공제 여부',
   },
-  /** 계좌이체(직원 정산) — 은행 짝 맞추기가 직원 정산 줄을 이 값으로 찾는다(대표 결정 2026-10-30). */
+  /** 계좌이체(직원 정산) — 은행 짝 맞추기가 직원 정산 줄을 이 값으로 찾는다(대표 결정 2026-10-30). 이름은 210 부터 「계좌이체」. */
   {
     category: 'TAX_PAY_METHOD',
     useTp: '000',
     codes: ['TRANSFER'],
     source: 'packages/shared/src/domain/tax-card-cash.ts (TAX_PAY_METHOD_TRANSFER)',
-    label: '세무 지급방법 직원 정산',
+    label: '세무 결제방법 직원 정산',
   },
 ] as const;
 

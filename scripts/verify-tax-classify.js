@@ -266,6 +266,14 @@ async function main() {
         wb3 && JSON.stringify(wb3.SheetNames) === JSON.stringify([kindName('CARD')]),
         { all: wb2?.SheetNames, card: wb3?.SheetNames, cardRows: cardAoa.length });
 
+      // 1-4 보완 — 현금 시트의 결제방법 · 증빙 칸 이름은 코드 분류 이름(글자로 박지 않는다)
+      const catName = async (cat) => (await c.query(`SELECT name FROM public.tb_s080_code_masters WHERE category = $1`, [cat])).rows[0]?.name;
+      const [payName, proofName] = [await catName('TAX_PAY_METHOD'), await catName('TAX_PROOF')];
+      const cashHead = wb2 ? XLSX.utils.sheet_to_json(wb2.Sheets[kindName('CASH')], { header: 1 })[0] : [];
+      check('K25', '★ 엑셀 현금 시트 — 결제방법 · 증빙 칸 이름 = 코드 분류 TAX_PAY_METHOD · TAX_PROOF 이름',
+        !!payName && !!proofName && cashHead?.[5] === payName && cashHead?.[6] === proofName,
+        { payName, proofName, cashHead });
+
       await applyCompanyScope(c, tenant(ORG_B));
       const bList2 = await listClassifyOp(c, ORG_B, query({ view: 'all' }));
       const bCard = await confirmClassifyOp(c, ORG_B, [{ kind: 'CARD', id: 'vcc-c2', itemCode: 'RENT' }], ACTOR);

@@ -2,7 +2,7 @@
  * 세무 자료 올리기(s050200010) — 카드 사용 내역 · 현금 경비 (1-4, 2026-10-30). 라우트는 `taxUploads.ts` 가 종류로 나눠 부른다.
  *
  *   카드  홈택스 사업용 신용카드 사용내역(대응표 HOMETAX_BIZ_CARD) → 카드 줄 표(208)
- *   현금  세무 표준 양식(대응표 TAX_CASH_STD) → 현금 줄 표(208). 양식은 `cashTemplateOp` 가 내려준다
+ *   현금  세무 표준 양식(대응표 TAX_CASH_STD — 210 부터 1줄 제목 · 구분 + 금액 한 칸) → 현금 줄 표(208). 양식은 `cashTemplateOp` 가 내려준다
  *
  * ★★★ 운영사 세션도 **자기 단체만** — 모든 조회 · 저장에 `org_id = 세션 단체 ID` 를 직접 건다(`db/taxCardCash.ts` · `db/taxUploads.ts`).
  * ★★ 카드번호는 끝 4자리만 — 변환(shared `convertCardSheet`)이 전체 번호를 버린 뒤의 줄만 여기로 온다. 로그에도 남기지 않는다.
@@ -12,6 +12,7 @@
  *   현금 거래처는 거래처 표에 넣지 않는다(글로만).
  */
 import { createHash } from 'node:crypto';
+import * as XLSX from 'xlsx';
 import { formatBizNumber } from '@swonbiz/shared/domain/tax-number';
 import {
   CASH_TEMPLATE_FILE_NAME,
@@ -36,6 +37,7 @@ import {
 } from '@swonbiz/shared/domain/tax-card-cash';
 import type { TaxItemOption } from '@swonbiz/shared/domain/tax-classify';
 import {
+  TAX_INV_DIR_CATEGORY,
   TAX_VENDOR_GENERAL,
   type TaxCodeName,
   type TaxUploadFileView,
@@ -53,7 +55,6 @@ import {
   lockOrgUploads,
 } from '../db/taxUploads.ts';
 import { cardKeyCounts, cashKeyCounts, insertCardRows, insertCashRows, registeredCardLast4 } from '../db/taxCardCash.ts';
-import { buildXlsx, type XlsxSheet } from '../lib/xlsxExport.ts';
 import { readSheetRows } from '../tax/readSheet.ts';
 import { loadItems } from './taxClassify.ts';
 import { loadCodeNames, skipReasonsFor, type TaxOp, type TaxOpFail } from './taxUploads.ts';
@@ -100,11 +101,16 @@ async function prepareCard(client: ScopedClient, orgId: number, bytes: Uint8Arra
   };
 }
 
-/** 현금 이름 → 코드값에 쓰는 목록 — 항목은 그 회사 사업자 유형 파티션(세무 설정 전이면 빈 목록). */
+/** 현금 이름 → 코드값에 쓰는 목록 — 구분(TAX_INV_DIR) · 항목은 그 회사 사업자 유형 파티션(세무 설정 전이면 빈 목록). */
 async function cashNames(client: ScopedClient, orgId: number): Promise<CashCodeNames & { items: TaxItemOption[] }> {
   const { items } = await loadItems(client, orgId);
-  const codes = await loadCodeNames(client, [TAX_PAY_METHOD_CATEGORY, TAX_PROOF_CATEGORY]);
-  return { items, payMethods: codes.get(TAX_PAY_METHOD_CATEGORY) ?? [], proofs: codes.get(TAX_PROOF_CATEGORY) ?? [] };
+  const codes = await loadCodeNames(client, [TAX_INV_DIR_CATEGORY, TAX_PAY_METHOD_CATEGORY, TAX_PROOF_CATEGORY]);
+  return {
+    directions: codes.get(TAX_INV_DIR_CATEGORY) ?? [],
+    items,
+    payMethods: codes.get(TAX_PAY_METHOD_CATEGORY) ?? [],
+    proofs: codes.get(TAX_PROOF_CATEGORY) ?? [],
+  };
 }
 
 async function prepareCash(client: ScopedClient, orgId: number, bytes: Uint8Array): Promise<TaxOp<CashPrepared>> {
@@ -239,39 +245,53 @@ export async function uploadCardCashOp(
   };
 }
 
-/* ── 현금 경비 양식 내려받기(판단 14 · 15) ─────────────────────────────────── */
+/* ── 현금 경비 양식 내려받기(판단 14 · 15 · 210) ──────────────────────────── */
+
+/** 양식에서 날짜 · 금액 서식을 걸어 두는 자료 줄 수(2~1,001줄). 그 아래도 적을 수 있다 — 서식만 없다. */
+export const CASH_TEMPLATE_DATA_ROWS = 1000;
+const DATE_FORMAT = 'yyyy-mm-dd';
+const AMOUNT_FORMAT = '#,##0';
 
 /**
- * 현금 경비 표준 양식 시트 넷 — 드롭다운 없이 목록 시트만(공통 부품 `xlsxExport` 는 그대로 쓴다).
- *   「현금 경비」 1줄 안내 문구 · 2줄 제목 줄(대응표 TAX_CASH_STD 그대로) · 자료 줄 없음
- *   「항목 목록」(그 회사 출금 항목 · 풀이) · 「지급방법 목록」 · 「증빙 목록」 — 코드 표 이름 그대로
+ * 현금 경비 표준 양식 파일 — SheetJS 로 직접 만든다(칸 서식 때문 — 공통 부품 `xlsxExport` 는 칸 서식을 다루지 않아 그대로 둔다).
+ * ★ 드롭다운(데이터 유효성 검사)은 없다 — SheetJS 무료판은 쓸 수 없고 ExcelJS 는 라이선스 문제로 미뤘다(2026-10-31). 목록 시트만.
+ *   「현금 경비」(첫 시트 — 올리기는 첫 시트를 읽는다) 1줄 제목 줄(대응표 TAX_CASH_STD 그대로) · 자료 줄 없음 ·
+ *               자료 줄 2~1,001줄의 날짜 칸 날짜 서식 · 금액 칸 「#,##0」(빈 칸에 서식만)
+ *   「안내」     안내 문구 한 줄씩
+ *   「구분 목록」 · 「항목 목록」(그 회사 출금 항목 · 풀이) · 「결제방법 목록」 · 「증빙 목록」 — 코드 표 이름 그대로.
+ *               머리 · 시트 이름은 제목 줄의 그 칸 이름(코드 관리 · 대응표와 함께 바뀐다)
  */
-export function cashTemplateSheets(
+export function buildCashTemplate(
   signature: readonly string[],
-  names: { items: readonly TaxItemOption[]; payMethods: readonly TaxCodeName[]; proofs: readonly TaxCodeName[] },
-): XlsxSheet<any>[] {
-  // 공통 부품은 첫 줄을 제목으로 쓴다 — 첫 줄 = 안내 문구(첫 칸), 줄 하나 = 표준 제목 줄
-  const form: XlsxSheet<readonly string[]> = {
-    name: '현금 경비',
-    columns: signature.map((_, i) => ({ header: i === 0 ? CASH_TEMPLATE_GUIDE : '', value: (r) => r[i] ?? '' })),
-    rows: [signature],
-  };
+  columns: CashMapColumns,
+  names: Omit<CashCodeNames, 'items'> & { items: readonly TaxItemOption[] },
+): Uint8Array {
+  const wb = XLSX.utils.book_new();
+  const form = XLSX.utils.aoa_to_sheet([[...signature]]);
+  for (let r = 1; r <= CASH_TEMPLATE_DATA_ROWS; r++) {
+    form[XLSX.utils.encode_cell({ r, c: columns.useDate - 1 })] = { t: 'z', z: DATE_FORMAT };
+    form[XLSX.utils.encode_cell({ r, c: columns.amount - 1 })] = { t: 'z', z: AMOUNT_FORMAT };
+  }
+  form['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: CASH_TEMPLATE_DATA_ROWS, c: signature.length - 1 } });
+  XLSX.utils.book_append_sheet(wb, form, '현금 경비');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(CASH_TEMPLATE_GUIDE.map((l) => [l])), '안내');
+
+  const head = (col: number) => signature[col - 1] ?? '';
+  const list = (col: number, rows: readonly TaxCodeName[]) =>
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[head(col)], ...rows.map((x) => [x.name])]), `${head(col)} 목록`);
+  list(columns.direction, names.directions);
   // 사업자 유형이 없으면(세무 설정 전) 항목이 비어 있다 — 안내 한 줄만 두고 양식은 그대로 내려준다(대표 2026-10-30)
-  const items: XlsxSheet<TaxItemOption> = {
-    name: '항목 목록',
-    columns: [{ header: '항목', value: (r) => r.name }, { header: '풀이', value: (r) => r.description }],
-    rows: names.items.length > 0 ? names.items : [{ code: '', name: NO_ITEMS_NOTE, description: null }],
-  };
-  const list = (name: string, header: string, rows: readonly TaxCodeName[]): XlsxSheet<TaxCodeName> => ({
-    name, columns: [{ header, value: (r) => r.name }], rows,
-  });
-  return [form, items, list('지급방법 목록', '지급방법', names.payMethods), list('증빙 목록', '증빙', names.proofs)];
+  const items = names.items.length > 0 ? names.items.map((x) => [x.name, x.description ?? '']) : [[NO_ITEMS_NOTE, '']];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[head(columns.item), '풀이'], ...items]), `${head(columns.item)} 목록`);
+  list(columns.payMethod, names.payMethods);
+  list(columns.proof, names.proofs);
+  return new Uint8Array(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', sheetStubs: true }));
 }
 
 /** 현금 경비 양식 — 그 회사 항목 목록으로 만든다. 세무 설정 전이면 항목 목록 시트에 안내 한 줄(막지 않는다). */
 export async function cashTemplateOp(client: ScopedClient, orgId: number): Promise<TaxOp<{ fileName: string; bytes: Uint8Array }>> {
   const map = await loadImportMap<CashMapColumns>(client, TAX_KIND_CASH);
   if (!map) return NO_MAP;
-  const bytes = buildXlsx(cashTemplateSheets(map.headerSignature, await cashNames(client, orgId)));
+  const bytes = buildCashTemplate(map.headerSignature, map.columns, await cashNames(client, orgId));
   return { ok: true, data: { fileName: CASH_TEMPLATE_FILE_NAME, bytes } };
 }

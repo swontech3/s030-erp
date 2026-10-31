@@ -8,8 +8,10 @@
  *   - ★★ 카드번호는 **끝 4자리만** 남긴다 — 변환 결과 · 응답 · 로그 어디에도 전체 번호를 싣지 않는다
  *   - 카드 공제 여부가 「공제 · 불공제」가 아니면 줄을 빼지 않고 공제 여부를 비워서 넣고 경고한다
  *   - 세무 설정에 없는 카드 끝 4자리 줄은 넣고 경고한다
- *   - 현금은 세무 표준 양식(1줄 안내 · 2줄 제목). 필수 = 날짜 · 품명 · 금액(매출액 · 매입액 중 하나) · 지급방법
- *   - 항목 · 지급방법 · 증빙은 **코드 표 이름**으로 코드값을 찾는다(대응표에 바꾸기표 없음, 결정 18)
+ *   - 현금은 세무 표준 양식(1줄 제목, 안내는 「안내」 시트 — 210, 2026-10-31). 필수 = 날짜 · 구분 · 품명 · 금액 · 결제방법
+ *   - 구분 · 항목 · 결제방법 · 증빙은 **코드 표 이름**으로 코드값을 찾는다(대응표에 바꾸기표 없음, 결정 18).
+ *     구분 = TAX_INV_DIR 이름(매입 · 매출). 구분 · 결제방법이 비었거나 목록에 없으면 뺀 줄
+ *   - 날짜에 시각이 붙어도 받는다 — 날짜 부분만(현금만. 계산서 · 카드의 `dateOf` 는 그대로)
  *   - 목록에 없는 항목 · 증빙은 비워서 넣고 경고 · 매출 줄에 적힌 항목은 무시하고 경고(매출에는 항목이 없다)
  *   - 승인번호가 없어 중복은 「개수 맞추기」로 막는다 — 열쇠마다 파일 안 n개 · DB m개면 n−m개만 넣는다
  */
@@ -37,10 +39,15 @@ export const TAX_CARD_DEDUCT_CATEGORY = 'TAX_CARD_DEDUCT';
 /** ★ 고정 — 계좌이체(직원 정산). 뒤 단계 은행 짝 맞추기가 이 값으로 직원 정산 줄을 찾는다(code-usage `PINNED_CODES`). */
 export const TAX_PAY_METHOD_TRANSFER = 'TRANSFER';
 
-/** 현금 경비 양식 1줄 안내(판단 15) — 양식 내려받기가 이 글을 1줄에 둔다. */
-export const CASH_TEMPLATE_GUIDE =
-  '회사 사업용 카드로 낸 것은 적지 않습니다(카드 사용 내역으로 올립니다). 매출액 · 매입액 중 하나만 적고, ' +
-  '항목 · 지급방법 · 증빙은 목록 시트의 이름 그대로 적습니다. 항목을 비우면 매출 · 매입 항목 지정에서 붙입니다.';
+/** 현금 경비 양식 안내(판단 15 · 210) — 양식 내려받기가 「안내」 시트에 한 줄씩 둔다. */
+export const CASH_TEMPLATE_GUIDE: readonly string[] = [
+  '회사 사업용 카드로 낸 것은 적지 않습니다(카드 사용 내역으로 올립니다).',
+  '「현금 경비」 시트 1줄의 제목은 고치지 말고, 2줄부터 한 줄에 한 건씩 적습니다.',
+  '날짜 · 구분 · 품명 · 금액 · 결제방법은 꼭 적습니다. 거래처 · 항목 · 증빙은 비워도 됩니다.',
+  '구분 · 항목 · 결제방법 · 증빙은 목록에 있는 이름 그대로 적으세요(구분 목록 · 항목 목록 · 결제방법 목록 · 증빙 목록 시트).',
+  '금액은 원 단위 숫자만 적습니다(0 보다 큰 정수).',
+  '항목을 비우면 매출 · 매입 항목 지정에서 붙입니다. 매출 줄에는 항목을 붙이지 않습니다.',
+];
 
 /** 현금 경비 양식 파일 이름. */
 export const CASH_TEMPLATE_FILE_NAME = '현금경비_양식.xlsx';
@@ -65,11 +72,11 @@ export interface CardMapColumns {
 
 export interface CashMapColumns {
   useDate: number;
+  direction: number;
   description: number;
   vendorName: number;
   item: number;
-  salesAmount: number;
-  purchaseAmount: number;
+  amount: number;
   payMethod: number;
   proof: number;
 }
@@ -107,7 +114,7 @@ export interface CashStdRow {
   useDate: string;
   description: string;
   vendorName: string | null;
-  /** P 매입(매입액 칸) · S 매출(매출액 칸). */
+  /** P 매입 · S 매출(구분 칸 — TAX_INV_DIR 이름). */
   direction: TaxInvDir;
   amount: number;
   /** TAX_PAY_METHOD 코드값. */
@@ -128,9 +135,9 @@ export interface CardExcluded {
 /** 넣지 않은 현금 줄 — 키 = 코드 TAX_SKIP_REASON 코드값(205 · 209). */
 export interface CashExcluded {
   badDate: number;
+  badDirection: number;
   noDescription: number;
   noAmount: number;
-  bothAmounts: number;
   badAmount: number;
   badPayMethod: number;
 }
@@ -216,6 +223,8 @@ export function convertCardSheet(
 /* ── 현금 ────────────────────────────────────────────────────────────────── */
 
 export interface CashCodeNames {
+  /** 구분(TAX_INV_DIR) — P 매입 · S 매출. */
+  directions: readonly TaxCodeName[];
   /** 그 회사 사업자 유형 파티션의 켜진 출금 항목(TAX_ITEM_OUT) — 세무 설정 전이면 빈 목록. */
   items: readonly TaxCodeName[];
   payMethods: readonly TaxCodeName[];
@@ -224,6 +233,15 @@ export interface CashCodeNames {
 
 const codeByName = (list: readonly TaxCodeName[], name: string): string | null =>
   list.find((x) => x.name.trim() === name)?.code ?? null;
+
+/** 현금 날짜 — `dateOf` 에 더해 날짜 뒤에 시각이 붙은 글자(`2026-09-05 14:30` · `…T14:30:00`)도 받고 날짜 부분만 쓴다. */
+function cashDateOf(v: unknown): string | null {
+  if (v instanceof Date) return dateOf(v);
+  const m = /^(\d{4}[-./]?\d{2}[-./]?\d{2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(textOf(v));
+  if (!m) return null;
+  if (m[2] !== undefined && (Number(m[2]) > 23 || Number(m[3]) > 59 || Number(m[4] ?? 0) > 59)) return null;
+  return dateOf(m[1]);
+}
 
 /** 현금 경비 표준 양식 → 표준 줄. */
 export function convertCashSheet(
@@ -234,22 +252,21 @@ export function convertCashSheet(
   const read = readDataRows(sheetRows, map.headerRow, map.headerSignature);
   if (!read.ok) return read;
   const c = map.columns;
-  const excluded: CashExcluded = { badDate: 0, noDescription: 0, noAmount: 0, bothAmounts: 0, badAmount: 0, badPayMethod: 0 };
+  const excluded: CashExcluded = { badDate: 0, badDirection: 0, noDescription: 0, noAmount: 0, badAmount: 0, badPayMethod: 0 };
   const rows: CashStdRow[] = [];
   let itemUnknown = 0;
   let proofUnknown = 0;
   let salesItem = 0;
   for (const row of read.data) {
-    const useDate = dateOf(cell(row, c.useDate));
+    const useDate = cashDateOf(cell(row, c.useDate));
     if (!useDate) { excluded.badDate++; continue; }
+    const dirCode = codeByName(names.directions, textOf(cell(row, c.direction)));
+    if (dirCode !== TAX_INV_DIR_PURCHASE && dirCode !== TAX_INV_DIR_SALES) { excluded.badDirection++; continue; }
+    const direction: TaxInvDir = dirCode;
     const description = textOf(cell(row, c.description));
     if (description === '') { excluded.noDescription++; continue; }
-    const salesText = textOf(cell(row, c.salesAmount));
-    const buyText = textOf(cell(row, c.purchaseAmount));
-    if (salesText === '' && buyText === '') { excluded.noAmount++; continue; }
-    if (salesText !== '' && buyText !== '') { excluded.bothAmounts++; continue; }
-    const direction: TaxInvDir = buyText !== '' ? TAX_INV_DIR_PURCHASE : TAX_INV_DIR_SALES;
-    const amount = amountOf(cell(row, buyText !== '' ? c.purchaseAmount : c.salesAmount));
+    if (textOf(cell(row, c.amount)) === '') { excluded.noAmount++; continue; }
+    const amount = amountOf(cell(row, c.amount));
     if (amount === null || amount <= 0) { excluded.badAmount++; continue; }
     const payMethod = codeByName(names.payMethods, textOf(cell(row, c.payMethod)));
     if (!payMethod) { excluded.badPayMethod++; continue; }

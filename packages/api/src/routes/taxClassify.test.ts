@@ -224,9 +224,11 @@ describe('cashExportSheet — 현금 경비 시트(1-4)', () => {
     invDirs: [{ code: 'P', name: '매입' }, { code: 'S', name: '매출' }],
     payMethods: [{ code: 'CASH', name: '현금' }],
     proofs: [{ code: 'RECEIPT', name: '영수증' }],
+    payMethodHeader: '결제방법',
+    proofHeader: '증빙',
   };
 
-  it('칸 — 날짜 · 품명 · 거래처 · 구분 · 금액 · 지급방법 · 증빙 · 항목(매출은 「매출」)', () => {
+  it('칸 — 날짜 · 품명 · 거래처 · 구분 · 금액 · 결제방법 · 증빙 · 항목(매출은 「매출」)', () => {
     const bytes = buildXlsx([cashExportSheet([
       { ...base, itemCode: 'MEAL' },
       base,
@@ -234,10 +236,17 @@ describe('cashExportSheet — 현금 경비 시트(1-4)', () => {
     ], names)]);
     const wb = XLSX.read(bytes, { type: 'array' });
     expect(XLSX.utils.sheet_to_json(wb.Sheets['현금 경비']!, { header: 1, defval: '' })).toEqual([
-      ['날짜', '품명', '거래처', '구분', '금액', '지급방법', '증빙', '항목'],
+      ['날짜', '품명', '거래처', '구분', '금액', '결제방법', '증빙', '항목'],
       ['2026-09-05', '점심', '지어낸 식당', '매입', 5000, '현금', '영수증', '식대·회의비'],
       ['2026-09-05', '점심', '지어낸 식당', '매입', 5000, '현금', '영수증', '분류 필요'],
       ['2026-09-05', '점심', '', '매출', 30000, '현금', '', '매출'],
     ]);
+  });
+
+  it('★ 결제방법 · 증빙 칸 이름은 코드 분류(TAX_PAY_METHOD · TAX_PROOF) 이름을 쓴다 — 글자로 박지 않는다', () => {
+    const bytes = buildXlsx([cashExportSheet([base], { ...names, payMethodHeader: '지어낸 결제', proofHeader: '지어낸 증빙' })]);
+    const wb = XLSX.read(bytes, { type: 'array' });
+    expect(XLSX.utils.sheet_to_json(wb.Sheets['현금 경비']!, { header: 1 })[0]).toEqual(
+      ['날짜', '품명', '거래처', '구분', '금액', '지어낸 결제', '지어낸 증빙', '항목']);
   });
 });

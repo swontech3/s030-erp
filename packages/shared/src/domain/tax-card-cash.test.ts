@@ -4,6 +4,7 @@
  * ★ 값은 모두 지어낸 것이다. 원본 샘플(doc/data-src/)의 값은 쓰지 않는다 — 제목 줄 이름과 칸 위치만 209 대응표 그대로다.
  */
 import { describe, expect, it } from 'vitest';
+import { PINNED_CODES } from './code-usage.ts';
 import {
   CASH_TEMPLATE_GUIDE,
   cardDedupKey,
@@ -32,17 +33,19 @@ const CARD_MAP: CardImportMap = {
   },
 };
 
-const CASH_HEADER = ['날짜', '품명', '거래처', '항목', '매출액', '매입액', '지급방법', '증빙'];
+/** 210 대응표 — 1줄 제목 · 구분 + 금액 한 칸(2026-10-31). */
+const CASH_HEADER = ['날짜', '구분', '품명', '거래처', '항목', '금액', '결제방법', '증빙'];
 const CASH_MAP: CashImportMap = {
   id: 'TAX_CASH_STD',
   kind: 'CASH',
-  headerRow: 2,
+  headerRow: 1,
   headerSignature: CASH_HEADER,
-  columns: { useDate: 1, description: 2, vendorName: 3, item: 4, salesAmount: 5, purchaseAmount: 6, payMethod: 7, proof: 8 },
+  columns: { useDate: 1, direction: 2, description: 3, vendorName: 4, item: 5, amount: 6, payMethod: 7, proof: 8 },
 };
 const CASH_NAMES = {
+  directions: [{ code: 'P', name: '매입' }, { code: 'S', name: '매출' }],
   items: [{ code: 'MEAL', name: '식대·회의비' }, { code: 'SUPPLY', name: '소모품비' }],
-  payMethods: [{ code: 'CASH', name: '현금' }, { code: 'TRANSFER', name: '계좌이체(직원 정산)' }, { code: 'OWNER', name: '대표 개인 돈' }],
+  payMethods: [{ code: 'CASH', name: '현금' }, { code: 'TRANSFER', name: '계좌이체' }, { code: 'OWNER', name: '대표 개인 돈' }],
   proofs: [{ code: 'RECEIPT', name: '영수증' }, { code: 'NONE', name: '없음' }],
 };
 
@@ -55,10 +58,10 @@ function cardLine(o: Partial<Record<'date' | 'card' | 'biz' | 'name' | 'deduct' 
 }
 const cardSheet = (...lines: unknown[][]) => [['', '', '', '', '', '', '', '', '', '', '', '', '총 사용금액 : 0(원)'], CARD_HEADER, ...lines];
 
-function cashLine(o: Partial<Record<'date' | 'desc' | 'vendor' | 'item' | 'pay' | 'proof', string>> & { sales?: unknown; buy?: unknown } = {}): unknown[] {
-  return [o.date ?? '2026-09-05', o.desc ?? '지어낸 품명', o.vendor ?? '', o.item ?? '', o.sales ?? '', o.buy ?? 5000, o.pay ?? '현금', o.proof ?? ''];
+function cashLine(o: Partial<Record<'dir' | 'desc' | 'vendor' | 'item' | 'pay' | 'proof', string>> & { date?: unknown; amount?: unknown } = {}): unknown[] {
+  return [o.date ?? '2026-09-05', o.dir ?? '매입', o.desc ?? '지어낸 품명', o.vendor ?? '', o.item ?? '', o.amount ?? 5000, o.pay ?? '현금', o.proof ?? ''];
 }
-const cashSheet = (...lines: unknown[][]) => [[CASH_TEMPLATE_GUIDE], CASH_HEADER, ...lines];
+const cashSheet = (...lines: unknown[][]) => [CASH_HEADER, ...lines];
 
 describe('convertCardSheet — 홈택스 사업용 신용카드', () => {
   it('2줄째 제목 줄 · 14칸이 맞으면 표준 양식으로 바꾼다 — 카드번호는 끝 4자리만', () => {
@@ -119,11 +122,11 @@ describe('convertCardSheet — 홈택스 사업용 신용카드', () => {
   });
 });
 
-describe('convertCashSheet — 현금 경비 표준 양식', () => {
-  it('매입액 줄 = P · 매출액 줄 = S, 이름은 코드 표 이름으로 코드값을 찾는다', () => {
+describe('convertCashSheet — 현금 경비 표준 양식(210 — 구분 + 금액 한 칸)', () => {
+  it('구분 「매입」 = P · 「매출」 = S, 구분 · 항목 · 결제방법 · 증빙은 코드 표 이름으로 코드값을 찾는다', () => {
     const r = convertCashSheet(cashSheet(
       cashLine({ vendor: ' 지어낸 식당 ', item: '식대·회의비', proof: '영수증' }),
-      cashLine({ sales: 30000, buy: '', pay: '계좌이체(직원 정산)' }),
+      cashLine({ dir: '매출', amount: 30000, pay: '계좌이체' }),
     ), CASH_MAP, CASH_NAMES);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -132,34 +135,56 @@ describe('convertCashSheet — 현금 경비 표준 양식', () => {
       { useDate: '2026-09-05', description: '지어낸 품명', vendorName: null, direction: 'S', amount: 30000, payMethod: 'TRANSFER', proof: null, itemCode: null },
     ]);
     expect(r.warnings).toEqual([]);
+    expect(r.totalRows).toBe(2);
   });
 
-  it('1줄 안내 문구 · 2줄 제목 줄 — 제목 줄이 다르면(대표 옛 파일 모양) 양식이 맞지 않는다', () => {
-    const old = [['사용일시', '품   명', '거래처', '항목', '매출액', '매입액', '지급방법', '증빙'], cashLine()];
-    expect(convertCashSheet(old, CASH_MAP, CASH_NAMES)).toMatchObject({ ok: false, error: { code: 'format_mismatch' } });
+  it('★ 1줄이 제목 줄 — 옛 양식(1줄 안내 · 매출액 · 매입액 두 칸) · 대표 옛 파일 모양은 양식이 맞지 않는다', () => {
+    const oldStd = [['지어낸 안내'], ['날짜', '품명', '거래처', '항목', '매출액', '매입액', '지급방법', '증빙'], ['2026-09-05', '가', '', '', '', 5000, '현금', '']];
+    const oldOwner = [['사용일시', '품   명', '거래처', '항목', '매출액', '매입액', '지급방법', '증빙'], ['2026-09-05', '가', '', '', '', 5000, '현금', '']];
+    for (const sheet of [oldStd, oldOwner]) {
+      expect(convertCashSheet(sheet, CASH_MAP, CASH_NAMES)).toEqual({ ok: false, error: { code: 'format_mismatch', message: '양식이 맞지 않습니다' } });
+    }
   });
 
-  it('필수 = 날짜 · 품명 · 금액 하나 · 지급방법 — 틀리면 빼고 센다', () => {
+  it('필수 = 날짜 · 구분 · 품명 · 금액 · 결제방법 — 틀리면 빼고 센다', () => {
     const r = convertCashSheet(cashSheet(
       cashLine({ date: '어제' }),
+      cashLine({ dir: '' }),
+      cashLine({ dir: '환불' }),
       cashLine({ desc: '  ' }),
-      cashLine({ buy: '' }),
-      cashLine({ sales: 100, buy: 100 }),
-      cashLine({ buy: -100 }),
-      cashLine({ buy: 0 }),
+      cashLine({ amount: '' }),
+      cashLine({ amount: -100 }),
+      cashLine({ amount: 0 }),
+      cashLine({ amount: '만원' }),
+      cashLine({ amount: 1500.5 }),
       cashLine({ pay: '' }),
       cashLine({ pay: '카드' }),
-      cashLine(),
+      cashLine({ pay: '계좌이체(직원 정산)' }),
+      cashLine({ amount: '12,000' }),
     ), CASH_MAP, CASH_NAMES);
-    expect(r.ok && r.excluded).toEqual({ badDate: 1, noDescription: 1, noAmount: 1, bothAmounts: 1, badAmount: 2, badPayMethod: 2 });
-    expect(r.ok && r.rows.length).toBe(1);
+    expect(r.ok && r.excluded).toEqual({ badDate: 1, badDirection: 2, noDescription: 1, noAmount: 1, badAmount: 4, badPayMethod: 3 });
+    expect(r.ok && r.rows.map((x) => x.amount)).toEqual([12000]);
+  });
+
+  it('★ 날짜에 시각이 붙어도 받는다 — 날짜 부분만(현금만, 210 판단 2)', () => {
+    const r = convertCashSheet(cashSheet(
+      cashLine({ date: '2026-09-05 14:30' }),
+      cashLine({ date: '2026-09-06 09:05:59' }),
+      cashLine({ date: '2026.09.07 23:59' }),
+      cashLine({ date: '2026-09-08T08:00:00' }),
+      cashLine({ date: new Date(Date.UTC(2026, 8, 9, 23, 30)) }),
+      cashLine({ date: '2026-09-10 25:00' }),
+      cashLine({ date: '2026-02-30 10:00' }),
+    ), CASH_MAP, CASH_NAMES);
+    expect(r.ok && r.rows.map((x) => x.useDate)).toEqual(['2026-09-05', '2026-09-06', '2026-09-07', '2026-09-08', '2026-09-09']);
+    expect(r.ok && r.excluded.badDate).toBe(2);
   });
 
   it('★ 목록에 없는 항목 · 증빙은 비워서 넣고 경고, 매출 줄의 항목은 무시하고 경고(판단 9 · 10)', () => {
     const r = convertCashSheet(cashSheet(
       cashLine({ item: '복리후생비' }),
       cashLine({ proof: '카드전표' }),
-      cashLine({ sales: 1000, buy: '', item: '식대·회의비' }),
+      cashLine({ dir: '매출', amount: 1000, item: '식대·회의비' }),
     ), CASH_MAP, CASH_NAMES);
     expect(r.ok && r.rows.map((x) => [x.itemCode, x.proof])).toEqual([[null, null], [null, null], [null, null]]);
     expect(r.ok && r.warnings.map((w) => [w.code, w.count])).toEqual([
@@ -171,6 +196,18 @@ describe('convertCashSheet — 현금 경비 표준 양식', () => {
     const r = convertCashSheet(cashSheet(cashLine({ item: '식대·회의비' })), CASH_MAP, { ...CASH_NAMES, items: [] });
     expect(r.ok && r.rows[0]!.itemCode).toBeNull();
     expect(r.ok && r.warnings[0]!.code).toBe('cash_item_unknown');
+  });
+});
+
+describe('★ 고정 코드(code-usage PINNED_CODES) — 카드 · 현금 뺀 줄 종류 = 응답 키', () => {
+  it('CardExcluded · CashExcluded 키(205 의 badDate · badAmount 는 205 몫)와 빠짐없이 · 더하지 않고 같다', () => {
+    const card = convertCardSheet(cardSheet(cardLine()), CARD_MAP, ['4821']);
+    const cash = convertCashSheet(cashSheet(cashLine()), CASH_MAP, CASH_NAMES);
+    if (!card.ok || !cash.ok) throw new Error('변환 실패');
+    const keys = [...new Set([...Object.keys(card.excluded), ...Object.keys(cash.excluded)])]
+      .filter((k) => k !== 'badDate' && k !== 'badAmount').sort();
+    const pinned = PINNED_CODES.find((p) => p.category === 'TAX_SKIP_REASON' && p.label === '세무 카드 · 현금 뺀 줄 종류');
+    expect([...(pinned?.codes ?? [])].sort()).toEqual(keys);
   });
 });
 
@@ -209,8 +246,16 @@ describe('countByUseMonth', () => {
   });
 });
 
-describe('CASH_TEMPLATE_GUIDE — 양식 1줄 안내(판단 15)', () => {
-  it('회사 사업용 카드로 낸 것은 적지 않는다는 안내가 들어 있다', () => {
-    expect(CASH_TEMPLATE_GUIDE).toContain('회사 사업용 카드로 낸 것은 적지 않습니다');
+describe('CASH_TEMPLATE_GUIDE — 양식 「안내」 시트(판단 15 · 210)', () => {
+  it('회사 사업용 카드로 낸 것은 적지 않는다 · 목록에 있는 이름 그대로 적는다', () => {
+    const all = CASH_TEMPLATE_GUIDE.join('\n');
+    expect(all).toContain('회사 사업용 카드로 낸 것은 적지 않습니다');
+    expect(all).toContain('목록에 있는 이름 그대로 적으세요');
+  });
+
+  it('★ 새 칸 이름(구분 · 금액 · 결제방법)을 쓰고 옛 칸 이름(매출액 · 매입액 · 지급방법)은 없다', () => {
+    const all = CASH_TEMPLATE_GUIDE.join('\n');
+    for (const w of ['구분', '금액', '결제방법', '구분 목록', '결제방법 목록']) expect(all).toContain(w);
+    for (const w of ['매출액', '매입액', '지급방법']) expect(all).not.toContain(w);
   });
 });

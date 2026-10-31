@@ -6,6 +6,8 @@
  * ★ 크기(5MB)는 Fastify 본문 해석이 먼저 막고 여기서 한 번 더 본다. 줄 수는 상한 + 여유까지만 읽는다 —
  *   나머지는 읽지 않고, 넘친 것은 표준 양식 변환(`convertInvoiceSheet`)이 「10,000줄까지」로 막는다.
  * ★ 수식 · 서식 · 매크로는 읽지 않는다. 값만.
+ * ★ 엑셀 날짜 값은 UTC 로 읽는다(`UTC: true`, 2026-10-31) — 아니면 서버 시간대(서울) 자정이 되어 UTC 날짜로 보는
+ *   `dateOf` 가 하루 앞 날짜를 낸다. 글자로 적힌 날짜(홈택스 파일)는 영향이 없다.
  */
 import * as XLSX from 'xlsx';
 import {
@@ -33,6 +35,7 @@ export function readSheetRows(bytes: Uint8Array): SheetRead {
       type: 'buffer',
       sheetRows: TAX_UPLOAD_MAX_ROWS + HEAD_ROOM_ROWS,
       cellDates: true,
+      UTC: true,
       cellFormula: false,
       cellHTML: false,
       cellStyles: false,
@@ -47,7 +50,7 @@ export function readSheetRows(bytes: Uint8Array): SheetRead {
     const range = XLSX.utils.decode_range(ref);
     range.s.r = 0;
     range.s.c = 0;
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, defval: null, blankrows: true, range });
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, defval: null, blankrows: true, range, UTC: true });
     return { ok: true, format, rows };
   } catch {
     return { ok: false, code: 'unreadable', message: '읽을 수 없는 파일입니다' };

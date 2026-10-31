@@ -32,6 +32,21 @@ describe('readSheetRows', () => {
     expect(r.rows[2]?.[1]).toBe(110000);
   });
 
+  it('★ 엑셀 날짜 값 칸은 서버 시간대와 상관없이 적은 날짜 그대로(하루 밀리지 않는다) — 시각이 붙어도 그 날', () => {
+    // 일련값 46270 = 2026-09-05 (지어낸 날짜). 46270.979 = 같은 날 23:29 쯤
+    const ws = XLSX.utils.aoa_to_sheet([['날짜'], [46270], [46270.979]]);
+    ws['A2']!.z = 'yyyy-mm-dd';
+    ws['A3']!.z = 'yyyy-mm-dd hh:mm';
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '현금 경비');
+    const r = readSheetRows(new Uint8Array(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer));
+    if (!r.ok) throw new Error(r.message);
+    const [d1, d2] = [r.rows[1]?.[0], r.rows[2]?.[0]];
+    expect(d1).toBeInstanceOf(Date);
+    expect((d1 as Date).toISOString().slice(0, 10)).toBe('2026-09-05');
+    expect((d2 as Date).toISOString().slice(0, 10)).toBe('2026-09-05');
+  });
+
   it('엑셀이 아닌 바이트(앞 바이트)는 거절', () => {
     const r = readSheetRows(new TextEncoder().encode('작성일자,승인번호\n2026-09-05,A-1'));
     expect(r).toMatchObject({ ok: false, code: 'not_spreadsheet' });

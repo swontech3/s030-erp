@@ -6,7 +6,7 @@
  *   POST /tax/uploads?kind=INVOICE         한 트랜잭션 — 올린 파일 기록 → 거래처 자동 등록 · 승격 → 계산서 넣기
  *   POST /tax/uploads/delete { ids[] }     파일 지우기(그 줄도 함께)
  *   POST /tax/uploads/delete-check { ids[] } 지우기 전 확인 — 지우기와 같은 계산(빠질 줄 · 겹쳤을 수 있는 파일), 지우지 않음
- *   GET  /tax/uploads/template?kind=CASH   현금 경비 표준 양식(1-4) — 1줄 안내 · 2줄 제목 줄 + 항목 · 지급방법 · 증빙 목록 시트
+ *   GET  /tax/uploads/template?kind=CASH   현금 경비 표준 양식(1-4 · 210) — 1줄 제목 줄 + 안내 · 구분 · 항목 · 결제방법 · 증빙 목록 시트
  *
  * ★ 1-4(2026-10-30): kind=CARD(홈택스 사업용 신용카드) · CASH(현금 경비 표준 양식)도 받는다 — 처리는 `taxCardCash.ts`.
  *
