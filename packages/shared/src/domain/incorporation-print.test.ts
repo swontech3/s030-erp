@@ -351,6 +351,30 @@ describe('유한회사 — 정관 자리표시 · 서류 묶음', () => {
       '주소 : 서울 서초구 2',
     ]);
   });
+  it('★ 사원총회의사록 · 설립등기신청서(2026-11-01) — 자리표시 3개가 이름표에 있다', () => {
+    const names = INCORP_PRINT_FIELDS.map((f) => f.name);
+    expect(names).toEqual(expect.arrayContaining(['ceoRrn', 'representativeRrnList', 'minutesOfficerRrnList']));
+  });
+  it('사원 1명 — 대표이사 주민번호 · 신청서 대표이사 칸 · 의사록 임원 선임', () => {
+    const v = buildIncorpCasePrintValues(ltdSrc(one));
+    expect(v.ceoRrn).toBe('900101-1234567');
+    expect(v.representativeRrnList).toBe('대표이사 홍길동(900101-1234567)\n(06164) 서울 강남구 1');
+    expect(v.minutesOfficerRrnList).toBe('대표이사 겸 사내이사 : 홍길동\n주민등록번호 : 900101-1234567\n주소 : (06164) 서울 강남구 1');
+  });
+  it('사원 2명(이사 둘 · 대표 하나) · 감사 — 직위는 의사록 규칙(감사만 맡으면 감사)', () => {
+    const ps = [{ ...two[0]! }, { ...two[1]!, isDirector: true }, person({ name: '이감사', isAuditor: true, rrn: '8803031234567', address: '경기 성남시 3' })];
+    const v = buildIncorpCasePrintValues(ltdSrc(ps));
+    expect(v.minutesOfficerRrnList.split('\n').filter((l) => !l.startsWith('주'))).toEqual(['대표이사 겸 사내이사 : 홍길동', '사내이사 : 김철수', '감　　사 : 이감사']);
+    expect(v.representativeRrnList.split('\n')).toHaveLength(2);
+    expect(v.directorAuditorList.split('\n')).toEqual(['이사 홍길동 (900101-1234567)', '이사 김철수 (910202-2345678)', '감사 이감사 (880303-1234567)']);
+  });
+  it('★ 세금 — 유한회사 줄의 설정이 발기설립과 같으면 같은 규칙 · 같은 값(자본금 2천만 · 서울 중과)', () => {
+    const ltd = buildIncorpCasePrintValues(ltdSrc(one));
+    // 20,000,000 × 4/1000 = 80,000 < 최소 112,500 → 112,500 × 3 = 337,500, 교육세 20%
+    expect([ltd.regLicenseTax, ltd.localEduTax, ltd.taxTotal, ltd.regFee]).toEqual(['337,500', '67,500', '405,000', '35,000']);
+    const stock = buildIncorpCasePrintValues({ ...src(), snapshot: { ...src().snapshot, info: { ...src().snapshot.info, capitalAmount: 20_000_000 } } });
+    expect([ltd.regLicenseTax, ltd.localEduTax, ltd.taxTotal, ltd.regFee]).toEqual([stock.regLicenseTax, stock.localEduTax, stock.taxTotal, stock.regFee]);
+  });
   it('★ 서류 묶음 — 유한회사 건은 유한회사 양식만, 주식회사 건은 형태 없는(주식회사) 양식만', () => {
     const forms = [
       { id: 'r1', name: '정관', mark: { domain: 'incorporation' as const, unit: 'case' as const }, definition: null, tokens: [] },

@@ -20,6 +20,9 @@
  * ★ 유한회사(결정 2026-10-31) — 정관(유한회사) 자리표시 3개(`contributionUnitAmount` · `articlesMemberTable` ·
  *   `articlesMemberSignList`). 나머지는 기존 이름 그대로다(자본금 = `capitalAmount`). 사원 = 발기인 칸(`isFounder`),
  *   출자좌수 = 인수 수 칸, 1좌의 금액 = 1주의 금액 칸.
+ * ★ 유한회사 설립 2단계(2026-11-01) — 사원총회의사록(유한회사) · 설립등기신청서(유한회사) 자리표시 3개(`ceoRrn` ·
+ *   `representativeRrnList` · `minutesOfficerRrnList`). 원본(대표가 넣은 docx)이 주민번호를 적는 자리만 새로 두었다 —
+ *   나머지는 기존 이름 그대로다(사원 서명란 = `articlesMemberSignList`, 1좌의 금액 = `contributionUnitAmount`).
  * ★ 서류 묶음은 회사 형태로 가른다(`buildIncorpPrintDocuments`) — 양식 표시의 `companyType`, 없으면 주식회사 양식.
  * ★★ 주민번호는 이 함수에 **평문으로 들어와 출력값으로만 나간다** — 복호화 · no-store 는 API 몫(법인변경과 같다).
  *    목록 칸(이사 · 감사 · 발기인 …)에도 들어간다(레거시와 같다).
@@ -112,6 +115,10 @@ export const INCORP_PRINT_FIELDS: readonly IncorpPrintField[] = [
   { name: 'contributionUnitAmount', label: '출자 1좌의 금액', source: 'case' },
   { name: 'articlesMemberTable', label: '정관 사원별 출자좌수', source: 'case' },
   { name: 'articlesMemberSignList', label: '정관 사원 서명란', source: 'case' },
+  // 유한회사 사원총회의사록 · 설립등기신청서(2026-11-01) — 원본이 주민번호를 적는 자리
+  { name: 'ceoRrn', label: '대표이사 주민등록번호', source: 'case' },
+  { name: 'representativeRrnList', label: '대표이사 성명 · 주민등록번호와 주소', source: 'case' },
+  { name: 'minutesOfficerRrnList', label: '임원 선임(의사록, 주민등록번호 · 주소)', source: 'case' },
   // 등기 설정
   { name: 'formLabel', label: '표시명', source: 'case' },
   { name: 'formNo', label: '양식호수', source: 'case' },
@@ -434,6 +441,20 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
       founders.map((p) => `${p.name}　출자 ${formatAmount(p.unitsSubscribed || 0)}좌(금 ${formatAmount((info.parValue ?? 0) * (p.unitsSubscribed || 0))}원)`),
     ),
     articlesMemberSignList: lines(founders.flatMap((p) => [`사원　성명 : ${p.name} (${rrnOf(p)})　(인)`, `주소 : ${formatIncorpAddress(p)}`])),
+
+    // 유한회사 사원총회의사록 · 설립등기신청서(2026-11-01) — 원본 docx 의 주민번호 자리.
+    // 신청서 ⑨ 「대표이사 ○○○(-) / 주소」 · 의사록 제2호 의안 「대표이사 겸 사내이사 : 이름 / 주민번호 / 주소」
+    ceoRrn: rep ? rrnOf(rep) : '',
+    representativeRrnList: lines(representatives.flatMap((p) => [`대표이사 ${p.name}(${rrnOf(p)})`, formatIncorpAddress(p)])),
+    minutesOfficerRrnList: lines(
+      persons
+        .filter((p) => p.isDirector || p.isAuditor)
+        .flatMap((p) => [
+          `${p.isRepresentative && p.isDirector ? '대표이사 겸 사내이사' : minutesRole(p)} : ${p.name}`,
+          `주민등록번호 : ${rrnOf(p)}`,
+          `주소 : ${formatIncorpAddress(p)}`,
+        ]),
+    ),
 
     // 등기 설정 — 법인변경과 같은 규칙(결정 1 (가))
     formLabel: setting?.label ?? '',
