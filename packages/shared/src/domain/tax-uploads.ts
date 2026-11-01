@@ -16,6 +16,7 @@
  */
 import { digitsOnly, formatBizNumber, isBizNumberChecksumOk, isBizNumberLength } from './tax-number.ts';
 import type { CardExcluded, CardStdRow, CashExcluded, CashStdRow } from './tax-card-cash.ts';
+import type { BankTxnExcluded, BankTxnStdRow, BankXferExcluded, BankXferStdRow, XferMatchStatus } from './tax-bank.ts';
 
 export const TAX_INV_DIR_CATEGORY = 'TAX_INV_DIR';
 export const TAX_INV_CLASS_CATEGORY = 'TAX_INV_CLASS';
@@ -24,9 +25,12 @@ export const TAX_VENDOR_TP_CATEGORY = 'TAX_VENDOR_TP';
 /** 뺀 줄 종류(205) — 코드값 = `InvoiceExcluded` 의 키. ★ 고정 코드. */
 export const TAX_SKIP_REASON_CATEGORY = 'TAX_SKIP_REASON';
 
-/** 자료 종류 — 올릴 수 있는 것(TAX_KIND 코드값). 1-2 세금계산서 · 1-4 카드 사용 내역 · 현금 경비(tax-card-cash.ts). */
+/**
+ * 자료 종류 — 올릴 수 있는 것(TAX_KIND 코드값). 1-2 세금계산서 · 1-4 카드 사용 내역 · 현금 경비(tax-card-cash.ts) ·
+ * 1-5 은행 입출금(tax-bank.ts — 거래내역 · 이체 내역).
+ */
 export const TAX_KIND_INVOICE = 'INVOICE';
-export const TAX_UPLOADABLE_KINDS: readonly string[] = [TAX_KIND_INVOICE, 'CARD', 'CASH'];
+export const TAX_UPLOADABLE_KINDS: readonly string[] = [TAX_KIND_INVOICE, 'CARD', 'CASH', 'BANK'];
 
 /** 매입 · 매출 — ★ 고정 코드(code-usage.ts `PINNED_CODES`). 203 CHECK 가 기댄다. */
 export const TAX_INV_DIR_PURCHASE = 'P';
@@ -119,7 +123,11 @@ export interface TaxUploadWarning {
     | 'card_unregistered'
     | 'cash_item_unknown'
     | 'cash_proof_unknown'
-    | 'cash_sales_item_ignored';
+    | 'cash_sales_item_ignored'
+    // 은행(1-5, tax-bank.ts) — 계좌번호 없는 파일은 받고 알린다 · 짝 못 찾은 이체 줄은 덧붙이지 않고 알린다
+    | 'bank_account_unchecked'
+    | 'xfer_unmatched'
+    | 'xfer_ambiguous';
   message: string;
   count?: number;
 }
@@ -130,7 +138,9 @@ export type TaxUploadErrorCode =
   | 'no_rows'
   | 'own_biz_no_missing'
   | 'own_biz_no_mismatch'
-  | 'direction_unknown';
+  | 'direction_unknown'
+  /** 은행 — 파일의 계좌번호가 고른 계좌와 다름(1-5). */
+  | 'account_mismatch';
 
 export interface TaxUploadError {
   code: TaxUploadErrorCode;
@@ -534,9 +544,26 @@ export interface TaxUploadFileView {
   fileName: string;
   /** 파일의 자료 줄 수. */
   rowCount: number;
-  /** 새로 들어간 줄 수 — 나머지(row_count − inserted_count)는 건너뛰었거나 뺀 줄. */
+  /**
+   * 새로 들어간 줄 수 — 나머지(row_count − inserted_count)는 건너뛰었거나 뺀 줄.
+   * ★ 은행 이체 내역 파일은 **지금 덧붙어 있는 줄 수**를 읽을 때 다시 센다(결정 14 — 거래내역 파일을 지우면 줄어든다).
+   */
   insertedCount: number;
   uploadedAt: string;
+  /** 은행 파일만 — TXN 거래내역 · XFER 이체 내역(코드 TAX_BANK_FILE). 다른 자료는 null. */
+  bankFileTp: string | null;
+  /** 은행 파일만 — 올릴 때 고른 계좌. 별칭은 세무 설정에서 번호로 찾는다(지웠으면 null). */
+  account: { bankCode: string; accountNo: string; alias: string | null } | null;
+}
+
+/** 자료 올리기에서 고를 수 있는 은행 계좌 — 세무 설정의 은행 계좌(「사용 안 함」 제외). */
+export interface TaxUploadBankAccount {
+  id: string;
+  bankCode: string;
+  number: string;
+  alias: string | null;
+  /** 그 은행에 대응표가 있는 파일 종류(TXN · XFER) — 비면 「이 은행 파일은 아직 받지 못합니다」. */
+  fileTps: string[];
 }
 
 export interface TaxUploadKindCard {
@@ -555,15 +582,34 @@ export interface TaxUploadsResponse {
   bizTypeName: string | null;
   cards: TaxUploadKindCard[];
   files: TaxUploadFileView[];
-  /** 자료 종류는 설명(카드 설명 — 코드 설명 칸, 비어 있으면 null)까지. */
-  codes: { kinds: (TaxCodeName & { description: string | null })[]; invDirs: TaxCodeName[] };
+  /** 은행 입출금 업로드 창의 계좌 선택지(1-5). */
+  bankAccounts: TaxUploadBankAccount[];
+  /**
+   * 자료 종류는 설명(카드 설명 — 코드 설명 칸, 비어 있으면 null)까지.
+   * 은행 이름(BANK) · 은행 파일 종류 이름(TAX_BANK_FILE)은 1-5.
+   */
+  codes: {
+    kinds: (TaxCodeName & { description: string | null })[];
+    invDirs: TaxCodeName[];
+    banks: TaxCodeName[];
+    bankFileTps: TaxCodeName[];
+  };
 }
 
-/** 자료 종류마다 다른 부분 — 계산서는 매입/매출 · 계산서 줄, 카드 · 현금은 매입/매출 없이 그 줄. */
+/** 이체 미리보기 한 줄 — 이체 줄 + 짝 상태(찾음 · 못 찾음 · 정할 수 없음 · 이미 덧붙임). */
+export type BankXferPreviewRow = BankXferStdRow & { status: XferMatchStatus };
+
+/**
+ * 자료 종류마다 다른 부분 — 계산서는 매입/매출 · 계산서 줄, 카드 · 현금은 매입/매출 없이 그 줄,
+ * 은행은 파일 종류(거래내역 · 이체 내역)마다 그 줄.
+ */
 export type TaxUploadKindPart =
   | { kind: 'INVOICE'; direction: TaxInvDir; sample: InvoiceStdRow[]; excluded: InvoiceExcluded }
   | { kind: 'CARD'; direction: null; sample: CardStdRow[]; excluded: CardExcluded }
-  | { kind: 'CASH'; direction: null; sample: CashStdRow[]; excluded: CashExcluded };
+  | { kind: 'CASH'; direction: null; sample: CashStdRow[]; excluded: CashExcluded }
+  | { kind: 'BANK'; bankFileTp: 'TXN'; direction: null; sample: BankTxnStdRow[]; excluded: BankTxnExcluded }
+  /** ★ 이체 — `toInsert` = 덧붙일 줄 수 · `alreadyUploaded` = 이미 덧붙인 줄이라 건너뛸 줄 수. */
+  | { kind: 'BANK'; bankFileTp: 'XFER'; direction: null; sample: BankXferPreviewRow[]; excluded: BankXferExcluded };
 
 export type TaxUploadPreview = TaxUploadKindPart & {
   fileName: string;
@@ -586,7 +632,7 @@ export interface TaxUploadResult {
   file: TaxUploadFileView;
   insertedCount: number;
   alreadyUploaded: number;
-  excluded: InvoiceExcluded | CardExcluded | CashExcluded;
+  excluded: InvoiceExcluded | CardExcluded | CashExcluded | BankTxnExcluded | BankXferExcluded;
   vendorsCreated: number;
   vendorsPromoted: number;
   warnings: TaxUploadWarning[];
@@ -600,6 +646,8 @@ export interface TaxUploadDeleteResult {
    * ★ 원본을 보관하지 않아(결정 10) 정확히 몇 줄이 겹쳤는지는 알 수 없다. 건너뛴 줄 수는 위쪽 한계다.
    */
   laterFilesWithSkips: { id: string; fileName: string; skippedRows: number }[];
+  /** 덧붙인 이체 정보가 빠질 은행 출금 줄 수 — 이체 파일을 지우면 비우고, 거래내역 파일을 지우면 줄과 함께 빠진다(1-5). */
+  xferDetached: number;
 }
 
 export interface TaxVendorView {

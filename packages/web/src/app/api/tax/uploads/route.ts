@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { forwardGetJson, forwardUpload } from '@/lib/forward';
+import { uploadQuery } from './uploadQuery';
 
 /**
  * 세무 자료 올리기 — `GET /tax/uploads?month=` · `POST /tax/uploads?kind=` (Fastify) 로 넘긴다.
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
   return forwardGetJson(`/tax/uploads?month=${encodeURIComponent(month)}`);
 }
 
+/** ★ 은행(1-5)은 `&account=&fileTp=` 도 그대로 넘긴다 — 판정은 Fastify 가 한다. */
 export async function POST(request: NextRequest) {
-  const kind = request.nextUrl.searchParams.get('kind') ?? '';
-  return forwardUpload(request, `/tax/uploads?kind=${encodeURIComponent(kind)}`);
+  return forwardUpload(request, `/tax/uploads?${uploadQuery(request)}`);
 }

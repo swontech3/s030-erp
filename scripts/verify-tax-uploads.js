@@ -118,6 +118,220 @@ function makeCashXlsx(header, rows) {
   return new Uint8Array(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }
 
+/* ── 은행(1-5, 2026-11-01) ─────────────────────────────────────────────────── */
+
+/** 엑셀 한 장 — `bookType` xls · xlsx. */
+function sheetBytes(aoa, bookType) {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Sheet 1');
+  return new Uint8Array(XLSX.write(wb, { type: 'buffer', bookType }));
+}
+
+/** 지어낸 국민 거래내역(xls) — 1~6줄 머리(1줄 첫 칸 계좌번호, tag 로 지문을 가른다) · 7줄 제목. rows: [No, 일시, 상대, 출금, 입금, 잔액]. */
+function makeKbXls(header, { acct, rows, tag }) {
+  return sheetBytes([
+    [`계좌번호 : ${acct}`, '', '', '', '', '최초대출일 : '],
+    [`총잔액 : 0 ${tag}`], ['계좌명 : 지어낸 통장'], ['출금가능액 : 0'], ['출금합계 : 0', '', '', '', '', '입금합계 : 0'],
+    ['조회기간 : 2026.09.01 ~ 2026.09.30'],
+    header,
+    ...rows.map(([no, at, cp, out, inn, bal]) => [no, at, cp, out, inn, bal, '지어낸 표시', '', '전자금융', '지어낸 점', '']),
+  ], 'xls');
+}
+
+/** 지어낸 우리 거래내역(xlsx) — 1~3줄 머리(2줄 계좌번호 · 예금주) · 4줄 제목 · 마지막 합계 줄. rows: [No, 일시, 기재내용, 지급, 입금, 잔액]. */
+function makeWrXlsx(header, { acct, rows, tag }) {
+  return sheetBytes([
+    Array(10).fill(`우리은행 거래내역조회 ${tag}`),
+    Array(10).fill(`계좌번호 : ${acct}        예금주 : (지어낸)`),
+    Array(10).fill('조회기간 : 2026.09.01~2026.09.30     '),
+    header,
+    ...rows.map(([no, at, cp, out, inn, bal]) => [no, at, '인터넷', cp, out, inn, bal, '지어낸 점', '', 0]),
+    ['', `총 ${rows.length}건`, '', '', '0원', '0원', 0, '', '', 0],
+  ], 'xlsx');
+}
+
+/** 지어낸 하나 거래내역(xlsx) — 1줄 제목 글 · 2줄 제목 · 빈 금액 칸 · 마지막 합계 줄. ★ 계좌번호 없음. */
+function makeHnXlsx(header, { rows, tag }) {
+  return sheetBytes([
+    [`거래내역조회 ${tag}`],
+    header,
+    ...rows.map(([no, at, inn, out, bal]) => [no, at, '대체', null, '지어낸 의뢰인', inn, out, bal, '타행이체', '지어낸 점', 'null']),
+    [null, '합   계', null, null, null, 0, 0, null, null, null, null],
+  ], 'xlsx');
+}
+
+/** 지어낸 우리 이체 결과(xlsx) — 1줄 제목 글(tag) · 2줄 제목 · 마지막 합계 줄. rows: [No, 일시, 출금계좌, 받는 계좌, 금액, 결과]. */
+function makeWrXferXlsx(header, { rows, tag }) {
+  return sheetBytes([
+    Array(15).fill(`인터넷 이체 결과조회 ${tag}`),
+    header,
+    ...rows.map(([no, at, from, to, amount, done]) =>
+      [no, at, from, '지어낸은행', to, amount, 0, '', '지어낸 받는분', '지어낸 받는표시', '지어낸 보낸표시', done ?? '처리완료', '정상 처리되었습니다.', '', '']),
+    ['', `총 ${rows.length}건`, '', '', '', '0원', '0원', '', '', '', '', '', '', '', ''],
+  ], 'xlsx');
+}
+
+/**
+ * 은행 거래내역 · 이체 내역 — 계좌 고르기 · 은행 대응표 · 계좌번호 맞추기 · 개수 맞추기 · 이미 올린 줄 위치 ·
+ * 이체 덧붙이기(±60초 · 끝 4자리만) · 이체 먼저 막기 · 지우기(이체 칸 비우기 · CASCADE · 덧붙인 수 다시 세기) · 회사별 막기.
+ * ★ 값은 모두 지어낸 것. 제목 줄은 DB 의 대응표(213)에서 읽는다.
+ */
+async function bankChecks(c) {
+  const KB = '12345678901234';
+  const WR = '1234567890123';
+  const HN = '12345678901';
+  const acct = (id, org, bank, number, alias, active = true) =>
+    c.query(`INSERT INTO public.tb_s050_fin_accounts (id, org_id, kind, bank_code, number, alias, is_active)
+             VALUES ($1, $2, 'B', $3, $4, $5, $6)`, [id, org, bank, number, alias, active]);
+  await acct('v-bank-kb', ORG_A, '004', KB, '지어낸 국민');
+  await acct('v-bank-wr', ORG_A, '020', WR, '지어낸 우리');
+  await acct('v-bank-hn', ORG_A, '081', HN, null);
+  await acct('v-bank-off', ORG_A, '004', '99999999999999', '안 쓰는 통장', false);
+  await applyCompanyScope(c, tenant(ORG_B));
+  await acct('v-bank-b', ORG_B, '004', KB, '회사 B 국민');
+  await applyCompanyScope(c, tenant(ORG_A));
+
+  const sig = async (id) => (await c.query(`SELECT header_signature FROM public.tb_s050_import_maps WHERE id = $1`, [id])).rows[0]?.header_signature;
+  const [kbSig, wrSig, hnSig, xfSig] = [await sig('BANK_004_TXN'), await sig('BANK_020_TXN'), await sig('BANK_081_TXN'), await sig('BANK_020_XFER')];
+  if (!kbSig || !wrSig || !hnSig || !xfSig) throw new Error('은행 대응표가 없다 — 213 을 먼저');
+  const T = (accountId) => ({ accountId, fileTp: 'TXN' });
+  const X = (accountId) => ({ accountId, fileTp: 'XFER' });
+  const pv = (name, bytes, bank) => previewUploadOp(c, ORG_A, 'BANK', name, bytes, bank);
+  const up = (name, bytes, bank) => uploadOp(c, ORG_A, 'BANK', name, bytes, ACTOR, bank);
+  const where = (r) => (r.ok ? JSON.stringify(r.data.alreadyWhere) : 'X');
+
+  // ── 목록 — 카드 켜짐 · 계좌 선택지 · 은행마다 받는 파일 종류 ──
+  const list = await listUploadsOp(c, ORG_A, MONTH);
+  const ba = (id) => list.bankAccounts.find((a) => a.id === id);
+  check('B1', '★ 목록 — 은행 입출금 카드 켜짐 · 계좌 선택지는 사용 중인 은행 계좌만(안 쓰는 통장 · 카드 빼고) · 은행마다 받는 파일 종류(우리만 이체) · 은행 · 파일 종류 이름(코드 표)',
+    list.cards.find((x) => x.kind === 'BANK')?.enabled === true &&
+    list.bankAccounts.map((a) => a.id).sort().join() === 'v-bank-hn,v-bank-kb,v-bank-wr' &&
+    ba('v-bank-kb')?.fileTps.join() === 'TXN' && ba('v-bank-wr')?.fileTps.join() === 'TXN,XFER' && ba('v-bank-hn')?.fileTps.join() === 'TXN' &&
+    ba('v-bank-kb')?.alias === '지어낸 국민' && list.codes.banks.length >= 3 && list.codes.bankFileTps.map((x) => x.code).join() === 'TXN,XFER',
+    { accounts: list.bankAccounts, banks: list.codes.banks.length, tps: list.codes.bankFileTps });
+
+  // ── 이체 내역을 먼저 올리면 막는다 ──
+  const xf1 = makeWrXferXlsx(xfSig, { tag: 'xf1', rows: [
+    [1, '2026.09.20 10:00:01', '1234-567-890123', '111-2222-33334444', 50000],
+    [2, '2026.09.20 11:00:00', '1234-567-890123', '55566677788', 70000],
+    [3, '2026.09.20 12:00:00', '9999-999-999999', '55566677788', 30000],
+  ] });
+  const early = await pv('xf1.xlsx', xf1, X('v-bank-wr'));
+  check('B2', '★ 이체 내역을 거래내역보다 먼저 — 400 「그 계좌 거래내역을 먼저 올리세요」', !early.ok && early.status === 400 && early.error === 'no_bank_txns', early);
+
+  // ── 국민 거래내역 ──
+  const kb1 = makeKbXls(kbSig, { acct: '123456-78-901234', tag: 'kb1', rows: [
+    [1, '2026.09.01 09:10:11', '지어낸 가', 10000, 0, 90000],
+    [2, '2026.09.02 10:00:00', '지어낸 나', 0, 5000, 95000],
+    [3, '2026.09.02 10:00:00', '지어낸 다', 0, 5000, 100000],
+    [4, '2026.09.03 25:00:00', '지어낸 라', 1000, 0, 99000],
+  ] });
+  const kpv = await pv('kb1.xls', kb1, T('v-bank-kb'));
+  check('B3', '국민 미리보기 — 넣을 3줄 · 날짜 틀린 1줄(badDate) · 9월 3줄 · 앞줄(거래일시 초까지 · 내 통장 표시) · 경고 없음 · 뺀 줄 이름은 은행 거래내역 키만',
+    kpv.ok && kpv.data.kind === 'BANK' && kpv.data.bankFileTp === 'TXN' && kpv.data.toInsert === 3 && kpv.data.excluded.badDate === 1 &&
+    kpv.data.byMonth[0]?.count === 3 && kpv.data.sample[0]?.txnAt === '2026-09-01 09:10:11' && kpv.data.sample[0]?.myNote === '지어낸 표시' &&
+    kpv.data.warnings.length === 0 && kpv.data.skipReasons.map((x) => x.code).join() === 'badAmount,badDate,noAmount,bothInOut,noBalance',
+    kpv.ok ? { toInsert: kpv.data.toInsert, excluded: kpv.data.excluded, skip: kpv.data.skipReasons.map((x) => x.code) } : kpv);
+  const kup = await up('kb1.xls', kb1, T('v-bank-kb'));
+  const kbRows = (await c.query(`SELECT account_no, bank_code, to_char(txn_at, 'YYYY-MM-DD HH24:MI:SS') at, in_amount::int i, out_amount::int o, balance::int b, my_note_src
+    FROM public.tb_s050_bank_txns WHERE org_id = $1 ORDER BY txn_at, balance`, [ORG_A])).rows;
+  check('B4', '★ 국민 올리기 — 3줄 · 계좌번호 · 은행 코드 · 거래일시 초까지 · 같은 초 같은 금액 두 줄은 잔액으로 갈려 둘 다 · 파일에 은행 칸(TXN · 계좌 · 별칭)',
+    kup.ok && kup.data.insertedCount === 3 && kbRows.length === 3 && kbRows.every((r) => r.account_no === KB && r.bank_code === '004') &&
+    kbRows[0].at === '2026-09-01 09:10:11' && kbRows[0].o === 10000 && kbRows[1].b === 95000 && kbRows[2].b === 100000 && kbRows[0].my_note_src === '지어낸 표시' &&
+    kup.data.file.bankFileTp === 'TXN' && JSON.stringify(kup.data.file.account) === JSON.stringify({ bankCode: '004', accountNo: KB, alias: '지어낸 국민' }),
+    kup.ok ? { rows: kbRows.length, file: kup.data.file } : kup);
+
+  const kb2 = makeKbXls(kbSig, { acct: '123456-78-901234', tag: 'kb2', rows: [
+    [1, '2026.09.02 10:00:00', '지어낸 나', 0, 5000, 95000],
+    [2, '2026.09.02 10:00:00', '지어낸 다', 0, 5000, 100000],
+    [3, '2026.10.01 08:00:00', '지어낸 마', 2000, 0, 98000],
+  ] });
+  const kpv2 = await pv('kb2.xls', kb2, T('v-bank-kb'));
+  check('B5', '★ 겹친 기간 — 이미 올린 2줄은 건너뛰고(개수 맞추기) 새 1줄(10월) · 이미 올린 줄 위치 「9월 · kb1.xls 2줄」',
+    kpv2.ok && kpv2.data.toInsert === 1 && kpv2.data.alreadyUploaded === 2 && kpv2.data.byMonth.map((m) => m.month).join() === '2026-10' &&
+    where(kpv2) === JSON.stringify([{ month: '2026-09', fileName: 'kb1.xls', count: 2 }]), where(kpv2));
+
+  const kbOther = makeKbXls(kbSig, { acct: '999999-99-999999', tag: 'kbx', rows: [[1, '2026.09.05 09:00:00', '지어낸', 100, 0, 900]] });
+  const mism = await pv('kbx.xls', kbOther, T('v-bank-kb'));
+  const off = await pv('kb1.xls', kb1, T('v-bank-off'));
+  const noMap = await pv('kb1.xls', kb1, X('v-bank-kb'));
+  check('B6', '★ 막기 — 파일 계좌번호가 고른 계좌와 다름(account_mismatch) · 안 쓰는 계좌(no_account) · 대응표 없는 은행 파일 종류(no_import_map) — 모두 400',
+    !mism.ok && mism.error === 'account_mismatch' && !off.ok && off.error === 'no_account' && !noMap.ok && noMap.error === 'no_import_map' &&
+    [mism, off, noMap].every((r) => r.status === 400), [mism, off, noMap].map((r) => r.error));
+
+  // ── 하나 — 계좌번호 없음 경고 ──
+  const hn1 = makeHnXlsx(hnSig, { tag: 'hn1', rows: [[1, '2026-09-05 08:00:01', 3000, null, 13000], [2, '2026-09-06 08:00:02', null, 1000, 12000]] });
+  const hup = await up('hn1.xlsx', hn1, T('v-bank-hn'));
+  check('B7', '하나 — 합계 줄은 빼고 2줄 · 빈 금액 칸은 0 · 파일에 계좌번호가 없어 경고하고 받는다',
+    hup.ok && hup.data.insertedCount === 2 && hup.data.warnings.map((w) => w.code).join() === 'bank_account_unchecked', hup.ok ? hup.data : hup);
+
+  // ── 우리 거래내역 → 이체 덧붙이기 ──
+  const wr1 = makeWrXlsx(wrSig, { acct: WR, tag: 'wr1', rows: [
+    [1, '2026.09.20 10:00:00', '지어낸 보낸표시', 50000, 0, 450000],
+    [2, '2026.09.20 15:00:00', '지어낸', 50000, 0, 400000],
+    [3, '2026.09.21 09:00:00', '지어낸', 0, 10000, 410000],
+  ] });
+  const wup = await up('wr1.xlsx', wr1, T('v-bank-wr'));
+  const xpv = await pv('xf1.xlsx', xf1, X('v-bank-wr'));
+  check('B8', '★ 우리 이체 미리보기 — 1줄 짝(1초 차) · 1줄 짝 없음(경고) · 다른 계좌 1줄 뺌 · ★ 받는 계좌는 끝 4자리만(응답 어디에도 전체 번호 없음)',
+    wup.ok && wup.data.insertedCount === 3 && xpv.ok && xpv.data.bankFileTp === 'XFER' && xpv.data.toInsert === 1 && xpv.data.alreadyUploaded === 0 &&
+    xpv.data.excluded.otherAccount === 1 && xpv.data.sample.map((s) => s.status).join() === 'match,none' &&
+    xpv.data.sample[0].toAccountLast4 === '4444' && !JSON.stringify(xpv.data).includes('33334444') && !JSON.stringify(xpv.data).includes('55566677788') &&
+    xpv.data.warnings.map((w) => w.code).join() === 'xfer_unmatched' &&
+    xpv.data.skipReasons.map((x) => x.code).join() === 'badAmount,badDate,noAmount,xferNotDone,otherAccount,noToAccount',
+    xpv.ok ? { toInsert: xpv.data.toInsert, statuses: xpv.data.sample.map((s) => s.status), warnings: xpv.data.warnings } : xpv);
+  const xup = await up('xf1.xlsx', xf1, X('v-bank-wr'));
+  const att = (await c.query(`SELECT to_char(t.txn_at, 'HH24:MI:SS') at, t.xfer_bank_src, t.xfer_account_last4, t.xfer_holder_src, t.xfer_to_memo_src, t.xfer_from_memo_src, f.file_name
+    FROM public.tb_s050_bank_txns t JOIN public.tb_s050_upload_files f ON f.id = t.xfer_file_id WHERE t.org_id = $1`, [ORG_A])).rows;
+  check('B9', '★ 이체 올리기 — 10:00:00 출금 줄 하나에 받는 은행 · 끝 4자리 · 받는분 · 메모 둘을 덧붙인다 · 새 줄은 넣지 않는다 · 파일 덧붙인 수 1',
+    xup.ok && xup.data.insertedCount === 1 && xup.data.file.bankFileTp === 'XFER' && xup.data.file.insertedCount === 1 &&
+    att.length === 1 && att[0].at === '10:00:00' && att[0].xfer_bank_src === '지어낸은행' && att[0].xfer_account_last4 === '4444' &&
+    att[0].xfer_holder_src === '지어낸 받는분' && att[0].xfer_to_memo_src === '지어낸 받는표시' && att[0].xfer_from_memo_src === '지어낸 보낸표시' &&
+    (await c.query(`SELECT count(*)::int n FROM public.tb_s050_bank_txns WHERE org_id = $1`, [ORG_A])).rows[0].n === 8,
+    { up: xup.ok ? xup.data.insertedCount : xup, att });
+
+  const xf2 = makeWrXferXlsx(xfSig, { tag: 'xf2', rows: [
+    [1, '2026.09.20 10:00:01', '1234-567-890123', '111-2222-33334444', 50000],
+    [2, '2026.09.20 15:00:30', '1234-567-890123', '12121212', 50000],
+  ] });
+  const xpv2 = await pv('xf2.xlsx', xf2, X('v-bank-wr'));
+  check('B10', '★ 겹친 이체 파일 — 이미 덧붙인 줄은 건너뛰고(위치 「9월 · xf1.xlsx 1줄」) 새 1줄(15:00 출금, 30초 차)만 덧붙인다',
+    xpv2.ok && xpv2.data.toInsert === 1 && xpv2.data.alreadyUploaded === 1 && xpv2.data.sample.map((s) => s.status).join() === 'already,match' &&
+    where(xpv2) === JSON.stringify([{ month: '2026-09', fileName: 'xf1.xlsx', count: 1 }]), where(xpv2));
+
+  // ── 지우기 ──
+  const files = (await listUploadsOp(c, ORG_A, MONTH)).files;
+  const fid = (name) => files.find((f) => f.fileName === name)?.id;
+  const chkX = await deleteUploadsOp(c, ORG_A, [fid('xf1.xlsx')], true);
+  const delX = await deleteUploadsOp(c, ORG_A, [fid('xf1.xlsx')]);
+  const left = (await c.query(`SELECT count(*)::int n, count(xfer_file_id)::int x FROM public.tb_s050_bank_txns WHERE org_id = $1`, [ORG_A])).rows[0];
+  check('B11', '★ 이체 파일 지우기 — 확인: 빠질 줄 0 · 덧붙인 정보 1줄이 지워짐 / 지우면 이체 칸만 비우고 거래내역 줄은 그대로',
+    chkX.ok && chkX.data.deletedRows === 0 && chkX.data.xferDetached === 1 && delX.ok && delX.data.deletedFiles === 1 && left.n === 8 && left.x === 0,
+    { chk: chkX.ok ? chkX.data : chkX, left });
+
+  const xup3 = await up('xf1.xlsx', xf1, X('v-bank-wr'));
+  const files2 = (await listUploadsOp(c, ORG_A, MONTH)).files;
+  const wrId = files2.find((f) => f.fileName === 'wr1.xlsx')?.id;
+  const chkW = await deleteUploadsOp(c, ORG_A, [wrId], true);
+  const delW = await deleteUploadsOp(c, ORG_A, [wrId]);
+  const xFile = (await listUploadsOp(c, ORG_A, MONTH)).files.find((f) => f.fileName === 'xf1.xlsx');
+  const xFileAny = (await c.query(`SELECT count(*)::int n FROM public.tb_s050_upload_files WHERE org_id = $1 AND file_name = 'xf1.xlsx'`, [ORG_A])).rows[0].n;
+  check('B12', '★ 거래내역 파일 지우기 — 확인: 빠질 줄 3 · 덧붙인 이체 1줄도 빠짐 / 지우면 줄이 함께(CASCADE) · 이체 파일 기록은 남고 덧붙인 수는 다시 세어 0',
+    xup3.ok && xup3.data.insertedCount === 1 && chkW.ok && chkW.data.deletedRows === 3 && chkW.data.xferDetached === 1 &&
+    delW.ok && delW.data.deletedFiles === 1 && xFileAny === 1 && (xFile === undefined || xFile.insertedCount === 0),
+    { chk: chkW.ok ? chkW.data : chkW, xFile, xFileAny });
+
+  // ── 회사별 막기 ──
+  await applyCompanyScope(c, tenant(ORG_B));
+  const bUseA = await previewUploadOp(c, ORG_B, 'BANK', 'kb1.xls', kb1, T('v-bank-kb'));
+  const bOwn = await previewUploadOp(c, ORG_B, 'BANK', 'kb1.xls', kb1, T('v-bank-b'));
+  const bList = await listUploadsOp(c, ORG_B, MONTH);
+  check('B13', '★ 회사 B — 회사 A 의 계좌 id 는 못 쓴다(no_account) · 자기 계좌로는 같은 파일도 새 줄 3(이미 올린 줄 위치 없음) · 계좌 선택지는 자기 것만',
+    !bUseA.ok && bUseA.error === 'no_account' && bOwn.ok && bOwn.data.toInsert === 3 && bOwn.data.alreadyWhere.length === 0 && bOwn.data.sameFile === null &&
+    bList.bankAccounts.map((a) => a.id).join() === 'v-bank-b', { bUseA: bUseA.ok || bUseA.error, bOwn: bOwn.ok ? bOwn.data.toInsert : bOwn });
+  await applyCompanyScope(c, tenant(ORG_A));
+}
+
 /** 같은 트랜잭션 안에서 실패할 수 있는 일 — 실패하면 그 자리까지만 되돌린다. */
 async function attempt(c, fn) {
   await c.query('SAVEPOINT s');
@@ -230,9 +444,10 @@ async function main() {
       // ── 목록 ──
       const ups = await listUploadsOp(c, ORG_A, MONTH);
       const inv = ups.cards.find((k) => k.kind === 'INVOICE');
-      check('U11', '자료 올리기 목록 — 계산서 · 카드 · 현금 카드가 열림(1-4) · 그 달 파일 수 · 코드 이름은 코드 표에서',
+      // ★ 1-5(2026-11-01): 은행 입출금(BANK) 카드도 열린다
+      check('U11', '자료 올리기 목록 — 계산서 · 카드 · 현금 · 은행 카드가 열림(1-4 · 1-5) · 그 달 파일 수 · 코드 이름은 코드 표에서',
         inv?.enabled === true && inv.fileCount === 6 &&
-        ups.cards.filter((k) => k.enabled).map((k) => k.kind).join() === 'INVOICE,CARD,CASH' &&
+        ups.cards.filter((k) => k.enabled).map((k) => k.kind).join() === 'INVOICE,CARD,CASH,BANK' &&
         ups.files.length === 6 && ups.codes.invDirs.map((d) => d.code).join() === 'P,S' &&
         // 카드 설명은 코드 설명 칸에서(비어 있으면 null) · 사업자 유형 이름(설정이 없으면 null)
         ups.codes.kinds.every((k) => 'description' in k) && 'bizTypeName' in ups && ups.bizTypeName === null,
@@ -447,6 +662,8 @@ async function main() {
         bCard.ok && bCard.data.toInsert === 4 && bCard.data.sameFile === null && bCard.data.alreadyWhere?.length === 0 &&
         bCard.data.warnings.find((w) => w.code === 'card_unregistered')?.count === 4, bCard.ok ? bCard.data.warnings : bCard);
       await applyCompanyScope(c, tenant(ORG_A));
+
+      await bankChecks(c);
     } finally {
       await c.query('ROLLBACK');
     }
@@ -458,8 +675,9 @@ async function main() {
       const n = async (t) => (await c.query(`SELECT count(*)::int n FROM public.${t} WHERE org_id = ANY($1)`, [[ORG_A, ORG_B]])).rows[0].n;
       const [f, v, i] = [await n('tb_s050_upload_files'), await n('tb_s050_vendors'), await n('tb_s050_invoices')];
       const [cd, cs, st, fa] = [await n('tb_s050_card_txns'), await n('tb_s050_cash_txns'), await n('tb_s050_settings'), await n('tb_s050_fin_accounts')];
-      check('Z1', '롤백 후 시험 줄 0 (운영사 스코프로 센다)', f === 0 && v === 0 && i === 0 && cd === 0 && cs === 0 && st === 0 && fa === 0,
-        `파일 ${f} · 거래처 ${v} · 계산서 ${i} · 카드 ${cd} · 현금 ${cs} · 설정 ${st} · 계좌·카드 ${fa}`);
+      const bk = await n('tb_s050_bank_txns');
+      check('Z1', '롤백 후 시험 줄 0 (운영사 스코프로 센다)', f === 0 && v === 0 && i === 0 && cd === 0 && cs === 0 && st === 0 && fa === 0 && bk === 0,
+        `파일 ${f} · 거래처 ${v} · 계산서 ${i} · 카드 ${cd} · 현금 ${cs} · 설정 ${st} · 계좌·카드 ${fa} · 은행 ${bk}`);
     } finally {
       await c.query('ROLLBACK');
     }

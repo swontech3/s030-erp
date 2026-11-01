@@ -17,6 +17,16 @@ export type { TaxUploadDeleteResult, TaxUploadPreview, TaxUploadResult, TaxUploa
 /** 자료 종류(TAX_KIND 코드값). 올릴 수 있는지는 서버가 카드마다 준다(`cards[].enabled`). */
 export const KIND_INVOICE = 'INVOICE';
 export const KIND_CASH = 'CASH';
+/** 은행 입출금(1-5) — 올릴 때 계좌 · 파일 종류(거래내역 · 이체 내역)를 함께 보낸다. */
+export const KIND_BANK = 'BANK';
+export const BANK_FILE_TXN = 'TXN';
+export const BANK_FILE_XFER = 'XFER';
+
+/** 은행 파일을 올릴 때 고른 것 — 계좌는 세무 설정 계좌 id(서버가 그 단체 것인지 본다). */
+export interface BankChoice {
+  accountId: string;
+  fileTp: string;
+}
 /** [보기]로 항목 지정 「이번 달 자료 전체」에 보낼 수 있는 파일 — 계산서 · 카드 · 현금(1-4). */
 export const VIEWABLE_KINDS: readonly string[] = [KIND_INVOICE, 'CARD', KIND_CASH];
 
@@ -75,11 +85,16 @@ const fileInit = (file: File, mime: string): RequestInit => ({
 export const loadUploads = (month: string) =>
   call<TaxUploadsResponse>(`/api/tax/uploads?month=${encodeURIComponent(month)}`);
 
-export const previewUpload = (kind: string, file: File, mime: string) =>
-  call<TaxUploadPreview>(`/api/tax/uploads/preview?kind=${encodeURIComponent(kind)}`, fileInit(file, mime));
+/** `?kind=` (+ 은행이면 `&account=&fileTp=`). */
+const kindQuery = (kind: string, bank: BankChoice | null) =>
+  `kind=${encodeURIComponent(kind)}` +
+  (bank ? `&account=${encodeURIComponent(bank.accountId)}&fileTp=${encodeURIComponent(bank.fileTp)}` : '');
 
-export const uploadFile = (kind: string, file: File, mime: string) =>
-  call<TaxUploadResult>(`/api/tax/uploads?kind=${encodeURIComponent(kind)}`, fileInit(file, mime));
+export const previewUpload = (kind: string, file: File, mime: string, bank: BankChoice | null = null) =>
+  call<TaxUploadPreview>(`/api/tax/uploads/preview?${kindQuery(kind, bank)}`, fileInit(file, mime));
+
+export const uploadFile = (kind: string, file: File, mime: string, bank: BankChoice | null = null) =>
+  call<TaxUploadResult>(`/api/tax/uploads?${kindQuery(kind, bank)}`, fileInit(file, mime));
 
 const idsInit = (ids: string[]): RequestInit => ({
   method: 'POST',
@@ -99,6 +114,9 @@ export function shortStamp(iso: string): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+
+/** 「09.01 09:10」 — 은행 거래일시(`YYYY-MM-DD HH:MM:SS`)를 미리보기 칸에. */
+export const shortDateTime = (at: string): string => `${at.slice(5, 7)}.${at.slice(8, 10)} ${at.slice(11, 16)}`;
 
 /** 금액 — 쉼표. */
 export const won = (n: number): string => n.toLocaleString('ko-KR');

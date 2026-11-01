@@ -73,8 +73,9 @@ async function run(q) {
   const transfer = pays.find((p) => p.code === 'TRANSFER');
   check('C3', 'TRANSFER 설명 칸에 「직원 정산」 뜻', !!transfer?.description && transfer.description.includes('직원 정산'), String(transfer?.description));
 
-  const skip = await q(`SELECT code, name, use_tp, sort_order, is_active FROM public.tb_s080_codes_line
-    WHERE build_id = '1' AND category = 'TAX_SKIP_REASON' ORDER BY sort_order, code`);
+  // ★ 213(2026-11-01)이 은행 뺀 줄 종류 다섯(13~17)을 더했다 — 앞 12줄(1~12번)만 견준다(13번부터는 verify-213)
+  const skip = (await q(`SELECT code, name, use_tp, sort_order, is_active FROM public.tb_s080_codes_line
+    WHERE build_id = '1' AND category = 'TAX_SKIP_REASON' ORDER BY sort_order, code`)).filter((l) => l.sort_order <= 12);
   check('C4', '★ TAX_SKIP_REASON — bothAmounts 없음 · badDirection 더함 · 순서 1~12 빈틈 없이 · 모두 켜짐',
     skip.map((l) => l.code).join(',') === SKIP.join(',') && skip.every((l, i) => l.sort_order === i + 1 && l.use_tp === '000' && l.is_active),
     skip.map((l) => `${l.sort_order}.${l.code}`).join(' '));

@@ -9,6 +9,8 @@
  * ★ 계산서 FK 는 (org_id, file_id) · (org_id, vendor_id) 로 단체까지 묶여 있다 — 남의 단체 id 는 DB 가 막는다.
  * ★ 1-4(2026-10-30): 올린 파일의 줄은 세 표(계산서 · 카드 208 · 현금 208)에 있다 — 파일 목록 · 파일 수 · 지울 줄 수 ·
  *   거래처 건수 · 합치기는 세 표를 함께 본다(`FILE_ROWS_SQL`). 현금 줄은 거래처를 가리키지 않는다.
+ * ★ 1-5(2026-11-01): 은행 거래내역 줄(212)도 파일 목록 · 파일 수 · 지울 줄 수에 든다. 이체 파일은 줄을 넣지 않고
+ *   거래내역 줄에 덧붙이므로 그 달을 덧붙인 줄로 본다(`FILE_MONTH_SQL`). 은행 줄은 거래처를 가리키지 않는다.
  */
 import { randomUUID } from 'node:crypto';
 import type {
@@ -36,12 +38,19 @@ export function monthRange(month: string): [string, string] {
 }
 
 /**
- * 세 표의 (단체, 파일, 날짜) — 계산서 작성일 · 카드 사용일 · 현금 날짜. 파일 목록 · 파일 수가 이것으로 그 달을 본다.
+ * 네 표의 (단체, 파일, 날짜) — 계산서 작성일 · 카드 사용일 · 현금 날짜 · 은행 거래일(1-5). 지울 줄 수가 이것으로 센다.
  * ★ 바깥 질의가 `org_id = $1` 을 건다(이 조각은 단체를 거르지 않는다).
  */
 const FILE_ROWS_SQL = `(SELECT org_id, file_id, write_date AS d FROM public.tb_s050_invoices
                        UNION ALL SELECT org_id, file_id, use_date FROM public.tb_s050_card_txns
-                       UNION ALL SELECT org_id, file_id, use_date FROM public.tb_s050_cash_txns)`;
+                       UNION ALL SELECT org_id, file_id, use_date FROM public.tb_s050_cash_txns
+                       UNION ALL SELECT org_id, file_id, txn_at::date FROM public.tb_s050_bank_txns)`;
+/**
+ * 파일 목록 · 파일 수가 그 달을 보는 줄 — 위에 더해 **이체 파일**은 덧붙인 출금 줄의 거래일로 본다(1-5).
+ * ★ 지울 줄 수에는 쓰지 않는다 — 이체 파일을 지워도 그 줄은 빠지지 않는다(이체 칸만 비움).
+ */
+const FILE_MONTH_SQL = `(SELECT org_id, file_id, d FROM ${FILE_ROWS_SQL} r
+                        UNION ALL SELECT org_id, xfer_file_id, txn_at::date FROM public.tb_s050_bank_txns WHERE xfer_file_id IS NOT NULL)`;
 
 /* ── 대응표 ──────────────────────────────────────────────────────────────── */
 
@@ -79,6 +88,10 @@ interface FileRow {
   row_count: number;
   inserted_count: number;
   uploaded_at: Date | string;
+  bank_file_tp: string | null;
+  bank_code: string | null;
+  account_no: string | null;
+  account_alias: string | null;
 }
 const fileView = (r: FileRow): TaxUploadFileView => ({
   id: r.id,
@@ -88,8 +101,20 @@ const fileView = (r: FileRow): TaxUploadFileView => ({
   rowCount: r.row_count,
   insertedCount: r.inserted_count,
   uploadedAt: iso(r.uploaded_at),
+  bankFileTp: r.bank_file_tp,
+  account: r.bank_code !== null && r.account_no !== null ? { bankCode: r.bank_code, accountNo: r.account_no, alias: r.account_alias } : null,
 });
-const FILE_COLS = 'f.id, f.kind, f.direction, f.file_name, f.row_count, f.inserted_count, f.uploaded_at';
+/**
+ * ★ 이체 파일(XFER)의 들어간 줄 수는 **지금 덧붙어 있는 줄**로 다시 센다(결정 14 — 거래내역 파일을 지우면 줄어든다).
+ * ★ 은행 파일의 계좌 별칭은 세무 설정에서 번호로 찾는다(FK 없음 — 지웠거나 번호를 고쳤으면 null).
+ */
+const FILE_COLS = `f.id, f.kind, f.direction, f.file_name, f.row_count,
+  CASE WHEN f.bank_file_tp = 'XFER'
+       THEN (SELECT count(*)::int FROM public.tb_s050_bank_txns b WHERE b.org_id = f.org_id AND b.xfer_file_id = f.id)
+       ELSE f.inserted_count END AS inserted_count,
+  f.uploaded_at, f.bank_file_tp, f.bank_code, f.account_no,
+  (SELECT a.alias FROM public.tb_s050_fin_accounts a
+    WHERE a.org_id = f.org_id AND a.kind = 'B' AND a.number = f.account_no ORDER BY a.sort_order, a.id LIMIT 1) AS account_alias`;
 
 /** 같은 파일(지문). */
 export async function findFileByHash(client: ScopedClient, orgId: number, hash: string): Promise<TaxUploadFileView | null> {
@@ -111,7 +136,7 @@ export async function listUploadFiles(client: ScopedClient, orgId: number, month
     `SELECT ${FILE_COLS}
        FROM public.tb_s050_upload_files f
       WHERE f.org_id = $1
-        AND (EXISTS (SELECT 1 FROM ${FILE_ROWS_SQL} i
+        AND (EXISTS (SELECT 1 FROM ${FILE_MONTH_SQL} i
                       WHERE i.org_id = f.org_id AND i.file_id = f.id AND i.d >= $2::date AND i.d < $3::date)
              OR (f.inserted_count = 0 AND f.uploaded_at >= $2::date AND f.uploaded_at < $3::date))
       ORDER BY f.uploaded_at DESC, f.id`,
@@ -127,7 +152,7 @@ export async function countFilesByKind(client: ScopedClient, orgId: number, mont
     client,
     `SELECT f.kind, count(DISTINCT f.id)::int AS n
        FROM public.tb_s050_upload_files f
-       JOIN ${FILE_ROWS_SQL} i ON i.org_id = f.org_id AND i.file_id = f.id
+       JOIN ${FILE_MONTH_SQL} i ON i.org_id = f.org_id AND i.file_id = f.id
       WHERE f.org_id = $1 AND i.d >= $2::date AND i.d < $3::date
       GROUP BY f.kind`,
     [orgId, from, to],
@@ -168,16 +193,20 @@ export interface NewUploadFile {
   fileSize: number;
   rowCount: number;
   insertedCount: number;
+  /** 은행 파일만(212 CHECK) — 파일 종류 · 고른 계좌번호 · 은행. 다른 자료는 없음. */
+  bank?: { fileTp: string; accountNo: string; bankCode: string };
 }
 
 export async function insertUploadFile(client: ScopedClient, orgId: number, f: NewUploadFile, actor: string): Promise<TaxUploadFileView> {
   const { rows } = await q<FileRow>(
     client,
     `INSERT INTO public.tb_s050_upload_files AS f
-       (id, org_id, kind, map_id, direction, file_name, file_hash, file_size, row_count, inserted_count, uploaded_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       (id, org_id, kind, map_id, direction, file_name, file_hash, file_size, row_count, inserted_count, uploaded_by,
+        bank_file_tp, account_no, bank_code)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      RETURNING ${FILE_COLS}`,
-    [randomUUID(), orgId, f.kind, f.mapId, f.direction, f.fileName, f.fileHash, f.fileSize, f.rowCount, f.insertedCount, actor],
+    [randomUUID(), orgId, f.kind, f.mapId, f.direction, f.fileName, f.fileHash, f.fileSize, f.rowCount, f.insertedCount, actor,
+      f.bank?.fileTp ?? null, f.bank?.accountNo ?? null, f.bank?.bankCode ?? null],
   );
   return fileView(rows[0]!);
 }
@@ -237,7 +266,10 @@ export async function countRowsOfFiles(client: ScopedClient, orgId: number, ids:
   return rows[0]?.n ?? 0;
 }
 
-/** 지우는 파일 중 가장 먼저 올린 것보다 **뒤에** 올린 파일 중 건너뛴 줄이 있는 것. */
+/**
+ * 지우는 파일 중 가장 먼저 올린 것보다 **뒤에** 올린 파일 중 건너뛴 줄이 있는 것.
+ * ★ 이체 파일(XFER)은 뺀다 — 그 파일의 「건너뛴 줄」은 짝 못 찾은 이체 줄이라 겹침과 관계없다(1-5).
+ */
 export async function laterFilesWithSkips(
   client: ScopedClient,
   orgId: number,
@@ -250,6 +282,7 @@ export async function laterFilesWithSkips(
       WHERE f.org_id = $1
         AND f.id <> ALL($2::text[])
         AND f.row_count > f.inserted_count
+        AND f.bank_file_tp IS DISTINCT FROM 'XFER'
         AND f.uploaded_at >= (SELECT min(d.uploaded_at) FROM public.tb_s050_upload_files d
                               WHERE d.org_id = $1 AND d.id = ANY($2::text[]))
       ORDER BY f.uploaded_at, f.id`,

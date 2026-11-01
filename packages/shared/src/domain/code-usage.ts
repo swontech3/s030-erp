@@ -177,6 +177,12 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
   { category: 'TAX_INV_DIR', useTp: '000', table: 'tb_s050_cash_txns', column: 'direction', label: '세무 현금 경비' },
   { category: 'TAX_PAY_METHOD', useTp: '000', table: 'tb_s050_cash_txns', column: 'pay_method', label: '세무 현금 경비' },
   { category: 'TAX_PROOF', useTp: '000', table: 'tb_s050_cash_txns', column: 'proof', label: '세무 현금 경비' },
+  /** 은행 거래내역 · 이체 내역(212 · 213, 2026-11-01) — 은행 코드 · 은행 파일 종류. */
+  { category: 'BANK', useTp: '000', table: 'tb_s050_bank_txns', column: 'bank_code', label: '세무 은행 거래내역' },
+  { category: 'BANK', useTp: '000', table: 'tb_s050_upload_files', column: 'bank_code', label: '세무 올린 파일' },
+  { category: 'BANK', useTp: '000', table: 'tb_s050_import_maps', column: 'bank_code', label: '세무 대응표' },
+  { category: 'TAX_BANK_FILE', useTp: '000', table: 'tb_s050_upload_files', column: 'bank_file_tp', label: '세무 올린 파일' },
+  { category: 'TAX_BANK_FILE', useTp: '000', table: 'tb_s050_import_maps', column: 'bank_file_tp', label: '세무 대응표' },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */
@@ -362,6 +368,22 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     codes: ['TRANSFER'],
     source: 'packages/shared/src/domain/tax-card-cash.ts (TAX_PAY_METHOD_TRANSFER)',
     label: '세무 결제방법 직원 정산',
+  },
+  /** 은행 파일 종류 — 212 CHECK(올린 파일 · 대응표)가 TXN · XFER 에 기댄다. 2026-11-01 추가. */
+  {
+    category: 'TAX_BANK_FILE',
+    useTp: '000',
+    codes: ['TXN', 'XFER'],
+    source: 'supabase/migrations/212_tax_bank_txns.sql (ck_s050_upload_files_bank_file_tp · ck_s050_import_maps_bank_file_tp)',
+    label: '세무 은행 파일 종류',
+  },
+  /** 은행 뺀 줄 종류(213) — 위 뺀 줄 종류와 같은 이유. 날짜 · 금액은 badDate · badAmount · noAmount 를 함께 쓴다. */
+  {
+    category: 'TAX_SKIP_REASON',
+    useTp: '000',
+    codes: ['bothInOut', 'noBalance', 'xferNotDone', 'otherAccount', 'noToAccount'],
+    source: 'packages/shared/src/domain/tax-bank.ts (BankTxnExcluded · BankXferExcluded)',
+    label: '세무 은행 뺀 줄 종류',
   },
 ] as const;
 

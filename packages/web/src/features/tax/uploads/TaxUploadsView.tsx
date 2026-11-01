@@ -13,6 +13,11 @@
  *   ★ [보기](1-3, 2026-10-27) — 한 줄만 골랐고 계산서 · 카드 · 현금 파일일 때 눌린다. 항목 지정 「이번 달 자료 전체」 + 그 파일 줄만으로 간다
  *     (`/tax/classify?month=&view=all&file=`, 결과서 0-7). 다른 자료는 받을 화면이 아직 없어 막는다.
  *     짝 맞추기가 없어 「짝이 풀립니다」 문장도 뺐다.
+ *   ★ 1-5(2026-11-01): 「은행 입출금」 카드가 켜진다. 업로드 창에서 **계좌**(세무 설정 은행 계좌, 「사용 안 함」 제외)와
+ *     **파일 종류**(거래내역 · 이체 내역 — 코드 TAX_BANK_FILE)를 고른다. 기관(은행)은 따로 고르지 않는다(대표 결정 — 결과서와 다름).
+ *     계좌가 없으면 「등록된 계좌가 없습니다 · [세무 설정에서 추가]」 + [파일 고르기] 막힘. 그 은행의 대응표가 없는 파일 종류는 막고 안내.
+ *     미리보기 — 거래내역: 거래일시 · 내용 · 입금 · 출금 두 칸 / 이체 내역: 이체일시 · 받는분(받는 은행 · 끝 4자리) · 금액 · 짝.
+ *     ★ 받는 계좌번호는 끝 4자리만 보인다(서버가 그것만 준다). 은행 파일 [보기]는 받을 화면(S05-04)이 없어 막는다.
  *
  * ★★ 이름 · 설명 · 선택지는 **API 가 준 코드 값으로만** 그린다(자료 종류 · 계산서 구분 · 뺀 줄 종류 · 사업자 유형).
  *    예외는 「삐용 경비」 카드 이름 하나다 — 자료 종류 코드가 아니다(1-2 는 「준비 중」으로만 그린다).
@@ -29,6 +34,9 @@ import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { TaxMonthBar, monthShort, todayNote } from '../common/TaxMonthBar';
 import { TaxToast, useTaxToast } from '../common/TaxToast';
 import {
+  BANK_FILE_TXN,
+  BANK_FILE_XFER,
+  KIND_BANK,
   KIND_CASH,
   TaxUploadError,
   VIEWABLE_KINDS,
@@ -36,11 +44,13 @@ import {
   deleteFiles,
   loadUploads,
   previewUpload,
+  shortDateTime,
   shortStamp,
   spreadsheetMimeOf,
   templateHref,
   uploadFile,
   won,
+  type BankChoice,
   type TaxUploadDeleteResult,
   type TaxUploadPreview,
   type TaxUploadsResponse,
@@ -102,6 +112,10 @@ export function TaxUploadsView({ month }: { month: string }) {
   }
 
   const kindName = (code: string) => data.codes.kinds.find((k) => k.code === code)?.name ?? code;
+  const bankFileName = (code: string) => data.codes.bankFileTps.find((x) => x.code === code)?.name ?? code;
+  /** 「국민은행 · 운영 통장」 — 별칭이 없으면(지웠거나 비움) 계좌번호. 은행 이름은 코드 표(BANK). */
+  const accountLabel = (a: { bankCode: string; accountNo: string; alias: string | null }) =>
+    `${data.codes.banks.find((b) => b.code === a.bankCode)?.name ?? a.bankCode} · ${a.alias ?? a.accountNo}`;
   const dirName = (code: string | null) => (code ? (data.codes.invDirs.find((d) => d.code === code)?.name ?? code) : '—');
   const enabled = data.cards.filter((c) => c.enabled);
   const up = enabled.filter((c) => c.fileCount > 0 || c.unused).length;
@@ -140,7 +154,7 @@ export function TaxUploadsView({ month }: { month: string }) {
         <div>
           <h1>자료 올리기</h1>
           <p>
-            {monthShort(month)} 자료를 엑셀로 올립니다. 은행은 기관을 고르면 시스템 표준양식으로 바뀝니다. 날짜가 다른 달인 줄은
+            {monthShort(month)} 자료를 엑셀로 올립니다. 은행은 계좌를 고르면 시스템 표준양식으로 바뀝니다. 날짜가 다른 달인 줄은
             그 달로 들어갑니다.
           </p>
         </div>
@@ -289,8 +303,11 @@ export function TaxUploadsView({ month }: { month: string }) {
                           onClick={(e) => e.stopPropagation()}
                         />
                       </td>
-                      <td>{kindName(f.kind)}</td>
-                      <td className={`${t.mut} ${t.ell}`}>{dirName(f.direction)}</td>
+                      <td>
+                        {kindName(f.kind)}
+                        {f.bankFileTp === BANK_FILE_XFER ? ` · ${bankFileName(f.bankFileTp)}` : ''}
+                      </td>
+                      <td className={`${t.mut} ${t.ell}`}>{f.account ? accountLabel(f.account) : dirName(f.direction)}</td>
                       <td className={t.ell} title={f.fileName}>
                         {f.fileName}
                       </td>
@@ -336,6 +353,7 @@ export function TaxUploadsView({ month }: { month: string }) {
                 </span>
               ))}
               {won(confirm.check.deletedRows)}줄이 빠집니다.
+              {confirm.check.xferDetached > 0 ? ` 덧붙인 이체 정보 ${won(confirm.check.xferDetached)}줄도 지워집니다.` : ''}
               {confirm.check.laterFilesWithSkips.length > 0 ? (
                 <>
                   <br />
@@ -373,7 +391,20 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const k = data.codes.kinds.find((x) => x.code === kind);
-  const canUse = data.cards.find((c) => c.kind === kind)?.enabled ?? false;
+  // 은행(1-5) — 계좌 · 파일 종류. 계좌는 첫 계좌, 파일 종류는 거래내역으로 시작한다
+  const isBank = kind === KIND_BANK;
+  const [accountId, setAccountId] = useState(data.bankAccounts[0]?.id ?? '');
+  const [fileTp, setFileTp] = useState(BANK_FILE_TXN);
+  const account = data.bankAccounts.find((a) => a.id === accountId) ?? null;
+  const bankOk = !isBank || (!!account && account.fileTps.includes(fileTp));
+  const bank: BankChoice | null = isBank && account ? { accountId: account.id, fileTp } : null;
+  const isXfer = isBank && fileTp === BANK_FILE_XFER;
+  const canUse = (data.cards.find((c) => c.kind === kind)?.enabled ?? false) && bankOk;
+  const bankName = (code: string) => data.codes.banks.find((b) => b.code === code)?.name ?? code;
+  const resetFile = () => {
+    setPicked(null);
+    setError(null);
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -394,7 +425,7 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
     }
     setBusy(true);
     try {
-      setPicked({ file, mime, preview: await previewUpload(kind, file, mime) });
+      setPicked({ file, mime, preview: await previewUpload(kind, file, mime, bank) });
     } catch (err) {
       setError(err instanceof TaxUploadError ? err.message : '파일을 확인하지 못했습니다');
     } finally {
@@ -417,8 +448,8 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
     setBusy(true);
     setError(null);
     try {
-      await uploadFile(kind, picked.file, picked.mime);
-      onDone(`올렸습니다 · ${p.byMonth.map((m) => `${monthShort(m.month)} ${won(m.count)}줄`).join(', ')}`);
+      await uploadFile(kind, picked.file, picked.mime, bank);
+      onDone(`${isXfer ? '덧붙였습니다' : '올렸습니다'} · ${p.byMonth.map((m) => `${monthShort(m.month)} ${won(m.count)}줄`).join(', ')}`);
     } catch (err) {
       setError(err instanceof TaxUploadError ? err.message : '올리지 못했습니다');
       setBusy(false);
@@ -470,7 +501,72 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
                 ))}
               </select>
             </label>
+            {isBank && data.bankAccounts.length > 0 ? (
+              <>
+                <label className={t.field}>
+                  <span className={t.lab}>계좌</span>
+                  <select
+                    className={t.select}
+                    value={accountId}
+                    onChange={(e) => {
+                      setAccountId(e.target.value);
+                      resetFile();
+                    }}
+                  >
+                    {data.bankAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.alias ? `${a.alias} · ` : ''}
+                        {bankName(a.bankCode)} {a.number}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={t.field}>
+                  <span className={t.lab}>파일 종류</span>
+                  <select
+                    className={t.select}
+                    value={fileTp}
+                    onChange={(e) => {
+                      setFileTp(e.target.value);
+                      resetFile();
+                    }}
+                  >
+                    {data.codes.bankFileTps.map((x) => (
+                      <option key={x.code} value={x.code}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            ) : null}
           </div>
+
+          {isBank && data.bankAccounts.length === 0 ? (
+            <div className={`${t.note} ${t.noteWarn}`}>
+              <span>
+                <Icon name="triangle-alert" size={16} />
+              </span>
+              <span>
+                등록된 계좌가 없습니다 ·{' '}
+                <Link href="/tax/settings" className={`${t.btn} ${t.btnLink}`}>
+                  세무 설정에서 추가
+                </Link>
+              </span>
+            </div>
+          ) : null}
+          {isBank && account && !account.fileTps.includes(fileTp) ? (
+            <div className={`${t.note} ${t.noteWarn}`}>
+              <span>
+                <Icon name="triangle-alert" size={16} />
+              </span>
+              <span>
+                {account.fileTps.length === 0
+                  ? `${bankName(account.bankCode)} 파일은 아직 받지 못합니다`
+                  : `${bankName(account.bankCode)}의 ${data.codes.bankFileTps.find((x) => x.code === fileTp)?.name ?? fileTp}은 아직 받지 못합니다`}
+              </span>
+            </div>
+          ) : null}
 
           <div
             className={`${t.drop} ${over ? t.dropOn : ''}`}
@@ -556,7 +652,8 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
                   <Icon name="info" size={16} />
                 </span>
                 <span>
-                  넣을 줄 <b>{won(p.toInsert)}</b> · {p.kind === 'INVOICE' ? '이미 올린 승인번호라' : '이미 올린 줄이라'} 건너뛸 줄{' '}
+                  {isXfer ? '덧붙일 줄' : '넣을 줄'} <b>{won(p.toInsert)}</b> ·{' '}
+                  {p.kind === 'INVOICE' ? '이미 올린 승인번호라' : isXfer ? '이미 덧붙인 줄이라' : '이미 올린 줄이라'} 건너뛸 줄{' '}
                   <b>{won(p.alreadyUploaded)}</b>
                   {skipped.length > 0
                     ? ` · 뺀 줄 ${skipped.map((s) => `${s.name} ${won(excludedOf(s.code))}`).join(' · ')}`
@@ -589,7 +686,7 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
             취소
           </button>
           <button type="button" className={`${t.btn} ${t.btnPrimary}`} disabled={!ready} onClick={doUpload}>
-            {ready ? `${won(total)}줄 올리기` : '올리기'}
+            {ready ? `${won(total)}줄 ${isXfer ? '덧붙이기' : '올리기'}` : '올리기'}
           </button>
         </div>
       </div>
@@ -600,6 +697,14 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
 /* ── 미리보기 표 — 자료 종류마다 칸이 다르다(결과서 S05-02 9-4, 1-4) ─────────── */
 
 const md = (date: string) => date.slice(5).replace('-', '.');
+
+/** 이체 줄의 짝 상태 — 미리보기 「짝」 칸 글자. */
+const XFER_STATUS: Record<'match' | 'none' | 'ambiguous' | 'already', string> = {
+  match: '찾음',
+  none: '못 찾음',
+  ambiguous: '정할 수 없음',
+  already: '이미 덧붙임',
+};
 
 function PreviewTable({ preview: p, dirName }: { preview: TaxUploadPreview; dirName: (code: string) => string }) {
   const more = (cols: number) => (
@@ -634,6 +739,76 @@ function PreviewTable({ preview: p, dirName }: { preview: TaxUploadPreview; dirN
               <td className={`${t.mut} ${t.tnum}`}>끝 {r.cardLast4}</td>
               <td className={t.ell}>{r.merchantName}</td>
               <td className={t.num}>{won(r.totalAmount)}</td>
+            </tr>
+          ))}
+          {more(4)}
+        </tbody>
+      </table>
+    );
+  }
+  if (p.kind === 'BANK' && p.bankFileTp === 'TXN') {
+    // 입금 · 출금 두 칸(대표 결정 16). 내용 = 상대(없으면 적요)
+    return (
+      <table className={t.tbl}>
+        <colgroup>
+          <col style={{ width: 100 }} />
+          <col />
+          <col style={{ width: 120 }} />
+          <col style={{ width: 120 }} />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>거래일시</th>
+            <th>내용</th>
+            <th className={t.num}>입금</th>
+            <th className={t.num}>출금</th>
+          </tr>
+        </thead>
+        <tbody>
+          {p.sample.map((r, i) => (
+            <tr key={i}>
+              <td className={t.tnum}>{shortDateTime(r.txnAt)}</td>
+              <td className={t.ell}>{r.counterparty ?? r.description ?? ''}</td>
+              <td className={t.num}>{r.inAmount > 0 ? won(r.inAmount) : ''}</td>
+              <td className={t.num}>{r.outAmount > 0 ? won(r.outAmount) : ''}</td>
+            </tr>
+          ))}
+          {more(4)}
+        </tbody>
+      </table>
+    );
+  }
+  if (p.kind === 'BANK') {
+    // 이체 — ★ 받는 계좌는 끝 4자리만. 짝 = 그 계좌 출금 줄(±60초 · 같은 금액)
+    return (
+      <table className={t.tbl}>
+        <colgroup>
+          <col style={{ width: 100 }} />
+          <col />
+          <col style={{ width: 120 }} />
+          <col style={{ width: 110 }} />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>이체일시</th>
+            <th>받는분</th>
+            <th className={t.num}>금액</th>
+            <th>짝</th>
+          </tr>
+        </thead>
+        <tbody>
+          {p.sample.map((r, i) => (
+            <tr key={i}>
+              <td className={t.tnum}>{shortDateTime(r.xferAt)}</td>
+              <td className={t.ell}>
+                {r.holder}
+                <span className={t.mut}>
+                  {' '}
+                  · {r.toBank} 끝 {r.toAccountLast4}
+                </span>
+              </td>
+              <td className={t.num}>{won(r.amount)}</td>
+              <td className={r.status === 'match' ? '' : t.mut}>{XFER_STATUS[r.status]}</td>
             </tr>
           ))}
           {more(4)}

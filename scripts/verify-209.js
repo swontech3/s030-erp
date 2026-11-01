@@ -92,8 +92,9 @@ async function codeChecks(q) {
       fmt(lines.map((l) => [l.code, l.name])));
   }
 
-  const skip = await q(`SELECT code, name, use_tp, sort_order, is_active FROM public.tb_s080_codes_line
-    WHERE build_id = '1' AND category = 'TAX_SKIP_REASON' ORDER BY sort_order, code`);
+  // ★ 213(2026-11-01)이 은행 뺀 줄 종류 다섯(13~17)을 더했다 — 앞 12줄(1~12번)만 견준다(13번부터는 verify-213)
+  const skip = (await q(`SELECT code, name, use_tp, sort_order, is_active FROM public.tb_s080_codes_line
+    WHERE build_id = '1' AND category = 'TAX_SKIP_REASON' ORDER BY sort_order, code`)).filter((l) => l.sort_order <= 12);
   const wantSkip = [...SKIP_OLD, ...SKIP_NEW.map(([c]) => c)];
   check(`C${n++}`, `TAX_SKIP_REASON — 205 의 7개 그대로 + 카드 · 현금 5개(순서 8~12, 210 뒤)`,
     skip.map((l) => l.code).join(',') === wantSkip.join(',') && skip.every((l, i) => l.sort_order === i + 1 && l.use_tp === '000' && l.is_active),
@@ -113,8 +114,10 @@ async function codeChecks(q) {
 }
 
 async function mapChecks(q, { deductCodes }) {
-  const rows = await q(`SELECT id, kind, name, header_row, header_signature, columns, is_active FROM public.tb_s050_import_maps ORDER BY id`);
-  check('M1', '대응표 세 줄 — 계산서(204) · 카드 · 현금, 자료 종류마다 하나',
+  // ★ 213(2026-11-01)이 은행 대응표 네 줄(kind BANK)을 더했다 — 은행 줄은 빼고 센다(은행은 verify-213)
+  const rows = (await q(`SELECT id, kind, name, header_row, header_signature, columns, is_active FROM public.tb_s050_import_maps ORDER BY id`))
+    .filter((r) => r.kind !== 'BANK');
+  check('M1', '대응표 세 줄(은행 빼고) — 계산서(204) · 카드 · 현금, 자료 종류마다 하나',
     rows.map((r) => `${r.id}:${r.kind}`).join(',') === `${CARD_MAP}:CARD,HOMETAX_TAX_INVOICE:INVOICE,${CASH_MAP}:CASH`,
     rows.map((r) => `${r.id}:${r.kind}`).join(','));
 

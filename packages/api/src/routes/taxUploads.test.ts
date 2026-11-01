@@ -20,7 +20,10 @@ const session = (role: ScopeRole): ErpSession => ({
   lastActiveAt: null,
 });
 
-const LIST: TaxUploadsResponse = { month: '2026-09', bizTypeName: null, cards: [], files: [], codes: { kinds: [], invDirs: [] } };
+const LIST: TaxUploadsResponse = {
+  month: '2026-09', bizTypeName: null, cards: [], files: [], bankAccounts: [],
+  codes: { kinds: [], invDirs: [], banks: [], bankFileTps: [] },
+};
 const EXCLUDED = { nonGeneral: 0, noBizNo: 0, badAmount: 0, noApproval: 0, dupInFile: 0, otherClass: 0, badDate: 0 };
 const PREVIEW: TaxUploadPreview = {
   kind: 'INVOICE', fileName: 'a.xls', direction: 'S', sameFile: null, totalRows: 0, byMonth: [], sample: [],
@@ -33,9 +36,12 @@ function fakeDeps(over: Partial<TaxUploadsDeps> = {}) {
   const calls: unknown[][] = [];
   const deps: TaxUploadsDeps = {
     list: async (s, month) => { calls.push(['list', s.s020OrgId, month]); return LIST; },
-    preview: async (s, kind, name, bytes) => { calls.push(['preview', s.s020OrgId, kind, name, bytes.length]); return { ok: true, data: PREVIEW }; },
-    upload: async (s, kind, name) => {
-      calls.push(['upload', s.s020OrgId, kind, name]);
+    preview: async (s, kind, name, bytes, bank) => {
+      calls.push(['preview', s.s020OrgId, kind, name, bytes.length, ...(bank ? [bank] : [])]);
+      return { ok: true, data: PREVIEW };
+    },
+    upload: async (s, kind, name, _bytes, bank) => {
+      calls.push(['upload', s.s020OrgId, kind, name, ...(bank ? [bank] : [])]);
       return { ok: false, status: 409, error: 'same_file', message: '이미 올린 파일입니다' };
     },
     remove: async (s, ids, dryRun) => {
@@ -113,10 +119,33 @@ describe('POST /tax/uploads/preview · /tax/uploads — 엑셀 본문', () => {
     expect(calls).toEqual([['preview', 9001, 'CARD', 'card.xls', XLS.length], ['upload', 9001, 'CASH', 'cash.xls']]);
   });
 
+  it('★ 은행 입출금(1-5) — 고른 계좌 id · 파일 종류(TXN · XFER)를 함께 넘긴다', async () => {
+    const { deps, calls } = fakeDeps();
+    const a = await build('tenant', deps);
+    const txn = await post(a, '/tax/uploads/preview?kind=BANK&account=fa-1&fileTp=TXN', { 'content-type': XLS_TYPE, 'x-file-name': 'kb.xls' }, XLS);
+    const xfer = await post(a, '/tax/uploads?kind=BANK&account=fa-2&fileTp=XFER', { 'content-type': XLS_TYPE, 'x-file-name': 'wr.xlsx' }, XLS);
+    expect(txn.statusCode).toBe(200);
+    expect(xfer.statusCode).toBe(409);
+    expect(calls).toEqual([
+      ['preview', 9001, 'BANK', 'kb.xls', XLS.length, { accountId: 'fa-1', fileTp: 'TXN' }],
+      ['upload', 9001, 'BANK', 'wr.xlsx', { accountId: 'fa-2', fileTp: 'XFER' }],
+    ]);
+  });
+
+  it('★ 은행인데 계좌 · 파일 종류가 없거나 틀리면 400 — 칸마다 알린다', async () => {
+    const { deps, calls } = fakeDeps();
+    const a = await build('tenant', deps);
+    const res = await post(a, '/tax/uploads/preview?kind=BANK&fileTp=X', { 'content-type': XLS_TYPE, 'x-file-name': 'a.xls' }, XLS);
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ error: 'invalid_request', errors: [{ field: 'account' }, { field: 'fileTp' }] });
+    expect(calls).toEqual([]);
+  });
+
   it('아직 올릴 수 없는 종류 · 종류 없음은 400', async () => {
     const { deps, calls } = fakeDeps();
     const a = await build('tenant', deps);
-    for (const url of ['/tax/uploads/preview?kind=BANK', '/tax/uploads/preview', '/tax/uploads?kind=NTAX']) {
+    // ★ 1-5(2026-11-01): 은행(BANK)이 켜져 아직 안 되는 종류는 대출(LOAN)로 본다
+    for (const url of ['/tax/uploads/preview?kind=LOAN', '/tax/uploads/preview', '/tax/uploads?kind=NTAX']) {
       const res = await post(a, url, { 'content-type': XLS_TYPE, 'x-file-name': 'a.xls' }, XLS);
       expect(res.statusCode).toBe(400);
       expect(res.json()).toMatchObject({ errors: [{ field: 'kind' }] });
@@ -215,7 +244,7 @@ describe('POST /tax/uploads/delete', () => {
 
 describe('POST /tax/uploads/delete-check — 지우기 전 확인(지우지 않음)', () => {
   it('지우기와 같은 처리를 확인으로만 부른다', async () => {
-    const DATA = { deletedFiles: 1, deletedRows: 3, laterFilesWithSkips: [] };
+    const DATA = { deletedFiles: 1, deletedRows: 3, laterFilesWithSkips: [], xferDetached: 0 };
     const { deps, calls } = fakeDeps({
       remove: async (s, ids, dryRun) => {
         calls.push([dryRun ? 'check' : 'remove', s.s020OrgId, ids]);
