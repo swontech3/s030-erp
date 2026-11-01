@@ -14,7 +14,8 @@
  *   2쪽 종류주식의 내용 행 뺌 · 대표이사 칸 → `representativeRrnList` · 「기 타」 괄호 설명 뺌. 3쪽(세금 · 첨부서면 · 신청인)은 그대로.
  *   행 높이는 지금 높이를 지키고, 잰 값이 더 크면 늘린다.
  * ★ 둘 다 법무 표시: 법인설립 · 건마다 · 회사 형태 유한회사(`companyType: 'A'`) — 유한회사 건의 [서류 출력]에만 뜬다.
- * ★ 등기 설정 U_P 줄(법인설립 · 기본 줄) — 양식호수 · 표시명 · 등기의 목적 · 사유 · 첨부서면은 원본에서. 세금 다섯 칸은
+ * ★ 결정 2026-11-01 반영 — 사유(공증 · 날짜 없음) · 의사록 의안 · 의장 · 직위 · 서명 · 첨부서면(`MINUTES_LINES` · `SETTING`).
+ * ★ 등기 설정 U_P 줄(법인설립 · 기본 줄) — 양식호수 · 표시명 · 등기의 목적 · 첨부서면은 원본에서. 세금 다섯 칸은
  *   발기설립(R_PROMOTER) 기본 줄의 `taxes` 를 그대로 복사한다(원본 안내 ⑫: 1000분의 4 · 100분의 20 · 대도시 3배 — 같다).
  * ★ 주식회사 양식 · R_PROMOTER 줄은 읽기만 한다.
  * ★ 기본은 **보기만** 한다. `--apply` 일 때만 한 트랜잭션으로 쓴다. 멈추는 경우(아무것도 쓰지 않는다):
@@ -70,14 +71,14 @@ const SETTING = {
   label: '유한회사 설립 등기',
   formNo: '[양식 제91호]',
   regPurpose: '유한회사 설립',
-  regReason: '정관을 작성하여 공증인의 인증을 받고 20○○년 ○월○일 출자 전액을 납입하였으므로 다음사항의 등기를 구함',
-  // 원본 첨부서면 11개(순서 그대로). 통수는 원본이 비어 있다 — 발기설립 줄과 같이 1통
+  // 결정 2026-11-01 1 — 공증 · 날짜 없이
+  regReason: '정관을 작성하고 출자 전액을 납입하였으므로 다음 사항의 등기를 구함',
+  // 원본 첨부서면 11개에서 현물출자재산인도증 · 이사과반수동의서를 뺀 9개(결정 7, 순서 그대로).
+  // 통수는 원본이 비어 있다 — 발기설립 줄과 같이 1통
   attachments: [
     '정관(자본금 10억 이상일 경우 공증받은 것)',
     '사원총회의사록(공증받은 것)',
     '출자금납입증명서',
-    '현물출자재산인도증',
-    '이사과반수동의서',
     '취임승낙서(인감증명서나 본인서명사실확인서 또는 전자본인서명확인서의 발급증 포함)',
     '주민등록표등(초)본',
     '대표이사 인감신고서',
@@ -159,39 +160,38 @@ const roundUp = (h) => Math.ceil((h + 0.01) * 100 - 1e-9) / 100;
 // =============================================================================
 // 사원총회의사록(유한회사) — 원본 글 그대로 · 칸 모양은 발기인총회의사록
 // =============================================================================
-/** 원본 docx 의 문단 순서. kind 는 발기인총회의사록의 어느 칸 모양을 쓰나. `gap` = 빈 줄(높이 cm). */
+/**
+ * 원본 docx 의 문단 순서. kind 는 발기인총회의사록의 어느 칸 모양을 쓰나. `gap` = 빈 줄(높이 cm).
+ * 결정 2026-11-01: 2 「발기인대표 선임의 건」 삭제 · 번호 당김 · 「사원(발기인)」 → 「사원」 · 「발기인 만장일치」 → 「사원 전원 일치」 ·
+ * 3 의장 = 첫 번째 사원(`chairName`) · 6 의장과 출석한 이사 기명날인(`directorSignList` — 원본 말미의 사원 줄 대신,
+ * 맺음 문장도 「의장이」 → 「의장과 출석한 이사가」).
+ */
 const MINUTES_LINES = [
   { kind: 'title', text: '사 원 총 회 의 사 록' },
   { gap: 1 },
-  { kind: 'body', text: '서기 {{meetingDate}} {{meetingTime}} 본 회사 본점 사무실에서 사원(발기인) 전원이 모여 의안을 심의하기 위하여 사원총회를 개최하다.' },
-  { kind: 'body', text: '사원의 호선으로 사원 {{ceoName}} 은 의장으로 선출되다.' },
+  { kind: 'body', text: '서기 {{meetingDate}} {{meetingTime}} 본 회사 본점 사무실에서 사원 전원이 모여 의안을 심의하기 위하여 사원총회를 개최하다.' },
+  { kind: 'body', text: '사원의 호선으로 사원 {{chairName}} 은 의장으로 선출되다.' },
   { gap: 0.5 },
-  { kind: 'agenda', text: '제1호 의안 : 발기인대표 선임의 건' },
+  { kind: 'agenda', text: '제1호 의안 : 임원 선임의 건' },
   { gap: 0.14 },
-  { kind: 'body', text: '의장은 본 회사의 설립 때까지의 모든 일을 보게 하기 위하여 발기인대표를 선임하여야 하는 이유를 설명하고 그 결의를 구한즉 일동은 이를 신중히 합의한 끝에 다음 사람을 발기인대표로 선출하다.' },
-  { kind: 'list', text: '발기인대표 : {{ceoName}}\n주민등록번호 : {{ceoRrn}}\n주소 : {{ceoAddress}}' },
-  { kind: 'body', text: '피선자는 즉석에서 취임을 승낙하다.' },
-  { gap: 0.5 },
-  { kind: 'agenda', text: '제2호 의안 : 임원 선임의 건' },
-  { gap: 0.14 },
-  { kind: 'body', text: '의장은 설립할 회사의 임원에 관한 의안을 내어 발기인 만장일치로 다음과 같이 임원을 선임하다' },
+  { kind: 'body', text: '의장은 설립할 회사의 임원에 관한 의안을 내어 사원 전원 일치로 다음과 같이 임원을 선임하다' },
   { kind: 'list', text: '{{minutesOfficerRrnList}}' },
   { kind: 'body', text: '피선자는 즉석에서 취임을 승낙하다.' },
   { gap: 0.5 },
-  { kind: 'agenda', text: '제3호 의안 : 본점 주소지 결정의 건' },
+  { kind: 'agenda', text: '제2호 의안 : 본점 주소지 결정의 건' },
   { gap: 0.14 },
-  { kind: 'body', text: '의장은 설립할 회사의 본점 주소지에 관한 의안을 내어 발기인 만장일치로 다음과 같이 본점주소지를 결정하다' },
+  { kind: 'body', text: '의장은 설립할 회사의 본점 주소지에 관한 의안을 내어 사원 전원 일치로 다음과 같이 본점주소지를 결정하다' },
   { kind: 'list', text: '본점주소지 : {{hqAddress}}' },
   { gap: 0.5 },
   { kind: 'body', text: '이상으로 회의의 목적인 의안 전부를 종료하였으므로 의장은 폐회를 선언하다' },
-  { kind: 'body', text: '위 결의를 명확히 하기 위하여 이 의사록을 작성하고 의장이 다음에 기명날인하다.' },
+  { kind: 'body', text: '위 결의를 명확히 하기 위하여 이 의사록을 작성하고 의장과 출석한 이사가 다음에 기명날인하다.' },
   { gap: 1 },
   { kind: 'date', text: '{{writeDate}}' },
   { gap: 0.5 },
   { kind: 'sign', text: '                                 {{companyName}}' },
-  { kind: 'sign', text: '                                 의장 : {{ceoName}} (인)' },
+  { kind: 'sign', text: '                                 의장 : {{chairName}} (인)' },
   { gap: 0.5 },
-  { kind: 'list', text: '{{articlesMemberSignList}}' },
+  { kind: 'list', text: '{{directorSignList}}' },
 ];
 
 /** 발기인총회의사록에서 칸 모양을 고른다 — 글자로 찾는다(행 번호에 기대지 않는다). */
@@ -353,6 +353,9 @@ function buildApplication(src) {
 
     console.log(`■ ${MINUTES_NAME} — 글: 원본 사원총회의사록.docx · 칸 모양: 표양식 「${MINUTES_FROM}」`);
     report(MINUTES_NAME, minutes, v2);
+    // 결정 2 · 5 — 남으면 안 되는 말(글과 값 둘 다)
+    const minutesText = minutes.pages.flatMap((p) => p.cells).map((x) => x.text ?? '').join('\n');
+    for (const w of ['발기인', '사내이사', '만장일치']) if (fill(minutesText, v2).includes(w)) problems.push(`${MINUTES_NAME}: 「${w}」이 남았다`);
     check1(MINUTES_NAME, minutes);
     console.log(`\n■ ${APP_NAME} — 표양식 「${APP_FROM}」 복사 · 원본 91(66).유한회사설립등기.docx 와 다른 행만`);
     for (const ch of changes) console.log(`  ${ch.page}쪽 ${ch.at}: ${JSON.stringify(ch.from)} → ${JSON.stringify(ch.to)}`);
@@ -372,6 +375,7 @@ function buildApplication(src) {
       console.log(`  [${k}] 맨 위 줄: ${fill('{{formNo}} {{formLabel}}', v)} · 출자1좌 ${v.contributionUnitAmount} · 자본금 ${v.capitalAmount}`);
       console.log(`  [${k}] 대표이사 칸: ${JSON.stringify(v.representativeRrnList.replace(/\d{6}-\d{7}/g, '######-#######'))}`);
       console.log(`  [${k}] 의사록 임원: ${JSON.stringify(v.minutesOfficerRrnList.replace(/\d{6}-\d{7}/g, '######-#######'))}`);
+      console.log(`  [${k}] 의장: ${v.chairName} · 이사 기명날인: ${JSON.stringify(v.directorSignList)}`);
     }
 
     await c.query('BEGIN');

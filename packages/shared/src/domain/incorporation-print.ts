@@ -20,9 +20,10 @@
  * ★ 유한회사(결정 2026-10-31) — 정관(유한회사) 자리표시 3개(`contributionUnitAmount` · `articlesMemberTable` ·
  *   `articlesMemberSignList`). 나머지는 기존 이름 그대로다(자본금 = `capitalAmount`). 사원 = 발기인 칸(`isFounder`),
  *   출자좌수 = 인수 수 칸, 1좌의 금액 = 1주의 금액 칸.
- * ★ 유한회사 설립 2단계(2026-11-01) — 사원총회의사록(유한회사) · 설립등기신청서(유한회사) 자리표시 3개(`ceoRrn` ·
- *   `representativeRrnList` · `minutesOfficerRrnList`). 원본(대표가 넣은 docx)이 주민번호를 적는 자리만 새로 두었다 —
- *   나머지는 기존 이름 그대로다(사원 서명란 = `articlesMemberSignList`, 1좌의 금액 = `contributionUnitAmount`).
+ * ★ 유한회사 설립 2단계(2026-11-01) — 사원총회의사록(유한회사) · 설립등기신청서(유한회사) 자리표시 4개:
+ *   `representativeRrnList` · `minutesOfficerRrnList`(원본 docx 가 주민번호를 적는 자리) · `chairName`(의장 = 첫 번째
+ *   사원, 결정 3) · `directorSignList`(의장과 출석한 이사 기명날인, 결정 6). 직위는 「대표이사」 · 「이사」 · 「감사」(결정 5 —
+ *   「사내이사」를 쓰지 않는다). 나머지는 기존 이름 그대로다(1좌의 금액 = `contributionUnitAmount`).
  * ★ 서류 묶음은 회사 형태로 가른다(`buildIncorpPrintDocuments`) — 양식 표시의 `companyType`, 없으면 주식회사 양식.
  * ★★ 주민번호는 이 함수에 **평문으로 들어와 출력값으로만 나간다** — 복호화 · no-store 는 API 몫(법인변경과 같다).
  *    목록 칸(이사 · 감사 · 발기인 …)에도 들어간다(레거시와 같다).
@@ -116,9 +117,10 @@ export const INCORP_PRINT_FIELDS: readonly IncorpPrintField[] = [
   { name: 'articlesMemberTable', label: '정관 사원별 출자좌수', source: 'case' },
   { name: 'articlesMemberSignList', label: '정관 사원 서명란', source: 'case' },
   // 유한회사 사원총회의사록 · 설립등기신청서(2026-11-01) — 원본이 주민번호를 적는 자리
-  { name: 'ceoRrn', label: '대표이사 주민등록번호', source: 'case' },
   { name: 'representativeRrnList', label: '대표이사 성명 · 주민등록번호와 주소', source: 'case' },
   { name: 'minutesOfficerRrnList', label: '임원 선임(의사록, 주민등록번호 · 주소)', source: 'case' },
+  { name: 'chairName', label: '의장(첫 번째 사원)', source: 'case' },
+  { name: 'directorSignList', label: '이사 기명날인(의사록)', source: 'case' },
   // 등기 설정
   { name: 'formLabel', label: '표시명', source: 'case' },
   { name: 'formNo', label: '양식호수', source: 'case' },
@@ -235,6 +237,11 @@ export function personRoleLabel(p: Pick<IncorpSnapshotPerson, 'isDirector' | 'is
 /** 의사록 · 조사보고서의 직위 — 감사만 맡으면 「감　　사」, 그 밖은 「사내이사」(결정 2026-10-12). */
 export function minutesRole(p: Pick<IncorpSnapshotPerson, 'isDirector' | 'isAuditor'>): string {
   return p.isAuditor && !p.isDirector ? '감　　사' : '사내이사';
+}
+
+/** 유한회사 의사록의 직위 — 「대표이사」 · 「이사」 · 「감사」(결정 2026-11-01 5 — 「사내이사」를 쓰지 않는다). */
+export function ltdOfficerRole(p: Pick<IncorpSnapshotPerson, 'isDirector' | 'isAuditor' | 'isRepresentative'>): string {
+  return p.isRepresentative ? '대표이사' : p.isDirector ? '이사' : '감사';
 }
 
 /** 시각 — `10:00` → 「10시」 · `10:30` → 「10시 30분」(결정 2026-10-14). 비었거나 시각이 아니면 ''. */
@@ -442,19 +449,18 @@ export function buildIncorpCasePrintValues(src: IncorpPrintSource): Record<strin
     ),
     articlesMemberSignList: lines(founders.flatMap((p) => [`사원　성명 : ${p.name} (${rrnOf(p)})　(인)`, `주소 : ${formatIncorpAddress(p)}`])),
 
-    // 유한회사 사원총회의사록 · 설립등기신청서(2026-11-01) — 원본 docx 의 주민번호 자리.
-    // 신청서 ⑨ 「대표이사 ○○○(-) / 주소」 · 의사록 제2호 의안 「대표이사 겸 사내이사 : 이름 / 주민번호 / 주소」
-    ceoRrn: rep ? rrnOf(rep) : '',
+    // 유한회사 사원총회의사록 · 설립등기신청서(2026-11-01). 신청서 ⑨ 「대표이사 ○○○(-) / 주소」 ·
+    // 의사록 임원 선임 「직위 : 이름 / 주민번호 / 주소」 — 직위는 대표이사 · 이사 · 감사(결정 5)
     representativeRrnList: lines(representatives.flatMap((p) => [`대표이사 ${p.name}(${rrnOf(p)})`, formatIncorpAddress(p)])),
     minutesOfficerRrnList: lines(
       persons
-        .filter((p) => p.isDirector || p.isAuditor)
-        .flatMap((p) => [
-          `${p.isRepresentative && p.isDirector ? '대표이사 겸 사내이사' : minutesRole(p)} : ${p.name}`,
-          `주민등록번호 : ${rrnOf(p)}`,
-          `주소 : ${formatIncorpAddress(p)}`,
-        ]),
+        .filter((p) => p.isDirector || p.isAuditor || p.isRepresentative)
+        .flatMap((p) => [`${ltdOfficerRole(p)} : ${p.name}`, `주민등록번호 : ${rrnOf(p)}`, `주소 : ${formatIncorpAddress(p)}`]),
     ),
+    // 의장 = 첫 번째 사원(결정 3 — 원본 「사원의 호선으로 사원 ○○」)
+    chairName: founders[0]?.name ?? '',
+    // 의장과 출석한 이사 기명날인(결정 6) — 이사(대표이사 포함)마다 한 줄
+    directorSignList: lines(persons.filter((p) => p.isDirector || p.isRepresentative).map((p) => `${ltdOfficerRole(p)}　${p.name}　　(인)`)),
 
     // 등기 설정 — 법인변경과 같은 규칙(결정 1 (가))
     formLabel: setting?.label ?? '',
