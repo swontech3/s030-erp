@@ -116,7 +116,8 @@ async function codeChecks(q) {
 async function mapChecks(q, { deductCodes }) {
   // ★ 213(2026-11-01)이 은행 대응표 네 줄(kind BANK)을 더했다 — 은행 줄은 빼고 센다(은행은 verify-213)
   const rows = (await q(`SELECT id, kind, name, header_row, header_signature, columns, is_active FROM public.tb_s050_import_maps ORDER BY id`))
-    .filter((r) => r.kind !== 'BANK');
+    // ★ 215(2026-11-01)가 국세 · 지방세 · 4대보험 · 대출 대응표(kind NTAX · LTAX · SOCIAL · LOAN)를 더했다 — 그것도 빼고 센다(verify-215)
+    .filter((r) => ['INVOICE', 'CARD', 'CASH'].includes(r.kind));
   check('M1', '대응표 세 줄(은행 빼고) — 계산서(204) · 카드 · 현금, 자료 종류마다 하나',
     rows.map((r) => `${r.id}:${r.kind}`).join(',') === `${CARD_MAP}:CARD,HOMETAX_TAX_INVOICE:INVOICE,${CASH_MAP}:CASH`,
     rows.map((r) => `${r.id}:${r.kind}`).join(','));

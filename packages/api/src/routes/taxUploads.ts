@@ -11,6 +11,8 @@
  * ★ 1-4(2026-10-30): kind=CARD(홈택스 사업용 신용카드) · CASH(현금 경비 표준 양식)도 받는다 — 처리는 `taxCardCash.ts`.
  * ★ 1-5(2026-11-01): kind=BANK(은행 입출금)는 `&account=<세무 설정 계좌 id>&fileTp=TXN|XFER` 를 함께 받는다 — 처리는 `taxBank.ts`.
  *   지우기는 이체 파일의 덧붙인 칸을 먼저 비운다(212 FK RESTRICT).
+ * ★ 1-6(2026-11-01): kind=NTAX(국세) · LTAX(지방세) · LOAN(대출)은 고를 것 없이, SOCIAL(4대보험)은
+ *   `&insTp=NP|HI|EI|IA&noticeMonth=YYYY-MM` 를 함께 받는다(본문은 CSV 도 된다) — 처리는 `taxPaySocialLoan.ts`.
  *
  * ★★★ 운영사 세션도 **자기 단체만** — 모든 조회 · 저장에 `org_id = 세션 단체 ID` 를 직접 건다(`db/taxUploads.ts`).
  *     DB 연결은 `scopeOfSession` — 회사 세션은 RLS(203)가 한 번 더 막는다. 역할로 403 을 내지 않는다(세무 설정과 같다).
@@ -79,6 +81,26 @@ import { cashTemplateOp, previewCardCashOp, uploadCardCashOp } from './taxCardCa
 import { previewBankOp, uploadBankOp, type BankUploadChoice } from './taxBank.ts';
 import { clearXfers, countXferDetached, listBankAccounts, listBankMaps } from '../db/taxBank.ts';
 import { TAX_BANK_FILE_CATEGORY, TAX_KIND_BANK, parseBankUploadQuery } from '@swonbiz/shared/domain/tax-bank';
+import {
+  TAX_KIND_LOAN,
+  TAX_KIND_SOCIAL,
+  TAX_LOAN_TP_CATEGORY,
+  TAX_PAY_KINDS,
+  TAX_SOCIAL_INS_CATEGORY,
+  parseSocialUploadQuery,
+  type TaxPayKind,
+} from '@swonbiz/shared/domain/tax-pay-social-loan';
+import {
+  previewLoanOp,
+  previewPayOp,
+  previewSocialOp,
+  uploadLoanOp,
+  uploadPayOp,
+  uploadSocialOp,
+  type SocialUploadChoice,
+} from './taxPaySocialLoan.ts';
+
+const isPayKind = (k: string): k is TaxPayKind => (TAX_PAY_KINDS as readonly string[]).includes(k);
 
 /* ── 결과 모양 ───────────────────────────────────────────────────────────── */
 
@@ -109,7 +131,10 @@ export async function skipReasonsFor(client: ScopedClient, excluded: object): Pr
 /* ── 읽기 ────────────────────────────────────────────────────────────────── */
 
 export async function listUploadsOp(client: ScopedClient, orgId: number, month: string): Promise<TaxUploadsResponse> {
-  const codes = await loadCodeNames(client, [TAX_KIND_CATEGORY, TAX_INV_DIR_CATEGORY, TAX_BIZ_TP_CATEGORY, BANK_CATEGORY, TAX_BANK_FILE_CATEGORY]);
+  const codes = await loadCodeNames(client, [
+    TAX_KIND_CATEGORY, TAX_INV_DIR_CATEGORY, TAX_BIZ_TP_CATEGORY, BANK_CATEGORY, TAX_BANK_FILE_CATEGORY,
+    TAX_SOCIAL_INS_CATEGORY, TAX_LOAN_TP_CATEGORY,
+  ]);
   const descs = await listCodeDescriptions(client, [TAX_KIND_CATEGORY], TAX_CODE_USE_TP);
   const settings = await readTaxSettingsRow(client, orgId);
   const counts = await countFilesByKind(client, orgId, month);
@@ -140,6 +165,8 @@ export async function listUploadsOp(client: ScopedClient, orgId: number, month: 
       invDirs: codes.get(TAX_INV_DIR_CATEGORY) ?? [],
       banks: codes.get(BANK_CATEGORY) ?? [],
       bankFileTps: codes.get(TAX_BANK_FILE_CATEGORY) ?? [],
+      socialInsTps: codes.get(TAX_SOCIAL_INS_CATEGORY) ?? [],
+      loanTps: codes.get(TAX_LOAN_TP_CATEGORY) ?? [],
     },
   };
 }
@@ -207,9 +234,13 @@ export async function previewUploadOp(
   fileName: string,
   bytes: Uint8Array,
   bank: BankUploadChoice | null = null,
+  social: SocialUploadChoice | null = null,
 ): Promise<TaxOp<TaxUploadPreview>> {
   if (kind === 'CARD' || kind === 'CASH') return previewCardCashOp(client, orgId, kind, fileName, bytes);
   if (kind === TAX_KIND_BANK) return bank ? previewBankOp(client, orgId, fileName, bytes, bank) : NO_BANK_CHOICE;
+  if (isPayKind(kind)) return previewPayOp(client, orgId, kind, fileName, bytes);
+  if (kind === TAX_KIND_SOCIAL) return social ? previewSocialOp(client, orgId, fileName, bytes, social) : NO_SOCIAL_CHOICE;
+  if (kind === TAX_KIND_LOAN) return previewLoanOp(client, orgId, fileName, bytes);
   const p = await prepareInvoiceUpload(client, orgId, bytes);
   if (!p.ok) return p;
   const d = p.data;
@@ -237,8 +268,10 @@ export async function previewUploadOp(
 
 /** 은행인데 계좌 · 파일 종류가 없다 — 라우트가 먼저 막지만 처리를 바로 부르는 쪽(검증 스크립트)도 막는다. */
 const NO_BANK_CHOICE = fail(400, 'invalid_request', '계좌와 파일 종류를 고르세요');
+/** 4대보험인데 보험 종류 · 고지 연월이 없다(1-6) — 위와 같은 이유. */
+const NO_SOCIAL_CHOICE = fail(400, 'invalid_request', '보험 종류와 고지 연월을 고르세요');
 
-/** 올리기 — 자료 종류로 나눈다(계산서 · 카드 · 현금 · 은행). 한 트랜잭션 안에서 부른다. */
+/** 올리기 — 자료 종류로 나눈다(계산서 · 카드 · 현금 · 은행 · 국세 · 지방세 · 4대보험 · 대출). 한 트랜잭션 안에서 부른다. */
 export function uploadOp(
   client: ScopedClient,
   orgId: number,
@@ -247,9 +280,15 @@ export function uploadOp(
   bytes: Uint8Array,
   actor: string,
   bank: BankUploadChoice | null = null,
+  social: SocialUploadChoice | null = null,
 ): Promise<TaxOp<TaxUploadResult>> {
   if (kind === 'CARD' || kind === 'CASH') return uploadCardCashOp(client, orgId, kind, fileName, bytes, actor);
   if (kind === TAX_KIND_BANK) return bank ? uploadBankOp(client, orgId, fileName, bytes, actor, bank) : Promise.resolve(NO_BANK_CHOICE);
+  if (isPayKind(kind)) return uploadPayOp(client, orgId, kind, fileName, bytes, actor);
+  if (kind === TAX_KIND_SOCIAL) {
+    return social ? uploadSocialOp(client, orgId, fileName, bytes, actor, social) : Promise.resolve(NO_SOCIAL_CHOICE);
+  }
+  if (kind === TAX_KIND_LOAN) return uploadLoanOp(client, orgId, fileName, bytes, actor);
   return uploadInvoicesOp(client, orgId, kind, fileName, bytes, actor);
 }
 
@@ -361,9 +400,13 @@ export async function deleteUploadsOp(
 /** 바꿔 끼울 수 있는 바깥 — 시험이 DB 없이 본문 · 400 · 404 · 409 를 본다. */
 export interface TaxUploadsDeps {
   list(session: ErpSession, month: string): Promise<TaxUploadsResponse>;
-  /** `bank` = 은행(BANK)일 때 고른 계좌 · 파일 종류 — 다른 자료는 null. */
-  preview(session: ErpSession, kind: string, fileName: string, bytes: Uint8Array, bank: BankUploadChoice | null): Promise<TaxOp<TaxUploadPreview>>;
-  upload(session: ErpSession, kind: string, fileName: string, bytes: Uint8Array, bank: BankUploadChoice | null): Promise<TaxOp<TaxUploadResult>>;
+  /** `bank` = 은행(BANK)일 때 고른 계좌 · 파일 종류, `social` = 4대보험(SOCIAL)일 때 보험 종류 · 고지 연월 — 다른 자료는 null. */
+  preview(
+    session: ErpSession, kind: string, fileName: string, bytes: Uint8Array, bank: BankUploadChoice | null, social: SocialUploadChoice | null,
+  ): Promise<TaxOp<TaxUploadPreview>>;
+  upload(
+    session: ErpSession, kind: string, fileName: string, bytes: Uint8Array, bank: BankUploadChoice | null, social: SocialUploadChoice | null,
+  ): Promise<TaxOp<TaxUploadResult>>;
   /** `dryRun` = 지우기 전 확인(같은 계산, 지우지 않음). */
   remove(session: ErpSession, ids: string[], dryRun: boolean): Promise<TaxOp<TaxUploadDeleteResult>>;
   /** 표준 양식 내려받기 — 지금은 현금 경비(CASH)뿐. */
@@ -399,9 +442,10 @@ export async function runOp<T>(session: ErpSession, fn: (client: ScopedClient) =
 
 const defaultDeps: TaxUploadsDeps = {
   list: (session, month) => run(session, (c) => listUploadsOp(c, session.s020OrgId, month)),
-  preview: (session, kind, name, bytes, bank) => runOp(session, (c) => previewUploadOp(c, session.s020OrgId, kind, name, bytes, bank)),
-  upload: (session, kind, name, bytes, bank) =>
-    runOp(session, (c) => uploadOp(c, session.s020OrgId, kind, name, bytes, String(session.s020MemberId), bank)),
+  preview: (session, kind, name, bytes, bank, social) =>
+    runOp(session, (c) => previewUploadOp(c, session.s020OrgId, kind, name, bytes, bank, social)),
+  upload: (session, kind, name, bytes, bank, social) =>
+    runOp(session, (c) => uploadOp(c, session.s020OrgId, kind, name, bytes, String(session.s020MemberId), bank, social)),
   remove: (session, ids, dryRun) => runOp(session, (c) => deleteUploadsOp(c, session.s020OrgId, ids, dryRun)),
   template: (session) => runOp(session, (c) => cashTemplateOp(c, session.s020OrgId)),
 };
@@ -449,9 +493,14 @@ export function registerTaxUploadRoutes(app: FastifyInstance, deps: TaxUploadsDe
   /** 미리보기 · 올리기 공통 — 종류 · 파일 이름 · 바이트를 확인하고 넘긴다. */
   const fileRoute = <T>(
     path: string,
-    call: (session: ErpSession, kind: string, fileName: string, bytes: Uint8Array, bank: BankUploadChoice | null) => Promise<TaxOp<T>>,
+    call: (
+      session: ErpSession, kind: string, fileName: string, bytes: Uint8Array, bank: BankUploadChoice | null, social: SocialUploadChoice | null,
+    ) => Promise<TaxOp<T>>,
   ) =>
-    app.post<{ Querystring: { kind?: string; account?: string; fileTp?: string }; Body: unknown }>(path, async (req, reply) => {
+    app.post<{
+      Querystring: { kind?: string; account?: string; fileTp?: string; insTp?: string; noticeMonth?: string };
+      Body: unknown;
+    }>(path, async (req, reply) => {
       const session = requireSession(req);
       reply.header('Cache-Control', 'no-store');
       const kind = req.query.kind ?? '';
@@ -467,12 +516,21 @@ export function registerTaxUploadRoutes(app: FastifyInstance, deps: TaxUploadsDe
         }
         bank = parsed.value;
       }
+      // 4대보험은 보험 종류 · 고지 연월이 있어야 한다(1-6) — 파일에 연월이 없고, 고용 · 산재는 제목 줄이 같다
+      let social: SocialUploadChoice | null = null;
+      if (kind === TAX_KIND_SOCIAL) {
+        const parsed = parseSocialUploadQuery(req.query);
+        if (!parsed.ok) {
+          return reply.code(400).send({ error: 'invalid_request', message: parsed.errors[0]!.message, errors: parsed.errors });
+        }
+        social = parsed.value;
+      }
       const fileName = readFileName(req.headers['x-file-name']);
       if (!fileName) return reply.code(400).send(badRequest('fileName', '파일 이름이 없습니다'));
       if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
         return reply.code(400).send(badRequest('file', '엑셀 파일(.xls · .xlsx)을 보내 주세요'));
       }
-      const r = await call(session, kind, fileName, new Uint8Array(req.body), bank);
+      const r = await call(session, kind, fileName, new Uint8Array(req.body), bank, social);
       if (!r.ok) return reply.code(r.status).send({ error: r.error, message: r.message });
       return reply.send(r.data);
     });

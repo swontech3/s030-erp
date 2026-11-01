@@ -106,17 +106,17 @@ async function structure(q) {
   const colsOf = async (t) => Object.fromEntries((await q(`SELECT column_name, data_type, is_nullable FROM information_schema.columns
     WHERE table_schema='public' AND table_name=$1`, [t])).map((c) => [c.column_name, [c.data_type, c.is_nullable]]));
   const uc = await colsOf(U);
-  check(`S${n++}`, `${U} — 은행 칸 셋(bank_file_tp · account_no · bank_code) 비울 수 있는 글자 칸, 칸 15개`,
+  check(`S${n++}`, `${U} — 은행 칸 셋(bank_file_tp · account_no · bank_code) 비울 수 있는 글자 칸, 칸 17개(214 가 4대보험 칸 둘을 더함)`,
     ['bank_file_tp', 'account_no', 'bank_code'].every((c) => JSON.stringify(uc[c]) === '["character varying","YES"]') &&
-    Object.keys(uc).length === 15, Object.keys(uc).join(','));
+    Object.keys(uc).length === 17, Object.keys(uc).join(','));
   const ucks = (await q(`SELECT conname FROM pg_constraint WHERE contype='c' AND conrelid = 'public.${U}'::regclass`)).map((r) => r.conname);
   check(`S${n++}`, `${U} — CHECK 「은행 파일만 은행 칸 셋을 채움」 · 파일 종류 TXN/XFER · 계좌번호 숫자 10~14`,
     ['ck_s050_upload_files_bank_kind', 'ck_s050_upload_files_bank_file_tp', 'ck_s050_upload_files_account_no'].every((c) => ucks.includes(c)),
     ucks.sort().join(','));
 
   const mc = await colsOf(M);
-  check(`S${n++}`, `${M} — 은행 칸 둘(bank_code · bank_file_tp) 비울 수 있는 글자 칸, 칸 11개`,
-    ['bank_code', 'bank_file_tp'].every((c) => JSON.stringify(mc[c]) === '["character varying","YES"]') && Object.keys(mc).length === 11,
+  check(`S${n++}`, `${M} — 은행 칸 둘(bank_code · bank_file_tp) 비울 수 있는 글자 칸, 칸 12개(214 가 4대보험 칸 하나를 더함)`,
+    ['bank_code', 'bank_file_tp'].every((c) => JSON.stringify(mc[c]) === '["character varying","YES"]') && Object.keys(mc).length === 12,
     Object.keys(mc).join(','));
   const mcks = (await q(`SELECT conname FROM pg_constraint WHERE contype='c' AND conrelid = 'public.${M}'::regclass`)).map((r) => r.conname);
   const mix = await q(`SELECT indexdef FROM pg_indexes WHERE schemaname='public' AND tablename=$1 AND indexname='uq_s050_import_maps_bank'`, [M]);

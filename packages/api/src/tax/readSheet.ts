@@ -23,6 +23,65 @@ export type SheetRead =
   | { ok: true; format: 'xls' | 'xlsx'; rows: unknown[][] }
   | { ok: false; code: 'not_spreadsheet' | 'too_large' | 'unreadable'; message: string };
 
+export type SocialRead =
+  | { ok: true; format: 'xls' | 'xlsx' | 'csv'; rows: unknown[][] }
+  | Extract<SheetRead, { ok: false }>;
+
+/**
+ * 4대보험 파일(1-6) — 앞 바이트가 엑셀이면 엑셀로, 아니면 CSV 로 읽는다.
+ * ★ 통합징수포털 CSV 는 옛 한글 부호(cp949)다 — UTF-8 로 깨짐 없이 풀리면 UTF-8(앞 표시 BOM 은 걷음), 아니면 Node 기본
+ *   `TextDecoder('euc-kr')`(cp949 를 포함하는 WHATWG 부호)로 푼다. 새 꾸러미는 쓰지 않는다.
+ * ★ 값은 모두 **글자 그대로** 둔다(숫자로 바꾸지 않는다 — 가입자 번호 앞 0 을 지킨다). 빈 줄도 빈 배열로 남긴다.
+ * ★ 칸을 읽는 것은 대응표가 가리키는 칸뿐이다(shared `convertSocialSheet`) — 주민번호 칸은 여기서 나뉘기만 하고 쓰이지 않는다.
+ */
+export function readSocialRows(bytes: Uint8Array): SocialRead {
+  if (bytes.length > TAX_UPLOAD_MAX_BYTES) {
+    return { ok: false, code: 'too_large', message: '파일은 5MB 까지 올릴 수 있습니다' };
+  }
+  if (detectSpreadsheetFormat(bytes)) return readSheetRows(bytes);
+  const text = decodeCsvText(bytes);
+  if (text === null) return { ok: false, code: 'not_spreadsheet', message: 'CSV · 엑셀 파일(.csv · .xls · .xlsx)만 올릴 수 있습니다' };
+  return { ok: true, format: 'csv', rows: parseCsv(text, TAX_UPLOAD_MAX_ROWS + HEAD_ROOM_ROWS) };
+}
+
+/** UTF-8(깨짐 없음) → 그대로, 아니면 cp949. 글자 파일이 아니면(NUL) null. */
+function decodeCsvText(bytes: Uint8Array): string | null {
+  if (bytes.includes(0)) return null;
+  try {
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes);
+  } catch {
+    return new TextDecoder('euc-kr').decode(bytes);
+  }
+}
+
+/** 쉼표 · 큰따옴표(RFC 4180) CSV → 행. 줄바꿈은 CRLF · LF. 마지막 빈 줄은 남기지 않는다. `maxRows` 줄까지만. */
+function parseCsv(text: string, maxRows: number): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+  const endRow = () => {
+    row.push(field);
+    rows.push(row.length === 1 && row[0] === '' ? [] : row);
+    row = [];
+    field = '';
+  };
+  for (let i = 0; i < text.length && rows.length < maxRows; i++) {
+    const ch = text[i]!;
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else field += ch;
+    } else if (ch === '"' && field === '') quoted = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\r' && text[i + 1] === '\n') { endRow(); i++; }
+    else if (ch === '\n' || ch === '\r') endRow();
+    else field += ch;
+  }
+  if ((field !== '' || row.length > 0) && rows.length < maxRows) endRow();
+  return rows;
+}
+
 export function readSheetRows(bytes: Uint8Array): SheetRead {
   if (bytes.length > TAX_UPLOAD_MAX_BYTES) {
     return { ok: false, code: 'too_large', message: '파일은 5MB 까지 올릴 수 있습니다' };

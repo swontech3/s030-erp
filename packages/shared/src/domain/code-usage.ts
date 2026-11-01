@@ -183,6 +183,16 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
   { category: 'BANK', useTp: '000', table: 'tb_s050_import_maps', column: 'bank_code', label: '세무 대응표' },
   { category: 'TAX_BANK_FILE', useTp: '000', table: 'tb_s050_upload_files', column: 'bank_file_tp', label: '세무 올린 파일' },
   { category: 'TAX_BANK_FILE', useTp: '000', table: 'tb_s050_import_maps', column: 'bank_file_tp', label: '세무 대응표' },
+  /**
+   * 국세 · 지방세 · 4대보험 · 대출(214 · 215, 2026-11-01) — 자료 종류 · 4대보험 종류 · 대출 기관 · 대출 거래 구분.
+   * ★ 대응표의 `social_ins_tps`(보험 종류 목록, text[])는 `칸 = 코드` 로 셀 수 없어 여기 없다 — `PINNED_CODES` 로 막는다.
+   * ★ TAX_TAX_NOEXP(비용이 아닌 세목)는 담는 칸이 없다 — 이름으로 견주므로 코드 관리에서 더하고 지운다.
+   */
+  { category: 'TAX_KIND', useTp: '000', table: 'tb_s050_tax_payments', column: 'kind', label: '세무 국세 · 지방세 납부' },
+  { category: 'TAX_SOCIAL_INS', useTp: '000', table: 'tb_s050_social_ins', column: 'ins_tp', label: '세무 4대보험 고지' },
+  { category: 'TAX_SOCIAL_INS', useTp: '000', table: 'tb_s050_upload_files', column: 'social_ins_tp', label: '세무 올린 파일' },
+  { category: 'BANK', useTp: '000', table: 'tb_s050_loan_txns', column: 'bank_code', label: '세무 대출 거래' },
+  { category: 'TAX_LOAN_TP', useTp: '000', table: 'tb_s050_loan_txns', column: 'txn_tp', label: '세무 대출 거래' },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */
@@ -384,6 +394,30 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     codes: ['bothInOut', 'noBalance', 'xferNotDone', 'otherAccount', 'noToAccount'],
     source: 'packages/shared/src/domain/tax-bank.ts (BankTxnExcluded · BankXferExcluded)',
     label: '세무 은행 뺀 줄 종류',
+  },
+  /** 4대보험 종류 — 214 CHECK(4대보험 줄 · 올린 파일 · 대응표 목록)가 코드값에 기댄다. 2026-11-01 추가. */
+  {
+    category: 'TAX_SOCIAL_INS',
+    useTp: '000',
+    codes: ['NP', 'HI', 'LTC', 'EI', 'IA'],
+    source: 'supabase/migrations/214_tax_pay_social_loan.sql (ck_s050_social_ins_tp · ck_s050_upload_files_social_ins_tp · ck_s050_import_maps_social_tps)',
+    label: '세무 4대보험 종류',
+  },
+  /** 대출 거래 구분 — 214 CHECK(대출 줄)가 D · R 에 기댄다. 2026-11-01 추가. */
+  {
+    category: 'TAX_LOAN_TP',
+    useTp: '000',
+    codes: ['D', 'R'],
+    source: 'supabase/migrations/214_tax_pay_social_loan.sql (ck_s050_loan_txns_tp) · packages/shared/src/domain/tax-pay-social-loan.ts',
+    label: '세무 대출 거래 구분',
+  },
+  /** 납부 · 4대보험 · 대출 뺀 줄 종류(215) — 위 뺀 줄 종류와 같은 이유. 날짜 · 금액은 badDate · badAmount · noAmount 를 함께 쓴다. */
+  {
+    category: 'TAX_SKIP_REASON',
+    useTp: '000',
+    codes: ['noPayNo', 'dupPayNo', 'noMemberName', 'noLoanAmount'],
+    source: 'packages/shared/src/domain/tax-pay-social-loan.ts (PayExcluded · SocialExcluded · LoanExcluded)',
+    label: '세무 납부 · 4대보험 · 대출 뺀 줄 종류',
   },
 ] as const;
 

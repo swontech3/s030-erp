@@ -9,6 +9,8 @@
  * ★★ API 의 풀(`db/pool.ts`)로 접속한다 — erp_app. 라우트가 쓰는 처리(`routes/taxUploads.ts` ·
  *    `routes/taxVendors.ts` 의 …Op)를 그대로 부른다.
  * ★ 엑셀은 SheetJS 로 **지어낸 값**을 써서 만든다 — 원본 샘플(doc/data-src/)을 쓰지 않는다. 제목 줄은 DB 의 대응표에서 읽는다.
+ * ★ 1-6(2026-11-01): 국세 · 지방세 · 4대보험 · 대출(D1~D15) — 납부번호 · 처음 보는 세목 · CSV · 같은 달 막기 · 주민번호 남기지 않기 ·
+ *   대출 끝 4자리 · 개수 맞추기 · 지우기 · 회사별 막기.
  * ★ 1-4 보완(2026-10-31): 미리보기의 「이미 올린 줄 위치」(alreadyWhere) — 계산서 · 카드 · 현금, 여러 파일, 다른 단체.
  * ★ 1-4(2026-10-30): 카드 사용 내역 · 현금 경비 — 끝 4자리만 남기기 · 개수 맞추기 · 같은 결제 두 번 · 경고 ·
  *   가맹점 거래처(일반) · 현금 항목(파일) · 목록 · 양식 내려받기 · 거래처 지우기 막기 · 합치기 · 파일 지우기(C · X 줄).
@@ -332,6 +334,171 @@ async function bankChecks(c) {
   await applyCompanyScope(c, tenant(ORG_A));
 }
 
+/**
+ * 국세 · 지방세 · 4대보험 · 대출(1-6) — 대응표 · 납부번호 중복 · 비용 판정 · 처음 보는 세목 · 4대보험 CSV · 같은 달 막기 ·
+ * 주민번호 남기지 않기 · 대출 끝 4자리 · 개수 맞추기 · 이미 올린 줄 위치 · 지우기(CASCADE) · 회사별 막기.
+ * ★ 값은 모두 지어낸 것. 제목 줄은 DB 의 대응표(215)에서 읽는다. 주민번호 칸에는 지어낸 표시 글자만 넣는다.
+ */
+async function paySocialLoanChecks(c) {
+  const sig = async (id) => (await c.query(`SELECT header_signature FROM public.tb_s050_import_maps WHERE id = $1`, [id])).rows[0]?.header_signature;
+  const [ntSig, ltSig, hiSig, eiSig, lnSig] =
+    [await sig('HOMETAX_NTAX_PAY'), await sig('WETAX_LTAX_PAY'), await sig('SOCIAL_HI'), await sig('SOCIAL_EI_IA'), await sig('BANK_020_LOAN')];
+  if (!ntSig || !ltSig || !hiSig || !eiSig || !lnSig) throw new Error('국세 · 지방세 · 4대보험 · 대출 대응표가 없다 — 215 를 먼저');
+  const pv = (org, kind, name, bytes, social = null) => previewUploadOp(c, org, kind, name, bytes, null, social);
+  const up = (org, kind, name, bytes, social = null) => uploadOp(c, org, kind, name, bytes, ACTOR, null, social);
+  const where = (r) => (r.ok ? JSON.stringify(r.data.alreadyWhere) : 'X');
+  const RRN_MARK = 'V-RRN-MARK';
+
+  const ntax = (tag, rows) => sheetBytes([[`국세 ${tag}`], ntSig, ...rows.map(([date, item, amount, no, pen]) =>
+    [date, item, '지어낸 회사 (가***)', amount, no, null, '지어낸세무서(000)', amount, 0, 0, 0, pen ?? 0, null])], 'xls');
+  const ltax = (tag, rows) => sheetBytes([
+    [null, null, null, `나의 납부확인 ${tag}`], [null, '총 건수 : ', `${rows.length}건`], ltSig,
+    ...rows.map(([no, item, date, amount, target]) => [null, no, null, null, null, item, '지어낸분', '지어낸 회사', date, amount, '지어낸시청', '지어낸납부', target])], 'xls');
+  const csv = (header, rows, tag) => new TextEncoder().encode(
+    [...Array(6).fill(tag), header.join(','), ...rows.map((r) => r.join(','))].join('\r\n') + '\r\n');
+  const hiRow = (no, name, base, hi, ltc) => {
+    const r = Array(31).fill('');
+    r[0] = '1'; r[1] = no; r[2] = RRN_MARK; r[3] = name; r[4] = base; r[5] = '건강'; r[6] = hi; r[7] = '0'; r[13] = hi;
+    r[18] = '요양'; r[19] = ltc; r[20] = '0'; r[26] = ltc;
+    return r;
+  };
+  const loan = (tag, rows, no = '9999-888-777666') => sheetBytes([[`우리은행 대출거래내역 ${tag}`], [`대출 계좌번호 : ${no}`], lnSig,
+    ...rows.map(([date, draw, bal, repay, int, late, refund, fee, tp]) => [1, date, draw, bal, repay, int, late, refund, fee, tp, '2026.09.01', '2026.10.01', '지어낸점'])], 'xlsx');
+
+  // ── 목록 — 여덟 카드 · 코드 이름 ──
+  const list = await listUploadsOp(c, ORG_A, MONTH);
+  check('D1', '목록 — 여덟 카드가 모두 열림 · 4대보험 종류(NP · HI · LTC · EI · IA) · 대출 거래 구분(D · R) 이름은 코드 표에서 · 카드 설명 SOCIAL · LOAN 은 215 문구',
+    list.cards.filter((k) => k.enabled).map((k) => k.kind).join() === 'INVOICE,CARD,CASH,BANK,NTAX,LTAX,SOCIAL,LOAN' &&
+    list.codes.socialInsTps.map((x) => x.code).join() === 'NP,HI,LTC,EI,IA' && list.codes.loanTps.map((x) => x.code).join() === 'D,R' &&
+    list.codes.kinds.find((k) => k.code === 'SOCIAL')?.description?.startsWith('사회보험 통합징수포털') === true &&
+    list.codes.kinds.find((k) => k.code === 'LOAN')?.description?.startsWith('은행 대출거래내역') === true,
+    { socialInsTps: list.codes.socialInsTps, loanTps: list.codes.loanTps });
+
+  // ── 국세 ──
+  const nt1 = ntax('nt1', [
+    ['2026-09-10', '부가가치세', 125000, 'V-NT-1', 500],
+    ['2026-09-10', '지어낸세목', 3300, 'V-NT-2'],
+    ['2026-09-11', '부가가치세', 1000, ''],
+    ['2026-09-12', '근로소득세(갑)', 2000, 'V-NT-1'],
+  ]);
+  const npv = await pv(ORG_A, 'NTAX', 'nt1.xls', nt1);
+  check('D2', '★ 국세 미리보기 — 넣을 2줄 · 납부번호 없음 1 · 파일 안 겹친 번호 1 · 비용 판정(부가가치세 아님 · 지어낸세목 비용) · 「처음 보는 세목」 경고는 지어낸세목만 · 뺀 줄 이름은 납부 키만',
+    npv.ok && npv.data.kind === 'NTAX' && npv.data.toInsert === 2 && npv.data.excluded.noPayNo === 1 && npv.data.excluded.dupPayNo === 1 &&
+    npv.data.sample[0]?.expense === false && npv.data.sample[1]?.expense === true && npv.data.sample[0]?.penalty === 500 &&
+    npv.data.warnings.length === 1 && npv.data.warnings[0].code === 'tax_item_new' && npv.data.warnings[0].message.includes('지어낸세목') &&
+    !npv.data.warnings[0].message.includes('근로소득세') &&
+    npv.data.skipReasons.map((x) => x.code).join() === 'badAmount,badDate,noAmount,noPayNo,dupPayNo',
+    npv.ok ? { toInsert: npv.data.toInsert, excluded: npv.data.excluded, warnings: npv.data.warnings, skip: npv.data.skipReasons.map((x) => x.code) } : npv);
+  const nup = await up(ORG_A, 'NTAX', 'nt1.xls', nt1);
+  const ntRows = (await c.query(`SELECT kind, pay_no, to_char(pay_date, 'YYYY-MM-DD') d, tax_item_src, amount::int a, penalty_amount::int p, belong_month, pay_method_src
+    FROM public.tb_s050_tax_payments WHERE org_id = $1 ORDER BY pay_no`, [ORG_A])).rows;
+  check('D3', '국세 올리기 — 2줄 · 종류 NTAX · 가산금 따로 · 귀속 · 납부방법 비움',
+    nup.ok && nup.data.insertedCount === 2 && ntRows.length === 2 && ntRows.every((r) => r.kind === 'NTAX' && r.belong_month === null && r.pay_method_src === null) &&
+    ntRows[0].pay_no === 'V-NT-1' && ntRows[0].a === 125000 && ntRows[0].p === 500 && ntRows[1].p === 0, ntRows);
+  const nt2 = ntax('nt2', [['2026-09-10', '지어낸세목', 3300, 'V-NT-2'], ['2026-10-05', '부가가치세', 7000, 'V-NT-3']]);
+  const npv2 = await pv(ORG_A, 'NTAX', 'nt2.xls', nt2);
+  check('D4', '★ 겹친 국세 파일 — 이미 있는 납부번호 1줄은 건너뛰고 새 1줄 · 위치 「9월 · nt1.xls」 · 이제 지어낸세목은 처음이 아님(경고 없음)',
+    npv2.ok && npv2.data.toInsert === 1 && npv2.data.alreadyUploaded === 1 && where(npv2) === '[{"month":"2026-09","fileName":"nt1.xls","count":1}]' &&
+    npv2.data.warnings.length === 0, npv2.ok ? { toInsert: npv2.data.toInsert, where: npv2.data.alreadyWhere, warnings: npv2.data.warnings } : npv2);
+
+  // ── 지방세 ──
+  const lt1 = ltax('lt1', [['V-NT-1', '지방소득세 특별징수분', '2026.09.30', '12,340', '2026년 08월 귀속분']]);
+  const lup = await up(ORG_A, 'LTAX', 'lt1.xls', lt1);
+  const ltRow = (await c.query(`SELECT to_char(belong_month, 'YYYY-MM') bm, pay_method_src, penalty_amount, amount::int a FROM public.tb_s050_tax_payments
+    WHERE org_id = $1 AND kind = 'LTAX'`, [ORG_A])).rows;
+  check('D5', '지방세 올리기 — 쉼표 금액 · 귀속 연월(과세대상) · 납부방법 · 가산금 비움 · 국세와 같은 납부번호도 따로 들어간다(종류마다)',
+    lup.ok && lup.data.insertedCount === 1 && ltRow.length === 1 && ltRow[0].bm === '2026-08' && ltRow[0].pay_method_src === '지어낸납부' &&
+    ltRow[0].penalty_amount === null && ltRow[0].a === 12340, ltRow);
+
+  // ── 4대보험 ──
+  const HI = { insTp: 'HI', noticeMonth: MONTH };
+  const hi1 = csv(hiSig, [hiRow('11111111111', '지어낸가', '3000000', '107850', '14170'), hiRow('22222222222', '지어낸나', '2000000', '71900', '9450')], 'hi1');
+  const hpv = await pv(ORG_A, 'SOCIAL', 'hi1.csv', hi1, HI);
+  check('D6', '★ 4대보험 건강 미리보기(CSV) — 넣을 2사람 · 보험별 합계 건강 2줄 · 장기요양 2줄 · 앞줄에 주민번호 칸 없음 · 고른 보험 · 고지 연월',
+    hpv.ok && hpv.data.kind === 'SOCIAL' && hpv.data.toInsert === 2 && hpv.data.socialInsTp === 'HI' && hpv.data.noticeMonth === MONTH &&
+    JSON.stringify(hpv.data.byInsTp) === '[{"insTp":"HI","count":2,"amount":179750},{"insTp":"LTC","count":2,"amount":23620}]' &&
+    !JSON.stringify(hpv.data).includes(RRN_MARK) && hpv.data.sample[0]?.memberNoLast4 === '1111',
+    hpv.ok ? { toInsert: hpv.data.toInsert, byInsTp: hpv.data.byInsTp } : hpv);
+  const hup = await up(ORG_A, 'SOCIAL', 'hi1.csv', hi1, HI);
+  const siRows = (await c.query(`SELECT ins_tp, member_name_src, member_no_last4, notice_amount::int a, pay_base::int b, to_char(notice_month, 'YYYY-MM') m
+    FROM public.tb_s050_social_ins WHERE org_id = $1 ORDER BY member_name_src, ins_tp`, [ORG_A])).rows;
+  const leak = (await c.query(`SELECT count(*)::int n FROM public.tb_s050_social_ins s WHERE s.org_id = $1 AND row_to_json(s)::text LIKE $2`,
+    [ORG_A, `%${RRN_MARK}%`])).rows[0].n;
+  check('D7', '★ 4대보험 올리기 — 2사람 4줄(건강 · 장기요양) · 끝 4자리 · 보수월액 · 고지 연월 · 파일 기록(보험 · 연월 · 들어간 사람 2) · 주민번호 칸 글자는 어디에도 없음',
+    hup.ok && hup.data.insertedCount === 2 && hup.data.file.social?.insTp === 'HI' && hup.data.file.social?.noticeMonth === MONTH &&
+    hup.data.file.rowCount === 2 && hup.data.file.insertedCount === 2 && siRows.length === 4 && leak === 0 &&
+    siRows[0].ins_tp === 'HI' && siRows[1].ins_tp === 'LTC' && siRows[0].member_no_last4 === '1111' && siRows[0].b === 3000000 && siRows.every((r) => r.m === MONTH),
+    { rows: siRows.length, leak, file: hup.ok ? hup.data.file.social : hup });
+  const hi2 = csv(hiSig, [hiRow('33333333333', '지어낸다', '1000000', '35950', '4720')], 'hi2');
+  const dup = [await pv(ORG_A, 'SOCIAL', 'hi2.csv', hi2, HI), await up(ORG_A, 'SOCIAL', 'hi2.csv', hi2, HI)];
+  const otherMonth = await pv(ORG_A, 'SOCIAL', 'hi2.csv', hi2, { insTp: 'HI', noticeMonth: '2026-10' });
+  check('D8', '★ 같은 달 같은 보험 파일 — 미리보기 · 올리기 모두 409 「먼저 지우세요」(결정 11) · 다른 달은 된다',
+    dup.every((r) => !r.ok && r.status === 409 && r.error === 'social_month_exists' && r.message.includes('먼저 지우세요') && r.message.includes('hi1.csv')) &&
+    otherMonth.ok && otherMonth.data.toInsert === 1, dup.map((r) => (r.ok ? 'ok' : r.message)));
+  const ei = csv(eiSig, [['1', '44444444444', RRN_MARK, '지어낸가', '61500', '3000000', '']], 'ei');
+  const ia = csv(eiSig, [['1', '44444444444', RRN_MARK, '지어낸가', '22500', '3000000', '']], 'ia');
+  const eup = await up(ORG_A, 'SOCIAL', 'ei.csv', ei, { insTp: 'EI', noticeMonth: MONTH });
+  const iup = await up(ORG_A, 'SOCIAL', 'ia.csv', ia, { insTp: 'IA', noticeMonth: MONTH });
+  const npAsHi = await pv(ORG_A, 'SOCIAL', 'ei.csv', csv(eiSig, [['1', '1', RRN_MARK, '가', '1', '1', '']], 'x'), { insTp: 'NP', noticeMonth: MONTH });
+  check('D9', '고용 · 산재 — 같은 모양 파일을 고른 보험 종류로 따로 넣는다 · 연금으로 고르면 양식이 맞지 않음(제목 줄이 다름)',
+    eup.ok && iup.ok && eup.data.insertedCount === 1 && iup.data.insertedCount === 1 && !npAsHi.ok && npAsHi.error === 'format_mismatch',
+    { eup: eup.ok || eup, iup: iup.ok || iup, npAsHi: npAsHi.ok || npAsHi.error });
+
+  // ── 대출 ──
+  const ln1 = loan('ln1', [
+    ['2026.09.25', 0, 1000000, null, 3000, 200, 50, 10, '이자납입'],
+    ['2026.09.26', 0, 1000000, null, 0, 0, 0, 0, '이자납입'],
+    ['2026.09.30', 0, 0, 1000000, 1000, 0, 0, 0, '원금상환/이자납입'],
+  ]);
+  const lnpv = await pv(ORG_A, 'LOAN', 'ln1.xlsx', ln1);
+  const lnup = await up(ORG_A, 'LOAN', 'ln1.xlsx', ln1);
+  const lnRows = (await c.query(`SELECT bank_code, loan_no_last4, txn_tp, principal_amount::int p, interest_amount::int i, fee_amount::int f, balance::int b
+    FROM public.tb_s050_loan_txns WHERE org_id = $1 ORDER BY txn_date`, [ORG_A])).rows;
+  check('D10', '★ 대출 — 끝 4자리 · 기관 020 · 이자 = 정상 + 연체 − 환출 · 수수료 따로 · 상환 · 모두 0 인 줄은 뺀다(noLoanAmount)',
+    lnpv.ok && lnpv.data.kind === 'LOAN' && lnpv.data.loanNoLast4 === '7666' && lnpv.data.bankCode === '020' && lnpv.data.excluded.noLoanAmount === 1 &&
+    lnup.ok && lnup.data.insertedCount === 2 && lnRows.length === 2 && lnRows.every((r) => r.bank_code === '020' && r.loan_no_last4 === '7666' && r.txn_tp === 'R') &&
+    lnRows[0].i === 3150 && lnRows[0].f === 10 && lnRows[1].p === 1000000 && lnRows[1].b === 0,
+    { pv: lnpv.ok ? lnpv.data.excluded : lnpv, rows: lnRows });
+  const ln2 = loan('ln2', [['2026.09.25', 0, 1000000, null, 3000, 200, 50, 10, '이자납입'], ['2026.10.25', 0, 1000000, null, 3000, 0, 0, 0, '이자납입']]);
+  const lnpv2 = await pv(ORG_A, 'LOAN', 'ln2.xlsx', ln2);
+  const lnOther = await pv(ORG_A, 'LOAN', 'ln3.xlsx', loan('ln3', [['2026.09.25', 0, 1000000, null, 3000, 200, 50, 10, '이자납입']], '1111-222-333444'));
+  check('D11', '★ 겹친 대출 파일 — 같은 줄 1줄은 건너뛰고 새 1줄(개수 맞추기) · 위치 「9월 · ln1.xlsx」 · 다른 대출번호면 같은 줄도 새 줄',
+    lnpv2.ok && lnpv2.data.toInsert === 1 && lnpv2.data.alreadyUploaded === 1 && where(lnpv2) === '[{"month":"2026-09","fileName":"ln1.xlsx","count":1}]' &&
+    lnOther.ok && lnOther.data.toInsert === 1 && lnOther.data.alreadyUploaded === 0, { pv2: where(lnpv2), other: lnOther.ok ? lnOther.data.toInsert : lnOther });
+
+  // ── CSV 는 4대보험만 · 목록 · 회사별 막기 ──
+  const csvAsTax = await pv(ORG_A, 'NTAX', 'a.csv', csv(ntSig, [], 'a'));
+  check('D12', 'CSV 는 4대보험만 — 국세에 CSV 를 보내면 「엑셀 파일만」(not_spreadsheet)', !csvAsTax.ok && csvAsTax.error === 'not_spreadsheet', csvAsTax);
+  const list2 = await listUploadsOp(c, ORG_A, MONTH);
+  const cardOf = (k) => list2.cards.find((x) => x.kind === k)?.fileCount;
+  const hiFile = list2.files.find((f) => f.fileName === 'hi1.csv');
+  check('D13', '9월 목록 — 국세 1(미리보기만 한 nt2 는 없음) · 지방세 1 · 4대보험 3(건강 · 고용 · 산재) · 대출 1 파일 · 4대보험 파일에 보험 · 연월',
+    cardOf('NTAX') === 1 && cardOf('LTAX') === 1 && cardOf('SOCIAL') === 3 && cardOf('LOAN') === 1 &&
+    hiFile?.social?.insTp === 'HI' && hiFile.social.noticeMonth === MONTH && hiFile.account === null,
+    { NTAX: cardOf('NTAX'), LTAX: cardOf('LTAX'), SOCIAL: cardOf('SOCIAL'), LOAN: cardOf('LOAN') });
+  await applyCompanyScope(c, tenant(ORG_B));
+  const bSeen = [
+    (await c.query(`SELECT count(*)::int n FROM public.tb_s050_tax_payments`)).rows[0].n,
+    (await c.query(`SELECT count(*)::int n FROM public.tb_s050_social_ins`)).rows[0].n,
+    (await c.query(`SELECT count(*)::int n FROM public.tb_s050_loan_txns`)).rows[0].n,
+  ];
+  const bHi = await pv(ORG_B, 'SOCIAL', 'hi1.csv', hi1, HI);
+  const bNt = await up(ORG_B, 'NTAX', 'nt1.xls', nt1);
+  const bDel = await deleteUploadsOp(c, ORG_B, [hup.ok ? hup.data.file.id : 'x']);
+  check('D14', '★ 회사 B — A 의 납부 · 4대보험 · 대출 줄이 안 보임 · 같은 달 막기 · 납부번호는 단체마다 · A 의 파일 지우기는 404',
+    bSeen.every((n) => n === 0) && bHi.ok && bHi.data.toInsert === 2 && bNt.ok && bNt.data.insertedCount === 2 && !bDel.ok && bDel.status === 404,
+    { bSeen, bHi: bHi.ok || bHi, bNt: bNt.ok ? bNt.data.insertedCount : bNt });
+  await applyCompanyScope(c, tenant(ORG_A));
+
+  // ── 지우기 ──
+  const del = await deleteUploadsOp(c, ORG_A, [hup.ok ? hup.data.file.id : 'x']);
+  const leftHi = (await c.query(`SELECT count(*)::int n FROM public.tb_s050_social_ins WHERE org_id = $1 AND ins_tp IN ('HI', 'LTC')`, [ORG_A])).rows[0].n;
+  const again = await pv(ORG_A, 'SOCIAL', 'hi2.csv', hi2, HI);
+  check('D15', '★ 4대보험 파일 지우기 — 그 파일의 4줄이 빠짐(CASCADE) · 그다음 같은 달 같은 보험을 다시 올릴 수 있다',
+    del.ok && del.data.deletedFiles === 1 && del.data.deletedRows === 4 && leftHi === 0 && again.ok && again.data.toInsert === 1,
+    { del: del.ok ? del.data : del, leftHi, again: again.ok || again });
+}
+
 /** 같은 트랜잭션 안에서 실패할 수 있는 일 — 실패하면 그 자리까지만 되돌린다. */
 async function attempt(c, fn) {
   await c.query('SAVEPOINT s');
@@ -444,10 +611,10 @@ async function main() {
       // ── 목록 ──
       const ups = await listUploadsOp(c, ORG_A, MONTH);
       const inv = ups.cards.find((k) => k.kind === 'INVOICE');
-      // ★ 1-5(2026-11-01): 은행 입출금(BANK) 카드도 열린다
-      check('U11', '자료 올리기 목록 — 계산서 · 카드 · 현금 · 은행 카드가 열림(1-4 · 1-5) · 그 달 파일 수 · 코드 이름은 코드 표에서',
+      // ★ 1-5(2026-11-01): 은행 입출금(BANK) 카드도 열린다 · 1-6(2026-11-01): 국세 · 지방세 · 4대보험 · 대출도(D1 이 자세히 본다)
+      check('U11', '자료 올리기 목록 — 여덟 카드가 모두 열림(1-4 · 1-5 · 1-6) · 그 달 파일 수 · 코드 이름은 코드 표에서',
         inv?.enabled === true && inv.fileCount === 6 &&
-        ups.cards.filter((k) => k.enabled).map((k) => k.kind).join() === 'INVOICE,CARD,CASH,BANK' &&
+        ups.cards.filter((k) => k.enabled).map((k) => k.kind).join() === 'INVOICE,CARD,CASH,BANK,NTAX,LTAX,SOCIAL,LOAN' &&
         ups.files.length === 6 && ups.codes.invDirs.map((d) => d.code).join() === 'P,S' &&
         // 카드 설명은 코드 설명 칸에서(비어 있으면 null) · 사업자 유형 이름(설정이 없으면 null)
         ups.codes.kinds.every((k) => 'description' in k) && 'bizTypeName' in ups && ups.bizTypeName === null,
@@ -664,6 +831,7 @@ async function main() {
       await applyCompanyScope(c, tenant(ORG_A));
 
       await bankChecks(c);
+      await paySocialLoanChecks(c);
     } finally {
       await c.query('ROLLBACK');
     }
@@ -676,8 +844,10 @@ async function main() {
       const [f, v, i] = [await n('tb_s050_upload_files'), await n('tb_s050_vendors'), await n('tb_s050_invoices')];
       const [cd, cs, st, fa] = [await n('tb_s050_card_txns'), await n('tb_s050_cash_txns'), await n('tb_s050_settings'), await n('tb_s050_fin_accounts')];
       const bk = await n('tb_s050_bank_txns');
-      check('Z1', '롤백 후 시험 줄 0 (운영사 스코프로 센다)', f === 0 && v === 0 && i === 0 && cd === 0 && cs === 0 && st === 0 && fa === 0 && bk === 0,
-        `파일 ${f} · 거래처 ${v} · 계산서 ${i} · 카드 ${cd} · 현금 ${cs} · 설정 ${st} · 계좌·카드 ${fa} · 은행 ${bk}`);
+      const [tp, si, ln] = [await n('tb_s050_tax_payments'), await n('tb_s050_social_ins'), await n('tb_s050_loan_txns')];
+      check('Z1', '롤백 후 시험 줄 0 (운영사 스코프로 센다)',
+        f === 0 && v === 0 && i === 0 && cd === 0 && cs === 0 && st === 0 && fa === 0 && bk === 0 && tp === 0 && si === 0 && ln === 0,
+        `파일 ${f} · 거래처 ${v} · 계산서 ${i} · 카드 ${cd} · 현금 ${cs} · 설정 ${st} · 계좌·카드 ${fa} · 은행 ${bk} · 납부 ${tp} · 4대보험 ${si} · 대출 ${ln}`);
     } finally {
       await c.query('ROLLBACK');
     }

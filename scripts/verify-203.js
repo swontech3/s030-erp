@@ -43,9 +43,12 @@ async function structure(q) {
   const want = {
     // ★ 212(2026-11-01)가 은행 칸을 더했다 — 대응표 bank_code · bank_file_tp, 올린 파일 bank_file_tp · account_no · bank_code (verify-212)
     [M]: ['id', 'kind', 'name', 'header_row', 'header_signature', 'columns', 'is_active', 'created_at', 'updated_at',
-      'bank_code', 'bank_file_tp'],
+      'bank_code', 'bank_file_tp',
+      // ★ 214(2026-11-01)가 4대보험 칸을 더했다 — 대응표 social_ins_tps, 올린 파일 social_ins_tp · notice_month (verify-214)
+      'social_ins_tps'],
     [U]: ['id', 'org_id', 'kind', 'map_id', 'direction', 'file_name', 'file_hash', 'file_size', 'row_count',
-      'inserted_count', 'uploaded_at', 'uploaded_by', 'bank_file_tp', 'account_no', 'bank_code'],
+      'inserted_count', 'uploaded_at', 'uploaded_by', 'bank_file_tp', 'account_no', 'bank_code',
+      'social_ins_tp', 'notice_month'],
     [V]: ['id', 'org_id', 'name', 'biz_no', 'vendor_tp', 'tp_set_by_user', 'first_kind', 'first_direction',
       'created_at', 'updated_at', 'created_by', 'updated_by'],
     [I]: ['id', 'org_id', 'file_id', 'vendor_id', 'direction', 'approval_no', 'write_date', 'partner_name_src',

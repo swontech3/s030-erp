@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
-import { readSheetRows } from './readSheet.ts';
+import { readSheetRows, readSocialRows } from './readSheet.ts';
 
 function workbookBytes(rows: unknown[][], bookType: 'xls' | 'xlsx'): Uint8Array {
   const wb = XLSX.utils.book_new();
@@ -62,5 +62,40 @@ describe('readSheetRows', () => {
     const broken = new Uint8Array(64);
     broken.set([0x50, 0x4b, 0x03, 0x04]);
     expect(readSheetRows(broken)).toMatchObject({ ok: false, code: 'unreadable' });
+  });
+});
+
+/**
+ * 4대보험 CSV(1-6) — 통합징수포털 파일은 옛 한글 부호(cp949)다. 시험 바이트는 지어낸 값이다.
+ * cp949 바이트: 「가」 B0 A1 · 「나」 B3 AA (글자 둘만 손으로 적는다 — Node 에 cp949 로 쓰는 기능이 없다).
+ */
+describe('readSocialRows — CSV(cp949 · UTF-8) 또는 엑셀', () => {
+  const cp949 = (parts: (string | number[])[]) =>
+    new Uint8Array(parts.flatMap((p) => (typeof p === 'string' ? [...new TextEncoder().encode(p)] : p)));
+
+  it('★ cp949 CSV — 빈 줄 자리를 지키고(7줄 = 6번) 값은 모두 글자 그대로', () => {
+    const r = readSocialRows(cp949(['\r\n\r\n', [0xb0, 0xa1], ',001,', [0xb3, 0xaa], ',1200\r\n']));
+    if (!r.ok) throw new Error(r.message);
+    expect(r.format).toBe('csv');
+    expect(r.rows[0]).toEqual([]);
+    expect(r.rows[2]).toEqual(['가', '001', '나', '1200']);
+  });
+
+  it('UTF-8(앞 표시 BOM 포함) CSV 도 읽는다', () => {
+    const r = readSocialRows(cp949([[0xef, 0xbb, 0xbf], '순번,가입자명\r\n1,시험\r\n']));
+    if (!r.ok) throw new Error(r.message);
+    expect(r.rows[0]).toEqual(['순번', '가입자명']);
+    expect(r.rows[1]).toEqual(['1', '시험']);
+  });
+
+  it('엑셀 바이트면 엑셀로 읽는다', () => {
+    const r = readSocialRows(workbookBytes([['순번'], ['1']], 'xlsx'));
+    if (!r.ok) throw new Error(r.message);
+    expect(r.format).toBe('xlsx');
+  });
+
+  it('글자 파일이 아닌 바이트(NUL)는 거절 · 5MB 를 넘으면 거절', () => {
+    expect(readSocialRows(new Uint8Array([0x61, 0x00, 0x62]))).toMatchObject({ ok: false, code: 'not_spreadsheet' });
+    expect(readSocialRows(new Uint8Array(5 * 1024 * 1024 + 1).fill(0x61))).toMatchObject({ ok: false, code: 'too_large' });
   });
 });

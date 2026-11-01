@@ -94,8 +94,10 @@ async function codeChecks(q) {
     lines.every((l, i) => l.use_tp === '000' && l.sort_order === i + 1 && l.is_active),
     fmt(lines.map((l) => [l.code, l.name])));
 
-  const skip = await q(`SELECT code, name, use_tp, sort_order, is_active FROM public.tb_s080_codes_line
-    WHERE build_id = '1' AND category = 'TAX_SKIP_REASON' ORDER BY sort_order, code`);
+  const skip = (await q(`SELECT code, name, use_tp, sort_order, is_active FROM public.tb_s080_codes_line
+    WHERE build_id = '1' AND category = 'TAX_SKIP_REASON' ORDER BY sort_order, code`))
+    // ★ 215(2026-11-01)가 국세 · 지방세 · 4대보험 · 대출 4개(순서 18~21)를 더했다 — 17번까지만 센다(새 4개는 verify-215)
+    .filter((l) => l.sort_order <= 17);
   const wantSkip = [...SKIP_OLD, ...SKIP_NEW.map(([c]) => c)];
   check('C3', 'TAX_SKIP_REASON — 있던 12개 그대로 + 은행 5개(순서 13~17)',
     skip.map((l) => l.code).join(',') === wantSkip.join(',') && skip.every((l, i) => l.sort_order === i + 1 && l.use_tp === '000' && l.is_active),
@@ -137,7 +139,8 @@ async function mapChecks(q, bankCodes) {
   const bankRows = rows.filter((r) => r.kind === 'BANK');
   check('M1', '은행 대응표 네 줄 — 국민 · 우리 · 하나 거래내역 · 우리 이체 결과', bankRows.map((r) => r.id).join(',') ===
     MAPS.map((m) => m[0]).sort().join(','), bankRows.map((r) => `${r.id}:${r.bank_code}:${r.bank_file_tp}`).join(','));
-  const others = rows.filter((r) => r.kind !== 'BANK');
+  // ★ 215(2026-11-01)가 국세 · 지방세 · 4대보험 · 대출 대응표 여섯 줄을 더했다 — 계산서 · 카드 · 현금만 센다(새 여섯은 verify-215)
+  const others = rows.filter((r) => ['INVOICE', 'CARD', 'CASH'].includes(r.kind));
   check('M2', '다른 대응표 셋(계산서 · 카드 · 현금)은 그대로 · 은행 칸 비움',
     others.map((r) => r.id).join(',') === 'HOMETAX_BIZ_CARD,HOMETAX_TAX_INVOICE,TAX_CASH_STD' &&
     others.every((r) => r.bank_code === null && r.bank_file_tp === null), others.map((r) => r.id).join(','));

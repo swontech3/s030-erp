@@ -17,6 +17,7 @@
 import { digitsOnly, formatBizNumber, isBizNumberChecksumOk, isBizNumberLength } from './tax-number.ts';
 import type { CardExcluded, CardStdRow, CashExcluded, CashStdRow } from './tax-card-cash.ts';
 import type { BankTxnExcluded, BankTxnStdRow, BankXferExcluded, BankXferStdRow, XferMatchStatus } from './tax-bank.ts';
+import type { LoanExcluded, LoanStdRow, PayExcluded, PayStdRow, SocialExcluded, SocialStdRow } from './tax-pay-social-loan.ts';
 
 export const TAX_INV_DIR_CATEGORY = 'TAX_INV_DIR';
 export const TAX_INV_CLASS_CATEGORY = 'TAX_INV_CLASS';
@@ -27,10 +28,10 @@ export const TAX_SKIP_REASON_CATEGORY = 'TAX_SKIP_REASON';
 
 /**
  * 자료 종류 — 올릴 수 있는 것(TAX_KIND 코드값). 1-2 세금계산서 · 1-4 카드 사용 내역 · 현금 경비(tax-card-cash.ts) ·
- * 1-5 은행 입출금(tax-bank.ts — 거래내역 · 이체 내역).
+ * 1-5 은행 입출금(tax-bank.ts — 거래내역 · 이체 내역) · 1-6 국세 · 지방세 · 4대보험 · 대출(tax-pay-social-loan.ts).
  */
 export const TAX_KIND_INVOICE = 'INVOICE';
-export const TAX_UPLOADABLE_KINDS: readonly string[] = [TAX_KIND_INVOICE, 'CARD', 'CASH', 'BANK'];
+export const TAX_UPLOADABLE_KINDS: readonly string[] = [TAX_KIND_INVOICE, 'CARD', 'CASH', 'BANK', 'NTAX', 'LTAX', 'SOCIAL', 'LOAN'];
 
 /** 매입 · 매출 — ★ 고정 코드(code-usage.ts `PINNED_CODES`). 203 CHECK 가 기댄다. */
 export const TAX_INV_DIR_PURCHASE = 'P';
@@ -44,10 +45,14 @@ export const TAX_VENDOR_GENERAL = 'G';
 /** 상한(결정 11). 203 CHECK 와 같은 값이다. */
 export const TAX_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 export const TAX_UPLOAD_MAX_ROWS = 10_000;
-/** 엑셀로 받는 본문 형식 — 화면이 확장자로 정해 보낸다. 서버는 파일 앞 바이트로 다시 본다. */
+/**
+ * 엑셀로 받는 본문 형식 — 화면이 확장자로 정해 보낸다. 서버는 파일 앞 바이트로 다시 본다.
+ * ★ CSV(text/csv)는 4대보험(1-6)만 받는다 — 다른 자료는 앞 바이트가 xls · xlsx 가 아니라 「엑셀 파일만」으로 막힌다.
+ */
 export const SPREADSHEET_MIME_TYPES = [
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv',
 ] as const;
 
 const VENDOR_NAME_MAX = 100;
@@ -127,7 +132,9 @@ export interface TaxUploadWarning {
     // 은행(1-5, tax-bank.ts) — 계좌번호 없는 파일은 받고 알린다 · 짝 못 찾은 이체 줄은 덧붙이지 않고 알린다
     | 'bank_account_unchecked'
     | 'xfer_unmatched'
-    | 'xfer_ambiguous';
+    | 'xfer_ambiguous'
+    // 국세 · 지방세(1-6, tax-pay-social-loan.ts) — 목록에도 없고 그 단체에서 처음인 세목은 비용으로 넣고 알린다(결정 19)
+    | 'tax_item_new';
   message: string;
   count?: number;
 }
@@ -140,7 +147,9 @@ export type TaxUploadErrorCode =
   | 'own_biz_no_mismatch'
   | 'direction_unknown'
   /** 은행 — 파일의 계좌번호가 고른 계좌와 다름(1-5). */
-  | 'account_mismatch';
+  | 'account_mismatch'
+  /** 대출 — 파일 머리에 대출 계좌번호가 없음(1-6). */
+  | 'no_loan_no';
 
 export interface TaxUploadError {
   code: TaxUploadErrorCode;
@@ -554,6 +563,8 @@ export interface TaxUploadFileView {
   bankFileTp: string | null;
   /** 은행 파일만 — 올릴 때 고른 계좌. 별칭은 세무 설정에서 번호로 찾는다(지웠으면 null). */
   account: { bankCode: string; accountNo: string; alias: string | null } | null;
+  /** 4대보험 파일만 — 올릴 때 고른 보험 종류(코드 TAX_SOCIAL_INS) · 고지 연월(`YYYY-MM`, 1-6). 다른 자료는 null. */
+  social: { insTp: string; noticeMonth: string } | null;
 }
 
 /** 자료 올리기에서 고를 수 있는 은행 계좌 — 세무 설정의 은행 계좌(「사용 안 함」 제외). */
@@ -586,15 +597,20 @@ export interface TaxUploadsResponse {
   bankAccounts: TaxUploadBankAccount[];
   /**
    * 자료 종류는 설명(카드 설명 — 코드 설명 칸, 비어 있으면 null)까지.
-   * 은행 이름(BANK) · 은행 파일 종류 이름(TAX_BANK_FILE)은 1-5.
+   * 은행 이름(BANK) · 은행 파일 종류 이름(TAX_BANK_FILE)은 1-5. 4대보험 종류(TAX_SOCIAL_INS) · 대출 거래 구분(TAX_LOAN_TP)은 1-6.
    */
   codes: {
     kinds: (TaxCodeName & { description: string | null })[];
     invDirs: TaxCodeName[];
     banks: TaxCodeName[];
     bankFileTps: TaxCodeName[];
+    socialInsTps: TaxCodeName[];
+    loanTps: TaxCodeName[];
   };
 }
+
+/** 납부 미리보기 한 줄 — 납부 줄 + 비용인지(코드 「비용이 아닌 세목」으로 정함, 1-6). */
+export type PayPreviewRow = PayStdRow & { expense: boolean };
 
 /** 이체 미리보기 한 줄 — 이체 줄 + 짝 상태(찾음 · 못 찾음 · 정할 수 없음 · 이미 덧붙임). */
 export type BankXferPreviewRow = BankXferStdRow & { status: XferMatchStatus };
@@ -609,7 +625,22 @@ export type TaxUploadKindPart =
   | { kind: 'CASH'; direction: null; sample: CashStdRow[]; excluded: CashExcluded }
   | { kind: 'BANK'; bankFileTp: 'TXN'; direction: null; sample: BankTxnStdRow[]; excluded: BankTxnExcluded }
   /** ★ 이체 — `toInsert` = 덧붙일 줄 수 · `alreadyUploaded` = 이미 덧붙인 줄이라 건너뛸 줄 수. */
-  | { kind: 'BANK'; bankFileTp: 'XFER'; direction: null; sample: BankXferPreviewRow[]; excluded: BankXferExcluded };
+  | { kind: 'BANK'; bankFileTp: 'XFER'; direction: null; sample: BankXferPreviewRow[]; excluded: BankXferExcluded }
+  /** 국세 · 지방세(1-6) — 같은 납부번호는 이미 올린 줄로 센다. */
+  | { kind: 'NTAX'; direction: null; sample: PayPreviewRow[]; excluded: PayExcluded }
+  | { kind: 'LTAX'; direction: null; sample: PayPreviewRow[]; excluded: PayExcluded }
+  /** 4대보험(1-6) — 고른 보험 종류 · 고지 연월, 보험 종류별 합계(넣을 줄 전체). */
+  | {
+      kind: 'SOCIAL';
+      direction: null;
+      socialInsTp: string;
+      noticeMonth: string;
+      sample: SocialStdRow[];
+      byInsTp: { insTp: string; count: number; amount: number }[];
+      excluded: SocialExcluded;
+    }
+  /** 대출(1-6) — 대출 기관(코드 BANK) · 대출번호 끝 4자리. */
+  | { kind: 'LOAN'; direction: null; bankCode: string; loanNoLast4: string; sample: LoanStdRow[]; excluded: LoanExcluded };
 
 export type TaxUploadPreview = TaxUploadKindPart & {
   fileName: string;
@@ -632,7 +663,7 @@ export interface TaxUploadResult {
   file: TaxUploadFileView;
   insertedCount: number;
   alreadyUploaded: number;
-  excluded: InvoiceExcluded | CardExcluded | CashExcluded | BankTxnExcluded | BankXferExcluded;
+  excluded: InvoiceExcluded | CardExcluded | CashExcluded | BankTxnExcluded | BankXferExcluded | PayExcluded | SocialExcluded | LoanExcluded;
   vendorsCreated: number;
   vendorsPromoted: number;
   warnings: TaxUploadWarning[];

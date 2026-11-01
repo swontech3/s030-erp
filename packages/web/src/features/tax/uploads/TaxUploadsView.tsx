@@ -18,6 +18,11 @@
  *     계좌가 없으면 「등록된 계좌가 없습니다 · [세무 설정에서 추가]」 + [파일 고르기] 막힘. 그 은행의 대응표가 없는 파일 종류는 막고 안내.
  *     미리보기 — 거래내역: 거래일시 · 내용 · 입금 · 출금 두 칸 / 이체 내역: 이체일시 · 받는분(받는 은행 · 끝 4자리) · 금액 · 짝.
  *     ★ 받는 계좌번호는 끝 4자리만 보인다(서버가 그것만 준다). 은행 파일 [보기]는 받을 화면(S05-04)이 없어 막는다.
+ *   ★ 1-6(2026-11-01): 「국세 납부」 · 「지방세 납부」 · 「4대보험」 · 「대출 내역」 카드가 켜진다. 4대보험만 업로드 창에서
+ *     **보험 종류**(국민연금 · 건강보험(장기요양 포함) · 고용보험 · 산재보험 — 코드 TAX_SOCIAL_INS)와 **고지 연월**(처음 값 = 작업할 달)을
+ *     고르고, 파일은 .csv 도 받는다(통합징수포털 파일). 미리보기 — 국세 · 지방세: 납부일 · 세목 · 비용 여부 · 귀속 · 금액 /
+ *     4대보험: 가입자(끝 4자리) · 보험 · 금액 + 보험 종류별 합계 / 대출: 거래일 · 구분 · 원금 · 이자 · 수수료 · 잔액.
+ *     ★ 주민번호는 서버가 읽지도 주지도 않는다. [보기]는 받을 화면(세금 · 보험 납부 · 대출)이 없어 막는다(결정 18).
  *
  * ★★ 이름 · 설명 · 선택지는 **API 가 준 코드 값으로만** 그린다(자료 종류 · 계산서 구분 · 뺀 줄 종류 · 사업자 유형).
  *    예외는 「삐용 경비」 카드 이름 하나다 — 자료 종류 코드가 아니다(1-2 는 「준비 중」으로만 그린다).
@@ -38,6 +43,8 @@ import {
   BANK_FILE_XFER,
   KIND_BANK,
   KIND_CASH,
+  KIND_SOCIAL,
+  PAY_KINDS,
   TaxUploadError,
   VIEWABLE_KINDS,
   checkDelete,
@@ -51,10 +58,12 @@ import {
   uploadFile,
   won,
   type BankChoice,
+  type SocialChoice,
   type TaxUploadDeleteResult,
   type TaxUploadPreview,
   type TaxUploadsResponse,
 } from './tax-uploads-model';
+import { TAX_SOCIAL_FILE_TPS } from '@swonbiz/shared/domain/tax-pay-social-loan';
 
 /** 카드 아이콘 — 시안 KINDS 의 icon(없는 것은 가까운 것으로). */
 const KIND_ICON: Record<string, IconName> = {
@@ -117,6 +126,9 @@ export function TaxUploadsView({ month }: { month: string }) {
   const accountLabel = (a: { bankCode: string; accountNo: string; alias: string | null }) =>
     `${data.codes.banks.find((b) => b.code === a.bankCode)?.name ?? a.bankCode} · ${a.alias ?? a.accountNo}`;
   const dirName = (code: string | null) => (code ? (data.codes.invDirs.find((d) => d.code === code)?.name ?? code) : '—');
+  /** 「건강보험 · 9월 고지」 — 4대보험 파일(1-6). 보험 이름은 코드 표(TAX_SOCIAL_INS). */
+  const socialLabel = (x: { insTp: string; noticeMonth: string }) =>
+    `${data.codes.socialInsTps.find((c) => c.code === x.insTp)?.name ?? x.insTp} · ${monthShort(x.noticeMonth)} 고지`;
   const enabled = data.cards.filter((c) => c.enabled);
   const up = enabled.filter((c) => c.fileCount > 0 || c.unused).length;
   const left = enabled.length - up;
@@ -307,7 +319,9 @@ export function TaxUploadsView({ month }: { month: string }) {
                         {kindName(f.kind)}
                         {f.bankFileTp === BANK_FILE_XFER ? ` · ${bankFileName(f.bankFileTp)}` : ''}
                       </td>
-                      <td className={`${t.mut} ${t.ell}`}>{f.account ? accountLabel(f.account) : dirName(f.direction)}</td>
+                      <td className={`${t.mut} ${t.ell}`}>
+                        {f.account ? accountLabel(f.account) : f.social ? socialLabel(f.social) : dirName(f.direction)}
+                      </td>
                       <td className={t.ell} title={f.fileName}>
                         {f.fileName}
                       </td>
@@ -399,7 +413,15 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
   const bankOk = !isBank || (!!account && account.fileTps.includes(fileTp));
   const bank: BankChoice | null = isBank && account ? { accountId: account.id, fileTp } : null;
   const isXfer = isBank && fileTp === BANK_FILE_XFER;
-  const canUse = (data.cards.find((c) => c.kind === kind)?.enabled ?? false) && bankOk;
+  // 4대보험(1-6) — 보험 종류 · 고지 연월. 보험 종류는 첫 것, 고지 연월은 작업할 달로 시작한다. 장기요양은 건강 파일에서 나온다
+  const isSocial = kind === KIND_SOCIAL;
+  const socialTps = data.codes.socialInsTps.filter((c) => TAX_SOCIAL_FILE_TPS.includes(c.code));
+  const [insTp, setInsTp] = useState(socialTps[0]?.code ?? '');
+  const [noticeMonth, setNoticeMonth] = useState(month);
+  const social: SocialChoice | null = isSocial && insTp && noticeMonth ? { insTp, noticeMonth } : null;
+  const socialOk = !isSocial || !!social;
+  const unit = isSocial ? '명' : '줄';
+  const canUse = (data.cards.find((c) => c.kind === kind)?.enabled ?? false) && bankOk && socialOk;
   const bankName = (code: string) => data.codes.banks.find((b) => b.code === code)?.name ?? code;
   const resetFile = () => {
     setPicked(null);
@@ -418,14 +440,14 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
     if (!file) return;
     setPicked(null);
     setError(null);
-    const mime = spreadsheetMimeOf(file.name);
+    const mime = spreadsheetMimeOf(file.name, isSocial);
     if (!mime) {
-      setError('엑셀 파일(.xlsx · .xls)만 올릴 수 있습니다');
+      setError(isSocial ? 'CSV · 엑셀 파일(.csv · .xlsx · .xls)만 올릴 수 있습니다' : '엑셀 파일(.xlsx · .xls)만 올릴 수 있습니다');
       return;
     }
     setBusy(true);
     try {
-      setPicked({ file, mime, preview: await previewUpload(kind, file, mime, bank) });
+      setPicked({ file, mime, preview: await previewUpload(kind, file, mime, bank, social) });
     } catch (err) {
       setError(err instanceof TaxUploadError ? err.message : '파일을 확인하지 못했습니다');
     } finally {
@@ -448,8 +470,8 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
     setBusy(true);
     setError(null);
     try {
-      await uploadFile(kind, picked.file, picked.mime, bank);
-      onDone(`${isXfer ? '덧붙였습니다' : '올렸습니다'} · ${p.byMonth.map((m) => `${monthShort(m.month)} ${won(m.count)}줄`).join(', ')}`);
+      await uploadFile(kind, picked.file, picked.mime, bank, social);
+      onDone(`${isXfer ? '덧붙였습니다' : '올렸습니다'} · ${p.byMonth.map((m) => `${monthShort(m.month)} ${won(m.count)}${unit}`).join(', ')}`);
     } catch (err) {
       setError(err instanceof TaxUploadError ? err.message : '올리지 못했습니다');
       setBusy(false);
@@ -540,6 +562,40 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
                 </label>
               </>
             ) : null}
+            {isSocial ? (
+              <>
+                <label className={t.field}>
+                  <span className={t.lab}>보험 종류</span>
+                  <select
+                    className={t.select}
+                    value={insTp}
+                    onChange={(e) => {
+                      setInsTp(e.target.value);
+                      resetFile();
+                    }}
+                  >
+                    {socialTps.map((x) => (
+                      <option key={x.code} value={x.code}>
+                        {x.name}
+                        {x.code === 'HI' ? ' (장기요양 포함)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={t.field}>
+                  <span className={t.lab}>고지 연월</span>
+                  <input
+                    type="month"
+                    className={t.select}
+                    value={noticeMonth}
+                    onChange={(e) => {
+                      setNoticeMonth(e.target.value);
+                      resetFile();
+                    }}
+                  />
+                </label>
+              </>
+            ) : null}
           </div>
 
           {isBank && data.bankAccounts.length === 0 ? (
@@ -578,8 +634,10 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
             onDrop={onDrop}
           >
             <Icon name="file-text" size={24} style={{ color: 'var(--text-caption)' }} />
-            <div style={{ fontSize: 14, color: 'var(--text-heading)', fontWeight: 700 }}>엑셀 파일을 끌어다 놓거나 고르세요</div>
-            <div className={t.sm}>.xlsx · .xls · 한 번에 한 파일</div>
+            <div style={{ fontSize: 14, color: 'var(--text-heading)', fontWeight: 700 }}>
+              {isSocial ? '파일을' : '엑셀 파일을'} 끌어다 놓거나 고르세요
+            </div>
+            <div className={t.sm}>{isSocial ? '.csv · .xlsx · .xls' : '.xlsx · .xls'} · 한 번에 한 파일</div>
             <div className={t.row} style={{ justifyContent: 'center' }}>
               <button
                 type="button"
@@ -592,7 +650,7 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
               <input
                 ref={input}
                 type="file"
-                accept=".xls,.xlsx"
+                accept={isSocial ? '.csv,.xls,.xlsx' : '.xls,.xlsx'}
                 hidden
                 onChange={(e) => {
                   void pick(e.target.files?.[0]);
@@ -628,15 +686,20 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
                       {data.codes.invDirs.find((d) => d.code === p.direction)?.name ?? p.direction}
                     </span>
                   ) : null}
-                  <span className={`${t.badge} ${t.bTodo}`}>전체 {won(p.totalRows)}줄</span>
+                  {p.kind === 'LOAN' ? (
+                    <span className={`${t.badge} ${t.bTodo}`}>
+                      {data.codes.banks.find((b) => b.code === p.bankCode)?.name ?? p.bankCode} · 대출 끝 {p.loanNoLast4}
+                    </span>
+                  ) : null}
+                  <span className={`${t.badge} ${t.bTodo}`}>전체 {won(p.totalRows)}{unit}</span>
                   {p.byMonth.map((m) =>
                     m.month === month ? (
                       <span key={m.month} className={`${t.badge} ${t.bDone}`}>
-                        {monthShort(m.month)} {won(m.count)}줄
+                        {monthShort(m.month)} {won(m.count)}{unit}
                       </span>
                     ) : (
                       <span key={m.month} className={`${t.badge} ${t.bTodo}`}>
-                        {monthShort(m.month)} {won(m.count)}줄 → {monthShort(m.month)}에 넣음
+                        {monthShort(m.month)} {won(m.count)}{unit} → {monthShort(m.month)}에 넣음
                       </span>
                     ),
                   )}
@@ -644,7 +707,11 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
               </div>
 
               <div className={t.card}>
-                <PreviewTable preview={p} dirName={(code) => data.codes.invDirs.find((d) => d.code === code)?.name ?? code} />
+                <PreviewTable
+                  preview={p}
+                  dirName={(code) => data.codes.invDirs.find((d) => d.code === code)?.name ?? code}
+                  codeName={(list, code) => data.codes[list].find((c) => c.code === code)?.name ?? code}
+                />
               </div>
 
               <div className={t.note}>
@@ -652,9 +719,20 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
                   <Icon name="info" size={16} />
                 </span>
                 <span>
-                  {isXfer ? '덧붙일 줄' : '넣을 줄'} <b>{won(p.toInsert)}</b> ·{' '}
-                  {p.kind === 'INVOICE' ? '이미 올린 승인번호라' : isXfer ? '이미 덧붙인 줄이라' : '이미 올린 줄이라'} 건너뛸 줄{' '}
-                  <b>{won(p.alreadyUploaded)}</b>
+                  {isXfer ? '덧붙일 줄' : isSocial ? '넣을 사람' : '넣을 줄'} <b>{won(p.toInsert)}</b>
+                  {isSocial ? null : (
+                    <>
+                      {' · '}
+                      {p.kind === 'INVOICE'
+                        ? '이미 올린 승인번호라'
+                        : PAY_KINDS.includes(p.kind)
+                          ? '이미 올린 납부번호라'
+                          : isXfer
+                            ? '이미 덧붙인 줄이라'
+                            : '이미 올린 줄이라'}{' '}
+                      건너뛸 줄 <b>{won(p.alreadyUploaded)}</b>
+                    </>
+                  )}
                   {skipped.length > 0
                     ? ` · 뺀 줄 ${skipped.map((s) => `${s.name} ${won(excludedOf(s.code))}`).join(' · ')}`
                     : ''}
@@ -686,7 +764,7 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
             취소
           </button>
           <button type="button" className={`${t.btn} ${t.btnPrimary}`} disabled={!ready} onClick={doUpload}>
-            {ready ? `${won(total)}줄 ${isXfer ? '덧붙이기' : '올리기'}` : '올리기'}
+            {ready ? `${won(total)}${unit} ${isXfer ? '덧붙이기' : '올리기'}` : '올리기'}
           </button>
         </div>
       </div>
@@ -706,7 +784,15 @@ const XFER_STATUS: Record<'match' | 'none' | 'ambiguous' | 'already', string> = 
   already: '이미 덧붙임',
 };
 
-function PreviewTable({ preview: p, dirName }: { preview: TaxUploadPreview; dirName: (code: string) => string }) {
+function PreviewTable({
+  preview: p,
+  dirName,
+  codeName,
+}: {
+  preview: TaxUploadPreview;
+  dirName: (code: string) => string;
+  codeName: (list: 'socialInsTps' | 'loanTps', code: string) => string;
+}) {
   const more = (cols: number) => (
     <tr>
       <td colSpan={cols} className={t.sm} style={{ textAlign: 'center' }}>
@@ -714,6 +800,125 @@ function PreviewTable({ preview: p, dirName }: { preview: TaxUploadPreview; dirN
       </td>
     </tr>
   );
+  if (p.kind === 'NTAX' || p.kind === 'LTAX') {
+    // 비용 여부 = 코드 「비용이 아닌 세목」으로 서버가 정한 것(저장하지 않음, 1-6). 귀속은 지방세만(국세 파일은 비어 있다)
+    return (
+      <table className={t.tbl}>
+        <colgroup>
+          <col style={{ width: 80 }} />
+          <col />
+          <col style={{ width: 90 }} />
+          <col style={{ width: 80 }} />
+          <col style={{ width: 150 }} />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>납부일</th>
+            <th>세목</th>
+            <th>비용</th>
+            <th>귀속</th>
+            <th className={t.num}>금액</th>
+          </tr>
+        </thead>
+        <tbody>
+          {p.sample.map((r, i) => (
+            <tr key={i}>
+              <td className={t.tnum}>{md(r.payDate)}</td>
+              <td className={t.ell}>{r.taxItem}</td>
+              <td className={r.expense ? '' : t.mut}>{r.expense ? '비용' : '비용 아님'}</td>
+              <td className={`${t.mut} ${t.tnum}`}>{r.belongMonth ? monthShort(r.belongMonth) : '—'}</td>
+              <td className={t.num}>
+                {won(r.amount)}
+                {r.penalty ? <span className={t.mut}> (가산금 {won(r.penalty)})</span> : null}
+              </td>
+            </tr>
+          ))}
+          {more(5)}
+        </tbody>
+      </table>
+    );
+  }
+  if (p.kind === 'SOCIAL') {
+    // ★ 주민번호는 없다 — 이름 · 가입자 번호 끝 4자리만. 금액은 파일 그대로(직원 · 회사 나눔은 직원 급여 단계)
+    return (
+      <table className={t.tbl}>
+        <colgroup>
+          <col />
+          <col style={{ width: 110 }} />
+          <col style={{ width: 140 }} />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>가입자</th>
+            <th>보험</th>
+            <th className={t.num}>금액</th>
+          </tr>
+        </thead>
+        <tbody>
+          {p.sample.map((r, i) => (
+            <tr key={i}>
+              <td className={t.ell}>
+                {r.memberName}
+                {r.memberNoLast4 ? <span className={t.mut}> · 끝 {r.memberNoLast4}</span> : null}
+              </td>
+              <td className={t.mut}>{codeName('socialInsTps', r.insTp)}</td>
+              <td className={t.num}>{won(r.noticeAmount)}</td>
+            </tr>
+          ))}
+          {more(3)}
+          {p.byInsTp.map((x) => (
+            <tr key={x.insTp}>
+              <td className={t.sm}>합계 · {won(x.count)}줄</td>
+              <td>{codeName('socialInsTps', x.insTp)}</td>
+              <td className={t.num}>
+                <b>{won(x.amount)}</b>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+  if (p.kind === 'LOAN') {
+    // 이자만 비용 — 원금 · 이자 · 수수료를 나눠 보인다(이자 = 정상 + 연체 − 환출, 1-6 결정 13)
+    return (
+      <table className={t.tbl}>
+        <colgroup>
+          <col style={{ width: 80 }} />
+          <col style={{ width: 70 }} />
+          <col />
+          <col />
+          <col style={{ width: 90 }} />
+          <col />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>거래일</th>
+            <th>구분</th>
+            <th className={t.num}>원금</th>
+            <th className={t.num}>이자</th>
+            <th className={t.num}>수수료</th>
+            <th className={t.num}>잔액</th>
+          </tr>
+        </thead>
+        <tbody>
+          {p.sample.map((r, i) => (
+            <tr key={i}>
+              <td className={t.tnum}>{md(r.txnDate)}</td>
+              <td className={t.mut} title={r.txnType ?? ''}>
+                {codeName('loanTps', r.txnTp)}
+              </td>
+              <td className={t.num}>{r.principal ? won(r.principal) : ''}</td>
+              <td className={t.num}>{r.interest ? won(r.interest) : ''}</td>
+              <td className={t.num}>{r.fee ? won(r.fee) : ''}</td>
+              <td className={t.num}>{won(r.balance)}</td>
+            </tr>
+          ))}
+          {more(6)}
+        </tbody>
+      </table>
+    );
+  }
   if (p.kind === 'CARD') {
     // 홈택스 파일에는 결제일 · 적용월이 없다(1-4 「다르게 해야 할 곳」 1 · 2). ★ 카드는 끝 4자리만
     return (

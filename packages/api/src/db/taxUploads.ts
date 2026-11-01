@@ -11,6 +11,8 @@
  *   거래처 건수 · 합치기는 세 표를 함께 본다(`FILE_ROWS_SQL`). 현금 줄은 거래처를 가리키지 않는다.
  * ★ 1-5(2026-11-01): 은행 거래내역 줄(212)도 파일 목록 · 파일 수 · 지울 줄 수에 든다. 이체 파일은 줄을 넣지 않고
  *   거래내역 줄에 덧붙이므로 그 달을 덧붙인 줄로 본다(`FILE_MONTH_SQL`). 은행 줄은 거래처를 가리키지 않는다.
+ * ★ 1-6(2026-11-01): 국세 · 지방세 납부 · 4대보험 고지 · 대출 거래 줄(214)도 든다(`db/taxPaySocialLoan.ts`). 4대보험 파일은
+ *   보험 종류 · 고지 연월을 파일 기록에 둔다(`social`). 이 줄들도 거래처를 가리키지 않는다.
  */
 import { randomUUID } from 'node:crypto';
 import type {
@@ -38,13 +40,17 @@ export function monthRange(month: string): [string, string] {
 }
 
 /**
- * 네 표의 (단체, 파일, 날짜) — 계산서 작성일 · 카드 사용일 · 현금 날짜 · 은행 거래일(1-5). 지울 줄 수가 이것으로 센다.
+ * 일곱 표의 (단체, 파일, 날짜) — 계산서 작성일 · 카드 사용일 · 현금 날짜 · 은행 거래일(1-5) ·
+ * 국세 · 지방세 납부일 · 4대보험 고지 연월(달 첫날) · 대출 거래일(1-6). 지울 줄 수가 이것으로 센다.
  * ★ 바깥 질의가 `org_id = $1` 을 건다(이 조각은 단체를 거르지 않는다).
  */
 const FILE_ROWS_SQL = `(SELECT org_id, file_id, write_date AS d FROM public.tb_s050_invoices
                        UNION ALL SELECT org_id, file_id, use_date FROM public.tb_s050_card_txns
                        UNION ALL SELECT org_id, file_id, use_date FROM public.tb_s050_cash_txns
-                       UNION ALL SELECT org_id, file_id, txn_at::date FROM public.tb_s050_bank_txns)`;
+                       UNION ALL SELECT org_id, file_id, txn_at::date FROM public.tb_s050_bank_txns
+                       UNION ALL SELECT org_id, file_id, pay_date FROM public.tb_s050_tax_payments
+                       UNION ALL SELECT org_id, file_id, notice_month FROM public.tb_s050_social_ins
+                       UNION ALL SELECT org_id, file_id, txn_date FROM public.tb_s050_loan_txns)`;
 /**
  * 파일 목록 · 파일 수가 그 달을 보는 줄 — 위에 더해 **이체 파일**은 덧붙인 출금 줄의 거래일로 본다(1-5).
  * ★ 지울 줄 수에는 쓰지 않는다 — 이체 파일을 지워도 그 줄은 빠지지 않는다(이체 칸만 비움).
@@ -92,6 +98,8 @@ interface FileRow {
   bank_code: string | null;
   account_no: string | null;
   account_alias: string | null;
+  social_ins_tp: string | null;
+  notice_month: string | null;
 }
 const fileView = (r: FileRow): TaxUploadFileView => ({
   id: r.id,
@@ -103,6 +111,7 @@ const fileView = (r: FileRow): TaxUploadFileView => ({
   uploadedAt: iso(r.uploaded_at),
   bankFileTp: r.bank_file_tp,
   account: r.bank_code !== null && r.account_no !== null ? { bankCode: r.bank_code, accountNo: r.account_no, alias: r.account_alias } : null,
+  social: r.social_ins_tp !== null && r.notice_month !== null ? { insTp: r.social_ins_tp, noticeMonth: r.notice_month } : null,
 });
 /**
  * ★ 이체 파일(XFER)의 들어간 줄 수는 **지금 덧붙어 있는 줄**로 다시 센다(결정 14 — 거래내역 파일을 지우면 줄어든다).
@@ -114,7 +123,8 @@ const FILE_COLS = `f.id, f.kind, f.direction, f.file_name, f.row_count,
        ELSE f.inserted_count END AS inserted_count,
   f.uploaded_at, f.bank_file_tp, f.bank_code, f.account_no,
   (SELECT a.alias FROM public.tb_s050_fin_accounts a
-    WHERE a.org_id = f.org_id AND a.kind = 'B' AND a.number = f.account_no ORDER BY a.sort_order, a.id LIMIT 1) AS account_alias`;
+    WHERE a.org_id = f.org_id AND a.kind = 'B' AND a.number = f.account_no ORDER BY a.sort_order, a.id LIMIT 1) AS account_alias,
+  f.social_ins_tp, to_char(f.notice_month, 'YYYY-MM') AS notice_month`;
 
 /** 같은 파일(지문). */
 export async function findFileByHash(client: ScopedClient, orgId: number, hash: string): Promise<TaxUploadFileView | null> {
@@ -195,6 +205,8 @@ export interface NewUploadFile {
   insertedCount: number;
   /** 은행 파일만(212 CHECK) — 파일 종류 · 고른 계좌번호 · 은행. 다른 자료는 없음. */
   bank?: { fileTp: string; accountNo: string; bankCode: string };
+  /** 4대보험 파일만(214 CHECK) — 고른 보험 종류 · 고지 연월(`YYYY-MM`). 다른 자료는 없음. */
+  social?: { insTp: string; noticeMonth: string };
 }
 
 export async function insertUploadFile(client: ScopedClient, orgId: number, f: NewUploadFile, actor: string): Promise<TaxUploadFileView> {
@@ -202,11 +214,12 @@ export async function insertUploadFile(client: ScopedClient, orgId: number, f: N
     client,
     `INSERT INTO public.tb_s050_upload_files AS f
        (id, org_id, kind, map_id, direction, file_name, file_hash, file_size, row_count, inserted_count, uploaded_by,
-        bank_file_tp, account_no, bank_code)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        bank_file_tp, account_no, bank_code, social_ins_tp, notice_month)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::date)
      RETURNING ${FILE_COLS}`,
     [randomUUID(), orgId, f.kind, f.mapId, f.direction, f.fileName, f.fileHash, f.fileSize, f.rowCount, f.insertedCount, actor,
-      f.bank?.fileTp ?? null, f.bank?.accountNo ?? null, f.bank?.bankCode ?? null],
+      f.bank?.fileTp ?? null, f.bank?.accountNo ?? null, f.bank?.bankCode ?? null,
+      f.social?.insTp ?? null, f.social ? `${f.social.noticeMonth}-01` : null],
   );
   return fileView(rows[0]!);
 }

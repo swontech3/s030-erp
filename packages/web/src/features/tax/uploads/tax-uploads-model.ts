@@ -3,7 +3,7 @@
  *
  * ★ 브라우저는 Fastify 에 직접 붙지 않는다 — `/api/tax/uploads/**`(Next 중계)를 부른다.
  * ★ 엑셀 검사(형식 · 양식 · 매입/매출 · 줄 거르기)는 **서버가 한다**(shared `tax-uploads.ts`). 화면은 결과만 그린다.
- * ★ 엑셀은 바이트 그대로 보낸다 — 본문 형식은 확장자로 정하고(xls · xlsx), 원래 이름은 `X-File-Name`(URI 인코딩).
+ * ★ 엑셀은 바이트 그대로 보낸다 — 본문 형식은 확장자로 정하고(xls · xlsx · 4대보험만 csv), 원래 이름은 `X-File-Name`(URI 인코딩).
  */
 import type {
   TaxUploadDeleteResult,
@@ -22,12 +22,25 @@ export const KIND_BANK = 'BANK';
 export const BANK_FILE_TXN = 'TXN';
 export const BANK_FILE_XFER = 'XFER';
 
+/** 4대보험(1-6) — 올릴 때 보험 종류(NP · HI · EI · IA) · 고지 연월을 함께 보낸다. 본문은 CSV 도 된다. */
+export const KIND_SOCIAL = 'SOCIAL';
+export const KIND_LOAN = 'LOAN';
+/** 국세 · 지방세(1-6) — 미리보기 표가 같다. */
+export const PAY_KINDS: readonly string[] = ['NTAX', 'LTAX'];
+
+/** 4대보험 파일을 올릴 때 고른 것 — 판정은 서버가 한다. */
+export interface SocialChoice {
+  insTp: string;
+  noticeMonth: string;
+}
+
 /** 은행 파일을 올릴 때 고른 것 — 계좌는 세무 설정 계좌 id(서버가 그 단체 것인지 본다). */
 export interface BankChoice {
   accountId: string;
   fileTp: string;
 }
-/** [보기]로 항목 지정 「이번 달 자료 전체」에 보낼 수 있는 파일 — 계산서 · 카드 · 현금(1-4). */
+/** [보기]로 항목 지정 「이번 달 자료 전체」에 보낼 수 있는 파일 — 계산서 · 카드 · 현금(1-4).
+ *  ★ 은행 · 국세 · 지방세 · 4대보험 · 대출은 받을 화면이 아직 없어 막는다(1-6 결정 18). */
 export const VIEWABLE_KINDS: readonly string[] = [KIND_INVOICE, 'CARD', KIND_CASH];
 
 /** 표준 양식 내려받기 주소 — 지금은 현금 경비뿐(1-4). */
@@ -69,10 +82,15 @@ const MIME_BY_EXT: Record<string, string> = {
   xls: 'application/vnd.ms-excel',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
+const CSV_MIME = 'text/csv';
 
-/** 고른 파일의 본문 형식 — .xls · .xlsx 가 아니면 null(결과서 「.xlsx · .xls · 한 번에 한 파일」). */
-export function spreadsheetMimeOf(fileName: string): string | null {
+/**
+ * 고른 파일의 본문 형식 — .xls · .xlsx 가 아니면 null(결과서 「.xlsx · .xls · 한 번에 한 파일」).
+ * `allowCsv` = 4대보험(1-6) — 통합징수포털 파일이 CSV 다.
+ */
+export function spreadsheetMimeOf(fileName: string, allowCsv = false): string | null {
   const ext = fileName.toLowerCase().split('.').pop() ?? '';
+  if (allowCsv && ext === 'csv') return CSV_MIME;
   return MIME_BY_EXT[ext] ?? null;
 }
 
@@ -85,16 +103,17 @@ const fileInit = (file: File, mime: string): RequestInit => ({
 export const loadUploads = (month: string) =>
   call<TaxUploadsResponse>(`/api/tax/uploads?month=${encodeURIComponent(month)}`);
 
-/** `?kind=` (+ 은행이면 `&account=&fileTp=`). */
-const kindQuery = (kind: string, bank: BankChoice | null) =>
+/** `?kind=` (+ 은행이면 `&account=&fileTp=`, 4대보험이면 `&insTp=&noticeMonth=`). */
+const kindQuery = (kind: string, bank: BankChoice | null, social: SocialChoice | null) =>
   `kind=${encodeURIComponent(kind)}` +
-  (bank ? `&account=${encodeURIComponent(bank.accountId)}&fileTp=${encodeURIComponent(bank.fileTp)}` : '');
+  (bank ? `&account=${encodeURIComponent(bank.accountId)}&fileTp=${encodeURIComponent(bank.fileTp)}` : '') +
+  (social ? `&insTp=${encodeURIComponent(social.insTp)}&noticeMonth=${encodeURIComponent(social.noticeMonth)}` : '');
 
-export const previewUpload = (kind: string, file: File, mime: string, bank: BankChoice | null = null) =>
-  call<TaxUploadPreview>(`/api/tax/uploads/preview?${kindQuery(kind, bank)}`, fileInit(file, mime));
+export const previewUpload = (kind: string, file: File, mime: string, bank: BankChoice | null = null, social: SocialChoice | null = null) =>
+  call<TaxUploadPreview>(`/api/tax/uploads/preview?${kindQuery(kind, bank, social)}`, fileInit(file, mime));
 
-export const uploadFile = (kind: string, file: File, mime: string, bank: BankChoice | null = null) =>
-  call<TaxUploadResult>(`/api/tax/uploads?${kindQuery(kind, bank)}`, fileInit(file, mime));
+export const uploadFile = (kind: string, file: File, mime: string, bank: BankChoice | null = null, social: SocialChoice | null = null) =>
+  call<TaxUploadResult>(`/api/tax/uploads?${kindQuery(kind, bank, social)}`, fileInit(file, mime));
 
 const idsInit = (ids: string[]): RequestInit => ({
   method: 'POST',

@@ -22,7 +22,7 @@ const session = (role: ScopeRole): ErpSession => ({
 
 const LIST: TaxUploadsResponse = {
   month: '2026-09', bizTypeName: null, cards: [], files: [], bankAccounts: [],
-  codes: { kinds: [], invDirs: [], banks: [], bankFileTps: [] },
+  codes: { kinds: [], invDirs: [], banks: [], bankFileTps: [], socialInsTps: [], loanTps: [] },
 };
 const EXCLUDED = { nonGeneral: 0, noBizNo: 0, badAmount: 0, noApproval: 0, dupInFile: 0, otherClass: 0, badDate: 0 };
 const PREVIEW: TaxUploadPreview = {
@@ -36,12 +36,12 @@ function fakeDeps(over: Partial<TaxUploadsDeps> = {}) {
   const calls: unknown[][] = [];
   const deps: TaxUploadsDeps = {
     list: async (s, month) => { calls.push(['list', s.s020OrgId, month]); return LIST; },
-    preview: async (s, kind, name, bytes, bank) => {
-      calls.push(['preview', s.s020OrgId, kind, name, bytes.length, ...(bank ? [bank] : [])]);
+    preview: async (s, kind, name, bytes, bank, social) => {
+      calls.push(['preview', s.s020OrgId, kind, name, bytes.length, ...(bank ? [bank] : []), ...(social ? [social] : [])]);
       return { ok: true, data: PREVIEW };
     },
-    upload: async (s, kind, name, _bytes, bank) => {
-      calls.push(['upload', s.s020OrgId, kind, name, ...(bank ? [bank] : [])]);
+    upload: async (s, kind, name, _bytes, bank, social) => {
+      calls.push(['upload', s.s020OrgId, kind, name, ...(bank ? [bank] : []), ...(social ? [social] : [])]);
       return { ok: false, status: 409, error: 'same_file', message: '이미 올린 파일입니다' };
     },
     remove: async (s, ids, dryRun) => {
@@ -141,15 +141,50 @@ describe('POST /tax/uploads/preview · /tax/uploads — 엑셀 본문', () => {
     expect(calls).toEqual([]);
   });
 
-  it('아직 올릴 수 없는 종류 · 종류 없음은 400', async () => {
+  it('없는 종류 · 종류 없음은 400', async () => {
     const { deps, calls } = fakeDeps();
     const a = await build('tenant', deps);
-    // ★ 1-5(2026-11-01): 은행(BANK)이 켜져 아직 안 되는 종류는 대출(LOAN)로 본다
-    for (const url of ['/tax/uploads/preview?kind=LOAN', '/tax/uploads/preview', '/tax/uploads?kind=NTAX']) {
+    // ★ 1-6(2026-11-01): 여덟 종류가 모두 켜져 「아직 안 되는 종류」가 없다 — 없는 종류(PAYROLL · X)로 본다
+    for (const url of ['/tax/uploads/preview?kind=PAYROLL', '/tax/uploads/preview', '/tax/uploads?kind=X']) {
       const res = await post(a, url, { 'content-type': XLS_TYPE, 'x-file-name': 'a.xls' }, XLS);
       expect(res.statusCode).toBe(400);
       expect(res.json()).toMatchObject({ errors: [{ field: 'kind' }] });
     }
+    expect(calls).toEqual([]);
+  });
+
+  it('★ 국세 · 지방세 · 대출(1-6) — 고를 것 없이 종류만 넘긴다', async () => {
+    const { deps, calls } = fakeDeps();
+    const a = await build('tenant', deps);
+    for (const kind of ['NTAX', 'LTAX', 'LOAN']) {
+      const res = await post(a, `/tax/uploads/preview?kind=${kind}`, { 'content-type': XLS_TYPE, 'x-file-name': 'a.xls' }, XLS);
+      expect(res.statusCode).toBe(200);
+    }
+    expect(calls).toEqual([
+      ['preview', 9001, 'NTAX', 'a.xls', XLS.length], ['preview', 9001, 'LTAX', 'a.xls', XLS.length], ['preview', 9001, 'LOAN', 'a.xls', XLS.length],
+    ]);
+  });
+
+  it('★ 4대보험(1-6) — CSV 본문 · 고른 보험 종류 · 고지 연월을 함께 넘긴다', async () => {
+    const { deps, calls } = fakeDeps();
+    const a = await build('tenant', deps);
+    const csv = Buffer.from('a,b\r\n');
+    const p = await post(a, '/tax/uploads/preview?kind=SOCIAL&insTp=HI&noticeMonth=2026-09', { 'content-type': 'text/csv', 'x-file-name': 'hi.csv' }, csv);
+    const u = await post(a, '/tax/uploads?kind=SOCIAL&insTp=IA&noticeMonth=2026-10', { 'content-type': 'text/csv', 'x-file-name': 'ia.csv' }, csv);
+    expect(p.statusCode).toBe(200);
+    expect(u.statusCode).toBe(409);
+    expect(calls).toEqual([
+      ['preview', 9001, 'SOCIAL', 'hi.csv', csv.length, { insTp: 'HI', noticeMonth: '2026-09' }],
+      ['upload', 9001, 'SOCIAL', 'ia.csv', { insTp: 'IA', noticeMonth: '2026-10' }],
+    ]);
+  });
+
+  it('★ 4대보험인데 보험 종류 · 고지 연월이 없거나 틀리면 400 — 칸마다 알린다(장기요양은 고를 수 없음)', async () => {
+    const { deps, calls } = fakeDeps();
+    const a = await build('tenant', deps);
+    const res = await post(a, '/tax/uploads/preview?kind=SOCIAL&insTp=LTC', { 'content-type': 'text/csv', 'x-file-name': 'a.csv' }, 'a,b');
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ error: 'invalid_request', errors: [{ field: 'insTp' }, { field: 'noticeMonth' }] });
     expect(calls).toEqual([]);
   });
 
@@ -161,10 +196,11 @@ describe('POST /tax/uploads/preview · /tax/uploads — 엑셀 본문', () => {
     expect(res.json()).toMatchObject({ errors: [{ field: 'fileName' }] });
   });
 
-  it('엑셀이 아닌 본문 형식은 415 — 라우트까지 오지 않는다', async () => {
+  it('엑셀 · CSV 가 아닌 본문 형식은 415 — 라우트까지 오지 않는다', async () => {
     const { deps, calls } = fakeDeps();
     const a = await build('tenant', deps);
-    const res = await post(a, '/tax/uploads/preview?kind=INVOICE', { 'content-type': 'text/csv', 'x-file-name': 'a.csv' }, 'a,b');
+    // ★ 1-6(2026-11-01): text/csv 는 4대보험 때문에 받는다(아래) — 받지 않는 형식은 application/zip 으로 본다(text/plain 은 Fastify 기본 해석이 받는다)
+    const res = await post(a, '/tax/uploads/preview?kind=INVOICE', { 'content-type': 'application/zip', 'x-file-name': 'a.zip' }, 'a,b');
     expect(res.statusCode).toBe(415);
     expect(calls).toEqual([]);
   });
