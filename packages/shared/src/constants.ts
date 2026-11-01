@@ -132,6 +132,15 @@ export const BBIYONG = {
   ORG_PATCH_PATH: "/rest/v1/s021100010/erp-patch-org",
 
   /**
+   * 단체 목록(조회) — `GET ?orgName=&memberName=&limit=&curPage=`(연동규격 사본 2-1). 공용 회사 조회 팝업이 쓴다.
+   * ★ 등록 · 수정과 같이 **「단체관리」(S021100010) 화면 권한**이 있는 운영사 직원 토큰이어야 한다(2-2) — 없으면
+   *   HTTP 200 본문 `status: 403` · `error: ["AUTHZ_DENY"]`.
+   * ★ 응답(2026-11-01 개발계 실측): `data` 는 행 배열(쪽 감싸개 없음) · 행마다 `totCnt`(전체 수) ·
+   *   행 칸 `orgId` · `orgCode` · `orgName` · `orgTp` · `memberName` · `telNo` · `email` · `memberCnt` · …
+   */
+  ORG_LIST_PATH: "/rest/v1/s021100010/org-list",
+
+  /**
    * 직원정보 — 구성원 신규(`I`) · 수정(`U`) · 삭제(`D`) 를 **한 엔드포인트**로 받는다
    * (삐용 규격 2026-10-05). 가르는 것은 본문의 `regTp` 다.
    *

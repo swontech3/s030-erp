@@ -464,7 +464,9 @@ export type BbiyongOrgKey = { orgId: number } | { orgCode: string };
 export type OrgLookupOutcome<T> =
   | { kind: 'ok'; value: T }
   /** `message` 는 운영자에게 그대로 보여줄 문구다. */
-  | { kind: 'unsupported'; message: string };
+  | { kind: 'unsupported'; message: string }
+  /** 삐용이 권한으로 거절했다(`AUTHZ_DENY` — 「단체관리」 화면 권한 없음). 다시 해도 풀리지 않는다. */
+  | { kind: 'forbidden'; message: string };
 
 export interface BbiyongOrg {
   createOrg(req: BbiyongOrgRequest, accessToken: string): Promise<CreateOrgOutcome>;

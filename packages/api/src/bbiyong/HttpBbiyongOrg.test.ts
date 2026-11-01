@@ -483,3 +483,55 @@ describe('parseMemberOp — 성공 게이트', () => {
     expect(parseMemberOp({ result: 'success', status: '200', data: { memberId: 1 } }, 'I').kind).toBe('rejected');
   });
 });
+
+// =============================================================================
+// 단체 목록 · 단건 — GET org-list (2026-11-01, 개발계 실측 모양)
+// =============================================================================
+describe('HttpBbiyongOrg — 단체 목록(org-list)', () => {
+  const row = (orgId: number, orgCode: string, orgName: string, totCnt: number) => ({
+    orgId, orgName, telNo: '', memberName: '홍대표', email: 'x@y', memberCnt: '1', orgCode, orgTp: 'N',
+    countryCode: 'KR', countryName: '대한민국', serviceNms: '삐용', ceoAcceptStatus: null, totCnt,
+  });
+  const page = (rows: unknown[]) => ({ status: 200, result: 'success', massage: null, data: rows, error: [] });
+
+  it('★ GET · 토큰 · 회사명 일부 · 쪽 크기 100 · 1쪽 — 행을 다섯 칸으로, 코드 순', async () => {
+    const { org, calls } = adapter(page([row(5, 'VHF', '해피프렌즈', 2), row(1, 'SWT', '(주)에스원테크', 2)]));
+    const out = await org.listOrgs({ name: ' 프렌 ' }, 'tok');
+    expect(calls).toHaveLength(1);
+    const u = new URL(calls[0]!.url);
+    expect(u.pathname).toBe('/rest/v1/s021100010/org-list');
+    expect(Object.fromEntries(u.searchParams)).toEqual({ orgName: '프렌', memberName: '', limit: '100', curPage: '1' });
+    expect(calls[0]!.init.method).toBe('GET');
+    expect((calls[0]!.init.headers as Record<string, string>).authorization).toBe('Bearer tok');
+    // 삐용이 준 것 중 회사명에 「프렌」이 든 것만(모의 어댑터와 같은 규칙)
+    expect(out).toEqual({ kind: 'ok', value: [{ orgId: 5, orgCode: 'VHF', orgName: '해피프렌즈', repName: '홍대표', status: null }] });
+  });
+
+  it('★ 전체 수(totCnt)만큼 쪽을 넘겨 끝까지 받는다', async () => {
+    const first = Array.from({ length: 100 }, (_, i) => row(i + 1, `A${String(i).padStart(3, '0')}`, `회사${i}`, 130));
+    const second = Array.from({ length: 30 }, (_, i) => row(i + 101, `B${String(i).padStart(3, '0')}`, `회사${i + 100}`, 130));
+    const { org, calls } = adapterSeq([page(first), page(second)]);
+    const out = await org.listOrgs({ name: '' }, 'tok');
+    expect(calls.map((c) => new URL(c.url).searchParams.get('curPage'))).toEqual(['1', '2']);
+    expect(out.kind === 'ok' && out.value.length).toBe(130);
+  });
+
+  it('★ 권한 거절(본문 status 403 · AUTHZ_DENY)은 forbidden — 장애가 아니다', async () => {
+    const { org } = adapter({ status: 403, result: 'fail', massage: '권한이 없습니다. 관리자에게 권한을 요청하세요', data: [], error: ['AUTHZ_DENY'] });
+    expect(await org.listOrgs({ name: '' }, 'tok')).toEqual({ kind: 'forbidden', message: '삐용 단체관리 권한이 필요합니다' });
+  });
+
+  it('401 은 토큰 만료로 던진다(재발급은 withFreshAccess) · HTTP 오류 · 다른 본문 status 는 장애', async () => {
+    await expect(adapter({}, 401).org.listOrgs({ name: '' }, 'tok')).rejects.toBeInstanceOf(BbiyongTokenExpiredError);
+    await expect(adapter({}, 500).org.listOrgs({ name: '' }, 'tok')).rejects.toBeInstanceOf(BbiyongUnavailableError);
+    await expect(adapter({ status: 400, result: 'fail', massage: '잘못된 요청', data: [] }).org.listOrgs({ name: '' }, 'tok')).rejects.toBeInstanceOf(BbiyongUnavailableError);
+  });
+
+  it('★ 단건 — 목록에서 단체 ID(또는 단체코드)가 정확히 같은 줄 · 없으면 null · 권한 거절은 그대로', async () => {
+    const body = page([row(4, 'VJA', '주안교회', 3), row(41, 'VJB', '주안교회2', 3), row(1, 'SWT', '(주)에스원테크', 3)]);
+    expect((await adapter(body).org.getOrg({ orgId: 4 }, 'tok'))).toMatchObject({ kind: 'ok', value: { orgId: 4, orgCode: 'VJA' } });
+    expect((await adapter(body).org.getOrg({ orgCode: 'vjb' }, 'tok'))).toMatchObject({ kind: 'ok', value: { orgId: 41 } });
+    expect(await adapter(body).org.getOrg({ orgId: 404 }, 'tok')).toEqual({ kind: 'ok', value: null });
+    expect((await adapter({ status: 403, result: 'fail', data: [], error: ['AUTHZ_DENY'] }).org.getOrg({ orgId: 4 }, 'tok')).kind).toBe('forbidden');
+  });
+});
