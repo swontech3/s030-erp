@@ -68,6 +68,9 @@ export const CORP_CHANGE_PRINT_FIELDS: readonly PrintField[] = [
   { name: 'matter', label: '등기할사항(제목)', source: 'case' },
   { name: 'matterBody', label: '등기할사항(내용)', source: 'case' },
   { name: 'resolutionDate', label: '결의일', source: 'case' },
+  // 본점이전(동일관할 · 타관할) — 새 본점 · 이전일(2026-11-01, 유한회사 타관할 신청서 ⑥ · ⑦)
+  { name: 'newHqAddress', label: '새 본점', source: 'case' },
+  { name: 'relocationDate', label: '이전일', source: 'case' },
   { name: 'regLicenseTax', label: '등록면허세', source: 'case' },
   { name: 'localEduTax', label: '지방교육세', source: 'case' },
   { name: 'taxTotal', label: '세액합계', source: 'case' },
@@ -336,6 +339,7 @@ export function changeSummary(snapshot: CorpChangeSubmitSnapshot): string {
     case 'NAME':
       return `상호를 「${s(p.newName)}」(으)로 변경한다.`;
     case 'HQ':
+    case 'HQ_OUT':
       return `본점을 「${formatAddressWithZip(p.newHqAddress)}」(으)로 이전한다.`;
     case 'CEO_ADDR':
       return [
@@ -384,6 +388,10 @@ export interface PrintOfficer extends SnapshotOfficer {
  * 등기할 사항(내용) `matterBody` = 레거시 문장. 설정의 「등기할 사항(내용)」이 있으면 그 글을 앞에
  * 한 줄로 붙인다(질문 1).
  */
+const isHqMove = (changeType: string) => changeType === 'HQ' || changeType === 'HQ_OUT';
+const asAddress = (v: unknown): { zipCode?: string | null; address?: string | null; addressDetail?: string | null } | null =>
+  typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, string | null>) : null;
+
 export function buildCasePrintValues(src: CasePrintSource): Record<string, string> {
   const { snapshot, setting, changeTypeName, inputs } = src;
   const c = snapshot.company;
@@ -407,6 +415,11 @@ export function buildCasePrintValues(src: CasePrintSource): Record<string, strin
     matterBody: [setting?.matterBody, summary].filter((v): v is string => !!v).join('\n'),
     // 결의일 — 변경 내용의 `resolutionDate`(상호 · 목적 · 본점 · 임원). 대표주소 변경에는 없다 → 빈칸
     resolutionDate: formatKoreanDate(typeof snapshot.payload.resolutionDate === 'string' ? snapshot.payload.resolutionDate : null),
+    // 본점이전만 값이 있다 — 새 본점은 본점주소(`hqAddress`)와 같은 모양(우편번호 없음), 이전일은 「2026년 11월 1일」
+    newHqAddress: isHqMove(snapshot.changeType) ? formatAddress(asAddress(snapshot.payload.newHqAddress)) : '',
+    relocationDate: isHqMove(snapshot.changeType)
+      ? formatKoreanDate(typeof snapshot.payload.relocationDate === 'string' ? snapshot.payload.relocationDate : null)
+      : '',
     regLicenseTax: formatAmount(t.regLicense),
     localEduTax: formatAmount(t.localEdu),
     taxTotal: formatAmount(total),

@@ -51,13 +51,48 @@ export const CORP_CHANGE_STATUS_CATEGORY = 'LAW_PROG_ST';
 export const CORP_CHANGE_CODE_USE_TP = '000';
 
 /**
- * 변경 구분 5종. **이 목록에 없으면 거절한다.**
+ * 변경 구분 6종(2026-11-01 타관할로의 본점이전 `HQ_OUT` 더함). **이 목록에 없으면 거절한다.**
  *
  * ★ 개발 DB 코드표에는 `CEO_CHG`(대표이사변경)도 있다 — **구현 없음, 나중.** 레거시에도
  *   입력 칸 정의가 없었다(결정 2026-10-09). 넣을 때 여기와 `CHANGE_TYPE_DEFS` 에 함께 넣는다.
  */
-export const CORP_CHANGE_TYPES = ['NAME', 'HQ', 'PURPOSE', 'OFFICER', 'CEO_ADDR'] as const;
+export const CORP_CHANGE_TYPES = ['NAME', 'HQ', 'HQ_OUT', 'PURPOSE', 'OFFICER', 'CEO_ADDR'] as const;
 export type CorpChangeType = (typeof CORP_CHANGE_TYPES)[number];
+
+// =============================================================================
+// 회사 형태별 구분 — 본점이전 (결정 2026-11-01)
+// =============================================================================
+
+/**
+ * 유한회사 회사유형 코드(`MEMBER_TYPE` — 입주사 000 · 비입주사 002 모두 `A`). 그 밖(비었음 포함)은 주식회사로 본다
+ * (서식 규칙 `incorpMarkCompanyType` · 출력과 같다).
+ */
+export const LTD_MEMBER_TYPE = 'A';
+
+/**
+ * 이 회사유형의 건이 고를 수 있는 구분인가(결정 2026-11-01 2 · 11).
+ *   · 타관할로의 본점이전(`HQ_OUT`) — 유한회사 건만
+ *   · 동일관할 본점이전(`HQ`) — 유한회사 건은 고를 수 없다
+ *   · 그 밖의 구분 — 모든 건
+ * ★ 화면(새 건 대화상자 선택지)과 서버(첫 저장 · 저장 · 작성완료 거절)가 이 함수 하나를 쓴다.
+ */
+export function changeTypeAllowedFor(changeType: string, memberType: string | null | undefined): boolean {
+  const ltd = memberType === LTD_MEMBER_TYPE;
+  if (changeType === 'HQ_OUT') return ltd;
+  if (changeType === 'HQ') return !ltd;
+  return true;
+}
+
+/** 구분이 회사유형과 맞지 않을 때의 문구. 맞으면 null. 오류 자리는 `changeType`. */
+export function changeTypeMemberTypeError(changeType: string, memberType: string | null | undefined): string | null {
+  if (changeTypeAllowedFor(changeType, memberType)) return null;
+  return changeType === 'HQ_OUT'
+    ? '타관할로의 본점이전은 유한회사 건만 고를 수 있습니다 — 회사 정보의 회사유형을 확인하세요'
+    : '유한회사 건은 동일관할 본점이전을 고를 수 없습니다 — 타관할로의 본점이전으로 새 건을 만드세요';
+}
+
+/** 타관할 본점이전 세금 안내(결정 2026-11-01 3) — 세금은 등기 설정의 고정액이다. */
+export const HQ_OUT_TAX_HINT = '대도시 밖에서 대도시로 전입하면 세금이 달라집니다 — 법무사 확인';
 
 /**
  * 진행 상태 4종 — 서류작성중(P) → 작성완료(E) → 완료(C), 그리고 취소(X).
@@ -167,6 +202,17 @@ export const CHANGE_TYPE_DEFS: Readonly<Record<CorpChangeType, CorpChangeTypeDef
       { name: 'relocationDate', label: '이전일', type: 'date', required: true },
     ],
   },
+  // 타관할로의 본점이전(결정 2026-11-01 1) — 칸은 동일관할(HQ)과 같다. 유한회사 건만(`changeTypeAllowedFor`)
+  HQ_OUT: {
+    usesOfficers: false,
+    officerEffectiveDateRequired: false,
+    requiresCeoHome: false,
+    fields: [
+      { name: 'newHqAddress', label: '신규 본점주소', type: 'address', required: true, hint: HQ_OUT_TAX_HINT },
+      { name: 'resolutionDate', label: '결의일', type: 'date', required: true },
+      { name: 'relocationDate', label: '이전일', type: 'date', required: true },
+    ],
+  },
   PURPOSE: {
     usesOfficers: false,
     officerEffectiveDateRequired: false,
@@ -260,7 +306,7 @@ export interface CorpChangeContent {
    * 기본정보의 대표자 자택 — 구분이 `requiresCeoHome` 일 때 본다. 없으면 「비어 있다」로 거절한다
    * (검증 없이 통과시키지 않는다). 입주사면 문구가 입주사 화면으로 보낸다.
    */
-  company?: { isTenant: boolean; ceoZipCode: string | null; ceoAddress: string | null };
+  company?: { isTenant: boolean; ceoZipCode: string | null; ceoAddress: string | null; memberType?: string | null };
 }
 
 /** 대표자 자택 주소가 비었을 때의 자리 — 기본정보 카드의 그 칸 옆에 붙는다. */
@@ -383,6 +429,12 @@ export function validateCorpChange(content: CorpChangeContent): CorpChangeFieldE
       errors.push({ field: 'officers', message: '임원을 1명 이상 등록하세요' });
     }
     content.officers.forEach((o, i) => errors.push(...validateOfficer(o, i, def.officerEffectiveDateRequired)));
+  }
+
+  // 회사유형과 맞지 않는 구분(결정 2026-11-01 2 · 11) — 회사값이 실려 온 때만 본다
+  if (content.company) {
+    const wrongType = changeTypeMemberTypeError(content.changeType, content.company.memberType ?? null);
+    if (wrongType) errors.push({ field: 'changeType', message: wrongType });
   }
 
   if (def.requiresCeoHome) {
@@ -558,12 +610,13 @@ export const REGISTRATION_DEADLINE_DAYS = 14;
 
 /**
  * 구분별 등기 기준일 — 이 표 한 곳에서 정한다.
- *   상호 · 목적 = 결의일 · 본점 = 이전일 · 대표주소 = 전입일 · 임원 = 임원 효력일 중 **가장 이른 날**
+ *   상호 · 목적 = 결의일 · 본점(동일관할 · 타관할) = 이전일 · 대표주소 = 전입일 · 임원 = 임원 효력일 중 **가장 이른 날**
  */
 export const DEADLINE_BASIS: Readonly<Record<CorpChangeType, { label: string; field: string | null }>> = {
   NAME: { label: '결의일', field: 'resolutionDate' },
   PURPOSE: { label: '결의일', field: 'resolutionDate' },
   HQ: { label: '이전일', field: 'relocationDate' },
+  HQ_OUT: { label: '이전일', field: 'relocationDate' },
   CEO_ADDR: { label: '전입일', field: 'moveInDate' },
   OFFICER: { label: '효력일', field: null }, // 임원별 효력일 중 가장 이른 날
 };

@@ -1619,3 +1619,93 @@ describe('비입주사 회사 정보 — 운영사 또는 수정 권한(F002)이
     expect(asked).toBe(0);
   });
 });
+
+// =============================================================================
+// 타관할로의 본점이전(HQ_OUT) · 회사 형태 (결정 2026-11-01 2 · 11)
+// =============================================================================
+describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
+  const LEGAL_ORG = (memberType: string | null) => ({ match: /FROM public\.tb_s080_legal_orgs/, rows: [{ member_type: memberType }] });
+  const TENANT = (memberType: string | null) => ({
+    match: /FROM public\.tb_s080_companies\s+WHERE link_s020_org_id/,
+    rows: [{ company_id: 'c1', member_type: memberType }],
+  });
+  const INS_CHANGE = /INSERT INTO public\.tb_s080_corp_changes/;
+  const HQ_PAYLOAD = { newHqAddress: { zipCode: '13500', address: '경기 성남시 1' }, resolutionDate: '2026-10-01', relocationDate: '2026-10-02' };
+
+  it('GET /company-type — 비입주사는 법무 회사 정보, 입주사는 ERP 회원구분 · 없으면 null', async () => {
+    for (const [answers, want] of [
+      [[LEGAL_ORG('A')], 'A'],
+      [[TENANT('R')], 'R'],
+      [[], null],
+    ] as const) {
+      const db = fakeDb([...answers]);
+      const a = await build(session('operator', 1), db.deps);
+      const res = await a.inject({ method: 'GET', url: '/legal/corp-changes/company-type?orgId=9003&orgCode=Z99' });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ memberType: want });
+      expect(db.seen.some((s) => /tb_s080_corp_changes/.test(s.sql))).toBe(false);
+      await a.close();
+      app = null;
+    }
+  });
+
+  it('★★ GET /company-type — 회사 세션이 남의 단체를 적으면 403 · 안 적으면 자기 단체', async () => {
+    const db = fakeDb([LEGAL_ORG('A')]);
+    const a = await build(session('tenant', 9003), db.deps);
+    expect((await a.inject({ method: 'GET', url: '/legal/corp-changes/company-type?orgId=9001' })).statusCode).toBe(403);
+    expect(db.runs()).toBe(0);
+    const res = await a.inject({ method: 'GET', url: '/legal/corp-changes/company-type' });
+    expect(res.json()).toEqual({ memberType: 'A' });
+    expect(db.seen.find((s) => /tb_s080_legal_orgs/.test(s.sql))!.params).toEqual([9003]);
+  });
+
+  it.each([
+    ['HQ_OUT', 'A', 201],
+    ['HQ_OUT', 'R', 400],
+    ['HQ_OUT', null, 400],
+    ['HQ', 'A', 400],
+    ['HQ', 'R', 201],
+    ['HQ', null, 201],
+  ])('★ 첫 저장 — %s · 저장된 회사유형 %s → %i (거절이면 건을 만들지 않는다)', async (changeType, memberType, status) => {
+    const db = fakeDb([LEGAL_ORG(memberType)]);
+    const a = await build(session('operator', 1), db.deps);
+    const res = await a.inject({ method: 'POST', url: '/legal/corp-changes', payload: { changeType, orgId: 9003, orgCode: 'Z99', payload: HQ_PAYLOAD } });
+    expect(res.statusCode).toBe(status);
+    expect(db.seen.some((s) => INS_CHANGE.test(s.sql))).toBe(status === 201);
+    if (status === 400) expect(res.json().errors.map((e: { field: string }) => e.field)).toEqual(['changeType']);
+  });
+
+  it('첫 저장 — 회사 정보가 함께 실리면 그 회사유형으로 본다', async () => {
+    const codes = { match: /FROM public.tb_s080_codes_line/, rows: [{ category: 'MEMBER_TYPE', code: 'A', name: '유한회사' }] };
+    const db = fakeDb([LEGAL_ORG(null), codes]);
+    const a = await build(session('operator', 1), db.deps);
+    const company = { legalName: '유한회사 에이', memberType: 'A' };
+    const res = await a.inject({ method: 'POST', url: '/legal/corp-changes', payload: { changeType: 'HQ_OUT', orgId: 9003, orgCode: 'Z99', payload: HQ_PAYLOAD, company } });
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('★ [저장] — 유한회사로 저장된 회사의 동일관할(HQ) 건은 400 · 변경 내용을 쓰지 않는다', async () => {
+    const db = fakeDb([CHANGE_ROW({ change_type: 'HQ' }), LEGAL_ORG('A')]);
+    const a = await build(session('operator', 1), db.deps);
+    const res = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: HQ_PAYLOAD } });
+    expect(res.statusCode).toBe(400);
+    expect(db.seen.some((s) => /UPDATE public\.tb_s080_corp_changes/.test(s.sql))).toBe(false);
+  });
+
+  it('★ 작성완료(P→E) — 주식회사 건의 타관할(HQ_OUT)은 400 · 유한회사는 통과 · 완료(E→C)는 막지 않는다', async () => {
+    const STATUS_UPDATE = { match: /UPDATE public\.tb_s080_corp_changes SET status/, rows: [{}] };
+    const press = async (status: string, to: string, memberType: string) => {
+      const db = fakeDb([CHANGE_ROW({ change_type: 'HQ_OUT', status, payload: HQ_PAYLOAD }), STATUS_UPDATE, LEGAL_ORG(memberType)]);
+      const a = await build(session('operator', 1), db.deps);
+      const res = await a.inject({ method: 'POST', url: '/legal/corp-changes/cc-1/transition', payload: { from: status, to } });
+      await a.close();
+      app = null;
+      return res;
+    };
+    const bad = await press('P', 'E', 'R');
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json().errors.map((e: { field: string }) => e.field)).toEqual(['changeType']);
+    expect((await press('P', 'E', 'A')).statusCode).toBe(200);
+    expect((await press('E', 'C', 'R')).statusCode).toBe(200);
+  });
+});

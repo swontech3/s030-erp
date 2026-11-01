@@ -12,10 +12,14 @@
  *     단체코드만 주소에 싣는다(회사명은 싣지 않는다 — 복사 금지)
  *   · 회사 사용자 — 자기 회사로 바로 시작한다. 단체를 싣지 않는다 — 서버가 세션 단체를 쓴다.
  *   ★ 주소의 단체는 화면이 믿지 않는다 — 서버가 임시 모드 읽기와 첫 저장 때 세션과 대조한다(403).
- * ★ 변경 구분은 목록 응답의 선택지(5종, shared `CORP_CHANGE_TYPES` 로 거른 것)를 쓴다.
+ * ★ 변경 구분은 목록 응답의 선택지(shared `CORP_CHANGE_TYPES` 로 거른 것)를 쓴다.
  *   저장한 뒤에는 바꿀 수 없다.
+ * ★ 회사 형태로 한 번 더 거른다(결정 2026-11-01) — 회사를 고르면(회사 사용자는 바로) 회사유형을 읽어
+ *   `changeTypeAllowedFor` 로 거른다: 유한회사 = 타관할로의 본점이전만, 그 밖(비었음 포함 = 주식회사로 봄) =
+ *   동일관할 본점이전만. 회사유형이 비면 안내 한 줄. 서버도 첫 저장 · 저장 · 작성완료 때 같은 함수로 거절한다.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { changeTypeAllowedFor } from '@swonbiz/shared/domain/corp-change';
 import { useRouter } from 'next/navigation';
 import type { CodeOption } from '@swonbiz/shared/domain/corp-change-list';
 import type { OrgPick } from '@swonbiz/shared/domain/org-lookup';
@@ -36,8 +40,48 @@ export function NewCorpChangeDialog({ changeTypes, pickOrg, onClose }: Props) {
   const [org, setOrg] = useState<OrgPick | null>(null);
   const [lookup, setLookup] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** 회사유형 — 읽는 중 · 읽음(null = 비었음) · 실패. 회사를 고르기 전(운영사)은 'idle'. */
+  const [typeLoad, setTypeLoad] = useState<
+    { state: 'idle' } | { state: 'loading' } | { state: 'ok'; memberType: string | null } | { state: 'error'; message: string }
+  >({ state: 'idle' });
 
-  const ready = changeType !== '' && (!pickOrg || org !== null);
+  // 회사가 정해지면 회사유형을 읽는다 — 운영사는 고른 회사, 회사 사용자는 자기 회사(단체를 싣지 않는다)
+  useEffect(() => {
+    if (pickOrg && !org) {
+      setTypeLoad({ state: 'idle' });
+      return;
+    }
+    let live = true;
+    setTypeLoad({ state: 'loading' });
+    const qs = new URLSearchParams();
+    if (pickOrg && org) {
+      qs.set('orgId', String(org.orgId));
+      qs.set('orgCode', org.orgCode);
+    }
+    fetch(`/api/legal/corp-changes/company-type?${qs.toString()}`)
+      .then(async (res) => {
+        const body = (await res.json()) as { memberType?: string | null; message?: string };
+        if (!live) return;
+        if (!res.ok) setTypeLoad({ state: 'error', message: body.message ?? '회사유형을 읽지 못했습니다' });
+        else setTypeLoad({ state: 'ok', memberType: body.memberType ?? null });
+      })
+      .catch(() => {
+        if (live) setTypeLoad({ state: 'error', message: '서버에 연결할 수 없습니다' });
+      });
+    return () => {
+      live = false;
+    };
+  }, [pickOrg, org]);
+
+  const memberType = typeLoad.state === 'ok' ? typeLoad.memberType : null;
+  const options = typeLoad.state === 'ok' ? changeTypes.filter((t) => changeTypeAllowedFor(t.code, memberType)) : [];
+
+  // 회사를 바꿔 고른 구분이 선택지에서 빠지면 비운다
+  useEffect(() => {
+    if (changeType !== '' && typeLoad.state === 'ok' && !changeTypeAllowedFor(changeType, memberType)) setChangeType('');
+  }, [changeType, typeLoad, memberType]);
+
+  const ready = changeType !== '' && (!pickOrg || org !== null) && typeLoad.state === 'ok';
 
   /** 임시 모드로 간다 — 아무것도 쓰지 않는다. */
   const start = () => {
@@ -91,18 +135,24 @@ export function NewCorpChangeDialog({ changeTypes, pickOrg, onClose }: Props) {
             <select
               className={styles.select}
               value={changeType}
-              disabled={busy}
+              disabled={busy || typeLoad.state !== 'ok'}
               autoFocus={!pickOrg}
               onChange={(e) => setChangeType(e.target.value)}
             >
               <option value="">선택</option>
-              {changeTypes.map((t) => (
+              {options.map((t) => (
                 <option key={t.code} value={t.code}>
                   {t.name}
                 </option>
               ))}
             </select>
           </label>
+          {pickOrg && typeLoad.state === 'idle' ? <p className={styles.modalDesc}>회사를 먼저 고르세요.</p> : null}
+          {typeLoad.state === 'loading' ? <p className={styles.modalDesc}>회사유형을 읽는 중입니다…</p> : null}
+          {typeLoad.state === 'error' ? <p className={styles.modalDesc}>{typeLoad.message}</p> : null}
+          {typeLoad.state === 'ok' && memberType === null ? (
+            <p className={styles.modalDesc}>유한회사면 회사 정보에서 회사유형을 먼저 넣어 주세요.</p>
+          ) : null}
 
           <div className={styles.modalFoot}>
             <button type="button" className={styles.btn} disabled={busy} onClick={onClose}>

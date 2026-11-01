@@ -206,6 +206,18 @@ describe('buildCasePrintValues', () => {
     ...over,
   });
 
+  it('★ 본점이전(HQ · HQ_OUT, 2026-11-01) — 새 본점(우편번호 없음) · 이전일, 다른 구분은 빈칸', () => {
+    const payload = { newHqAddress: { zipCode: '06100', address: '경기 성남시 새로 9', addressDetail: '2층' }, resolutionDate: '2026-10-01', relocationDate: '2026-10-05' };
+    for (const changeType of ['HQ', 'HQ_OUT']) {
+      const v = buildCasePrintValues(src({ snapshot: snap({ changeType, payload, company: { ...snap().company, memberType: 'A' } }) }));
+      expect([v.newHqAddress, v.relocationDate]).toEqual(['경기 성남시 새로 9 2층', '2026년 10월 5일']);
+      expect(v.matterBody).toBe('본점을 「(06100) 경기 성남시 새로 9 2층」(으)로 이전한다.');
+      expect(v.hqAddress).toBe('서울 강남구 본점로 1 3층');
+    }
+    const other = buildCasePrintValues(src());
+    expect([other.newHqAddress, other.relocationDate]).toEqual(['', '']);
+  });
+
   it('★ 모든 자리표시 이름에 값이 있다 — 빈 것도 빈칸으로', () => {
     const v = buildCasePrintValues(src());
     expect(Object.keys(v).sort()).toEqual(CORP_CHANGE_PRINT_FIELDS.map((f) => f.name).sort());

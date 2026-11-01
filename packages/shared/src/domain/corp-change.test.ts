@@ -3,11 +3,14 @@ import {
   CORP_CHANGE_STATUSES,
   CORP_CHANGE_TYPES,
   CHANGE_TYPE_DEFS,
+  HQ_OUT_TAX_HINT,
   INITIAL_CORP_CHANGE_STATUS,
   REGISTRATION_DEADLINE_DAYS,
   availableTransitions,
   canEditCorpChange,
   canPrintCorpChange,
+  changeTypeAllowedFor,
+  changeTypeMemberTypeError,
   checkDelete,
   checkTransition,
   purposeLines,
@@ -46,8 +49,8 @@ const VALID: Record<string, CorpChangeContent> = {
 
 // =============================================================================
 describe('코드 어휘', () => {
-  it('변경 구분 5종 — CEO_CHG 는 없다(구현 없음, 나중)', () => {
-    expect([...CORP_CHANGE_TYPES]).toEqual(['NAME', 'HQ', 'PURPOSE', 'OFFICER', 'CEO_ADDR']);
+  it('변경 구분 6종(2026-11-01 HQ_OUT) — CEO_CHG 는 없다(구현 없음, 나중)', () => {
+    expect([...CORP_CHANGE_TYPES]).toEqual(['NAME', 'HQ', 'HQ_OUT', 'PURPOSE', 'OFFICER', 'CEO_ADDR']);
     expect(Object.keys(CHANGE_TYPE_DEFS).sort()).toEqual([...CORP_CHANGE_TYPES].sort());
   });
 
@@ -63,6 +66,7 @@ describe('코드 어휘', () => {
     expect(required).toEqual({
       NAME: ['newName', 'resolutionDate'],
       HQ: ['newHqAddress', 'resolutionDate', 'relocationDate'],
+      HQ_OUT: ['newHqAddress', 'resolutionDate', 'relocationDate'],
       PURPOSE: ['purposes', 'resolutionDate'],
       OFFICER: ['resolutionDate'],
       CEO_ADDR: ['newCeoAddress', 'moveInDate'],
@@ -79,6 +83,41 @@ describe('코드 어휘', () => {
 });
 
 // =============================================================================
+describe('★ 타관할로의 본점이전(HQ_OUT) · 회사 형태(결정 2026-11-01)', () => {
+  it('칸은 동일관할(HQ)과 같고, 새 본점 칸에 세금 안내', () => {
+    expect(CHANGE_TYPE_DEFS.HQ_OUT.fields.map(({ hint: _h, ...f }) => f)).toEqual(CHANGE_TYPE_DEFS.HQ.fields.map(({ hint: _h, ...f }) => f));
+    expect(CHANGE_TYPE_DEFS.HQ_OUT.fields[0]!.hint).toBe(HQ_OUT_TAX_HINT);
+    expect(CHANGE_TYPE_DEFS.HQ.fields.some((f) => f.hint)).toBe(false);
+  });
+  it.each([
+    ['A', 'HQ_OUT', true],
+    ['A', 'HQ', false],
+    ['R', 'HQ_OUT', false],
+    ['R', 'HQ', true],
+    [null, 'HQ_OUT', false],
+    [null, 'HQ', true],
+    ['C', 'HQ_OUT', false],
+    ['A', 'NAME', true],
+    ['A', 'OFFICER', true],
+    [null, 'CEO_ADDR', true],
+  ])('회사유형 %s · %s → %s (비었으면 주식회사로 본다)', (memberType, changeType, ok) => {
+    expect(changeTypeAllowedFor(changeType, memberType)).toBe(ok);
+    expect(changeTypeMemberTypeError(changeType, memberType) === null).toBe(ok);
+  });
+  const hqOut = { changeType: 'HQ_OUT', payload: { newHqAddress: { zipCode: '06164', address: '서울 강남구 1' }, resolutionDate: '2026-10-01', relocationDate: '2026-10-02' }, officers: [] };
+  it('작성완료 — 유한회사면 통과, 주식회사 · 비었으면 changeType 자리에 거절', () => {
+    expect(validateCorpChange({ ...hqOut, company: { isTenant: false, ceoZipCode: null, ceoAddress: null, memberType: 'A' } })).toEqual([]);
+    for (const memberType of ['R', null]) {
+      expect(validateCorpChange({ ...hqOut, company: { isTenant: false, ceoZipCode: null, ceoAddress: null, memberType } }).map((e) => e.field)).toEqual(['changeType']);
+    }
+  });
+  it('작성완료 — 유한회사의 동일관할(HQ)은 거절, 주식회사는 그대로 통과', () => {
+    const hq = { ...hqOut, changeType: 'HQ' };
+    expect(validateCorpChange({ ...hq, company: { isTenant: true, ceoZipCode: null, ceoAddress: null, memberType: 'A' } }).map((e) => e.field)).toEqual(['changeType']);
+    expect(validateCorpChange({ ...hq, company: { isTenant: true, ceoZipCode: null, ceoAddress: null, memberType: 'R' } })).toEqual([]);
+  });
+});
+
 describe('검증 — 서류작성완료(P→E)', () => {
   it.each(Object.keys(VALID))('%s — 채운 내용은 통과', (t) => {
     expect(validateCorpChange(VALID[t]!)).toEqual([]);
@@ -441,6 +480,7 @@ describe('신청기한 — 모든 구분, 기준일 + 14일', () => {
     ['NAME', { resolutionDate: '2026-10-01', moveInDate: '2026-09-01' }, '결의일', '2026-10-01'],
     ['PURPOSE', { resolutionDate: '2026-10-02' }, '결의일', '2026-10-02'],
     ['HQ', { resolutionDate: '2026-09-01', relocationDate: '2026-10-03' }, '이전일', '2026-10-03'],
+    ['HQ_OUT', { resolutionDate: '2026-09-01', relocationDate: '2026-10-05' }, '이전일', '2026-10-05'],
     ['CEO_ADDR', { moveInDate: '2026-10-04', resolutionDate: '2026-09-01' }, '전입일', '2026-10-04'],
   ])('★ 기준일 — %s 는 %o 에서 %s', (type, payload, label, day) => {
     expect(registrationDeadline(type, payload, '2026-10-20')).toMatchObject({ basisLabel: label, basisDay: day });

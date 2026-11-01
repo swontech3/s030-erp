@@ -8,6 +8,7 @@
  *   GET    /legal/corp-changes                       목록
  *   POST   /legal/corp-changes                       첫 저장 = 새 건 { changeType, orgId?, orgCode?, payload, officers[], company? }
  *   GET    /legal/corp-changes/draft                 임시 모드 기본정보 ?changeType=&orgId=&orgCode= (건을 읽지 않는다)
+ *   GET    /legal/corp-changes/company-type          새 건 대화상자의 회사유형 ?orgId=&orgCode= → { memberType } (2026-11-01)
  *   GET    /legal/corp-changes/:id                   상세 + 임원 + 기본정보
  *   PATCH  /legal/corp-changes/:id                   [저장] { payload, company? } — P 만 · 새 상세를 돌려준다
  *   DELETE /legal/corp-changes/:id?from=             삭제 — 운영사 · P/X 만, 임원도 함께
@@ -75,6 +76,7 @@ import {
   parseCompanyPart,
   parseCreateBody,
   parseFirstSave,
+  parseOrgTarget,
   type BbiyongCompanyDefaults,
   type CorpChangeDraftResponse,
   type LegalOrgInput,
@@ -92,6 +94,7 @@ import {
   editOfficer,
   readCorpChangeDetail,
   transitionCorpChange,
+  readCorpChangeCompanyType,
   readCorpChangeDraft,
   removeOfficer,
   saveCorpChangePayload,
@@ -233,6 +236,18 @@ export function registerCorpChangeRoutes(app: FastifyInstance, deps: CorpChangeD
     const editor = await deps.companyEditor(session);
     const result = await deps.run(session, (client) => readCorpChangeDraft(client, session, parsed.value, editor));
     return send(reply, await withCompanyDefaults(session, result));
+  });
+
+  /**
+   * 새 건 대화상자의 회사유형 — 구분 선택지를 거르는 데만 쓴다(결정 2026-11-01, `changeTypeAllowedFor`).
+   * 주소의 단체는 새 건과 같은 규칙으로 읽는다(`parseOrgTarget`) — 회사 세션이 남의 단체를 적으면 403.
+   */
+  app.get<{ Querystring: Record<string, unknown> }>('/legal/corp-changes/company-type', async (req, reply) => {
+    const session = requireSession(req);
+    const q = req.query ?? {};
+    const parsed = parseOrgTarget(q.orgId, q.orgCode, session);
+    if (!parsed.ok) return refuse(reply, parsed);
+    return send(reply, await deps.run(session, (client) => readCorpChangeCompanyType(client, parsed.value)));
   });
 
   app.get<{ Params: { id: string } }>('/legal/corp-changes/:id', async (req, reply) => {

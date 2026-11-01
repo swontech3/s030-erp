@@ -25,6 +25,7 @@ import {
   INITIAL_CORP_CHANGE_STATUS,
   availableTransitions,
   canEditCorpChange,
+  changeTypeMemberTypeError,
   checkDelete,
   checkTransition,
   isCorpChangeStatus,
@@ -231,6 +232,35 @@ async function checkCompanyWrite(
 // =============================================================================
 
 /**
+ * 회사유형과 맞지 않는 구분 거절(결정 2026-11-01 2 · 11) — 첫 저장 · [저장] 이 쓴다(작성완료는 `validateCorpChange`).
+ * 회사 정보가 함께 실려 오면 그 값(이번에 저장될 회사유형), 아니면 저장된 회사유형으로 본다.
+ * ★ 단체는 RLS 를 통과한 건의 것이거나 `parseOrgTarget` 을 거친 것만 넣는다(db 머리말 ⚠).
+ */
+async function checkChangeTypeForCompany(
+  client: ScopedClient,
+  changeType: string,
+  orgId: number,
+  company: LegalOrgInput | null,
+): Promise<OpError | null> {
+  const memberType = company ? company.memberType : (await readCompanySource(client, orgId)).memberType;
+  const message = changeTypeMemberTypeError(changeType, memberType);
+  return message ? fail(400, 'invalid_request', message, [{ field: 'changeType', message }]) : null;
+}
+
+/**
+ * 새 건 대화상자의 회사유형(결정 2026-11-01) — 구분 선택지를 거르는 데만 쓴다(건을 읽지 않는다).
+ * 입주사 = ERP 회원구분, 비입주사 = 법무 회사 정보의 회사유형. 비었으면 null(화면은 주식회사로 본다).
+ * ★ 단체는 `parseOrgTarget` 을 거친 것이다 — 회사 세션이 남의 단체를 적으면 그 전에 403.
+ */
+export async function readCorpChangeCompanyType(
+  client: ScopedClient,
+  target: OrgTarget,
+): Promise<OpResult<{ memberType: string | null }>> {
+  const source = await readCompanySource(client, target.orgId);
+  return { ok: true, value: { memberType: source.memberType } };
+}
+
+/**
  * 임시 모드(`/legal/corp-changes/new`) — **건을 읽지 않는다**(아직 없다). 기본정보만 읽어서 보여 준다.
  * ★ 단체는 `parseCreateBody` 를 거친 것이다 — 회사 세션이 주소에 남의 단체를 적으면 그 전에 403.
  */
@@ -274,6 +304,8 @@ export async function createCorpChange(
     const refused = await checkCompanyWrite(client, companyEditor, input.orgId, input.company);
     if (refused) return refused;
   }
+  const wrongType = await checkChangeTypeForCompany(client, input.changeType, input.orgId, input.company ?? null);
+  if (wrongType) return wrongType;
 
   const id = randomUUID();
   const actor = actorOf(session);
@@ -420,7 +452,9 @@ export async function transitionCorpChange(
           changeType: row.changeType,
           payload: row.payload,
           officers: officers.map(officerForValidation),
-          company: company ? { isTenant: company.isTenant, ceoZipCode: company.ceoZipCode, ceoAddress: company.ceoAddress } : undefined,
+          company: company
+            ? { isTenant: company.isTenant, ceoZipCode: company.ceoZipCode, ceoAddress: company.ceoAddress, memberType: company.memberType }
+            : undefined,
         }
       : undefined,
   });
@@ -519,6 +553,8 @@ export async function saveCorpChangePayload(
     const refused = await checkCompanyWrite(client, companyEditor, row.orgId, company.value);
     if (refused) return refused;
   }
+  const wrongType = await checkChangeTypeForCompany(client, row.changeType, row.orgId, company.value);
+  if (wrongType) return wrongType;
 
   const actor = actorOf(session);
   await updatePayload(client, { id, payload: parsed.value, actor });

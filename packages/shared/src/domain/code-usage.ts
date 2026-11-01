@@ -201,7 +201,7 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
   {
     category: 'LAW_CNG_TP',
     useTp: '000',
-    codes: ['NAME', 'HQ', 'PURPOSE', 'OFFICER', 'CEO_ADDR'],
+    codes: ['NAME', 'HQ', 'HQ_OUT', 'PURPOSE', 'OFFICER', 'CEO_ADDR'],
     source: 'packages/shared/src/domain/corp-change.ts (CORP_CHANGE_TYPES)',
     label: '법인변경 구분별 입력 칸',
   },

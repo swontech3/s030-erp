@@ -969,7 +969,7 @@ function PayloadField({
     return (
       <div className={`${styles.field} ${styles.spanAll}`}>
         {label}
-        {note ? <span className={styles.hint}>{note}</span> : null}
+        {note ?? def.hint ? <span className={styles.hint}>{note ?? def.hint}</span> : null}
         <AddressInput value={value as Address} disabled={disabled} onChange={onChange} onError={onError} />
         {serverError}
       </div>
