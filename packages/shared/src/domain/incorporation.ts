@@ -174,7 +174,7 @@ const LTD_HIDDEN: ReadonlySet<string> = new Set(['unitsAuthorized', 'unitsIssued
 
 const LTD_FIELD_DEFS: readonly IncorpFieldDef[] = INCORP_FIELD_DEFS.filter((d) => !LTD_HIDDEN.has(d.name)).map((d) =>
   d.name === 'nameKo'
-    ? { ...d, hint: '입력한 그대로 서류에 씁니다 — 「유한회사」를 넣어 적습니다' }
+    ? { ...d, hint: '「유한회사」를 빼고 적습니다' }
     : d.name === 'parValue'
       ? { ...d, label: '1좌의 금액' }
       : d,
@@ -186,12 +186,6 @@ const LTD_FIELD_DEFS: readonly IncorpFieldDef[] = INCORP_FIELD_DEFS.filter((d) =
  */
 export function incorpFieldDefsOf(entity: IncorpEntityType = INCORP_ENTITY_TYPE): readonly IncorpFieldDef[] {
   return entity === INCORP_LTD_ENTITY_TYPE ? LTD_FIELD_DEFS : INCORP_FIELD_DEFS;
-}
-
-/** 유한회사 상호에 「유한회사」가 없을 때의 안내 — 막지 않는다(결정 2026-10-31). 있거나 비면 null. */
-export function ltdNameNotice(nameKo: string | null | undefined): string | null {
-  const name = (nameKo ?? '').trim();
-  return name !== '' && !name.includes('유한회사') ? '상호에 「유한회사」가 없습니다 — 입력한 그대로 서류에 쓰입니다' : null;
 }
 
 /** 회사 · 자본 · 설립 정보 — 검증에 넘기는 모양(이번에 **저장될** 값). 숫자 칸은 숫자 또는 null. */

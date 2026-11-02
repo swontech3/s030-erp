@@ -21,7 +21,8 @@
  *   `composeIncorporationName`, 서류에 쓰이는 이름과 같은 함수).
  * ★ 회사 형태(주식회사 · 유한회사, 결정 2026-10-31) — 새 건(임시 모드)에서만 고른다. 저장된 건은 읽기만.
  *   유한회사는 칸 이름표가 바뀌고(발기인 → 사원 · 인수 주식 수 → 출자좌수 · 1주 → 1좌, shared `incorpTermsOf` ·
- *   `incorpFieldDefsOf`) 수권 · 발행 주식 수 · 공고방법 칸이 없다. 상호는 입력값 그대로 — 「유한회사」가 없으면 안내만.
+ *   `incorpFieldDefsOf`) 수권 · 발행 주식 수 · 공고방법 칸이 없다. 상호는 주식회사와 같은 방식 — 같은 위치 칸의
+ *   이름표만 「유한회사」 위치로 바뀐다(결정 2026-11-02). 새 건에서 형태를 바꾸면 합친 상호의 낱말도 따라 바뀐다.
  * ★ 사업목적은 [목록에서 고르기] 팝업(`BizPurposePickerDialog`)을 그대로 쓴다 — 카탈로그를 고치는 버튼은 없다.
  * ★ 저장할 때 내용 검증은 하지 않는다(작성 중 임시 저장) — 검증은 작성완료 때 서버가. 경고(1주 100원 미만 ·
  *   자본금 10억 이상인데 감사 없음)는 막지 않고 지금 입력으로 보여 준다(shared `incorporationWarnings`).
@@ -50,7 +51,6 @@ import {
   incorpFieldDefsOf,
   incorpTermsOf,
   incorporationWarnings,
-  ltdNameNotice,
   type IncorpEntityType,
   type IncorpFieldDef,
   type IncorpTerms,
@@ -58,6 +58,7 @@ import {
 } from '@swonbiz/shared/domain/incorporation';
 import {
   composeIncorporationName,
+  incorpEntityWord,
   maskRrn,
   type IncorpPersonView,
   type IncorporationDetailResponse,
@@ -591,8 +592,6 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
   // ★ 경고는 지금 입력으로 센다(막지 않는다) — 서버 상세의 `warnings` 와 같은 함수다.
   const warnings = incorporationWarnings({ info: wire as IncorporationInfo, persons }, entityType);
   const composed = composeIncorporationName(form.text.nameKo, form.companyTypePosition, entityType);
-  const nameNotice = isLtd ? ltdNameNotice(form.text.nameKo) : null;
-  const entityName = (code: string) => draft.entityTypes.find((c) => c.code === code)?.name ?? code;
   const positions =
     draft.namePositions.length > 0 ? draft.namePositions : [{ code: draft.defaultNamePosition, name: draft.defaultNamePosition }];
   const disabled = !editable || busy;
@@ -760,34 +759,25 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
             <div className={styles.sectionRule} />
             <div className={styles.grid4}>
               {field('nameKo', true)}
-              {isLtd ? (
-                // 유한회사 — 상호는 입력값 그대로(위치 없음). 「유한회사」가 없으면 안내만(막지 않는다)
-                <div className={styles.field}>
-                  <span className={styles.label}>「{entityName(entityType)}」 표기</span>
-                  <span className={`${styles.readValue}${nameNotice ? '' : ` ${styles.readEmpty}`}`}>
-                    {nameNotice ?? '입력한 상호 그대로'}
-                  </span>
-                </div>
-              ) : (
-                <label className={styles.field}>
-                  <span className={styles.label}>「주식회사」 위치</span>
-                  <select
-                    className={`${styles.select}${errorFor('companyTypePosition') ? ` ${styles.inputInvalid}` : ''}`}
-                    value={form.companyTypePosition}
-                    disabled={disabled}
-                    onChange={(e) => setForm((f) => ({ ...f, companyTypePosition: e.target.value }))}
-                  >
-                    {positions.map((p) => (
-                      <option key={p.code} value={p.code}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errorFor('companyTypePosition') ? (
-                    <span className={styles.fieldError}>{errorFor('companyTypePosition')}</span>
-                  ) : null}
-                </label>
-              )}
+              {/* 위치 칸은 하나다 — 이름표만 회사 형태 낱말로(「주식회사」 위치 · 「유한회사」 위치, 결정 2026-11-02) */}
+              <label className={styles.field}>
+                <span className={styles.label}>「{incorpEntityWord(entityType)}」 위치</span>
+                <select
+                  className={`${styles.select}${errorFor('companyTypePosition') ? ` ${styles.inputInvalid}` : ''}`}
+                  value={form.companyTypePosition}
+                  disabled={disabled}
+                  onChange={(e) => setForm((f) => ({ ...f, companyTypePosition: e.target.value }))}
+                >
+                  {positions.map((p) => (
+                    <option key={p.code} value={p.code}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                {errorFor('companyTypePosition') ? (
+                  <span className={styles.fieldError}>{errorFor('companyTypePosition')}</span>
+                ) : null}
+              </label>
               <div className={styles.field}>
                 <span className={styles.label}>서류에 쓰이는 상호</span>
                 <span className={`${styles.readValue}${composed ? '' : ` ${styles.readEmpty}`}`}>{composed || '—'}</span>

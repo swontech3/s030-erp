@@ -11,7 +11,6 @@ import {
   incorporationWarnings,
   isMonthDay,
   isTimeOfDay,
-  ltdNameNotice,
   validateIncorporation,
   type IncorporationContent,
   type IncorporationPersonInput,
@@ -195,12 +194,6 @@ describe('유한회사 — 칸 · 이름표', () => {
   it('설립 구분 — R → R_PROMOTER · A → U_P', () => {
     expect(incorpMethodOf('R')).toBe('R_PROMOTER');
     expect(incorpMethodOf('A')).toBe('U_P');
-  });
-  it('상호에 「유한회사」가 없으면 안내만', () => {
-    expect(ltdNameNotice('한가람')).toMatch(/유한회사/);
-    expect(ltdNameNotice('유한회사 한가람')).toBeNull();
-    expect(ltdNameNotice('한가람 유한회사')).toBeNull();
-    expect(ltdNameNotice('  ')).toBeNull();
   });
 });
 

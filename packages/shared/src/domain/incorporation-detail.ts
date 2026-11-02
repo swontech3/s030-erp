@@ -12,7 +12,7 @@
  * ★ 회사 세션은 자기 단체로만(`parseOrgTarget` — 남의 단체는 403).
  * ★ 상호는 「순수 상호 + 회사유형 + 위치(앞 F / 뒤 B)」를 합친다(결정 2026-10-11, `composeIncorporationName`).
  *   위치 선택지는 코드표 `NAME_POSITION`, 기본값은 앞(F).
- *   ★ 유한회사(A)는 **입력값 그대로**다(결정 2026-10-31) — 위치를 쓰지 않는다. 「유한회사」가 없으면 화면이 안내만.
+ *   ★ 유한회사(A)도 같은 방식이다(결정 2026-11-02) — 「유한회사」를 위치대로 합친다. 10-31 의 「입력값 그대로」는 버렸다.
  * ★ 회사 형태(주식회사 R · 유한회사 A, 코드표 `MEMBER_TYPE`/001)는 **새 건을 만들 때만** 고른다(첫 저장의 `entityType`).
  *   저장된 건은 바꾸지 않는다. 보내지 않으면 주식회사(지금까지와 같다).
  */
@@ -38,8 +38,15 @@ export const NAME_POSITION_CATEGORY = 'NAME_POSITION';
 export const NAME_POSITION_USE_TP = '000';
 /** 위치 기본값 — 앞(결정 2026-10-11). */
 export const DEFAULT_NAME_POSITION = 'F';
-/** 회사유형 이름 — 주식회사만이라 고정이다(코드표 `MEMBER_TYPE` R 의 이름과 같다). */
+/** 회사유형 이름 — 주식회사(코드표 `MEMBER_TYPE` R 의 이름과 같다). */
 export const INCORP_ENTITY_NAME = '주식회사';
+/** 회사유형 이름 — 유한회사(코드표 `MEMBER_TYPE` A 의 이름과 같다, 결정 2026-11-02). */
+export const INCORP_LTD_ENTITY_NAME = '유한회사';
+
+/** 상호에 붙는 회사 형태 낱말 — 주식회사 · 유한회사. 위치 칸 이름표(「○○」 위치)도 이것을 쓴다. */
+export function incorpEntityWord(entity: IncorpEntityType = INCORP_ENTITY_TYPE): string {
+  return entity === INCORP_LTD_ENTITY_TYPE ? INCORP_LTD_ENTITY_NAME : INCORP_ENTITY_NAME;
+}
 
 type Bad = { ok: false; status: 400; message: string; errors: CorpChangeFieldError[] };
 const badAt = (errors: CorpChangeFieldError[]): Bad => ({
@@ -70,9 +77,9 @@ function countOrNull(v: unknown): number | null | undefined {
 // =============================================================================
 
 /**
- * 서류의 상호 — 순수 상호 + 「주식회사」를 위치대로. F 「주식회사 한가람」 · B 「한가람 주식회사」.
+ * 서류의 상호 — 순수 상호 + 회사 형태 낱말(`incorpEntityWord`)을 위치대로. F 「주식회사 한가람」 · B 「한가람 주식회사」,
+ * 유한회사는 F 「유한회사 한가람」 · B 「한가람 유한회사」(결정 2026-11-02 — 주식회사와 같은 방식).
  * 위치가 F · B 가 아니면 기본값(F). 순수 상호가 비면 빈 글자(서류는 빈칸).
- * 유한회사(A)는 입력값 그대로(앞뒤 공백만 뗀다, 결정 2026-10-31).
  */
 export function composeIncorporationName(
   nameKo: string | null | undefined,
@@ -81,9 +88,9 @@ export function composeIncorporationName(
 ): string {
   const name = (nameKo ?? '').trim();
   if (name === '') return '';
-  if (entity === INCORP_LTD_ENTITY_TYPE) return name;
+  const word = incorpEntityWord(entity);
   const pos = position === 'B' || position === 'F' ? position : DEFAULT_NAME_POSITION;
-  return pos === 'F' ? `${INCORP_ENTITY_NAME} ${name}` : `${name} ${INCORP_ENTITY_NAME}`;
+  return pos === 'F' ? `${word} ${name}` : `${name} ${word}`;
 }
 
 // =============================================================================

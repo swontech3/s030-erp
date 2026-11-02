@@ -313,7 +313,7 @@ describe('readIncorporationSnapshot', () => {
 // =============================================================================
 describe('유한회사 — 정관 자리표시 · 서류 묶음', () => {
   const ltdInfo = (() => {
-    const r = parseIncorpInfo({ ...info, nameKo: '유한회사 한가람', capitalAmount: 20_000_000, parValue: 10_000, unitsAuthorized: null, unitsIssued: null });
+    const r = parseIncorpInfo({ ...info, nameKo: '한가람', capitalAmount: 20_000_000, parValue: 10_000, unitsAuthorized: null, unitsIssued: null });
     if (!r.ok) throw new Error('fixture');
     return r.value;
   })();
@@ -332,14 +332,20 @@ describe('유한회사 — 정관 자리표시 · 서류 묶음', () => {
     const names = INCORP_PRINT_FIELDS.map((f) => f.name);
     expect(names).toEqual(expect.arrayContaining(['contributionUnitAmount', 'articlesMemberTable', 'articlesMemberSignList']));
   });
-  it('사원 1명 — 자본금 · 1좌 금액 · 출자좌수 표 · 서명란 · 상호는 입력값 그대로', () => {
+  it('사원 1명 — 자본금 · 1좌 금액 · 출자좌수 표 · 서명란 · 상호는 위치대로(뒤)', () => {
     const v = buildIncorpCasePrintValues(ltdSrc(one));
-    expect(v.companyName).toBe('유한회사 한가람');
+    expect(v.companyName).toBe('한가람 유한회사');
     expect(v.capitalAmount).toBe('20,000,000');
     expect(v.contributionUnitAmount).toBe('10,000');
     expect(v.articlesMemberTable).toBe('홍길동　출자 2,000좌(금 20,000,000원)');
     expect(v.articlesMemberSignList).toBe('사원　성명 : 홍길동 (900101-1234567)　(인)\n주소 : (06164) 서울 강남구 1');
     expect(v.regPurpose).toBe('유한회사 발기설립');
+  });
+  it('★ 상호 위치 앞(F) — 정관 · 신청서가 함께 쓰는 companyName 이 「유한회사 한가람」(결정 2026-11-02)', () => {
+    const front = { ...ltdInfo, companyTypePosition: 'F' };
+    const ps = one.map((p, i): IncorpPersonView => ({ ...p, id: `p${i}`, rrnMasked: null, sortOrder: i + 1 }));
+    const v = buildIncorpCasePrintValues({ ...ltdSrc(one), snapshot: buildIncorporationSnapshot(front, ps, 'A') });
+    expect(v.companyName).toBe('유한회사 한가람');
   });
   it('사원 2명 — 사람마다 줄, 합 = 자본금', () => {
     const v = buildIncorpCasePrintValues(ltdSrc(two));
