@@ -202,6 +202,12 @@ export const SCREENS = {
    * 자료 올리기 [보기]가 `?view=all&file=` 로 「이번 달 자료 전체」 탭에 들어온다. 은행 · 현금 · 짝 남은 금액은 뒤 단계.
    */
   s050300010: { route: '/tax/classify', name: '매출 · 매입 항목 지정', group: '030' },
+  /**
+   * 세금 · 보험 납부 · 대출(1-7, 2026-11-02) — 1-6 에서 올린 국세 · 지방세 · 4대보험 · 대출을 보기만 + 엑셀. 시안 없음.
+   * 탭 「국세 · 지방세 · 4대보험 · 대출」. 자료 올리기 [보기]가 `?file=` 로 그 파일 종류의 탭에 들어온다.
+   * 고치기 · 은행 짝 맞추기 · 4대보험 회사 · 직원 나눔은 뒤 단계.
+   */
+  s050300040: { route: '/tax/payments', name: '세금 · 보험 납부 · 대출', group: '030' },
 } as const satisfies Record<string, ScreenMeta>;
 
 export type ScreenId = keyof typeof SCREENS;

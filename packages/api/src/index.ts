@@ -37,6 +37,7 @@ import { registerBizRecommendRoutes } from './routes/bizRecommend.ts';
 import { registerIncorporationRoutes } from './routes/incorporations.ts';
 import { registerDocFormSettingRoutes } from './routes/docFormSettings.ts';
 import { registerTaxClassifyRoutes } from './routes/taxClassify.ts';
+import { registerTaxPaymentsRoutes } from './routes/taxPayments.ts';
 import { registerTaxSettingRoutes } from './routes/taxSettings.ts';
 import { registerSpreadsheetBodyParser, registerTaxUploadRoutes } from './routes/taxUploads.ts';
 import { registerTaxVendorRoutes } from './routes/taxVendors.ts';
@@ -179,6 +180,7 @@ registerTaxSettingRoutes(app);
 registerTaxUploadRoutes(app);
 registerTaxVendorRoutes(app);
 registerTaxClassifyRoutes(app);
+registerTaxPaymentsRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,

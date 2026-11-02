@@ -11,7 +11,8 @@
  *     ★ 카드번호는 끝 4자리만 보인다(서버가 그것만 준다).
  *   ★ 1-2 에서 그리지 않는 것: 회색 안내 띠 · 「이번 달 없음」 · 「삐용 경비」 줄 · 중복 의심 표 · 다음 단계 줄.
  *   ★ [보기](1-3, 2026-10-27) — 한 줄만 골랐고 계산서 · 카드 · 현금 파일일 때 눌린다. 항목 지정 「이번 달 자료 전체」 + 그 파일 줄만으로 간다
- *     (`/tax/classify?month=&view=all&file=`, 결과서 0-7). 다른 자료는 받을 화면이 아직 없어 막는다.
+ *     (`/tax/classify?month=&view=all&file=`, 결과서 0-7). 국세 · 지방세 · 4대보험 · 대출 파일은 세금 · 보험 납부 · 대출의
+ *     그 탭으로(`/tax/payments?month=&file=`, 1-7). 은행은 받을 화면이 아직 없어 막는다(`viewHrefOf`).
  *     짝 맞추기가 없어 「짝이 풀립니다」 문장도 뺐다.
  *   ★ 1-5(2026-11-01): 「은행 입출금」 카드가 켜진다. 업로드 창에서 **계좌**(세무 설정 은행 계좌, 「사용 안 함」 제외)와
  *     **파일 종류**(거래내역 · 이체 내역 — 코드 TAX_BANK_FILE)를 고른다. 기관(은행)은 따로 고르지 않는다(대표 결정 — 결과서와 다름).
@@ -22,7 +23,7 @@
  *     **보험 종류**(국민연금 · 건강보험(장기요양 포함) · 고용보험 · 산재보험 — 코드 TAX_SOCIAL_INS)와 **고지 연월**(처음 값 = 작업할 달)을
  *     고르고, 파일은 .csv 도 받는다(통합징수포털 파일). 미리보기 — 국세 · 지방세: 납부일 · 세목 · 비용 여부 · 귀속 · 금액 /
  *     4대보험: 가입자(끝 4자리) · 보험 · 금액 + 보험 종류별 합계 / 대출: 거래일 · 구분 · 원금 · 이자 · 수수료 · 잔액.
- *     ★ 주민번호는 서버가 읽지도 주지도 않는다. [보기]는 받을 화면(세금 · 보험 납부 · 대출)이 없어 막는다(결정 18).
+ *     ★ 주민번호는 서버가 읽지도 주지도 않는다. [보기]는 세금 · 보험 납부 · 대출의 그 탭으로 간다(1-7).
  *
  * ★★ 이름 · 설명 · 선택지는 **API 가 준 코드 값으로만** 그린다(자료 종류 · 계산서 구분 · 뺀 줄 종류 · 사업자 유형).
  *    예외는 「삐용 경비」 카드 이름 하나다 — 자료 종류 코드가 아니다(1-2 는 「준비 중」으로만 그린다).
@@ -46,7 +47,6 @@ import {
   KIND_SOCIAL,
   PAY_KINDS,
   TaxUploadError,
-  VIEWABLE_KINDS,
   checkDelete,
   deleteFiles,
   loadUploads,
@@ -56,6 +56,7 @@ import {
   spreadsheetMimeOf,
   templateHref,
   uploadFile,
+  viewHrefOf,
   won,
   type BankChoice,
   type SocialChoice,
@@ -121,6 +122,9 @@ export function TaxUploadsView({ month }: { month: string }) {
   }
 
   const kindName = (code: string) => data.codes.kinds.find((k) => k.code === code)?.name ?? code;
+  /** [보기] 주소 — 한 줄만 골랐고 받을 화면이 있는 자료일 때(`viewHrefOf`). */
+  const viewFile = sel.length === 1 ? data.files.find((f) => f.id === sel[0]) : undefined;
+  const viewHref = viewFile ? viewHrefOf(viewFile.kind, month, viewFile.id) : null;
   const bankFileName = (code: string) => data.codes.bankFileTps.find((x) => x.code === code)?.name ?? code;
   /** 「국민은행 · 운영 통장」 — 별칭이 없으면(지웠거나 비움) 계좌번호. 은행 이름은 코드 표(BANK). */
   const accountLabel = (a: { bankCode: string; accountNo: string; alias: string | null }) =>
@@ -256,8 +260,8 @@ export function TaxUploadsView({ month }: { month: string }) {
           <button
             type="button"
             className={`${t.btn} ${t.btnSm}`}
-            disabled={!(sel.length === 1 && VIEWABLE_KINDS.includes(data.files.find((f) => f.id === sel[0])?.kind ?? ''))}
-            onClick={() => router.push(`/tax/classify?month=${month}&view=all&file=${encodeURIComponent(sel[0]!)}`)}
+            disabled={viewHref === null}
+            onClick={() => viewHref && router.push(viewHref)}
           >
             <Icon name="eye" size={16} />
             보기
