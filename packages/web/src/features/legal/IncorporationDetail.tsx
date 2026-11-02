@@ -58,6 +58,7 @@ import {
 } from '@swonbiz/shared/domain/incorporation';
 import {
   composeIncorporationName,
+  incorpBareName,
   incorpEntityWord,
   maskRrn,
   type IncorpPersonView,
@@ -80,6 +81,11 @@ interface Props {
   draft: IncorporationDraftResponse;
   /** 저장된 건. **null 이면 임시 모드**(건이 아직 없다). */
   saved: IncorporationDetailResponse | null;
+  /**
+   * 새 건에서 고른 회사의 이름(삐용 단체 조회, 결정 2026-11-02) — 상호 칸에 미리 넣는다(형태 표기는 떼고,
+   * `incorpBareName`). 고칠 수 있다. 저장된 건 · 회사를 고르지 않은 새 건 · 조회 실패는 null(넣지 않음).
+   */
+  pickedOrgName?: string | null;
 }
 
 type InfoName = keyof IncorporationInfo;
@@ -268,7 +274,7 @@ const personBody = (p: {
   rrn: p.rrn === '' ? null : p.rrn,
 });
 
-export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
+export function IncorporationDetail({ draft, saved: initialSaved, pickedOrgName = null }: Props) {
   const router = useRouter();
   /** ★ 저장된 건은 **상태로** 든다 — 전이 · 저장이 돌려준 새 상세, 409 뒤에 다시 읽은 상세로 다시 그린다. */
   const [saved, setSaved] = useState<IncorporationDetailResponse | null>(initialSaved);
@@ -297,11 +303,18 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
   );
 
   // ── 설립 정보 ────────────────────────────────────────────────────────────
-  const initialForm = useMemo(
-    // 새 건은 개회시간을 기본값(10:00)으로 채워 둔다 — 지우면 빈칸으로 저장된다
-    () => toInfoForm(initialSaved?.info ?? { meetingTime: DEFAULT_MEETING_TIME }, draft.defaultNamePosition),
-    [initialSaved, draft.defaultNamePosition],
-  );
+  const initialForm = useMemo(() => {
+    // 저장된 건은 저장된 값 그대로 — 고른 회사명으로 바꾸지 않는다
+    if (initialSaved) return toInfoForm(initialSaved.info, draft.defaultNamePosition);
+    // 새 건은 개회시간을 기본값(10:00)으로 채워 둔다 — 지우면 빈칸으로 저장된다.
+    // 회사를 골랐으면 그 이름(형태 표기를 뗀 것)을 상호 칸에 미리 넣는다 — 고칠 수 있다(결정 2026-11-02).
+    // ★ 시작값에만 넣는다 — 입력 중인 상호 칸을 덮어쓰는 자리가 없다.
+    const bare = pickedOrgName ? incorpBareName(pickedOrgName) : '';
+    return toInfoForm(
+      bare ? { meetingTime: DEFAULT_MEETING_TIME, nameKo: bare } : { meetingTime: DEFAULT_MEETING_TIME },
+      draft.defaultNamePosition,
+    );
+  }, [initialSaved, draft.defaultNamePosition, pickedOrgName]);
   const [form, setForm] = useState<InfoForm>(initialForm);
   const [savedWire, setSavedWire] = useState<string>(() => JSON.stringify(toWire(initialForm)));
   const wire = toWire(form);

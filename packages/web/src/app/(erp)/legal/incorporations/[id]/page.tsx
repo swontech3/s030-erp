@@ -19,12 +19,27 @@ import type {
   IncorporationDetailResponse,
   IncorporationDraftResponse,
 } from '@swonbiz/shared/domain/incorporation-detail';
+import type { OrgInfo } from '@swonbiz/shared/domain/org-lookup';
 import { callApi } from '@/lib/api';
 import { readSid, requireScreen } from '@/lib/session';
 import { IncorporationDetail } from '@/features/legal/IncorporationDetail';
 
 /** 임시 모드를 가리키는 세그먼트. 실제 건 ID 는 UUID 라 겹치지 않는다. */
 const NEW = 'new';
+
+/**
+ * 새 건에서 고른 회사의 이름 — 상호 칸에 미리 넣는다(결정 2026-11-02).
+ * ★ 회사명은 주소에 싣지 않는다(목록 화면의 「복사 금지」) — 서버끼리 공용 회사 조회 단건(`/org-lookup/one`, 운영사 전용)으로 읽는다.
+ * ★ 못 읽으면(삐용 장애 · 권한 · 없음) null — 미리 넣지 않을 뿐 작성은 막지 않는다.
+ */
+async function pickedOrgName(orgId: number, sid: string | null): Promise<string | null> {
+  try {
+    const res = await callApi<{ org: OrgInfo | null }>(`/org-lookup/one?orgId=${encodeURIComponent(String(orgId))}`, { erpSid: sid });
+    return res.ok ? (res.body.org?.orgName ?? null) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default async function IncorporationDetailPage({
   params,
@@ -46,7 +61,14 @@ export default async function IncorporationDetailPage({
     // ★ 틀린 주소(단체 없음)와 남의 단체(403)는 열 것이 없다 — 「없는 화면」으로 본다.
     if (res.status === 400 || res.status === 403) notFound();
     if (!res.ok) throw new Error(`법인설립 작성 준비 실패(${res.status})`);
-    return <IncorporationDetail key={`new:${qs.toString()}`} draft={res.body} saved={null} />;
+    return (
+      <IncorporationDetail
+        key={`new:${qs.toString()}`}
+        draft={res.body}
+        saved={null}
+        pickedOrgName={orgId ? await pickedOrgName(res.body.orgId, sid) : null}
+      />
+    );
   }
 
   const res = await callApi<IncorporationDetailResponse>(`/legal/incorporations/${encodeURIComponent(id)}`, { erpSid: sid });

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildIncorporationSnapshot,
   composeIncorporationName,
+  incorpBareName,
   incorpEntityWord,
   incorporationDisplayName,
   parseIncorpFirstSave,
@@ -128,6 +129,21 @@ describe('유한회사 — 상호 · 첫 저장 · 스냅샷(결정 2026-10-31)'
     expect(composeIncorporationName('한가람', null, 'A')).toBe('유한회사 한가람');
     expect(composeIncorporationName('', 'B', 'A')).toBe('');
     expect(composeIncorporationName('한가람', 'B', 'R')).toBe('한가람 주식회사');
+  });
+  it('고른 회사명 → 상호 칸 — 앞뒤 형태 표기를 떼고, 위치 칸으로 다시 붙는다(결정 2026-11-02)', () => {
+    expect(incorpBareName('주식회사 한가람')).toBe('한가람');
+    expect(incorpBareName('한가람 주식회사')).toBe('한가람');
+    expect(incorpBareName('유한회사 한가람')).toBe('한가람');
+    expect(incorpBareName(' 한가람유한회사 ')).toBe('한가람');
+    expect(incorpBareName('(주)한가람')).toBe('한가람');
+    expect(incorpBareName('한가람 (유)')).toBe('한가람');
+    expect(incorpBareName('한가람')).toBe('한가람');
+    expect(incorpBareName('한가람주식회사상사')).toBe('한가람주식회사상사'); // 가운데는 그대로
+    expect(incorpBareName('주식회사')).toBe('주식회사'); // 떼면 비면 원래 이름
+    expect(incorpBareName(null)).toBe('');
+    // 주식회사 · 유한회사 각각 — 고른 회사명이 서류에 쓰이는 상호로
+    expect(composeIncorporationName(incorpBareName('주식회사 한가람'), 'B', 'R')).toBe('한가람 주식회사');
+    expect(composeIncorporationName(incorpBareName('주식회사 한가람'), 'F', 'A')).toBe('유한회사 한가람');
   });
   it('형태를 바꾸면 낱말만 바뀐다 — 같은 상호 · 같은 위치', () => {
     expect(composeIncorporationName('한가람', 'B', 'R')).toBe('한가람 주식회사');

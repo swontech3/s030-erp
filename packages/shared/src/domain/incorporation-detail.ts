@@ -93,6 +93,24 @@ export function composeIncorporationName(
   return pos === 'F' ? `${word} ${name}` : `${name} ${word}`;
 }
 
+/** 회사명 앞뒤에서 떼는 회사 형태 표기 — 위치 칸으로 다시 붙는다(결정 2026-11-02). */
+const ENTITY_MARKS = ['주식회사', '유한회사', '(주)', '(유)'] as const;
+
+/**
+ * 고른 회사명 → 상호 칸에 미리 넣을 순수 상호(결정 2026-11-02). 앞 · 뒤의 「주식회사」 · 「유한회사」 · (주) · (유)를
+ * 한 번씩 떼고 공백을 정리한다. 「주식회사 한가람」 · 「한가람 유한회사」 · 「(주)한가람」 → 「한가람」.
+ * 떼고 나서 비면 원래 이름(공백만 뗀 것)을 그대로 쓴다 — 빈 상호를 만들지 않는다.
+ */
+export function incorpBareName(orgName: string | null | undefined): string {
+  const original = (orgName ?? '').trim();
+  let name = original;
+  const front = ENTITY_MARKS.find((m) => name.startsWith(m));
+  if (front) name = name.slice(front.length).trim();
+  const back = ENTITY_MARKS.find((m) => name.endsWith(m));
+  if (back) name = name.slice(0, name.length - back.length).trim();
+  return name === '' ? original : name;
+}
+
 // =============================================================================
 // 단체 · 설립 정보 · 사람
 // =============================================================================
