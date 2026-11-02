@@ -4,6 +4,7 @@ import {
   INCORP_FOUNDER_MAX,
   INCORP_PURPOSE_MAX,
   checkIncorporationTransition,
+  incorpPersonsCapital,
   closingTimeOf,
   incorpFieldDefsOf,
   incorpMethodOf,
@@ -245,5 +246,31 @@ describe('유한회사 — 작성완료 검증', () => {
     ]);
     const big = { ...LTD, info: { ...LTD.info, capitalAmount: 1_000_000_000, parValue: 500_000 } };
     expect(incorporationWarnings(big, 'A')).toEqual(['자본금이 10억 원 이상입니다 — 유한회사 정관은 10억 원 미만(공증 면제) 기준입니다']);
+  });
+});
+
+// =============================================================================
+// 자본금 칸 옆 「사람별 합계」(결정 2026-11-02) — 표시만, 검증은 그대로
+// =============================================================================
+describe('incorpPersonsCapital — 사람별 합계', () => {
+  const people: IncorporationPersonInput[] = [
+    { name: '갑', isFounder: true, unitsSubscribed: 1_200 },
+    { name: '을', isFounder: true, unitsSubscribed: 800 },
+    { name: '감사', isAuditor: true, unitsSubscribed: 500 }, // 발기인(사원) 아님 — 세지 않는다
+  ];
+  it('발기인(사원) 합 × 1주(1좌) 금액 · 자본금과 같으면 차이 0', () => {
+    expect(incorpPersonsCapital({ capitalAmount: 20_000_000, parValue: 10_000 }, people)).toEqual({
+      units: 2_000,
+      parValue: 10_000,
+      total: 20_000_000,
+      diff: 0,
+    });
+  });
+  it('다르면 차이(합계 − 자본금) · 자본금이 비면 차이 null · 1주 금액이 비면 null', () => {
+    expect(incorpPersonsCapital({ capitalAmount: 25_000_000, parValue: 10_000 }, people)?.diff).toBe(-5_000_000);
+    expect(incorpPersonsCapital({ capitalAmount: 15_000_000, parValue: 10_000 }, people)?.diff).toBe(5_000_000);
+    expect(incorpPersonsCapital({ capitalAmount: null, parValue: 10_000 }, people)?.diff).toBeNull();
+    expect(incorpPersonsCapital({ capitalAmount: 20_000_000, parValue: null }, people)).toBeNull();
+    expect(incorpPersonsCapital({ capitalAmount: 0, parValue: 100 }, [])).toEqual({ units: 0, parValue: 100, total: 0, diff: 0 });
   });
 });

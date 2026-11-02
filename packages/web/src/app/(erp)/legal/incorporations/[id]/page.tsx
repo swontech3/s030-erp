@@ -28,14 +28,14 @@ import { IncorporationDetail } from '@/features/legal/IncorporationDetail';
 const NEW = 'new';
 
 /**
- * 새 건에서 고른 회사의 이름 — 상호 칸에 미리 넣는다(결정 2026-11-02).
+ * 새 건에서 고른 회사(삐용 단체 조회) — 회사명은 상호 칸에, 대표자 · 전화는 사람 한 줄 · 대표이사 전화에 미리 넣는다(결정 2026-11-02).
  * ★ 회사명은 주소에 싣지 않는다(목록 화면의 「복사 금지」) — 서버끼리 공용 회사 조회 단건(`/org-lookup/one`, 운영사 전용)으로 읽는다.
  * ★ 못 읽으면(삐용 장애 · 권한 · 없음) null — 미리 넣지 않을 뿐 작성은 막지 않는다.
  */
-async function pickedOrgName(orgId: number, sid: string | null): Promise<string | null> {
+async function pickedOrg(orgId: number, sid: string | null): Promise<OrgInfo | null> {
   try {
     const res = await callApi<{ org: OrgInfo | null }>(`/org-lookup/one?orgId=${encodeURIComponent(String(orgId))}`, { erpSid: sid });
-    return res.ok ? (res.body.org?.orgName ?? null) : null;
+    return res.ok ? (res.body.org ?? null) : null;
   } catch {
     return null;
   }
@@ -66,7 +66,7 @@ export default async function IncorporationDetailPage({
         key={`new:${qs.toString()}`}
         draft={res.body}
         saved={null}
-        pickedOrgName={orgId ? await pickedOrgName(res.body.orgId, sid) : null}
+        picked={orgId ? await pickedOrg(res.body.orgId, sid) : null}
       />
     );
   }

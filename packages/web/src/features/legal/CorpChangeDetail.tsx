@@ -1621,7 +1621,7 @@ function OfficersSection({
                 inputMode="numeric"
                 autoComplete="off"
                 placeholder={draft.rrnMasked ? `${draft.rrnMasked} — 바꿀 때만 입력` : '숫자 13자리'}
-                onChange={(e) => setDraft({ ...draft, rrn: e.target.value })}
+                onChange={(e) => setDraft({ ...draft, rrn: maskInput(e.currentTarget, 'rrn') })}
               />
               {rrnBad ? (
                 <span className={styles.fieldError}>주민등록번호는 숫자 13자리로 입력하세요</span>

@@ -647,8 +647,8 @@ export class HttpBbiyongOrg implements BbiyongOrg {
         const orgCode = str(r?.orgCode);
         const orgName = str(r?.orgName);
         if (orgId === null || !orgCode || !orgName) continue; // 모양이 다른 줄은 버린다(지어내지 않는다)
-        // 대표자 = 행의 `memberName`(회사 등록 때 대표로 보낸 이름과 같은 칸). 상태 칸은 행에 없다 → null
-        rows.push({ orgId, orgCode, orgName, repName: str(r?.memberName) || null, status: null });
+        // 대표자 = 행의 `memberName`(회사 등록 때 대표로 보낸 이름과 같은 칸). 전화 = 행의 `telNo`(빈 글자는 null). 상태 칸은 행에 없다 → null
+        rows.push({ orgId, orgCode, orgName, repName: str(r?.memberName) || null, telNo: str(r?.telNo) || null, status: null });
         if (total === null) total = toInt(r?.totCnt);
       }
       if (data.length < ORG_LIST_PAGE_SIZE || (total !== null && page * ORG_LIST_PAGE_SIZE >= total)) break;

@@ -372,6 +372,30 @@ export function validateIncorporation(content: IncorporationContent, entity: Inc
 const memberUnits = (persons: readonly IncorporationPersonInput[]) =>
   persons.filter((p) => p.isFounder).reduce((s, p) => s + (isCount(p.unitsSubscribed) ? p.unitsSubscribed : 0), 0);
 
+/** 자본금 칸 옆 「사람별 합계」(결정 2026-11-02) — 화면 표시만. 검증은 위 두 검증 함수 그대로다. */
+export interface IncorpPersonsCapital {
+  /** 발기인(유한회사는 사원) 인수 주식 수(출자좌수) 합. */
+  units: number;
+  /** 1주(1좌)의 금액. */
+  parValue: number;
+  /** units × parValue. */
+  total: number;
+  /** total − 자본금. 자본금이 비었으면 null. 0 이면 같다. */
+  diff: number | null;
+}
+
+/** 사람별 합계 — 1주(1좌)의 금액이 없으면 null(셀 수 없다). 두 회사 형태 모두 발기인 · 사원(`isFounder`)의 합이다. */
+export function incorpPersonsCapital(
+  info: Pick<IncorporationInfo, 'capitalAmount' | 'parValue'>,
+  persons: readonly IncorporationPersonInput[],
+): IncorpPersonsCapital | null {
+  const { capitalAmount, parValue } = info;
+  if (!isCount(parValue)) return null;
+  const units = memberUnits(persons);
+  const total = units * parValue;
+  return { units, parValue, total, diff: isCount(capitalAmount) ? total - capitalAmount : null };
+}
+
 /**
  * 유한회사 작성완료 검증(결정 2026-10-31) — 주식회사와 다른 곳:
  *   · 칸은 `incorpFieldDefsOf('A')`(수권 · 발행 주식 수 · 공고방법 없음)

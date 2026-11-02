@@ -494,6 +494,15 @@ describe('HttpBbiyongOrg — 단체 목록(org-list)', () => {
   });
   const page = (rows: unknown[]) => ({ status: 200, result: 'success', massage: null, data: rows, error: [] });
 
+  it('전화(telNo) — 있으면 그대로, 빈 글자는 null(2026-11-02 · 법인설립 대표자 미리 넣기)', async () => {
+    const { org } = adapter(page([{ ...row(5, 'VHF', '해피프렌즈', 2), telNo: '02-555-1234' }, row(1, 'SWT', '에스원', 2)]));
+    const out = await org.listOrgs({ name: '' }, 'tok');
+    expect(out.kind === 'ok' ? out.value.map((o) => [o.orgCode, o.telNo]) : out).toEqual([
+      ['SWT', null],
+      ['VHF', '02-555-1234'],
+    ]);
+  });
+
   it('★ GET · 토큰 · 회사명 일부 · 쪽 크기 100 · 1쪽 — 행을 다섯 칸으로, 코드 순', async () => {
     const { org, calls } = adapter(page([row(5, 'VHF', '해피프렌즈', 2), row(1, 'SWT', '(주)에스원테크', 2)]));
     const out = await org.listOrgs({ name: ' 프렌 ' }, 'tok');
@@ -504,7 +513,7 @@ describe('HttpBbiyongOrg — 단체 목록(org-list)', () => {
     expect(calls[0]!.init.method).toBe('GET');
     expect((calls[0]!.init.headers as Record<string, string>).authorization).toBe('Bearer tok');
     // 삐용이 준 것 중 회사명에 「프렌」이 든 것만(모의 어댑터와 같은 규칙)
-    expect(out).toEqual({ kind: 'ok', value: [{ orgId: 5, orgCode: 'VHF', orgName: '해피프렌즈', repName: '홍대표', status: null }] });
+    expect(out).toEqual({ kind: 'ok', value: [{ orgId: 5, orgCode: 'VHF', orgName: '해피프렌즈', repName: '홍대표', telNo: null, status: null }] });
   });
 
   it('★ 전체 수(totCnt)만큼 쪽을 넘겨 끝까지 받는다', async () => {
