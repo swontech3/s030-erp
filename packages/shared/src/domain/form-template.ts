@@ -73,6 +73,12 @@ export interface Cell {
   /** pt. 없으면 양식 글꼴 크기. */
   fontSize?: number;
   bold?: boolean;
+  /**
+   * 「내용에 맞춤」(결정 2026-11-05) — 이 칸이 있는 **행**은 저장된 높이를 못 박지 않고 내용 줄 수만큼만 쓴다.
+   * 내용이 적으면 행이 줄고, 저장된 높이만큼 차면 지금과 같다. 걸침(rowSpan) 1 인 칸만 본다(`fitRowsOf`).
+   * 없으면 고정 높이(지금과 같다). ★ 편집기는 이 칸을 그리지 않고 그대로 들고 다닌다(칸 복사 · 행 넣고 빼기).
+   */
+  fitHeight?: boolean;
 }
 
 /** 한 장 — A4 세로 한 장에 표 하나다. 치수는 전부 **cm** 다. */
@@ -239,7 +245,18 @@ function parseCell(v: unknown, where: string): Cell {
     if (typeof v.bold !== 'boolean') fail(where, 'bold 는 참/거짓이어야 합니다');
     cell.bold = v.bold as boolean;
   }
+  if (v.fitHeight !== undefined) {
+    if (typeof v.fitHeight !== 'boolean') fail(where, 'fitHeight 는 참/거짓이어야 합니다');
+    cell.fitHeight = v.fitHeight as boolean;
+  }
   return cell;
+}
+
+/** 「내용에 맞춤」 행 번호들 — 그 행에 앵커가 있고 걸침이 1 인 칸이 `fitHeight` 를 가진 행. */
+export function fitRowsOf(page: Page): Set<number> {
+  const rows = new Set<number>();
+  for (const c of page.cells) if (c.fitHeight === true && (c.rowSpan ?? 1) === 1) rows.add(c.row);
+  return rows;
 }
 
 function parsePage(v: unknown, where: string): Page {

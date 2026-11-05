@@ -4,6 +4,7 @@ import {
   createEmptyPage,
   definitionTokens,
   extractTokens,
+  fitRowsOf,
   FormDefinitionError,
   inputFieldsOf,
   isLegalForm,
@@ -199,5 +200,24 @@ describe('isLegalForm — 법무 양식은 표양식 화면에서 뽑지 않는�
   it('저장된 정의를 읽어도 원천이 남아 법무 양식으로 판정된다', () => {
     const stored = { ...createEmptyDefinition(), dataSource: 'corp-change' };
     expect(isLegalForm(parseDefinition(JSON.parse(JSON.stringify(stored))))).toBe(true);
+  });
+});
+
+describe('「내용에 맞춤」 행(결정 2026-11-05)', () => {
+  const page = (cells: unknown[]) => ({ colWidths: [1, 2], rowHeights: [1, 10, 1], cells });
+
+  it('parseDefinition 이 fitHeight 를 지키고, 참/거짓이 아니면 거절한다', () => {
+    const def = parseDefinition({ ...createEmptyDefinition(), pages: [page([{ row: 1, col: 1, text: '{{list}}', fitHeight: true }])] });
+    expect(def.pages[0].cells[0].fitHeight).toBe(true);
+    expect(() => parseDefinition({ ...createEmptyDefinition(), pages: [page([{ row: 1, col: 1, fitHeight: 'y' }])] })).toThrow(FormDefinitionError);
+  });
+
+  it('표시가 있는 칸의 행만 — 걸침 1 인 칸만 본다 · 표시가 없으면 빈 집합', () => {
+    const def = parseDefinition({
+      ...createEmptyDefinition(),
+      pages: [page([{ row: 1, col: 1, fitHeight: true }, { row: 0, col: 0, rowSpan: 3, fitHeight: true }, { row: 2, col: 1, fitHeight: false }])],
+    });
+    expect([...fitRowsOf(def.pages[0])]).toEqual([1]);
+    expect(fitRowsOf(createEmptyPage()).size).toBe(0);
   });
 });

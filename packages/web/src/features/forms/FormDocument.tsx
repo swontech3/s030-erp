@@ -13,7 +13,7 @@
  * ★ 인쇄는 `FormPrintPortal` 이 이 컴포넌트를 body 로 포털해서 한다(계약서와 같은 방식).
  */
 import type { Ref } from 'react';
-import { DEFAULT_MARGIN_TOP, splitTokens, type FormDefinition, type Page } from '@swonbiz/shared/domain/form-template';
+import { DEFAULT_MARGIN_TOP, fitRowsOf, splitTokens, type FormDefinition, type Page } from '@swonbiz/shared/domain/form-template';
 import { cellAt, coveredPositions } from '@swonbiz/shared/domain/form-grid';
 import styles from './form-doc.module.css';
 
@@ -89,6 +89,8 @@ function PageTable({
   blankWhenEmpty: readonly string[];
 }) {
   const covered = coveredPositions(page);
+  // ★ 「내용에 맞춤」 행은 높이를 못 박지 않는다 — 표의 행은 내용만큼 자란다(결정 2026-11-05).
+  const fit = fitRowsOf(page);
   const tableWidth = page.colWidths.reduce((a, b) => a + b, 0);
   return (
     <table
@@ -102,7 +104,7 @@ function PageTable({
       </colgroup>
       <tbody>
         {page.rowHeights.map((h, r) => (
-          <tr key={r} style={{ height: `${h}cm` }}>
+          <tr key={r} style={fit.has(r) ? undefined : { height: `${h}cm` }}>
             {page.colWidths.map((_, c) => {
               if (covered.has(`${r},${c}`)) return null;
               const cell = cellAt(page, r, c);
