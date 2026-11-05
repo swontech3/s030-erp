@@ -6,11 +6,14 @@
  *      사유 · 새 본점 · 연월일 · 지배인), 남는 높이는 큰 칸 다섯(사유 · 새 본점 · 연월일 · 지배인 · 상호 변경)에
  *      그 높이 비율로 나눈다. 다른 행은 그대로. 재서 장 끝(27.30cm)을 넘지 않게 맞춘다.
  *   2. 「사원총회 의사록(유한회사, 변경)」 — 2장을 1장으로 합친다(열 폭이 같다 — 2장 행을 1장 아래에 잇는다).
- *      · 서명란 「의장 대표이사」 옆 이름 칸 = `{{ceoName}}`(회사 정보의 대표자 = 의장)
+ *      · 서명란 「의장 대표이사」 옆 이름 칸 = `{{ceoName}}`(회사 정보의 대표자 = 의장) · 「이사」 첫 줄 이름 칸 =
+ *        `{{directorName}}`(동의서와 같은 출력 때 입력, 결정 2026-11-05) · 둘째 줄은 빈칸 그대로
  *      · 출석 현황 6칸 · 회의 종료시각 = 「출력 때 입력」 자리표시(이름표 사전에 더함)
  *      · 한 장에 넘치면 **내용보다 높은 행의 남는 높이만** 같은 비율로 줄인다(글이 잘리지 않는다)
  *   3. 「이사과반수동의서」 — 대표이사 줄 이름 칸 = `{{ceoName}}`, 이사 줄 이름 칸 = `{{directorName}}`(출력 때 입력)
- *   ★ 이름 칸의 글자 크기는 같은 줄의 직위 칸과 같게(12pt). 그 밖의 칸 · 자리표시 · 법무 표시는 그대로.
+ *   ★ 이름 칸의 글자 크기 · 세로 정렬은 같은 줄의 직위 칸과 같게(12pt · 가운데). 서명란 이름 칸은 오른쪽으로 넓힌다(`widenNameRow` —
+ *     0.85cm 라 이름이 세로로 한 자씩 찍혔다, 결정 2026-11-05). 「(인)」은 바로 다음 칸으로 밀린다.
+ *     그 밖의 칸 · 자리표시 · 법무 표시는 그대로.
  *   ★ 「출력 때 입력」은 법인변경 [서류 출력] 화면이 서버 값에 없는 자리표시마다 입력칸을 띄운다(`printManualFields`).
  *
  * ★ 기본은 **보기만** 한다(읽기 전용 트랜잭션). `--apply` 일 때만 한 트랜잭션으로 쓰고 되읽는다.
@@ -58,6 +61,7 @@ const MIN_MANUAL = [
   ['votingMemberCount', '의결권 있는 사원의 수'], ['votingUnits', '의결권 있는 출자좌수'],
   ['attendMemberCount', '출석 사원의 수'], ['attendUnits', '출석 출자좌수'],
   ['meetingEndTime', '회의 종료시각'],
+  ['directorName', '이사 성명'],
 ];
 const AGREE_MANUAL = [['ceoName', '대표자'], ['directorName', '이사 성명']];
 
@@ -119,6 +123,8 @@ document.body.setAttribute('data-out',encodeURIComponent(JSON.stringify(out)));
 }
 const last = (a) => a[a.length - 1];
 const r2 = (n) => Math.round(n * 100) / 100;
+/** 키를 정렬한 JSON — 되읽은 jsonb 와 쓴 값을 키 순서 없이 비교한다. */
+const canon = (v) => JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : x));
 
 // ── 칸 찾기 · 바꾸기(원본 JSON 사본에서) ──────────────────────────────
 function cellOf(page, row, col, what) {
@@ -143,6 +149,42 @@ function appHeights(page, extra) {
   return h;
 }
 
+/**
+ * 서명란 한 줄 — 이름 칸을 오른쪽으로 넓힌다(결정 2026-11-05: 0.85cm 라 이름이 세로로 한 자씩 찍혔다).
+ * 열 폭은 그대로, 그 줄의 칸만 다시 나눈다: 이름 칸 = 지금 자리부터 NAME_MIN_CM 이상이 될 때까지,
+ * 「(인)」 = 바로 다음 열부터 원래 너비 이상, 남는 오른쪽 = 빈 칸(없으면 없음). 칸의 모양(정렬 · 테두리 · 글자)은 그대로.
+ */
+const NAME_MIN_CM = 2.2; // 12pt 다섯 자 + 칸 안쪽 여백
+function widenNameRow(page, row, nameCol, what) {
+  const width = (from, span) => page.colWidths.slice(from, from + span).reduce((a, b) => a + b, 0);
+  const name = cellOf(page, row, nameCol, what);
+  const sealCol = nameCol + (name.colSpan ?? 1);
+  const seal = cellOf(page, row, sealCol, what);
+  expectText(seal, '(인)', what);
+  const restCol = sealCol + (seal.colSpan ?? 1);
+  const rest = page.cells.find((x) => x.row === row && x.col === restCol);
+  const lastCol = page.colWidths.length;
+  if (rest && restCol + (rest.colSpan ?? 1) !== lastCol) throw new Error(`${what} — ${row + 1}행 오른쪽 빈 칸이 줄 끝까지가 아니다`);
+  if (rest && (rest.text ?? '') !== '') throw new Error(`${what} — ${row + 1}행 오른쪽 칸이 비어 있지 않다`);
+  const sealWidth = width(sealCol, seal.colSpan ?? 1);
+  let nSpan = name.colSpan ?? 1;
+  while (width(nameCol, nSpan) < NAME_MIN_CM) nSpan++;
+  const sCol = nameCol + nSpan;
+  let sSpan = 1;
+  while (sCol + sSpan < lastCol && width(sCol, sSpan) < sealWidth - 1e-9) sSpan++;
+  if (sCol + sSpan > lastCol) throw new Error(`${what} — ${row + 1}행에 「(인)」 자리가 남지 않는다`);
+  name.colSpan = nSpan;
+  seal.col = sCol;
+  seal.colSpan = sSpan;
+  const rCol = sCol + sSpan;
+  if (rest) {
+    if (rCol < lastCol) { rest.col = rCol; rest.colSpan = lastCol - rCol; }
+    else page.cells = page.cells.filter((x) => x !== rest);
+  }
+  return { 줄: row + 1, '이름 칸(cm)': r2(width(nameCol, nSpan)), '(인) 칸(cm)': r2(width(sCol, sSpan)) };
+}
+const widened = [];
+
 /** 2. 의사록 — 2장을 1장으로 · 자리표시. */
 function editMinutes(raw) {
   const next = structuredClone(raw);
@@ -163,7 +205,13 @@ function editMinutes(raw) {
   // 서명란 의장 대표이사 이름(2장 9행 6열)
   expectText(cellOf(p2, 8, 2, MIN), '의장 대표이사', MIN);
   const chair = cellOf(p2, 8, 5, MIN); expectText(chair, '', MIN);
-  chair.text = '{{ceoName}}'; chair.fontSize = 12;
+  chair.text = '{{ceoName}}'; chair.fontSize = 12; chair.valign = 'middle';
+  // 서명란 이사 첫 줄 이름(2장 11행 5열) = 동의서와 같은 입력 `directorName` · 둘째 줄(13행)은 빈칸 그대로
+  expectText(cellOf(p2, 10, 3, MIN), '이사', MIN);
+  const director = cellOf(p2, 10, 4, MIN); expectText(director, '', MIN);
+  director.text = '{{directorName}}'; director.fontSize = 12; director.valign = 'middle';
+  // 서명란 이름 칸 넓히기 — 의장 · 이사 두 줄(둘째 이사 줄도 「(인)」 자리를 첫 줄과 맞춘다, 이름은 빈칸 그대로)
+  for (const [r, col] of [[8, 5], [10, 4], [12, 4]]) widened.push({ 서식: MIN, ...widenNameRow(p2, r, col, MIN), '(2장 기준)': '' });
   // 합치기 — 2장 행을 1장 아래로
   const off = p1.rowHeights.length;
   p1.rowHeights = [...p1.rowHeights, ...p2.rowHeights];
@@ -179,10 +227,11 @@ function editAgree(raw) {
   const p = next.pages[0];
   expectText(cellOf(p, 9, 3, AGREE), '대표이사', AGREE);
   const ceo = cellOf(p, 9, 6, AGREE); expectText(ceo, '', AGREE);
-  ceo.text = '{{ceoName}}'; ceo.fontSize = 12;
+  ceo.text = '{{ceoName}}'; ceo.fontSize = 12; ceo.valign = 'middle';
   expectText(cellOf(p, 11, 4, AGREE), '이사', AGREE);
   const dir = cellOf(p, 11, 5, AGREE); expectText(dir, '', AGREE);
-  dir.text = '{{directorName}}'; dir.fontSize = 12;
+  dir.text = '{{directorName}}'; dir.fontSize = 12; dir.valign = 'middle';
+  for (const [r, col] of [[9, 6], [11, 5]]) widened.push({ 서식: AGREE, ...widenNameRow(p, r, col, AGREE), '(2장 기준)': '' });
   addLabels(next, AGREE_MANUAL);
   return next;
 }
@@ -278,6 +327,9 @@ async function main() {
     console.log(`  표 끝 ${last(m1.m.ends)}cm / 한 장 ${PAGE_INNER_CM}cm · 행 ${minDef.pages[0].rowHeights.length}개`);
     console.table(minTokens.map((t) => ({ 자리표시: t, 값: known.has(t) ? '서버(건)' : '출력 때 입력', 이름표: (minDef.manualFields ?? []).find((m) => m.name === t)?.label ?? '', '견본 값': (minValues[t] ?? '').slice(0, 30) })));
 
+    console.log('\n■ 서명란 이름 칸 넓히기 — 이름 칸 2.2cm 이상 · 「(인)」은 바로 다음 칸(의사록 줄 번호는 합치기 전 2장 기준)');
+    console.table(widened.map(({ '(2장 기준)': _x, ...w }) => w));
+
     console.log(`\n■ 3. ${AGREE} — 표 끝 ${last(a1.ends)}cm / 한 장 ${PAGE_INNER_CM}cm`);
     console.table(definitionTokens(agreeDef).map((t) => ({ 자리표시: t, 값: known.has(t) ? '서버(건)' : '출력 때 입력', 이름표: (agreeDef.manualFields ?? []).find((m) => m.name === t)?.label ?? '', '견본 값': (agreeValues[t] ?? '').slice(0, 30) })));
 
@@ -297,7 +349,7 @@ async function main() {
     const after = [];
     for (const [f, next] of writes) {
       const r = (await c.query(`SELECT definition FROM public.tb_s080_form_templates WHERE id = $1`, [f.id])).rows[0];
-      const same = JSON.stringify(r.definition) === JSON.stringify(next);
+      const same = canon(r.definition) === canon(next); // jsonb 는 키 순서를 바꾼다 — 키를 정렬해 비교
       const def = migrateDefinition(r.definition);
       after.push({ 서식: f.name, 장수: def.pages.length, 자리표시: definitionTokens(def).length, 이름표: (def.manualFields ?? []).length, '쓴 그대로': same ? '예' : '아니오' });
       if (!same) throw new Error(`「${f.name}」 되읽은 정의가 다르다 — 되돌린다`);
