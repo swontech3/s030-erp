@@ -145,7 +145,6 @@ export function TaxVendorsView({ month }: { month: string }) {
       </div>
       <div className={t.pageH}>
         <div>
-          <h1>거래처</h1>
           <p>
             자료를 올리면 거래처가 자동으로 생깁니다. 이름·사업자번호를 고치고, 같은 곳을 하나로 합치고, 자주 거래하는 곳을
             주거래처로 표시합니다.

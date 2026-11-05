@@ -33,7 +33,8 @@ const apiEnv = readEnv(process.argv[3] || 'packages/api/.env');
 const dryAt = process.argv.indexOf('--dry-run');
 const dryFiles = dryAt >= 0 ? process.argv.slice(dryAt + 1) : null;
 
-const FILE_TP = ['TAX_BANK_FILE', '은행 파일 종류', [['TXN', '거래내역'], ['XFER', '이체 내역']]];
+// ★ 216(2026-11-05)이 이름을 바꿨다 — 거래내역 → 은행거래내역 · 이체 내역 → 은행이체내역(코드값은 그대로)
+const FILE_TP = ['TAX_BANK_FILE', '은행 파일 종류', [['TXN', '은행거래내역'], ['XFER', '은행이체내역']]];
 const SKIP_OLD = ['nonGeneral', 'noBizNo', 'badAmount', 'noApproval', 'dupInFile', 'otherClass', 'badDate',
   'noCardNo', 'noDescription', 'noAmount', 'badPayMethod', 'badDirection'];
 const SKIP_NEW = [

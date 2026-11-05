@@ -1,5 +1,5 @@
 /**
- * 세무 세금 · 보험 납부 · 대출(s050300040, 세무 S05) — 1-7 (2026-11-02). 읽기만.
+ * 세무 세금 · 4대보험 · 대출(s050300040, 세무 S05) — 1-7 (2026-11-02). 읽기만.
  *
  *   GET /tax/payments?month&tab&from&to&file          지금 탭의 줄 · 탭마다 줄 수 · 파일 띠 · 코드 이름
  *   GET /tax/payments/export?…(목록과 같은 주소)       지금 탭 거르기 결과를 엑셀로(ERP 공통 부품 `lib/xlsxExport.ts`)
@@ -127,7 +127,7 @@ export function payExportSheet(tab: 'NTAX' | 'LTAX', rows: readonly TaxPaymentRo
   return { name: PAYMENT_TAB_LABELS[tab], columns, rows };
 }
 
-/** 4대보험 사람별 시트. ★ 가입자 번호는 끝 4자리만. */
+/** 4대보험 사람별 시트. ★ 가입자 번호(끝 4자리)는 엑셀에 넣지 않는다 — 화면과 같다(API 응답에는 있다, 직원 급여에서 씀). */
 export function socialExportSheet(rows: readonly SocialInsRow[], insNames: readonly TaxCodeName[]): XlsxSheet<SocialInsRow> {
   return {
     name: PAYMENT_TAB_LABELS.SOCIAL,
@@ -135,7 +135,6 @@ export function socialExportSheet(rows: readonly SocialInsRow[], insNames: reado
       { header: '고지 연월', value: (r) => r.noticeMonth },
       { header: '보험 종류', value: (r) => nameOf(insNames, r.insTp) },
       { header: '이름', value: (r) => r.name },
-      { header: '가입자 번호(끝 4자리)', value: (r) => r.memberLast4 },
       { header: '보수월액', value: (r) => r.payBase },
       { header: '금액', value: (r) => r.noticeAmount },
     ],

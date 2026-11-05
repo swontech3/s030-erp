@@ -402,7 +402,6 @@ export function TaxSettingsView() {
       </div>
       <div className={t.pageH}>
         <div>
-          <h1>세무 설정</h1>
           <p>세무에만 쓰는 값을 정합니다. 처음에 한 번 하고, 바뀔 때만 고칩니다.</p>
         </div>
       </div>

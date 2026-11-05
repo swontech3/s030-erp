@@ -249,7 +249,6 @@ export function TaxClassifyView({ month, initialView, fileId: initialFile }: Pro
       <TaxMonthBar month={month} note={todayNote(data.bizTypeName)} />
       <div className={t.pageH}>
         <div>
-          <h1>매출 · 매입 항목 지정</h1>
           <p>{desc(data.counts.total)}</p>
         </div>
         {isLeft ? (

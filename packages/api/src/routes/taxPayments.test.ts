@@ -160,11 +160,11 @@ const SOC: SocialInsRow = {
 const INS = [{ code: 'NP', name: '국민연금' }, { code: 'HI', name: '건강보험' }, { code: 'LTC', name: '장기요양' }];
 
 describe('socialExportSheet · socialTotalsSheet — 4대보험 두 시트(결정 ④)', () => {
-  it('사람별 칸 — 고지 연월 · 보험 종류 · 이름 · 가입자 번호(끝 4자리) · 보수월액 · 금액', () => {
+  it('사람별 칸 — 고지 연월 · 보험 종류 · 이름 · 보수월액 · 금액 (가입자 번호는 넣지 않는다)', () => {
     expect(aoa(socialExportSheet([SOC, { ...SOC, id: 's2', insTp: 'LTC', memberLast4: null, payBase: null, noticeAmount: 13780 }], INS))).toEqual([
-      ['고지 연월', '보험 종류', '이름', '가입자 번호(끝 4자리)', '보수월액', '금액'],
-      ['2026-09', '건강보험', '홍길동', '1234', 3000000, 106350],
-      ['2026-09', '장기요양', '홍길동', null, null, 13780],
+      ['고지 연월', '보험 종류', '이름', '보수월액', '금액'],
+      ['2026-09', '건강보험', '홍길동', 3000000, 106350],
+      ['2026-09', '장기요양', '홍길동', null, 13780],
     ]);
   });
 

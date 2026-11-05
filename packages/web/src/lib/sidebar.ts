@@ -53,7 +53,7 @@ const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
   s050100020: 'building-2', // 거래처 — 세무 서비스(s05)
   s050200010: 'upload', // 자료 올리기 — 세무 서비스(s05)
   s050300010: 'file-pen-line', // 매출 · 매입 항목 지정(옛 거래 분류) — 세무 서비스(s05). 시안에 메뉴 아이콘이 없어 가까운 것
-  s050300040: 'receipt', // 세금 · 보험 납부 · 대출 — 세무 서비스(s05). 시안 없음 — 시안 자료 카드의 국세 · 지방세 아이콘
+  s050300040: 'receipt', // 세금 · 4대보험 · 대출 — 세무 서비스(s05). 시안 없음 — 시안 자료 카드의 국세 · 지방세 아이콘
 };
 
 export interface NavItem {

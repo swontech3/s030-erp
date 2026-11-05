@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * 세금 · 보험 납부 · 대출(s050300040) 본문 — 1-7 (2026-11-02). **시안 없음** — 항목 지정 「이번 달 자료 전체」 탭과 같은 부품 ·
+ * 세금 · 4대보험 · 대출(s050300040) 본문 — 1-7 (2026-11-02). **시안 없음** — 항목 지정 「이번 달 자료 전체」 탭과 같은 부품 ·
  * 모양만 쓴다(작업할 달 줄 · 제목 · 파일 띠 · 표 카드(탭 → 버튼 줄 [엑셀 내려받기] + 기간 → 표)). 읽기만.
  *
  *   탭 넷(결정 ①): 국세 · 지방세 · 4대보험 · 대출 (건수)
@@ -10,7 +10,7 @@
  *   4대보험: 안내 한 줄 「회사 · 직원 부담은 직원 급여에서 나눕니다」(결정 ②) · 보험 종류별 합계 표 · 사람별 목록. 고지 연월로 거른다(⑥)
  *   대출: 대출(은행 · 끝 4자리)별 요약 표(실행 원금 · 상환 원금 · 이자 · 수수료, 잔액 없음 ⑤) · 거래 목록(잔액 포함)
  * ★ 요약 · 합계는 새 모양을 만들지 않고 같은 표(`t.tbl`)의 줄로 그린다(자료 올리기 미리보기의 「합계 · N줄」 줄과 같은 꼴).
- * ★ 이름(보험 종류 · 구분 · 은행)은 API 가 준 코드 이름으로만 그린다. ★ 가입자 번호 · 대출번호는 끝 4자리만(서버가 그것만 준다).
+ * ★ 이름(보험 종류 · 구분 · 은행)은 API 가 준 코드 이름으로만 그린다. ★ 대출번호는 끝 4자리만(서버가 그것만 준다). 4대보험 가입자 번호(끝 4자리)는 화면 · 엑셀에 보이지 않는다(API 는 준다).
  * ★ 파일로 들어오면 기간 거르기를 걸지 않고 기간 칸을 숨긴다 · 다른 탭을 누르면 파일 띠가 풀린다(항목 지정과 같다).
  */
 import { useCallback, useEffect, useState } from 'react';
@@ -41,6 +41,9 @@ interface Props {
 /** `2026-09-25` → 「09.25」. */
 const shortDate = (date: string): string => `${date.slice(5, 7)}.${date.slice(8, 10)}`;
 
+/** 4대보험 두 표(보험 종류별 합계 · 사람별)의 폭 — 칸 폭의 합으로 맞춘다(590 = 90 + 110 + 130 + 120 + 140 = 340 + 110 + 140). */
+const SOCIAL_TABLE_W = 590;
+
 export function TaxPaymentsView({ month, initialTab, fileId: initialFile }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -69,7 +72,7 @@ export function TaxPaymentsView({ month, initialTab, fileId: initialFile }: Prop
           setLoadError(null);
         })
         .catch((err: unknown) =>
-          setLoadError(err instanceof TaxPaymentsError ? err.message : '세금 · 보험 납부 · 대출을 불러오지 못했습니다'),
+          setLoadError(err instanceof TaxPaymentsError ? err.message : '세금 · 4대보험 · 대출을 불러오지 못했습니다'),
         ),
     [key],
   );
@@ -270,9 +273,9 @@ export function TaxPaymentsView({ month, initialTab, fileId: initialFile }: Prop
           </span>
           <span>회사 · 직원 부담은 직원 급여에서 나눕니다</span>
         </div>
-        <table className={t.tbl} style={{ borderTop: '1px solid var(--border)' }}>
+        <table className={t.tbl} style={{ borderTop: '1px solid var(--border)', width: SOCIAL_TABLE_W }}>
           <colgroup>
-            <col />
+            <col style={{ width: 340 }} />
             <col style={{ width: 110 }} />
             <col style={{ width: 140 }} />
           </colgroup>
@@ -306,12 +309,12 @@ export function TaxPaymentsView({ month, initialTab, fileId: initialFile }: Prop
             ) : null}
           </tbody>
         </table>
-        <table className={t.tbl} style={{ borderTop: '1px solid var(--border)', marginTop: 16 }}>
+        <table className={t.tbl} style={{ borderTop: '1px solid var(--border)', marginTop: 16, width: SOCIAL_TABLE_W }}>
           <colgroup>
             <col style={{ width: 90 }} />
             <col style={{ width: 110 }} />
-            <col />
-            <col style={{ width: 140 }} />
+            <col style={{ width: 130 }} />
+            <col style={{ width: 120 }} />
             <col style={{ width: 140 }} />
           </colgroup>
           <thead>
@@ -330,9 +333,8 @@ export function TaxPaymentsView({ month, initialTab, fileId: initialFile }: Prop
                   <tr key={r.id}>
                     <td className={t.tnum}>{r.noticeMonth}</td>
                     <td className={t.mut}>{codeName(ins, r.insTp)}</td>
-                    <td className={t.ell}>
+                    <td className={t.ell} title={r.name}>
                       {r.name}
-                      {r.memberLast4 ? <span className={t.mut}> · 끝 {r.memberLast4}</span> : null}
                     </td>
                     <td className={t.num}>{r.payBase === null ? '' : won(r.payBase)}</td>
                     <td className={t.num}>{won(r.noticeAmount)}</td>
@@ -433,7 +435,6 @@ export function TaxPaymentsView({ month, initialTab, fileId: initialFile }: Prop
       <TaxMonthBar month={month} note={todayNote(null)} />
       <div className={t.pageH}>
         <div>
-          <h1>세금 · 보험 납부 · 대출</h1>
           <p>자료 올리기에서 올린 국세 · 지방세 납부, 4대보험 고지, 대출 거래를 봅니다.</p>
         </div>
       </div>

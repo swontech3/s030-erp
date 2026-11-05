@@ -11,7 +11,7 @@
  *     ★ 카드번호는 끝 4자리만 보인다(서버가 그것만 준다).
  *   ★ 1-2 에서 그리지 않는 것: 회색 안내 띠 · 「이번 달 없음」 · 「삐용 경비」 줄 · 중복 의심 표 · 다음 단계 줄.
  *   ★ [보기](1-3, 2026-10-27) — 한 줄만 골랐고 계산서 · 카드 · 현금 파일일 때 눌린다. 항목 지정 「이번 달 자료 전체」 + 그 파일 줄만으로 간다
- *     (`/tax/classify?month=&view=all&file=`, 결과서 0-7). 국세 · 지방세 · 4대보험 · 대출 파일은 세금 · 보험 납부 · 대출의
+ *     (`/tax/classify?month=&view=all&file=`, 결과서 0-7). 국세 · 지방세 · 4대보험 · 대출 파일은 세금 · 4대보험 · 대출의
  *     그 탭으로(`/tax/payments?month=&file=`, 1-7). 은행은 받을 화면이 아직 없어 막는다(`viewHrefOf`).
  *     짝 맞추기가 없어 「짝이 풀립니다」 문장도 뺐다.
  *   ★ 1-5(2026-11-01): 「은행 입출금」 카드가 켜진다. 업로드 창에서 **계좌**(세무 설정 은행 계좌, 「사용 안 함」 제외)와
@@ -23,7 +23,7 @@
  *     **보험 종류**(국민연금 · 건강보험(장기요양 포함) · 고용보험 · 산재보험 — 코드 TAX_SOCIAL_INS)와 **고지 연월**(처음 값 = 작업할 달)을
  *     고르고, 파일은 .csv 도 받는다(통합징수포털 파일). 미리보기 — 국세 · 지방세: 납부일 · 세목 · 비용 여부 · 귀속 · 금액 /
  *     4대보험: 가입자(끝 4자리) · 보험 · 금액 + 보험 종류별 합계 / 대출: 거래일 · 구분 · 원금 · 이자 · 수수료 · 잔액.
- *     ★ 주민번호는 서버가 읽지도 주지도 않는다. [보기]는 세금 · 보험 납부 · 대출의 그 탭으로 간다(1-7).
+ *     ★ 주민번호는 서버가 읽지도 주지도 않는다. [보기]는 세금 · 4대보험 · 대출의 그 탭으로 간다(1-7).
  *
  * ★★ 이름 · 설명 · 선택지는 **API 가 준 코드 값으로만** 그린다(자료 종류 · 계산서 구분 · 뺀 줄 종류 · 사업자 유형).
  *    예외는 「삐용 경비」 카드 이름 하나다 — 자료 종류 코드가 아니다(1-2 는 「준비 중」으로만 그린다).
@@ -168,7 +168,6 @@ export function TaxUploadsView({ month }: { month: string }) {
       <TaxMonthBar month={month} note={todayNote(data.bizTypeName)} />
       <div className={t.pageH}>
         <div>
-          <h1>자료 올리기</h1>
           <p>
             {monthShort(month)} 자료를 엑셀로 올립니다. 은행은 계좌를 고르면 시스템 표준양식으로 바뀝니다. 날짜가 다른 달인 줄은
             그 달로 들어갑니다.
@@ -285,16 +284,16 @@ export function TaxUploadsView({ month }: { month: string }) {
               <col style={{ width: 170 }} />
               <col />
               <col style={{ width: 64 }} />
-              <col style={{ width: 100 }} />
+              <col style={{ width: 120 }} />
             </colgroup>
             <thead>
               <tr>
                 <th aria-label="선택" />
-                <th>자료</th>
+                <th>구분</th>
                 <th>기관 · 계좌</th>
                 <th>파일 이름</th>
-                <th className={t.num}>줄</th>
-                <th>올린 때</th>
+                <th className={t.num}>행수</th>
+                <th>올린 시각</th>
               </tr>
             </thead>
             <tbody>
@@ -319,10 +318,8 @@ export function TaxUploadsView({ month }: { month: string }) {
                           onClick={(e) => e.stopPropagation()}
                         />
                       </td>
-                      <td>
-                        {kindName(f.kind)}
-                        {f.bankFileTp === BANK_FILE_XFER ? ` · ${bankFileName(f.bankFileTp)}` : ''}
-                      </td>
+                      {/* 은행 파일은 파일 종류 코드 이름 하나만(「은행거래내역」 · 「은행이체내역」, 216) — 자료 종류와 이어 붙이지 않는다 */}
+                      <td>{f.bankFileTp ? bankFileName(f.bankFileTp) : kindName(f.kind)}</td>
                       <td className={`${t.mut} ${t.ell}`}>
                         {f.account ? accountLabel(f.account) : f.social ? socialLabel(f.social) : dirName(f.direction)}
                       </td>
@@ -330,7 +327,9 @@ export function TaxUploadsView({ month }: { month: string }) {
                         {f.fileName}
                       </td>
                       <td className={t.num}>{won(f.insertedCount)}</td>
-                      <td className={`${t.mut} ${t.tnum}`}>{shortStamp(f.uploadedAt)}</td>
+                      <td className={`${t.mut} ${t.tnum}`} style={{ whiteSpace: 'nowrap' }}>
+                        {shortStamp(f.uploadedAt)}
+                      </td>
                     </tr>
                   );
                 })

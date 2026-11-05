@@ -45,7 +45,7 @@ export const VIEWABLE_KINDS: readonly string[] = [KIND_INVOICE, 'CARD', KIND_CAS
 
 /**
  * [보기]가 갈 주소 — 계산서 · 카드 · 현금은 항목 지정 「이번 달 자료 전체」, 국세 · 지방세 · 4대보험 · 대출은
- * 세금 · 보험 납부 · 대출(1-7 — 탭은 서버가 파일 종류로 정한다). ★ 은행은 받을 화면(은행 짝 맞추기)이 없어 null(막는다).
+ * 세금 · 4대보험 · 대출(1-7 — 탭은 서버가 파일 종류로 정한다). ★ 은행은 받을 화면(은행 짝 맞추기)이 없어 null(막는다).
  */
 export function viewHrefOf(kind: string, month: string, fileId: string): string | null {
   const file = encodeURIComponent(fileId);
