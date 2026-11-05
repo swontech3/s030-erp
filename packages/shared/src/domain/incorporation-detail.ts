@@ -399,6 +399,14 @@ export interface IncorporationDetailResponse extends IncorporationDraftResponse 
   warnings: string[];
 }
 
+/**
+ * 상태 전이 응답 — 상세 + 완료(C)로 바뀔 때 회사유형 안내 한 줄(결정 2026-11-05).
+ * null = 안내 없음(채웠거나 · 이미 같거나 · 완료로 바뀐 것이 아니다).
+ */
+export interface IncorporationTransitionResponse extends IncorporationDetailResponse {
+  companyTypeNotice: string | null;
+}
+
 /** 머리의 회사 이름 — 합친 상호 → 단체코드 → 「단체 {ID}」. */
 export function incorporationDisplayName(composed: string, org: { orgId: number; orgCode: string | null }): string {
   if (composed !== '') return composed;

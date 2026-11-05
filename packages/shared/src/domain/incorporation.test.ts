@@ -4,6 +4,7 @@ import {
   INCORP_FOUNDER_MAX,
   INCORP_PURPOSE_MAX,
   checkIncorporationTransition,
+  companyTypeOnComplete,
   incorpPersonsCapital,
   closingTimeOf,
   incorpFieldDefsOf,
@@ -272,5 +273,15 @@ describe('incorpPersonsCapital — 사람별 합계', () => {
     expect(incorpPersonsCapital({ capitalAmount: null, parValue: 10_000 }, people)?.diff).toBeNull();
     expect(incorpPersonsCapital({ capitalAmount: 20_000_000, parValue: null }, people)).toBeNull();
     expect(incorpPersonsCapital({ capitalAmount: 0, parValue: 100 }, [])).toEqual({ units: 0, parValue: 100, total: 0, diff: 0 });
+  });
+});
+
+describe('설립 완료 → 회사유형(결정 2026-11-05)', () => {
+  it('비면 채움 · 같으면 그대로 · 다르면 바꾸지 않음', () => {
+    expect(companyTypeOnComplete(null, 'A')).toBe('fill');
+    expect(companyTypeOnComplete('  ', 'R')).toBe('fill');
+    expect(companyTypeOnComplete('A', 'A')).toBe('same');
+    expect(companyTypeOnComplete('R', 'A')).toBe('differ');
+    expect(companyTypeOnComplete('P', 'R')).toBe('differ');
   });
 });

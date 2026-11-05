@@ -8,7 +8,8 @@
  *   · 상태 전이 판정은 법인변경과 같은 표(`checkIncorporationTransition` → `checkLegalTransition`)
  *   · 주민번호 평문은 받아서 바로 암호화할 뿐이다 — 응답은 마스킹뿐
  *
- * ★★ ERP 회사표에 쓰지 않는다(결정 2026-10-11). 완료(E→C)도 상태만 바꾼다 — ERP 반영은 링크 안내.
+ * ★★ ERP 회사표에 쓰지 않는다(결정 2026-10-11) — 단 하나, 완료(C) 때 회사유형만 적는다(결정 2026-11-05,
+ *   `incorpCompanyType.ts`). 다른 칸은 그대로 링크 안내.
  * ★ 상호 표기위치는 코드표 `NAME_POSITION` 에 있는 값만(F · B). 비면 기본값 F 로 저장한다(결정 2026-10-11).
  * ★ 회사 형태(결정 2026-10-31)는 코드표 `MEMBER_TYPE`/001 에 켜져 있는 R · A 만 — 새 건을 만들 때만 받는다.
  *   형태가 이름표 · 검증 · 경고 · 상호 합치기를 가른다(shared `incorporation.ts`).
@@ -51,6 +52,7 @@ import {
   type IncorpPersonView,
   type IncorporationDetailResponse,
   type IncorporationDraftResponse,
+  type IncorporationTransitionResponse,
   type IncorporationListFilter,
   type IncorporationListItem,
   type IncorporationListResponse,
@@ -75,6 +77,7 @@ import {
   type IncorporationRow,
 } from '../db/incorporations.ts';
 import type { OpError, OpResult } from './corpChangeOps.ts';
+import { applyCompanyTypeOnComplete } from './incorpCompanyType.ts';
 
 const fail = (status: OpError['status'], error: string, message: string, errors?: OpError['errors']): OpError =>
   errors ? { ok: false, status, error, message, errors } : { ok: false, status, error, message };
@@ -311,13 +314,15 @@ export async function saveIncorporationInfo(
  * 상태 전이 `{ from, to, cancelReason? }` — 순서는 법인변경과 같다:
  * 본문(400) → 잠가서 읽기(404) → 화면이 본 상태와 대조(409) → 판정(400 검증 · 403 · 409) → 쓰기.
  * ★ P→E 검증은 **저장된 값**(설립 정보 + 사람)으로 돈다. 작성완료 스냅샷 · 시각을 같은 트랜잭션에서 쓴다.
+ * ★ 완료(C)로 바뀌면 같은 트랜잭션에서 회사 정보의 회사유형을 설립 형태로 적는다(결정 2026-11-05,
+ *   `incorpCompanyType.ts`). 적지 않은 까닭은 `companyTypeNotice` 한 줄로 돌려준다 — 완료는 그대로다.
  */
 export async function transitionIncorporation(
   client: ScopedClient,
   session: ErpSession,
   id: string,
   body: unknown,
-): Promise<OpResult<IncorporationDetailResponse>> {
+): Promise<OpResult<IncorporationTransitionResponse>> {
   const parsed = parseTransitionBody(body);
   if (!parsed.ok) return fail(400, 'invalid_request', parsed.message, parsed.errors);
   const { from, to, cancelReason } = parsed.value;
@@ -350,7 +355,9 @@ export async function transitionIncorporation(
     snapshot: completing ? buildIncorporationSnapshot(row.info, persons, row.entityType) : undefined,
   });
   if (!changed) return STALE;
-  return readIncorporationDetail(client, session, id);
+  const companyTypeNotice = to === 'C' ? await applyCompanyTypeOnComplete(client, session, row.orgId, row.entityType) : null;
+  const detail = await readIncorporationDetail(client, session, id);
+  return detail.ok ? { ok: true, value: { ...detail.value, companyTypeNotice } } : detail;
 }
 
 /** 삭제 `?from=` — 판정은 `checkDelete`(운영사 · P/X). 사람을 함께 지운다. */

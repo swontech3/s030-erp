@@ -58,6 +58,30 @@ export function isIncorpEntityType(v: unknown): v is IncorpEntityType {
   return typeof v === 'string' && (INCORP_ENTITY_TYPES as readonly string[]).includes(v);
 }
 
+/**
+ * 설립 완료 → 회사 정보의 회사유형(결정 2026-11-05). 회사유형 코드값은 설립 형태와 같다(R · A).
+ *   · fill   — 비어 있다 → 설립 형태로 채운다
+ *   · same   — 이미 같다 → 그대로
+ *   · differ — 다른 값이 있다 → 바꾸지 않는다(완료는 그대로, 화면에 안내 한 줄)
+ */
+export type CompanyTypeOnComplete = 'fill' | 'same' | 'differ';
+
+export function companyTypeOnComplete(current: string | null, entity: IncorpEntityType): CompanyTypeOnComplete {
+  const cur = (current ?? '').trim();
+  if (cur === '') return 'fill';
+  return cur === entity ? 'same' : 'differ';
+}
+
+/** 안내 — 다른 값이 이미 있어 바꾸지 않았다. 이름은 코드표 이름(없으면 코드값). */
+export function companyTypeDifferNotice(currentName: string, entityName: string): string {
+  return `회사 정보의 회사유형이 「${currentName}」(으)로 되어 있어 「${entityName}」(으)로 바꾸지 않았습니다 — 맞는지 확인하세요.`;
+}
+
+/** 안내 — 입주사 회사 정보는 운영자만 쓴다. 회사 사용자가 완료하면 적지 않는다(결정 2026-11-05). */
+export function companyTypeOperatorOnlyNotice(entityName: string): string {
+  return `회사유형(${entityName})은 적지 않았습니다 — 입주사 회사 정보는 운영자가 입주사 화면에서 맞춥니다.`;
+}
+
 /** 설립 구분 — 공통코드 `LAW_EST_TP` 의 「주식회사 발기설립」. 등기 설정(`tb_s080_doc_form_settings`)의 줄 키이기도 하다. */
 export const INCORP_METHOD = 'R_PROMOTER';
 /** 설립 구분 — 「유한회사 발기설립」(`LAW_EST_TP` U_P, 결정 2026-10-31). */

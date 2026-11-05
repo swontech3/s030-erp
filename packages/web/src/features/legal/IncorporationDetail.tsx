@@ -65,6 +65,7 @@ import {
   type IncorpPersonView,
   type IncorporationDetailResponse,
   type IncorporationDraftResponse,
+  type IncorporationTransitionResponse,
 } from '@swonbiz/shared/domain/incorporation-detail';
 import { appendPurposeLines } from '@swonbiz/shared/domain/biz-purpose';
 import { parseDay } from '@swonbiz/shared/domain/day';
@@ -367,6 +368,8 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null 
   const dirty = JSON.stringify(wire) !== savedWire;
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  /** 완료 때 회사유형을 적지 않은 까닭 한 줄(결정 2026-11-05) — 다음 전이까지 보인다. */
+  const [typeNotice, setTypeNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const setText = (name: Exclude<InfoName, 'hq'>, value: string) =>
@@ -584,12 +587,14 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null 
     if (!saved) return null;
     setBusy(true);
     setSaveError(null);
-    const res = await send<IncorporationDetailResponse>('POST', `${base}/transition`, { from: saved.status, to, cancelReason });
+    setTypeNotice(null);
+    const res = await send<IncorporationTransitionResponse>('POST', `${base}/transition`, { from: saved.status, to, cancelReason });
     setBusy(false);
     if (res.ok) {
       setConfirm(null);
       setFieldErrors({});
       applyDetail(res.body);
+      setTypeNotice(res.body.companyTypeNotice ?? null);
       notify(`「${res.body.statusName}」 상태로 바꿨습니다`);
       return null;
     }
@@ -821,6 +826,12 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null 
             <div className={`${styles.banner} ${styles.bannerError}`} role="alert">
               <Icon name="circle-alert" size={16} />
               <span>{saveError}</span>
+            </div>
+          ) : null}
+          {typeNotice ? (
+            <div className={`${styles.banner} ${styles.bannerWarning}`} role="status">
+              <Icon name="triangle-alert" size={16} />
+              <span>{typeNotice}</span>
             </div>
           ) : null}
           {saved?.status === 'X' ? (
