@@ -836,3 +836,16 @@
   padding-left: 8px;
   border-left: 1px solid var(--border);
 }
+
+/* 「출력 때 입력」(결정 2026-11-05) — 서버가 채우지 않는 자리표시의 입력칸 */
+.printManual {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.printManualFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}

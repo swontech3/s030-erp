@@ -11,6 +11,8 @@ import {
   formatKoreanDate,
   formatRrn,
   pickDocFormSetting,
+  printManualFields,
+  withManualValues,
   readSubmitSnapshot,
   type CasePrintSource,
   type DocFormSettingRow,
@@ -426,5 +428,28 @@ describe('parsePrintLogBody — 출력 이력 기록 본문', () => {
   it('★ 임원 이름 · 주민번호를 실어 와도 버린다(아는 칸만)', () => {
     const r = parsePrintLogBody({ formId: 'f', officerName: '가짜', officerRrn: '9001011234567' });
     expect(r.ok && Object.keys(r.value).sort()).toEqual(['applyDate', 'formId', 'sheet', 'writeDate']);
+  });
+});
+
+describe('출력 때 입력(결정 2026-11-05)', () => {
+  const server = { companyName: '가나다', ceoName: '최현수', resolutionDate: '' };
+
+  it('서버 값에 없는 자리표시만 · 나온 순서 · 중복 없이 · 이름표는 양식 사전(없으면 이름)', () => {
+    expect(
+      printManualFields(['companyName', 'memberCount', 'resolutionDate', 'directorName', 'memberCount'], server, [
+        { name: 'memberCount', label: ' 사원의 총수 ' },
+        { name: 'companyName', label: '상호' },
+      ]),
+    ).toEqual([
+      { name: 'memberCount', label: '사원의 총수' },
+      { name: 'directorName', label: 'directorName' },
+    ]);
+  });
+
+  it('손으로 넣은 값을 얹는다 — 서버 값(빈 값 포함)은 덮지 않고, 빈 입력은 얹지 않는다', () => {
+    expect(withManualValues(server, { memberCount: '2', ceoName: '바꿈', resolutionDate: 'x', directorName: '  ' })).toEqual({
+      ...server,
+      memberCount: '2',
+    });
   });
 });

@@ -532,6 +532,39 @@ export interface CorpChangePrintResponse<D = unknown> {
 }
 
 // =============================================================================
+// 출력 때 입력(결정 2026-11-05) — 서버가 채우지 않는 자리표시를 [서류 출력] 화면에서 손으로 넣는다
+// =============================================================================
+
+/**
+ * 이 서류의 「출력 때 입력」 칸 — 양식의 자리표시 중 **서버 값에 없는 것**(나온 순서, 중복 없이).
+ * 이름표는 양식의 이름표 사전(`manualFields`), 없으면 자리표시 이름 그대로.
+ * ★ 값은 화면에만 든다 — 서버로 보내지 않고 저장 · 출력 이력에 남기지 않는다.
+ */
+export function printManualFields(
+  tokens: readonly string[],
+  serverValues: Readonly<Record<string, string>>,
+  labels: readonly { name: string; label: string }[] = [],
+): { name: string; label: string }[] {
+  const byName = new Map(labels.map((l) => [l.name, l.label.trim()]));
+  return [...new Set(tokens)]
+    .filter((t) => !Object.prototype.hasOwnProperty.call(serverValues, t))
+    .map((name) => ({ name, label: byName.get(name) || name }));
+}
+
+/** 서버 값 위에 손으로 넣은 값을 얹는다 — 서버 값이 있는 이름은 덮지 않는다. 빈 값은 얹지 않는다(빈칸). */
+export function withManualValues(
+  serverValues: Readonly<Record<string, string>>,
+  manual: Readonly<Record<string, string>>,
+): Record<string, string> {
+  const out: Record<string, string> = { ...serverValues };
+  for (const [k, v] of Object.entries(manual)) {
+    if (Object.prototype.hasOwnProperty.call(serverValues, k)) continue;
+    if (v.trim() !== '') out[k] = v;
+  }
+  return out;
+}
+
+// =============================================================================
 // 출력 이력(040) — [인쇄] 를 누를 때 한 줄
 // =============================================================================
 
