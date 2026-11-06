@@ -7,6 +7,7 @@ import {
   buildCasePrintValues,
   buildOfficerPrintValues,
   changeSummary,
+  corpChangeDocName,
   formatAttachments,
   formatKoreanDate,
   formatRrn,
@@ -206,6 +207,17 @@ describe('buildCasePrintValues', () => {
     changeTypeName: '대표이사 주소변경(코드)',
     inputs: { applyDate: '2026-10-11', writeDate: null },
     ...over,
+  });
+
+  it('★ 상호 — 표기 없으면 회사유형 낱말을 위치대로(결정 2026-11-06) · 입주사 · 비입주사 같다', () => {
+    const v = (company: Partial<CorpChangeSubmitSnapshot['company']>, namePosition?: string | null) =>
+      buildCasePrintValues(src({ snapshot: snap({ company: { ...snap().company, ...company } }), namePosition })).companyName;
+    expect(v({ name: '주식회사 에이' })).toBe('주식회사 에이'); // 표기 있음 — 그대로
+    expect(v({ isTenant: false, name: '기본 권한 회사', memberType: 'A' }, 'F')).toBe('유한회사 기본 권한 회사');
+    expect(v({ isTenant: false, name: '기본 권한 회사', memberType: 'A' }, 'B')).toBe('기본 권한 회사 유한회사');
+    expect(v({ isTenant: true, name: '에이', memberType: 'R' })).toBe('주식회사 에이'); // 설립 건 없음 — 앞
+    expect(v({ isTenant: true, name: '에이', memberType: 'R' }, 'B')).toBe('에이 주식회사');
+    expect(v({ isTenant: false, name: '에이', memberType: null }, 'B')).toBe('에이'); // 회사유형 빔
   });
 
   it('★ 본점이전(HQ · HQ_OUT, 2026-11-01) — 새 본점(우편번호 없음) · 이전일, 다른 구분은 빈칸', () => {
@@ -451,5 +463,23 @@ describe('출력 때 입력(결정 2026-11-05)', () => {
       ...server,
       memberCount: '2',
     });
+  });
+});
+
+describe('corpChangeDocName — 법인변경 서류의 상호(결정 2026-11-06)', () => {
+  it.each([
+    ['표기 있음(앞) — 그대로', '주식회사 한빛', 'A', 'B', '주식회사 한빛'],
+    ['표기 있음(뒤) — 그대로', '한빛 유한회사', 'R', null, '한빛 유한회사'],
+    ['표기 있음((주)) — 그대로', '(주)한빛', 'R', null, '(주)한빛'],
+    ['표기 있음((유)) — 그대로', '한빛(유)', 'A', null, '한빛(유)'],
+    ['표기 없음 + 설립 건 F', '한빛', 'A', 'F', '유한회사 한빛'],
+    ['표기 없음 + 설립 건 B', '한빛', 'A', 'B', '한빛 유한회사'],
+    ['표기 없음 + 설립 건 없음 — 앞', '한빛', 'R', null, '주식회사 한빛'],
+    ['회사유형 빔 — 붙이지 않음', '한빛', null, 'F', '한빛'],
+    ['회사유형이 R · A 가 아님 — 붙이지 않음', '한빛', 'C', 'F', '한빛'],
+    ['회사명 빔', '  ', 'R', 'F', ''],
+    ['앞뒤 공백은 뗀다', ' 한빛 ', 'R', null, '주식회사 한빛'],
+  ] as const)('%s', (_c, name, memberType, position, expected) => {
+    expect(corpChangeDocName(name, memberType, position)).toBe(expected);
   });
 });

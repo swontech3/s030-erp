@@ -111,6 +111,15 @@ export function incorpBareName(orgName: string | null | undefined): string {
   return name === '' ? original : name;
 }
 
+/**
+ * 회사명 앞 또는 뒤에 회사 형태 표기(`incorpBareName` 과 같은 목록 — 주식회사 · 유한회사 · (주) · (유))가 있는가.
+ * 법인변경 서류의 상호가 쓴다(`corpChangeDocName`, 결정 2026-11-06).
+ */
+export function hasIncorpEntityMark(name: string | null | undefined): boolean {
+  const n = (name ?? '').trim();
+  return ENTITY_MARKS.some((m) => n.startsWith(m) || n.endsWith(m));
+}
+
 // =============================================================================
 // 단체 · 설립 정보 · 사람
 // =============================================================================

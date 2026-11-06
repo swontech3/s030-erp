@@ -250,6 +250,7 @@ describe('applyCompanyDefaults — 삐용 값으로 빈 칸만', () => {
     memberType: null,
     memberTypeName: null,
     hasLegalOrg: false,
+    namePosition: null,
     defaultedFields: [],
   };
   const org = { orgId: 9003, orgCode: 'Z99' };
@@ -313,6 +314,7 @@ describe('applyCompanyDefaults — 회사유형 추정', () => {
     memberType: null,
     memberTypeName: null,
     hasLegalOrg: false,
+    namePosition: null,
     defaultedFields: [],
   };
   const org = { orgId: 9003, orgCode: 'Z99' };

@@ -57,6 +57,7 @@ import {
 } from '../db/corpChanges.ts';
 import { listMarkedFormTemplates } from '../db/formTemplates.ts';
 import { listCorpChangeSettings } from '../db/docFormSettings.ts';
+import { completedIncorpNamePosition } from '../db/incorporations.ts';
 import type { OpResult } from './corpChangeOps.ts';
 
 const fail = (status: 400 | 404 | 409, error: string, message: string, field?: string): OpResult<never> =>
@@ -103,8 +104,11 @@ export async function readCorpChangePrint(
   const settings = await listCorpChangeSettings(client);
   const codes = await listCodes(client, [{ category: CORP_CHANGE_TYPE_CATEGORY, useTp: CORP_CHANGE_CODE_USE_TP }]);
   const forms = await markedForms(client);
+  // 상호 낱말 위치 — 그 단체의 완료된 법인설립 건(없으면 앞, 결정 2026-11-06)
+  const namePosition = await completedIncorpNamePosition(client, row.orgId);
   const src = {
     snapshot,
+    namePosition,
     setting: pickDocFormSetting(settings, snapshot.changeType, snapshot.company.memberType),
     changeTypeName: codes.find((c) => c.code === snapshot.changeType)?.name ?? null,
     inputs: inputs.value,

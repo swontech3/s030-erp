@@ -63,6 +63,7 @@ import type { CodeOption } from '@swonbiz/shared/domain/corp-change-list';
 import { encrypt } from '../lib/crypto.ts';
 import type { ScopedClient } from '../db/withCompanyScope.ts';
 import { listCodes } from '../db/lookups.ts';
+import { completedIncorpNamePosition } from '../db/incorporations.ts';
 import {
   deleteCorpChange,
   deleteOfficer,
@@ -147,6 +148,8 @@ async function companyView(
     ? ((company.isTenant ? tenantTypes : legalTypes).find((c) => c.code === company.memberType)?.name ??
       company.memberType)
     : null;
+  // 「서류에 쓰이는 상호」의 낱말 위치 — 출력과 같다(`corpChangeDocName`, 결정 2026-11-06)
+  const namePosition = await completedIncorpNamePosition(client, org.orgId);
 
   return {
     company: {
@@ -163,6 +166,7 @@ async function companyView(
       memberType: company.memberType,
       memberTypeName,
       hasLegalOrg: company.hasLegalOrg,
+      namePosition,
       // 삐용 기본값은 라우트가 트랜잭션 밖에서 채운다(`applyCompanyDefaults`).
       defaultedFields: [],
     },

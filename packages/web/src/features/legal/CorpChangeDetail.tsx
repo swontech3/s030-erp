@@ -66,6 +66,7 @@ import {
   type CorpChangeStatus,
   type OfficerChangeKind,
 } from '@swonbiz/shared/domain/corp-change';
+import { corpChangeDocName } from '@swonbiz/shared/domain/corp-change-print';
 import { STALE_STATUS_MESSAGE } from '@swonbiz/shared/domain/corp-change-transition';
 import {
   corpChangeDateLine,
@@ -1186,6 +1187,12 @@ function payloadColumns(fields: readonly CorpChangeFieldDef[]): number {
  * ★ 저장은 머리의 [저장] 하나다(결정 2026-10-10) — 이 부품은 입력만 하고, 값은 부모가 든다.
  * ★ 삐용 기본값으로 채운 칸(`defaultedFields`)은 고치기 전까지 「저장 전」 딱지를 붙인다.
  */
+/**
+ * 「서류에 쓰이는 상호」 — 회사명에 회사 형태 표기가 없으면 회사유형 낱말을 붙인 것(`corpChangeDocName`). 서류 출력과 같다.
+ * ★ 서류는 작성완료 때의 회사 정보로 나간다 — 작성완료 뒤에 고친 값은 다시 작성완료해야 서류에 든다.
+ */
+const DOC_NAME_LABEL = '서류에 쓰이는 상호';
+
 function CompanySection({
   company,
   form,
@@ -1228,6 +1235,8 @@ function CompanySection({
       ['대표자 자택 주소', addressLine(company.ceo) || null, true],
     ];
     const missing = rows.some(([, v]) => v === null || v === '');
+    // 서류에 쓰이는 상호 — 출력과 같은 함수(결정 2026-11-06). 회사명이 비면 위 「회사명」이 이미 빈칸을 알린다
+    rows.push([DOC_NAME_LABEL, corpChangeDocName(company.legalName, company.memberType, company.namePosition) || null, true]);
     return (
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
@@ -1269,6 +1278,8 @@ function CompanySection({
     const e = errorFor(key);
     return e ? <span className={styles.fieldError}>{e}</span> : null;
   };
+
+  const docName = corpChangeDocName(form.legalName, form.memberType, company.namePosition);
 
   const preTag = (key: CompanyDefaultField) => (defaulted(key) ? <span className={styles.preTag}>저장 전</span> : null);
 
@@ -1339,6 +1350,11 @@ function CompanySection({
           <span className={styles.label}>대표자 자택 주소</span>
           <AddressInput value={form.ceo} disabled={disabled} compact onChange={(ceo) => set({ ceo })} onError={onError} />
           {fieldError('ceo') ?? fieldError('ceoAddress') ?? fieldError('ceoZipCode') ?? fieldError('ceoAddressDetail')}
+        </div>
+        {/* 서류에 쓰이는 상호 — 읽기만. 입력 중인 상호 · 회사유형으로 출력과 같은 함수를 부른다(결정 2026-11-06) */}
+        <div className={`${styles.field} ${styles.span2}`}>
+          <span className={styles.label}>{DOC_NAME_LABEL}</span>
+          <span className={`${styles.readValue}${docName ? '' : ` ${styles.readEmpty}`}`}>{docName || '—'}</span>
         </div>
       </div>
     </section>

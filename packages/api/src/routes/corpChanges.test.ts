@@ -749,6 +749,18 @@ describe('비입주사 회사 정보의 기본값 — 삐용 값으로 빈 칸�
     expect(body.company).toMatchObject({ legalName: '등기 상호', ceoName: '김대표', defaultedFields: ['ceoName'] });
   });
 
+  it('★ 완료된 법인설립 건의 상호 위치를 함께 준다(「서류에 쓰이는 상호」, 결정 2026-11-06) — 없으면 null', async () => {
+    const withPos = fakeDb([LEGAL_ROW({ legal_name: '시험', member_type: 'A' }), { match: /company_type_position FROM public.tb_s080_incorporations/, rows: [{ company_type_position: 'B' }] }]);
+    const a = await build(session('operator', 1), withPos.deps);
+    expect((await a.inject({ method: 'GET', url: draftUrl })).json().company).toMatchObject({ legalName: '시험', memberType: 'A', namePosition: 'B' });
+    await a.close();
+    const none = fakeDb([LEGAL_ROW({ legal_name: '시험', member_type: 'A' })]);
+    const b = await build(session('operator', 1), none.deps);
+    expect((await b.inject({ method: 'GET', url: draftUrl })).json().company.namePosition).toBeNull();
+    await b.close();
+    app = null;
+  });
+
   it('조회 실패(null)면 칸을 비워 두고 회사명은 단체코드', async () => {
     const db = fakeDb([], null);
     const a = await build(session('operator', 1), db.deps);
@@ -1290,6 +1302,29 @@ describe('GET /legal/corp-changes/:id/print — 서류 출력', () => {
     app = null;
     return { res, db };
   }
+
+  describe('★ 상호 — 회사 형태 표기가 없으면 회사유형 낱말을 붙인다(결정 2026-11-06)', () => {
+    const INCORP_POS = (pos: string) => ({ match: /company_type_position FROM public.tb_s080_incorporations/, rows: [{ company_type_position: pos }] });
+    const snapOf = (company: Record<string, unknown>) => SNAP({ ...SNAPSHOT, company: { ...SNAPSHOT.company, ...company } });
+    it('비입주사 · 유한회사 · 완료된 설립 건이 뒤(B) → 「시험 유한회사」 · 단체 번호로 읽는다', async () => {
+      const { res, db } = await print([snapOf({ isTenant: false, name: '시험', memberType: 'A' }), FORMS([CASE_FORM]), SETTINGS, CODES, INCORP_POS('B')]);
+      expect(res.statusCode).toBe(200);
+      expect(res.json().documents[0].sheets[0].values.companyName).toBe('시험 유한회사');
+      const q = db.seen.find((x) => /company_type_position FROM public.tb_s080_incorporations/.test(x.sql));
+      expect(q?.sql).toMatch(/status = 'C'/);
+      expect(q?.params).toEqual([9003]);
+    });
+    it('입주사 · 주식회사 · 설립 건 없음 → 앞(F) 「주식회사 시험」', async () => {
+      const { res } = await print([snapOf({ isTenant: true, name: '시험', memberType: 'R' }), FORMS([CASE_FORM]), SETTINGS, CODES]);
+      expect(res.json().documents[0].sheets[0].values.companyName).toBe('주식회사 시험');
+    });
+    it('표기가 있으면 그대로 · 회사유형이 비면 붙이지 않는다', async () => {
+      const a1 = await print([snapOf({ name: '(주)시험', memberType: 'R' }), FORMS([CASE_FORM]), SETTINGS, CODES, INCORP_POS('B')]);
+      expect(a1.res.json().documents[0].sheets[0].values.companyName).toBe('(주)시험');
+      const a2 = await print([snapOf({ isTenant: false, name: '시험', memberType: null }), FORMS([CASE_FORM]), SETTINGS, CODES]);
+      expect(a2.res.json().documents[0].sheets[0].values.companyName).toBe('시험');
+    });
+  });
 
   it('★★ 200 — 건마다 1장 · 임원마다 그 구분 임원만 · 주민번호 전체 · no-store', async () => {
     const { res } = await print(

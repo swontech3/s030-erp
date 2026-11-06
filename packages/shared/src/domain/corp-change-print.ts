@@ -32,6 +32,8 @@ import { purposeLines, DEFAULT_RESIGN_REASON, OFFICER_CHANGE_KIND_LABEL, isOffic
 import type { CorpChangeSubmitSnapshot, SnapshotAddress, SnapshotOfficer } from './corp-change-transition.ts';
 import { isLegalFormCompanyType, markAppliesTo, officersForMark, type LegalFormMark } from './legal-form-mark.ts';
 import { parseDay } from './day.ts';
+import { composeIncorporationName, hasIncorpEntityMark } from './incorporation-detail.ts';
+import { isIncorpEntityType } from './incorporation.ts';
 
 // =============================================================================
 // 자리표시 목록 — 표양식 편집기와 대표님 안내표가 이 목록을 읽는다
@@ -295,6 +297,23 @@ export function formatKoreanDate(day: string | null | undefined): string {
 }
 
 /**
+ * 서류의 상호(결정 2026-11-06) — 법인변경 출력의 `companyName` 과 상세 기본정보의 「서류에 쓰이는 상호」가 이것 하나를 쓴다.
+ *   · 회사명에 회사 형태 표기(`hasIncorpEntityMark` — 주식회사 · 유한회사 · (주) · (유), 앞 또는 뒤)가 있으면 그대로
+ *   · 없으면 회사유형 낱말(R 주식회사 · A 유한회사)을 위치대로 붙인다 — `composeIncorporationName` 그대로
+ *   · 회사유형이 비거나 R · A 가 아니면 붙이지 않는다. 회사명이 비면 빈 글자
+ * @param position 그 단체의 완료된 법인설립 건의 위치(F · B). 없으면 null → 앞(F, `composeIncorporationName` 의 기본값)
+ */
+export function corpChangeDocName(
+  name: string | null | undefined,
+  memberType: string | null | undefined,
+  position: string | null | undefined,
+): string {
+  const n = (name ?? '').trim();
+  if (n === '' || hasIncorpEntityMark(n) || !isIncorpEntityType(memberType)) return n;
+  return composeIncorporationName(n, position, memberType);
+}
+
+/**
  * 주소 — 「기본주소, 상세주소」. 상세주소가 비면 쉼표 없이 「기본주소」. 우편번호는 넣지 않는다(레거시 자리표시와 같다).
  * ★ 법무 서류(법인변경 · 법인설립)에 찍히는 주소는 모두 이 함수를 거친다(결정 2026-11-06) —
  *   우편번호를 붙이는 쪽(`formatAddressWithZip` · `formatIncorpAddress`)도 이 값 앞에 붙이기만 한다.
@@ -378,6 +397,11 @@ export interface CasePrintSource {
   /** 변경 구분의 코드 이름(`LAW_CNG_TP`) — 등기의 목적 설정이 비었을 때 쓴다. */
   changeTypeName: string | null;
   inputs: PrintInputs;
+  /**
+   * 그 단체의 완료된 법인설립 건의 상호 위치(F · B) — 상호에 회사 형태 낱말을 붙일 자리(`corpChangeDocName`).
+   * 없으면 null(앞). 결정 2026-11-06.
+   */
+  namePosition?: string | null;
 }
 
 /** 임원 한 명 — 스냅샷의 임원 + **출력 순간에 복호화한** 주민번호. */
@@ -404,7 +428,8 @@ export function buildCasePrintValues(src: CasePrintSource): Record<string, strin
   const summary = changeSummary(snapshot);
 
   const values: Record<string, string> = {
-    companyName: c.name ?? '',
+    // 상호 — 회사 형태 표기가 없으면 회사유형 낱말을 붙인다(결정 2026-11-06)
+    companyName: corpChangeDocName(c.name, c.memberType, src.namePosition ?? null),
     corpNumber: c.corpNumber ?? '',
     bizNumber: c.bizNumber ?? '',
     hqAddress: formatAddress(c.head),

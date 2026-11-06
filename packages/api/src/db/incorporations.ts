@@ -300,6 +300,23 @@ export async function deleteIncorporation(client: ScopedClient, args: { id: stri
   return (rowCount ?? 0) > 0;
 }
 
+/**
+ * 그 단체의 **완료된**(C) 법인설립 건의 상호 위치(F · B) — 가장 늦게 완료된 건. 없으면 null.
+ * 법인변경 서류의 상호가 회사 형태 낱말을 붙일 자리로 쓴다(`corpChangeDocName`, 결정 2026-11-06).
+ * ★ 보이는 건은 RLS 가 가른다(머리말 ★★★) — 회사 세션은 자기 단체 건만 읽는다.
+ */
+export async function completedIncorpNamePosition(client: ScopedClient, orgId: number): Promise<string | null> {
+  const { rows } = await q<{ company_type_position: string | null }>(
+    client,
+    `SELECT company_type_position FROM public.tb_s080_incorporations
+      WHERE org_id = $1 AND status = 'C'
+      ORDER BY completed_at DESC NULLS LAST, updated_at DESC
+      LIMIT 1`,
+    [orgId],
+  );
+  return rows[0]?.company_type_position ?? null;
+}
+
 /** 작성완료 스냅샷(가공 전) — 서류 출력(10-5)이 읽는다. */
 export async function readIncorporationSnapshotRaw(client: ScopedClient, id: string): Promise<unknown> {
   const { rows } = await q<{ submit_snapshot: unknown }>(

@@ -500,6 +500,11 @@ export interface CorpChangeCompanyInfo {
   /** 비입주사 법무 회사 정보 줄이 있는가(없으면 첫 저장이 만든다). */
   hasLegalOrg: boolean;
   /**
+   * 그 단체의 완료된 법인설립 건의 상호 위치(F · B) — 없으면 null. 「서류에 쓰이는 상호」(`corpChangeDocName`)가
+   * 회사 형태 낱말을 붙일 자리다(결정 2026-11-06).
+   */
+  namePosition: string | null;
+  /**
    * 삐용 값으로 **채워 보여 준** 칸(`applyCompanyDefaults`) — 아직 저장되지 않았다. 입주사는 늘 빈 배열.
    * 화면은 이 칸에 「저장 전」 표시를 붙이고, [저장] 하면 회사 정보로 남긴다.
    */
