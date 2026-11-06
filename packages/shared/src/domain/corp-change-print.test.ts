@@ -182,7 +182,7 @@ describe('changeSummary — 레거시 문장 그대로(결정 I)', () => {
   });
   it('대표주소 — 이전연월일 줄', () => {
     expect(changeSummary(snap())).toBe(
-      '대표이사 홍길동의 주소를 「(04500) 서울 중구 새집로 3 101호」(으)로 변경한다.\n이전연월일 : 2026년 10월 1일',
+      '대표이사 홍길동의 주소를 「(04500) 서울 중구 새집로 3, 101호」(으)로 변경한다.\n이전연월일 : 2026년 10월 1일',
     );
   });
   it('목적 — 빈 줄을 빼고 번호', () => {
@@ -212,9 +212,9 @@ describe('buildCasePrintValues', () => {
     const payload = { newHqAddress: { zipCode: '06100', address: '경기 성남시 새로 9', addressDetail: '2층' }, resolutionDate: '2026-10-01', relocationDate: '2026-10-05' };
     for (const changeType of ['HQ', 'HQ_OUT']) {
       const v = buildCasePrintValues(src({ snapshot: snap({ changeType, payload, company: { ...snap().company, memberType: 'A' } }) }));
-      expect([v.newHqAddress, v.relocationDate]).toEqual(['경기 성남시 새로 9 2층', '2026년 10월 5일']);
-      expect(v.matterBody).toBe('본점을 「(06100) 경기 성남시 새로 9 2층」(으)로 이전한다.');
-      expect(v.hqAddress).toBe('서울 강남구 본점로 1 3층');
+      expect([v.newHqAddress, v.relocationDate]).toEqual(['경기 성남시 새로 9, 2층', '2026년 10월 5일']);
+      expect(v.matterBody).toBe('본점을 「(06100) 경기 성남시 새로 9, 2층」(으)로 이전한다.');
+      expect(v.hqAddress).toBe('서울 강남구 본점로 1, 3층');
     }
     const other = buildCasePrintValues(src());
     expect([other.newHqAddress, other.relocationDate]).toEqual(['', '']);
@@ -232,7 +232,7 @@ describe('buildCasePrintValues', () => {
       companyName: '주식회사 에이',
       corpNumber: '110111-1234567',
       bizNumber: '123-45-67890',
-      hqAddress: '서울 강남구 본점로 1 3층',
+      hqAddress: '서울 강남구 본점로 1, 3층',
       ceoName: '홍길동',
       ceoAddress: '서울 마포구 자택로 2',
       ceoPhone: '02-123-4567',
@@ -321,7 +321,7 @@ describe('buildOfficerPrintValues', () => {
       officerPosition: '사내이사',
       officerKind: '중임',
       officerRrn: '900101-1234567',
-      officerAddress: '서울 중구 임원로 1 2층',
+      officerAddress: '서울 중구 임원로 1, 2층',
       officerEffectiveDate: '2026년 10월 1일',
     });
   });

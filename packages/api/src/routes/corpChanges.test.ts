@@ -1314,7 +1314,7 @@ describe('GET /legal/corp-changes/:id/print — 서류 출력', () => {
     ]);
     expect(body.documents[0].sheets[0].values).toMatchObject({
       companyName: '주식회사 시험',
-      hqAddress: '서울 강남구 본점로 1 3층',
+      hqAddress: '서울 강남구 본점로 1, 3층',
       ceoPhone: '02-000-0000',
       formNo: '[양식 제72-2호]',
       regPurpose: '임원변경',

@@ -112,7 +112,7 @@ describe('buildIncorpCasePrintValues', () => {
 
   it('★ 상호는 합친 상호(위치를 따른다) · 시·도는 정식 이름 · 공고방법 기본값', () => {
     expect(v.companyName).toBe('한가람 주식회사');
-    expect(v.hqAddress).toBe('(06164) 서울 강남구 테헤란로 1 3층');
+    expect(v.hqAddress).toBe('(06164) 서울 강남구 테헤란로 1, 3층');
     expect(v.hqSido).toBe('서울특별시');
     expect(v.publicNoticeMethod).toBe('회사의 인터넷 홈페이지');
   });

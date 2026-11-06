@@ -33,6 +33,7 @@
 import { parseDay } from './day.ts';
 import { purposeLines } from './corp-change.ts';
 import {
+  formatAddress,
   formatAmount,
   formatKoreanDate,
   formatRrn,
@@ -183,9 +184,12 @@ export function koreanAmount(n: number | null): string {
   return `금 ${result}원정`;
 }
 
-/** 주소 — 「(우편번호) 기본주소 상세주소」. 레거시 설립 서류의 `formatAddress` 그대로(우편번호를 넣는다). */
+/**
+ * 주소 — 「(우편번호) 기본주소, 상세주소」. 레거시 설립 서류의 `formatAddress` 그대로(우편번호를 넣는다).
+ * 기본주소 · 상세주소는 법인변경과 같은 `formatAddress` 가 잇는다(쉼표 — 결정 2026-11-06).
+ */
 export function formatIncorpAddress(a: { zipCode?: string | null; address?: string | null; addressDetail?: string | null } | null | undefined): string {
-  const base = [a?.address, a?.addressDetail].filter(Boolean).join(' ').trim();
+  const base = formatAddress(a);
   return a?.zipCode ? `(${a.zipCode}) ${base}`.trim() : base;
 }
 

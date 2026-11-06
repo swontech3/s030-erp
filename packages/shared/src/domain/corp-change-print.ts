@@ -294,18 +294,22 @@ export function formatKoreanDate(day: string | null | undefined): string {
   return `${y}년 ${Number(m)}월 ${Number(dd)}일`;
 }
 
-/** 주소 — 「기본주소 상세주소」. 우편번호는 넣지 않는다(레거시 자리표시와 같다). */
+/**
+ * 주소 — 「기본주소, 상세주소」. 상세주소가 비면 쉼표 없이 「기본주소」. 우편번호는 넣지 않는다(레거시 자리표시와 같다).
+ * ★ 법무 서류(법인변경 · 법인설립)에 찍히는 주소는 모두 이 함수를 거친다(결정 2026-11-06) —
+ *   우편번호를 붙이는 쪽(`formatAddressWithZip` · `formatIncorpAddress`)도 이 값 앞에 붙이기만 한다.
+ */
 export function formatAddress(a: Partial<SnapshotAddress> | null | undefined): string {
-  return [a?.address, a?.addressDetail].map((s) => s?.trim()).filter(Boolean).join(' ');
+  return [a?.address, a?.addressDetail].map((s) => s?.trim()).filter(Boolean).join(', ');
 }
 
 /**
- * 주소 — 「(우편번호) 기본주소 상세주소」. **등기할 사항 문장에서만** 쓴다(레거시 `formatAddressParts`
- * 그대로, 결정 I).
+ * 주소 — 「(우편번호) 기본주소, 상세주소」. **등기할 사항 문장에서만** 쓴다(레거시 `formatAddressParts`
+ * 그대로, 결정 I — 쉼표는 결정 2026-11-06).
  */
 function formatAddressWithZip(a: unknown): string {
   const o = isObj(a) ? a : {};
-  const base = [str(o.address), str(o.addressDetail)].filter(Boolean).join(' ').trim();
+  const base = formatAddress({ address: str(o.address), addressDetail: str(o.addressDetail) });
   const zip = str(o.zipCode);
   return zip ? `(${zip}) ${base}`.trim() : base;
 }
