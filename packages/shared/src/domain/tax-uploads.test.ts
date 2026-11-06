@@ -14,6 +14,9 @@ import {
   thisMonthOf,
   withRo,
   workMonthOf,
+  taxYearOptions,
+  taxMonthOptions,
+  pickTaxMonth,
   parseVendorEdit,
   parseVendorIds,
   parseVendorMerge,
@@ -275,6 +278,21 @@ describe('작업할 달 — 주소 ?month= (처음 값 지난달 · 끝 이번 �
     expect(workMonthOf('2026-11', today)).toBe('2026-09');
     expect(workMonthOf('2026-10', today)).toBe('2026-10');
     expect(workMonthOf('2025-03', today)).toBe('2025-03');
+  });
+});
+
+describe('달 고르기 — 연도 · 월 선택 상자(11-06)', () => {
+  it('연도 — 올해 포함 최근 3년, 작업할 달이 더 앞이면 그 해부터', () => {
+    expect(taxYearOptions('2026-09', '2026-11')).toEqual(['2024', '2025', '2026']);
+    expect(taxYearOptions('2022-05', '2026-11')).toEqual(['2022', '2023', '2024', '2025', '2026']);
+  });
+  it('월 — 올해는 이번 달까지, 지난해는 1~12월', () => {
+    expect(taxMonthOptions('2026', '2026-03')).toEqual(['2026-01', '2026-02', '2026-03']);
+    expect(taxMonthOptions('2025', '2026-03')).toHaveLength(12);
+  });
+  it('연도를 바꾸면 같은 달 — 이번 달보다 뒤면 이번 달', () => {
+    expect(pickTaxMonth('2025', '09', '2026-03')).toBe('2025-09');
+    expect(pickTaxMonth('2026', '09', '2026-03')).toBe('2026-03');
   });
 });
 

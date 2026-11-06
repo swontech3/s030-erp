@@ -1,0 +1,50 @@
+/*
+ * 세무 결과 화면(월별 손익 · 부가세 조회, 1-8) 모양 — 시안 `doc/tax-service/prototypes/s05-tax/tax.css` 의
+ * .kpi · .chart · .bar-g · .leg · .calc · .term · .gloss · .b-sm 그대로. 나머지(카드 · 띠 · 배지)는 tax.module.css 를 쓴다.
+ */
+
+/* ── 숫자 카드 ── */
+.kpi { padding: 16px 20px; }
+.kpiK { font-size: 12px; color: var(--text-muted); }
+.kpiV { margin-top: 4px; font-size: 22px; font-weight: 700; color: var(--text-heading); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.kpiV small { font-size: 14px; font-weight: 400; color: var(--text-muted); }
+.kpiPrimary { color: var(--color-primary); }
+
+/* ── 막대 차트(높이 200, 12칸) ── */
+.chart { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; align-items: end; height: 200px; padding: 0 4px; }
+.barG {
+  height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px;
+  border: 0; background: transparent; padding: 0; cursor: pointer; font: inherit;
+}
+.bars { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
+.b1, .b2 { width: 14px; border-radius: 3px 3px 0 0; }
+.b1 { background: var(--color-primary); }
+.b2 { background: var(--border-strong); }
+.barM { font-size: 12px; color: var(--text-muted); }
+.barOn .barM { color: var(--color-primary); font-weight: 700; }
+.barOn .bars { background: var(--color-accent-bg); border-radius: 6px; }
+.barOff { cursor: default; }
+.barOff .bars { opacity: .35; }
+.leg { display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); }
+.leg span { display: inline-flex; align-items: center; gap: 6px; }
+.leg i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* ── 계산 줄 ── */
+.calc { display: flex; flex-direction: column; margin-top: 8px; }
+.ln {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0;
+  border-top: 1px solid var(--border); font-size: 14px; color: var(--text-heading);
+}
+.ln:first-child { border-top: 0; }
+.lnL { display: flex; flex-direction: column; }
+.lnL small { font-size: 12px; color: var(--text-muted); }
+.lnV { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 700; }
+.lnNone { font-weight: 400; color: var(--text-muted); }
+.minus .lnV::before { content: "− "; color: var(--text-muted); font-weight: 400; }
+.sum { border-top: 2px solid var(--text-heading); font-size: 16px; font-weight: 700; }
+.sum .lnV { font-size: 20px; color: var(--color-primary); }
+
+/* ── 용어 풀이 · 작은 배지 ── */
+.term { border-bottom: 1px dotted var(--text-caption); cursor: help; }
+.gloss { display: inline-block; margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.bSm { height: 20px; padding: 0 7px; font-size: 11px; }

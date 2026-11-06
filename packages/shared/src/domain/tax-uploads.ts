@@ -364,6 +364,24 @@ export function addMonths(month: string, n: number): string {
 /** 지난달 — 작업할 달의 처음 값(결과서 0-2). */
 export const previousMonthOf = (d: Date): string => addMonths(thisMonthOf(d), -1);
 
+/** 달 고르기 연도 선택지(11-06) — 올해 포함 최근 3년, 작업할 달이 더 앞이면 그 해부터. 앞 해부터. */
+export function taxYearOptions(month: string, thisMonth: string): string[] {
+  const to = Number(thisMonth.slice(0, 4));
+  const from = Math.min(Number(month.slice(0, 4)), to - 2);
+  return Array.from({ length: to - from + 1 }, (_, i) => String(from + i));
+}
+
+/** 달 고르기 월 선택지 — 그 해 1월부터, 올해는 이번 달까지. */
+export function taxMonthOptions(year: string, thisMonth: string): string[] {
+  return Array.from({ length: 12 }, (_, i) => `${year}-${pad(i + 1)}`).filter((m) => m <= thisMonth);
+}
+
+/** 연도 · 월을 고른 달 — 이번 달보다 뒤면 이번 달. `mm` 은 `09`. */
+export function pickTaxMonth(year: string, mm: string, thisMonth: string): string {
+  const m = `${year}-${mm}`;
+  return m <= thisMonth ? m : thisMonth;
+}
+
 /** 주소의 달 — 없거나 틀리거나 이번 달보다 뒤면 지난달. */
 export function workMonthOf(raw: unknown, today: Date): string {
   const m = parseMonth(raw);

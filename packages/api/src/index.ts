@@ -38,8 +38,10 @@ import { registerIncorporationRoutes } from './routes/incorporations.ts';
 import { registerDocFormSettingRoutes } from './routes/docFormSettings.ts';
 import { registerTaxClassifyRoutes } from './routes/taxClassify.ts';
 import { registerTaxPaymentsRoutes } from './routes/taxPayments.ts';
+import { registerTaxPlRoutes } from './routes/taxPl.ts';
 import { registerTaxSettingRoutes } from './routes/taxSettings.ts';
 import { registerSpreadsheetBodyParser, registerTaxUploadRoutes } from './routes/taxUploads.ts';
+import { registerTaxVatRoutes } from './routes/taxVat.ts';
 import { registerTaxVendorRoutes } from './routes/taxVendors.ts';
 import { closePool } from './db/pool.ts';
 import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
@@ -181,6 +183,8 @@ registerTaxUploadRoutes(app);
 registerTaxVendorRoutes(app);
 registerTaxClassifyRoutes(app);
 registerTaxPaymentsRoutes(app);
+registerTaxPlRoutes(app);
+registerTaxVatRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,

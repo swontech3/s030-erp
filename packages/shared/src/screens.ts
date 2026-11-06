@@ -208,6 +208,18 @@ export const SCREENS = {
    * 고치기 · 은행 짝 맞추기 · 4대보험 회사 · 직원 나눔은 뒤 단계.
    */
   s050300040: { route: '/tax/payments', name: '세금 · 4대보험 · 대출', group: '030' },
+
+  // --- 040 결과 보기 ---
+  /**
+   * 월별 손익(1-8, 2026-11-05) — 한 해 막대 + 작업할 달의 매출 · 비용(항목별) · 이익 + 올해 누적. 보기만. 계산은 shared `tax-pl.ts`.
+   * 4대보험 · 은행 · 직원 급여는 아직 빠진다 — 직원 급여 · 은행 짝 맞추기 단계에서 넣는다.
+   */
+  s050400010: { route: '/tax/monthly-pl', name: '월별 손익', group: '040' },
+  /**
+   * 부가세 조회(1-8, 2026-11-05) — 신고 기간(법인 분기 · 개인 반기)별 낼 세금 예상 · 공제가 안 될 수 있는 매입 + 매출 · 매입 명세 엑셀.
+   * 보기만. 계산은 shared `tax-vat.ts`.
+   */
+  s050400020: { route: '/tax/vat', name: '부가세 조회', group: '040' },
 } as const satisfies Record<string, ScreenMeta>;
 
 export type ScreenId = keyof typeof SCREENS;

@@ -36,7 +36,9 @@
     "verify:tax-settings": "tsx scripts/verify-tax-settings.js",
     "verify:tax-uploads": "tsx scripts/verify-tax-uploads.js",
     "verify:tax-classify": "tsx scripts/verify-tax-classify.js",
-    "verify:tax-payments": "tsx scripts/verify-tax-payments.js"
+    "verify:tax-payments": "tsx scripts/verify-tax-payments.js",
+    "verify:tax-pl": "tsx scripts/verify-tax-pl.js",
+    "verify:tax-vat": "tsx scripts/verify-tax-vat.js"
   },
   "devDependencies": {
     "tsx": "^4.23.13",
