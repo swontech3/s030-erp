@@ -4,6 +4,7 @@ import {
   CORP_CHANGE_TYPES,
   CHANGE_TYPE_DEFS,
   HQ_OUT_TAX_HINT,
+  hqOutTaxHint,
   INITIAL_CORP_CHANGE_STATUS,
   REGISTRATION_DEADLINE_DAYS,
   availableTransitions,
@@ -84,10 +85,23 @@ describe('코드 어휘', () => {
 
 // =============================================================================
 describe('★ 타관할로의 본점이전(HQ_OUT) · 회사 형태(결정 2026-11-01)', () => {
-  it('칸은 동일관할(HQ)과 같고, 새 본점 칸에 세금 안내', () => {
-    expect(CHANGE_TYPE_DEFS.HQ_OUT.fields.map(({ hint: _h, ...f }) => f)).toEqual(CHANGE_TYPE_DEFS.HQ.fields.map(({ hint: _h, ...f }) => f));
-    expect(CHANGE_TYPE_DEFS.HQ_OUT.fields[0]!.hint).toBe(HQ_OUT_TAX_HINT);
-    expect(CHANGE_TYPE_DEFS.HQ.fields.some((f) => f.hint)).toBe(false);
+  it('칸은 동일관할(HQ)과 같다 — 세금 안내는 칸 정의에 두지 않는다(조건부, hqOutTaxHint)', () => {
+    expect(CHANGE_TYPE_DEFS.HQ_OUT.fields).toEqual(CHANGE_TYPE_DEFS.HQ.fields);
+    expect(CHANGE_TYPE_DEFS.HQ_OUT.fields.some((f) => f.hint)).toBe(false);
+  });
+  it.each([
+    ['서울→서울', '서울 강남구 테헤란로 1', '서울특별시 중구 세종대로 110', null],
+    ['지방→서울', '경기 성남시 분당구 1', '서울 강남구 테헤란로 1', HQ_OUT_TAX_HINT],
+    ['서울→지방', '서울 강남구 테헤란로 1', '부산 해운대구 1', null],
+    ['지방→지방', '경기 성남시 분당구 1', '부산 해운대구 1', null],
+    ['지금 본점 빔', '', '서울 강남구 테헤란로 1', null],
+    ['지금 본점 null', null, '서울 강남구 테헤란로 1', null],
+    ['새 본점 빔', '경기 성남시 분당구 1', '', null],
+  ] as const)('세금 안내 %s', (_c, current, next, expected) => {
+    expect(hqOutTaxHint(current, next)).toBe(expected);
+  });
+  it('세금 안내 문구', () => {
+    expect(HQ_OUT_TAX_HINT).toBe('대도시 신설 전입으로 중과세금 확인을 하세요.');
   });
   it.each([
     ['A', 'HQ_OUT', true],

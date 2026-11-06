@@ -39,6 +39,7 @@
  */
 import type { ScopeRole } from '../session.ts';
 import { parseDay } from './day.ts';
+import { metroSurchargeOf } from './incorporation-tax.ts';
 
 // =============================================================================
 // 코드 어휘
@@ -91,8 +92,22 @@ export function changeTypeMemberTypeError(changeType: string, memberType: string
     : '유한회사 건은 동일관할 본점이전을 고를 수 없습니다 — 타관할로의 본점이전으로 새 건을 만드세요';
 }
 
-/** 타관할 본점이전 세금 안내(결정 2026-11-01 3) — 세금은 등기 설정의 고정액이다. */
-export const HQ_OUT_TAX_HINT = '대도시 밖에서 대도시로 전입하면 세금이 달라집니다 — 법무사 확인';
+/** 타관할 본점이전 세금 안내 — 대도시 밖 → 대도시로 옮길 때만 새 본점 칸 아래에 보인다(`hqOutTaxHint`). */
+export const HQ_OUT_TAX_HINT = '대도시 신설 전입으로 중과세금 확인을 하세요.';
+
+/**
+ * 타관할 본점이전 세금 안내(결정 2026-11-06) — 지금 본점(회사 정보)이 대도시 밖이고 새 본점이 대도시면
+ * `HQ_OUT_TAX_HINT`, 그 밖에는 null. 대도시 판단은 법인설립과 같은 `metroSurchargeOf`(본점이 서울이면
+ * 중과)다 — 기준을 한 곳에 둔다. 지금 본점 주소가 비면 판단할 수 없으므로 null.
+ */
+export function hqOutTaxHint(
+  currentHqAddress: string | null | undefined,
+  newHqAddress: string | null | undefined,
+): string | null {
+  if (!(currentHqAddress ?? '').trim()) return null;
+  if (metroSurchargeOf(null, currentHqAddress)) return null;
+  return metroSurchargeOf(null, newHqAddress) ? HQ_OUT_TAX_HINT : null;
+}
 
 /**
  * 진행 상태 4종 — 서류작성중(P) → 작성완료(E) → 완료(C), 그리고 취소(X).
@@ -208,7 +223,8 @@ export const CHANGE_TYPE_DEFS: Readonly<Record<CorpChangeType, CorpChangeTypeDef
     officerEffectiveDateRequired: false,
     requiresCeoHome: false,
     fields: [
-      { name: 'newHqAddress', label: '신규 본점주소', type: 'address', required: true, hint: HQ_OUT_TAX_HINT },
+      // 세금 안내는 조건부라 칸 정의에 두지 않는다 — 화면이 `hqOutTaxHint` 로 붙인다(결정 2026-11-06)
+      { name: 'newHqAddress', label: '신규 본점주소', type: 'address', required: true },
       { name: 'resolutionDate', label: '결의일', type: 'date', required: true },
       { name: 'relocationDate', label: '이전일', type: 'date', required: true },
     ],

@@ -57,6 +57,7 @@ import {
   OFFICER_CHANGE_KIND_LABEL,
   REGISTRATION_DEADLINE_DAYS,
   canPrintCorpChange,
+  hqOutTaxHint,
   isRrnShape,
   purposeLines,
   registrationDeadline,
@@ -314,6 +315,17 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
   const initialForm = useMemo(() => toForm(def.fields, savedPayload), [def.fields, savedPayload]);
 
   const [form, setForm] = useState<FormPayload>(initialForm);
+  /**
+   * 타관할 본점이전 세금 안내(결정 2026-11-06) — 지금 본점(회사 정보: 입주사 = ERP 값, 비입주사 = 입력 중인 값)이
+   * 대도시 밖이고 새 본점이 대도시일 때만. 그 밖에는 문구 없음(`hqOutTaxHint`).
+   */
+  const hqOutNote =
+    draft.changeType === 'HQ_OUT'
+      ? hqOutTaxHint(
+          company.isTenant ? company.head.address : companyInput.head.address,
+          (form.newHqAddress as Address | undefined)?.address,
+        ) ?? undefined
+      : undefined;
   const [savedWire, setSavedWire] = useState<string>(() => JSON.stringify(toWire(def.fields, toForm(def.fields, savedPayload))));
   /** 저장 안 한 입력 — 변경 내용 또는 회사 정보를 사람이 고쳤다. [저장] · 상태 버튼 막기가 이것을 본다. */
   const dirty = JSON.stringify(toWire(def.fields, form)) !== savedWire || companyDirty;
@@ -807,6 +819,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
                   value={form[f.name] ?? (f.type === 'address' ? EMPTY_ADDRESS : '')}
                   disabled={!editable || busy}
                   error={errorFor(f.name)}
+                  note={f.name === 'newHqAddress' && draft.changeType === 'HQ_OUT' ? hqOutNote : undefined}
                   onChange={(v) => setForm((prev) => ({ ...prev, [f.name]: v }))}
                   onError={notify}
                   onNotice={notify}
