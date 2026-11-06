@@ -206,7 +206,7 @@ export function IncorporationPrintDialog({ id, onClose }: { id: string; onClose:
       </div>
 
       {/* 종이에 나갈 문서 — 고른 장 하나. 대화상자를 닫으면 함께 내려간다. */}
-      {doc && sheet ? <FormPrintPortal definition={doc.definition} values={sheet.values} /> : null}
+      {doc && sheet ? <FormPrintPortal definition={doc.definition} values={sheet.values} inlineBlanks /> : null}
     </div>
   );
 }

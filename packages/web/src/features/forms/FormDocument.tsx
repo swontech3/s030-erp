@@ -9,11 +9,19 @@
  * ★★ 두 벌로 그리지 않는다 — 미리보기와 종이가 다르면 미리보기가 거짓말을 한다.
  *    다른 것은 하나뿐이다: `showEmpty` 가 켜져 있으면 **아직 채우지 않은 자리표시**를
  *    이름표로 흐리게 보인다(화면). 꺼져 있으면 빈칸이다(종이).
+ *    법무 서류 종이(`inlineBlanks`)는 글과 함께 있는 빈 자리표시를 일정 너비 빈칸으로 찍는다.
  *
  * ★ 인쇄는 `FormPrintPortal` 이 이 컴포넌트를 body 로 포털해서 한다(계약서와 같은 방식).
  */
 import type { Ref } from 'react';
-import { DEFAULT_MARGIN_TOP, fitRowsOf, splitTokens, type FormDefinition, type Page } from '@swonbiz/shared/domain/form-template';
+import {
+  DEFAULT_MARGIN_TOP,
+  fitRowsOf,
+  inlineBlankWidths,
+  splitTokens,
+  type FormDefinition,
+  type Page,
+} from '@swonbiz/shared/domain/form-template';
 import { cellAt, coveredPositions } from '@swonbiz/shared/domain/form-grid';
 import styles from './form-doc.module.css';
 
@@ -27,6 +35,11 @@ interface Props {
   showEmpty: boolean;
   /** 미리보기에서도 비어 있으면 이름표 없이 빈칸으로 둘 자리표시 이름. */
   blankWhenEmpty?: readonly string[];
+  /**
+   * ★ 법무 서류 종이면 true — 글과 함께 있는 빈 자리표시를 일정 너비 빈칸으로 찍는다(`inlineBlankWidths`,
+   *   결정 2026-11-06). 미리보기(`showEmpty`)에는 쓰지 않는다. 일반 서류(표양식 관리)는 켜지 않는다.
+   */
+  inlineBlanks?: boolean;
   rootRef?: Ref<HTMLDivElement>;
 }
 
@@ -48,19 +61,30 @@ function CellText({
   labels,
   showEmpty,
   blankWhenEmpty,
+  inlineBlanks,
+  fit,
 }: {
   text: string;
   values: Readonly<Record<string, string>>;
   labels: Readonly<Record<string, string>>;
   showEmpty: boolean;
   blankWhenEmpty: readonly string[];
+  inlineBlanks: boolean;
+  /** 칸 폭(cm) · 글자 크기(pt) — 빈칸을 칸에 맞춰 줄인다(`inlineBlankWidths`). */
+  fit: { widthCm: number; fontPt: number };
 }) {
+  const pieces = splitTokens(text);
+  const widths = inlineBlanks && !showEmpty ? inlineBlankWidths(pieces, fit) : null;
   return (
     <>
-      {splitTokens(text).map((p, i) => {
+      {pieces.map((p, i) => {
         if (p.kind === 'text') return p.text;
         const v = values[p.name] ?? '';
         if (v !== '') return <span key={i}>{v}</span>;
+        // ★ 법무 서류 종이 — 글과 함께 있는 빈 자리표시는 일정 너비 빈칸(손으로 적을 자리, 결정 2026-11-06).
+        //   글자는 넣지 않는다.
+        const w = widths?.[i];
+        if (w) return <span key={i} className={styles.blank} style={{ width: `${w}em` }} />;
         // ★ 종이에는 아무것도 내보내지 않는다 — 지어낸 글자를 넣지 않는다.
         if (!showEmpty || blankWhenEmpty.includes(p.name)) return null;
         return (
@@ -80,6 +104,7 @@ function PageTable({
   labels,
   showEmpty,
   blankWhenEmpty,
+  inlineBlanks,
 }: {
   page: Page;
   fontSize: number;
@@ -87,6 +112,7 @@ function PageTable({
   labels: Readonly<Record<string, string>>;
   showEmpty: boolean;
   blankWhenEmpty: readonly string[];
+  inlineBlanks: boolean;
 }) {
   const covered = coveredPositions(page);
   // ★ 「내용에 맞춤」 행은 높이를 못 박지 않는다 — 표의 행은 내용만큼 자란다(결정 2026-11-05).
@@ -125,7 +151,18 @@ function PageTable({
                   }}
                 >
                   {cell?.text ? (
-                    <CellText text={cell.text} values={values} labels={labels} showEmpty={showEmpty} blankWhenEmpty={blankWhenEmpty} />
+                    <CellText
+                      text={cell.text}
+                      values={values}
+                      labels={labels}
+                      showEmpty={showEmpty}
+                      blankWhenEmpty={blankWhenEmpty}
+                      inlineBlanks={inlineBlanks}
+                      fit={{
+                        widthCm: page.colWidths.slice(c, c + (cell.colSpan ?? 1)).reduce((a, b) => a + b, 0),
+                        fontPt: cell.fontSize ?? fontSize,
+                      }}
+                    />
                   ) : null}
                 </td>
               );
@@ -137,7 +174,7 @@ function PageTable({
   );
 }
 
-export function FormDocument({ definition, values, labels = {}, showEmpty, blankWhenEmpty = NONE, rootRef }: Props) {
+export function FormDocument({ definition, values, labels = {}, showEmpty, blankWhenEmpty = NONE, inlineBlanks = false, rootRef }: Props) {
   return (
     <div ref={rootRef} className={styles.root} style={{ fontFamily: definition.font.family }}>
       {definition.pages.map((page, i) => (
@@ -149,6 +186,7 @@ export function FormDocument({ definition, values, labels = {}, showEmpty, blank
             labels={labels}
             showEmpty={showEmpty}
             blankWhenEmpty={blankWhenEmpty}
+            inlineBlanks={inlineBlanks}
           />
         </section>
       ))}

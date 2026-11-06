@@ -236,7 +236,7 @@ export function CorpChangePrintDialog({ id, onClose }: { id: string; onClose: ()
       </div>
 
       {/* 종이에 나갈 문서 — 고른 장 하나. 대화상자를 닫으면 함께 내려간다. */}
-      {doc && sheet ? <FormPrintPortal definition={doc.definition} values={values} /> : null}
+      {doc && sheet ? <FormPrintPortal definition={doc.definition} values={values} inlineBlanks /> : null}
     </div>
   );
 }
