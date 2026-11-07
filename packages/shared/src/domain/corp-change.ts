@@ -40,6 +40,7 @@
 import type { ScopeRole } from '../session.ts';
 import { parseDay } from './day.ts';
 import { metroSurchargeOf } from './incorporation-tax.ts';
+import { sidoOf } from './korea-sido.ts';
 
 // =============================================================================
 // 코드 어휘
@@ -110,6 +111,28 @@ export function hqOutTaxHint(
   if (!(currentHqAddress ?? '').trim()) return null;
   if (metroSurchargeOf(null, currentHqAddress)) return null;
   return metroSurchargeOf(null, newHqAddress) ? HQ_OUT_TAX_HINT : null;
+}
+
+/** 정관 변경 건 안내 — [서류 출력] 화면 위쪽 한 줄(`articlesChangeNotice`, 결정 2026-11-07). 종이에는 나가지 않는다. */
+export const ARTICLES_CHANGE_NOTICE = '정관 변경 건입니다 — 변경된 정관은 따로 준비하세요';
+
+/**
+ * 정관 변경 건 안내(결정 2026-11-07) — 상호(NAME) · 목적(PURPOSE)은 늘, 본점이전(HQ · HQ_OUT)은 지금 본점과
+ * 새 본점의 시·도가 다를 때만 `ARTICLES_CHANGE_NOTICE`, 그 밖(임원 · 대표자 주소 · 시·도가 같은 본점이전)은 null.
+ * 시·도는 세금 안내와 같은 `sidoOf`(정관 제3조 「본점은 ○○에 둔다」가 시·도 단위다).
+ * 두 주소 중 하나라도 비면 비교할 수 없으므로 null.
+ */
+export function articlesChangeNotice(
+  changeType: string,
+  currentHqAddress: string | null | undefined,
+  newHqAddress: string | null | undefined,
+): string | null {
+  if (changeType === 'NAME' || changeType === 'PURPOSE') return ARTICLES_CHANGE_NOTICE;
+  if (changeType !== 'HQ' && changeType !== 'HQ_OUT') return null;
+  const from = sidoOf(currentHqAddress);
+  const to = sidoOf(newHqAddress);
+  if (!from || !to) return null;
+  return from !== to ? ARTICLES_CHANGE_NOTICE : null;
 }
 
 /**

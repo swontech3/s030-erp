@@ -56,6 +56,7 @@ import {
   OFFICER_CHANGE_KINDS,
   OFFICER_CHANGE_KIND_LABEL,
   REGISTRATION_DEADLINE_DAYS,
+  articlesChangeNotice,
   canPrintCorpChange,
   hqOutTaxHint,
   isRrnShape,
@@ -327,6 +328,15 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
           (form.newHqAddress as Address | undefined)?.address,
         ) ?? undefined
       : undefined;
+  /**
+   * 정관 변경 건 안내(결정 2026-11-07) — [서류 출력] 위쪽 한 줄. 지금 본점 · 새 본점은 세금 안내와 같은 값이다
+   * (`articlesChangeNotice` — 상호 · 목적은 늘, 본점이전은 시·도가 다를 때만).
+   */
+  const articlesNotice = articlesChangeNotice(
+    draft.changeType,
+    company.isTenant ? company.head.address : companyInput.head.address,
+    (form.newHqAddress as Address | undefined)?.address,
+  );
   const [savedWire, setSavedWire] = useState<string>(() => JSON.stringify(toWire(def.fields, toForm(def.fields, savedPayload))));
   /** 저장 안 한 입력 — 변경 내용 또는 회사 정보를 사람이 고쳤다. [저장] · 상태 버튼 막기가 이것을 본다. */
   const dirty = JSON.stringify(toWire(def.fields, form)) !== savedWire || companyDirty;
@@ -858,6 +868,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
 
       {printing && saved ? <CorpChangePrintDialog
           id={saved.id}
+          articlesNotice={articlesNotice}
           onClose={() => {
             setPrinting(false);
             setPrintLogKey((k) => k + 1);

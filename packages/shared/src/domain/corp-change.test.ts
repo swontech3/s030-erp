@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ARTICLES_CHANGE_NOTICE,
+  articlesChangeNotice,
   CORP_CHANGE_STATUSES,
   CORP_CHANGE_TYPES,
   CHANGE_TYPE_DEFS,
@@ -518,5 +520,29 @@ describe('신청기한 — 모든 구분, 기준일 + 14일', () => {
     expect(at('2026-10-01', 'today')).toBeNull();
     expect(registrationDeadline('CEO_ADDR', null, '2026-10-10')).toBeNull();
     expect(registrationDeadline('CEO_CHG', { resolutionDate: '2026-10-01' }, '2026-10-10')).toBeNull();
+  });
+});
+
+describe('정관 변경 건 안내(결정 2026-11-07)', () => {
+  const SEOUL = '서울 강남구 테헤란로 1';
+  const SEOUL_FULL = '서울특별시 마포구 월드컵북로 2';
+  const GYEONGGI = '경기 성남시 분당구 1';
+  const N = ARTICLES_CHANGE_NOTICE;
+  it.each([
+    ['상호 — 늘', 'NAME', SEOUL, null, N],
+    ['목적 — 늘', 'PURPOSE', SEOUL, null, N],
+    ['동일관할 본점이전 · 시·도 다름', 'HQ', GYEONGGI, SEOUL, N],
+    ['동일관할 본점이전 · 시·도 같음(줄임 · 정식 이름)', 'HQ', SEOUL, SEOUL_FULL, null],
+    ['타관할 본점이전 · 시·도 다름', 'HQ_OUT', SEOUL, GYEONGGI, N],
+    ['타관할 본점이전 · 시·도 같음', 'HQ_OUT', SEOUL_FULL, SEOUL, null],
+    ['본점이전 · 지금 본점 빔', 'HQ_OUT', '', SEOUL, null],
+    ['본점이전 · 새 본점 빔', 'HQ', SEOUL, null, null],
+    ['임원', 'OFFICER', GYEONGGI, SEOUL, null],
+    ['대표자 주소', 'CEO_ADDR', GYEONGGI, SEOUL, null],
+  ] as const)('%s', (_c, type, current, next, expected) => {
+    expect(articlesChangeNotice(type, current, next)).toBe(expected);
+  });
+  it('문구', () => {
+    expect(ARTICLES_CHANGE_NOTICE).toBe('정관 변경 건입니다 — 변경된 정관은 따로 준비하세요');
   });
 });

@@ -66,7 +66,16 @@ interface Pick {
   sheet: number;
 }
 
-export function CorpChangePrintDialog({ id, onClose }: { id: string; onClose: () => void }) {
+export function CorpChangePrintDialog({
+  id,
+  articlesNotice,
+  onClose,
+}: {
+  id: string;
+  /** 정관 변경 건 안내(`articlesChangeNotice`, 결정 2026-11-07) — 있으면 위쪽에 한 줄. 종이에는 나가지 않는다. */
+  articlesNotice?: string | null;
+  onClose: () => void;
+}) {
   const [applyDate, setApplyDate] = useState(localToday);
   const [writeDate, setWriteDate] = useState(localToday);
   const [data, setData] = useState<PrintData | null>(null);
@@ -162,6 +171,12 @@ export function CorpChangePrintDialog({ id, onClose }: { id: string; onClose: ()
         </div>
 
         {/* ★ 화면 안내 — 대화상자에만 있다. 종이(포털)에는 나가지 않는다. */}
+        {articlesNotice ? (
+          <div className={`${styles.banner} ${styles.bannerInfo}`} role="note">
+            <Icon name="info" size={16} />
+            <span>{articlesNotice}</span>
+          </div>
+        ) : null}
         <div className={`${styles.banner} ${styles.bannerInfo}`} role="note">
           <Icon name="info" size={16} />
           <span>{PRINT_NOTICE}</span>
