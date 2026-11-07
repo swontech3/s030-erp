@@ -53,7 +53,19 @@ interface Pick {
   sheet: number;
 }
 
-export function IncorporationPrintDialog({ id, onClose }: { id: string; onClose: () => void }) {
+/**
+ * `initialDocName` — 처음 서류 목록이 왔을 때 이 이름의 서류를 골라 둔다(「설립 건 정관 보기」, 결정 2026-11-07).
+ * 없으면(또는 그 이름이 목록에 없으면) 지금처럼 첫 장.
+ */
+export function IncorporationPrintDialog({
+  id,
+  initialDocName = null,
+  onClose,
+}: {
+  id: string;
+  initialDocName?: string | null;
+  onClose: () => void;
+}) {
   const [applyDate, setApplyDate] = useState(localToday);
   const [writeDate, setWriteDate] = useState(localToday);
   const [data, setData] = useState<PrintData | null>(null);
@@ -61,6 +73,8 @@ export function IncorporationPrintDialog({ id, onClose }: { id: string; onClose:
   const [loading, setLoading] = useState(true);
   const [pick, setPick] = useState<Pick>({ doc: 0, sheet: 0 });
   const seq = useRef(0);
+  /** 처음 고를 서류 이름 — 첫 목록에서 한 번만 쓴다. */
+  const wanted = useRef(initialDocName);
 
   /* 열 때 · 날짜를 바꿀 때 — 늦게 온 옛 응답은 버린다. */
   useEffect(() => {
@@ -94,7 +108,16 @@ export function IncorporationPrintDialog({ id, onClose }: { id: string; onClose:
   const doc = docs[pick.doc];
   const sheet = doc?.sheets[pick.sheet];
   useEffect(() => {
-    if (docs.length > 0 && !sheet) {
+    if (docs.length === 0) return;
+    if (wanted.current !== null) {
+      const at = docs.findIndex((d) => d.name === wanted.current && d.sheets.length > 0);
+      wanted.current = null;
+      if (at >= 0) {
+        setPick({ doc: at, sheet: 0 });
+        return;
+      }
+    }
+    if (!sheet) {
       const first = docs.findIndex((d) => d.sheets.length > 0);
       setPick({ doc: Math.max(0, first), sheet: 0 });
     }

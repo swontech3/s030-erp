@@ -8,13 +8,19 @@
  * ★ 바꾸기 전에 「바꾸면 이전 정관 파일은 지워집니다」 확인 한 번 — 이전 파일은 행 · 저장소 실물까지 지워진다.
  * ★ 보기는 그때그때 만료되는 주소를 받아 새 창으로 연다 — 주소를 들고 있지 않는다.
  * ★ 형식 · 크기는 기존 첨부 규칙(`rejectBytes` — JPG · PNG · PDF · 10MB)으로 먼저 걸러 알린다.
- * ★ 완료된 법인설립 건이 있으면 「설립 건 정관 보기」(그 설립 건 상세로) — 정관을 따로 저장하거나 만들지 않는다.
+ * ★ 완료된 법인설립 건이 있으면 「설립 건 정관 보기」 — 그 설립 건 상세로 가서 [서류 출력]이 열리고 정관이 골라진다
+ *   (`?print=articles`, 결정 2026-11-07). 정관을 따로 저장하거나 만들지 않는다. 칸이 비었으면 안내 한 줄(`INCORP_ARTICLES_NOTE`).
  * ★ 이 칸은 건의 [저장] 과 상관없다 — 고르는 즉시 올라간다(단체에 붙는 파일이라 건과 따로 산다).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ALLOWED_MIME_TYPES, rejectBytes } from '@swonbiz/shared/domain/contract-files';
-import { ARTICLES_REPLACE_CONFIRM, type ArticlesFileView } from '@swonbiz/shared/domain/legal-articles-file';
+import {
+  ARTICLES_REPLACE_CONFIRM,
+  INCORP_ARTICLES_NOTE,
+  incorpArticlesHref,
+  type ArticlesFileView,
+} from '@swonbiz/shared/domain/legal-articles-file';
 import styles from './corp-change-detail.module.css';
 
 const base = (orgId: number) => `/api/legal/orgs/${encodeURIComponent(String(orgId))}/articles-file`;
@@ -110,7 +116,7 @@ export function ArticlesFileField({ orgId, onError }: { orgId: number; onError: 
       <span className={styles.label}>정관 파일</span>
       <div className={styles.fileRow}>
         <span className={`${styles.readValue} ${styles.fileName}${file ? '' : ` ${styles.readEmpty}`}`}>
-          {loadError ?? (view === null ? '읽는 중…' : file ? `${file.originalName}${file.fileSize !== null ? ` (${sizeText(file.fileSize)})` : ''}` : '올린 파일 없음')}
+          {loadError ?? (view === null ? '읽는 중…' : file ? `${file.originalName}${file.fileSize !== null ? ` (${sizeText(file.fileSize)})` : ''}` : view.completedIncorporationId ? INCORP_ARTICLES_NOTE : '올린 파일 없음')}
         </span>
         {file ? (
           <button type="button" className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`} onClick={() => void open()}>
@@ -143,7 +149,7 @@ export function ArticlesFileField({ orgId, onError }: { orgId: number; onError: 
         {view?.completedIncorporationId ? (
           <Link
             className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
-            href={`/legal/incorporations/${encodeURIComponent(view.completedIncorporationId)}`}
+            href={incorpArticlesHref(view.completedIncorporationId)}
           >
             설립 건 정관 보기
           </Link>

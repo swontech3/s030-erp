@@ -12,6 +12,7 @@
  *   바로가기만 준다(`completedIncorporationId`).
  */
 import { extensionFor } from './contract-files.ts';
+import { INCORP_LTD_ENTITY_TYPE } from './incorporation.ts';
 
 /** `tb_cm_file.target_type` — 법무 단체. 050 정책이 이 값으로 회사 세션을 연다. */
 export const LEGAL_ORG_FILE_TARGET = 'LEGAL_ORG';
@@ -20,6 +21,26 @@ export const ARTICLES_FILE_PURPOSE = 'ARTICLES';
 
 /** 바꾸기 전 확인 문구(결정 2026-11-07). */
 export const ARTICLES_REPLACE_CONFIRM = '바꾸면 이전 정관 파일은 지워집니다';
+
+/** 「정관 파일」 칸이 비고 완료된 설립 건이 있을 때의 안내(결정 2026-11-07). */
+export const INCORP_ARTICLES_NOTE = '우리 시스템에서 설립한 회사 — 설립 건에서 정관을 출력합니다';
+
+/**
+ * 「설립 건 정관 보기」 바로가기 — 설립 건 상세 주소에 표시 하나(`?print=articles`)를 단다(결정 2026-11-07).
+ * 상세가 [서류 출력]을 열고 그 건의 정관을 골라 둔다. 다른 서류 · 다른 경로는 그대로다.
+ */
+export const INCORP_PRINT_ARTICLES = 'articles';
+export function incorpArticlesHref(incorporationId: string): string {
+  return `/legal/incorporations/${encodeURIComponent(incorporationId)}?print=${INCORP_PRINT_ARTICLES}`;
+}
+
+/**
+ * 설립 건의 정관 서류 이름(= 양식 이름) — 유한회사 「정관(유한회사)」, 그 밖 「정관」.
+ * 서류 목록은 서버가 이미 회사 형태로 거른다(`buildIncorpPrintDocuments`) — 이 이름으로 그중 하나를 고른다.
+ */
+export function incorpArticlesFormName(entityType: string): string {
+  return entityType === INCORP_LTD_ENTITY_TYPE ? '정관(유한회사)' : '정관';
+}
 
 /** 올려 둔 정관 파일 한 개. 주소는 싣지 않는다 — 볼 때 따로 받는다(만료되는 주소). */
 export interface ArticlesFileInfo {

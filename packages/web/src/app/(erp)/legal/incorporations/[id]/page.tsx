@@ -13,6 +13,7 @@
  *    첫 [저장] 에 한꺼번에 보낸다. 주소의 단체는 화면이 믿지 않는다 — Fastify 가 세션과 대조한다(403).
  * ★ 사이드바에 없고 목록에서 들어온다. 그래도 `requireScreen` 은 반드시 거친다.
  * ★ 남의 건은 없는 건과 같이 404 다(RLS 042).
+ * ★ `?print=articles` — [서류 출력]을 열고 정관을 골라 둔다(법인변경 「설립 건 정관 보기」, 결정 2026-11-07). 저장된 건만.
  */
 import { notFound } from 'next/navigation';
 import type {
@@ -23,6 +24,7 @@ import type { OrgInfo } from '@swonbiz/shared/domain/org-lookup';
 import { callApi } from '@/lib/api';
 import { readSid, requireScreen } from '@/lib/session';
 import { IncorporationDetail } from '@/features/legal/IncorporationDetail';
+import { INCORP_PRINT_ARTICLES } from '@swonbiz/shared/domain/legal-articles-file';
 
 /** 임시 모드를 가리키는 세그먼트. 실제 건 ID 는 UUID 라 겹치지 않는다. */
 const NEW = 'new';
@@ -46,7 +48,7 @@ export default async function IncorporationDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ orgId?: string; orgCode?: string }>;
+  searchParams: Promise<{ orgId?: string; orgCode?: string; print?: string }>;
 }) {
   await requireScreen('s040100020', '/legal/incorporations/[id]');
   const { id } = await params;
@@ -76,5 +78,8 @@ export default async function IncorporationDetailPage({
   if (!res.ok) throw new Error(`법인설립 조회 실패(${res.status})`);
 
   // ★ 다른 건으로 옮겨 갈 때 입력 중이던 값이 남지 않게 다시 마운트한다.
-  return <IncorporationDetail key={id} draft={res.body} saved={res.body} />;
+  const { print } = await searchParams;
+  return (
+    <IncorporationDetail key={id} draft={res.body} saved={res.body} openArticlesPrint={print === INCORP_PRINT_ARTICLES} />
+  );
 }

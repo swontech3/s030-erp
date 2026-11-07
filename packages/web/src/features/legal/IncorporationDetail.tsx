@@ -71,6 +71,7 @@ import { appendPurposeLines } from '@swonbiz/shared/domain/biz-purpose';
 import { parseDay } from '@swonbiz/shared/domain/day';
 import { maskValue, type DigitMaskKind } from '@swonbiz/shared/domain/masked-caret';
 import type { OrgInfo } from '@swonbiz/shared/domain/org-lookup';
+import { incorpArticlesFormName } from '@swonbiz/shared/domain/legal-articles-file';
 import { formatMoneyInput, maskInput } from '@/features/contracts/form-model';
 import { Icon } from '@/components/ds';
 import { AddressInput, StatusActions, type Address } from './CorpChangeDetail';
@@ -93,6 +94,11 @@ interface Props {
    * 저장된 건 · 회사를 고르지 않은 새 건 · 조회 실패는 null(넣지 않음).
    */
   picked?: Pick<OrgInfo, 'orgName' | 'repName' | 'telNo'> | null;
+  /**
+   * 주소의 `?print=articles`(결정 2026-11-07) — [서류 출력]을 열고 그 건의 정관(`incorpArticlesFormName`)을 골라 둔다.
+   * 서류를 출력할 수 있는 건(작성완료 · 완료)일 때만. 처음 한 번만 — 닫으면 지금과 같다.
+   */
+  openArticlesPrint?: boolean;
 }
 
 /**
@@ -314,7 +320,7 @@ const personBody = (p: {
   rrn: p.rrn === '' ? null : p.rrn,
 });
 
-export function IncorporationDetail({ draft, saved: initialSaved, picked = null }: Props) {
+export function IncorporationDetail({ draft, saved: initialSaved, picked = null, openArticlesPrint = false }: Props) {
   const router = useRouter();
   /** ★ 저장된 건은 **상태로** 든다 — 전이 · 저장이 돌려준 새 상세, 409 뒤에 다시 읽은 상세로 다시 그린다. */
   const [saved, setSaved] = useState<IncorporationDetailResponse | null>(initialSaved);
@@ -569,7 +575,12 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null 
 
   // ── 상태 전이 · 삭제 — 처리는 이 화면 한 곳이다(목록에는 버튼이 없다) ──────────
   const [confirm, setConfirm] = useState<CorpChangeConfirmKind | null>(null);
-  const [printing, setPrinting] = useState(false);
+  /** 정관을 골라 열기(`?print=articles`) — 처음 한 번만. */
+  const articlesFirst = openArticlesPrint && initialSaved !== null && canPrintCorpChange(initialSaved.status);
+  const [printing, setPrinting] = useState(articlesFirst);
+  const [printDocName, setPrintDocName] = useState<string | null>(
+    articlesFirst && initialSaved ? incorpArticlesFormName(initialSaved.entityType) : null,
+  );
   /** 출력 이력 다시 읽기 — 서류 출력 대화상자를 닫을 때 올린다. */
   const [printLogKey, setPrintLogKey] = useState(0);
 
@@ -1000,8 +1011,10 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null 
       {printing && saved ? (
         <IncorporationPrintDialog
           id={saved.id}
+          initialDocName={printDocName}
           onClose={() => {
             setPrinting(false);
+            setPrintDocName(null);
             setPrintLogKey((k) => k + 1);
           }}
         />
