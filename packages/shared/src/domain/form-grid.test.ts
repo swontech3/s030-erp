@@ -202,3 +202,17 @@ describe('새 규칙 (2026-10-07)', () => {
     expect(parseDimensionInput('-1', true)).toBeNull();
   });
 });
+
+describe('「내용에 맞춤」 표시는 편집기 조작에 따라간다(결정 2026-11-05)', () => {
+  const base: Page = { colWidths: [1, 2], rowHeights: [1, 10, 1], cells: [{ row: 1, col: 1, text: '{{list}}', fitHeight: true }] };
+
+  it('위에 행을 넣고 빼도 같은 칸에 남는다', () => {
+    const added = addRow(base, 0);
+    expect(cellAt(added, 2, 1)?.fitHeight).toBe(true);
+    expect(cellAt(removeRow(added, 0), 1, 1)?.fitHeight).toBe(true);
+  });
+
+  it('글자를 고쳐도 남는다', () => {
+    expect(cellAt(updateCell(base, 1, 1, { text: '{{list}} 고침' }), 1, 1)?.fitHeight).toBe(true);
+  });
+});

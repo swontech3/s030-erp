@@ -14,8 +14,9 @@
  *   회사유형 — 전체 · 주식회사 · 유한회사(결정 B). 2종 밖 회사에는 「전체」 양식만 뜬다
  *   임원 구분 — 임원마다일 때만. 여럿 고른다
  *
- * ★ 업무(10-5, 2026-10-11) — 법인변경 · 법인설립. 설립은 출력 단위(건마다 · 임원마다 · 발기인마다)만 고른다
- *   (주식회사 · 발기설립 하나라 변경 구분 · 회사유형이 없다). 업무를 바꾸면 그 업무의 처음 표시로 돌아간다.
+ * ★ 업무(10-5, 2026-10-11) — 법인변경 · 법인설립. 설립은 출력 단위(건마다 · 임원마다 · 발기인마다)와
+ *   회사 형태(주식회사 · 유한회사, 2026-10-31 — 「전체」 없음)를 고른다. 형태가 없는 표시는 주식회사로 보인다
+ *   (`incorpMarkCompanyType`). 업무를 바꾸면 그 업무의 처음 표시로 돌아간다.
  * ★ 표시를 떼면 표시 칸이 정의에서 **빠진다**(빈 표시를 남기지 않는다).
  * ★ 선택지 이름은 코드에서 온다(`legalOptions`). 코드에서 꺼진 값이 저장돼 있으면 코드값을 그대로
  *   보인다 — 화면이 저장된 표시를 몰래 지우지 않게.
@@ -25,10 +26,12 @@ import {
   INCORP_MARK_UNITS,
   LEGAL_FORM_ALL_COMPANIES,
   LEGAL_FORM_COMPANY_TYPES,
+  incorpMarkCompanyType,
   parseLegalMark,
   type CorpChangeFormMark,
   type IncorpMarkUnit,
   type IncorporationFormMark,
+  type LegalFormCompanyType,
   type LegalFormMark,
 } from '@swonbiz/shared/domain/legal-form-mark';
 import type { LegalOptions } from './forms-model';
@@ -104,10 +107,25 @@ export function LegalMarkPanel({
               <span className={styles.legalLabel}>출력 단위</span>
               {INCORP_MARK_UNITS.map((u) => (
                 <label key={u} className={styles.check}>
-                  <input type="radio" name="legal-unit" checked={mark.unit === u} onChange={() => onChange({ domain: 'incorporation', unit: u })} />
+                  <input type="radio" name="legal-unit" checked={mark.unit === u} onChange={() => onChange({ ...mark, unit: u })} />
                   {INCORP_UNIT_LABEL[u]}
                 </label>
               ))}
+              <span className={styles.legalSep} />
+              <label className={styles.legalLabel}>
+                회사 형태
+                <select
+                  className={styles.legalSelect}
+                  value={incorpMarkCompanyType(mark)}
+                  onChange={(e) => onChange({ ...mark, companyType: e.target.value as LegalFormCompanyType })}
+                >
+                  {LEGAL_FORM_COMPANY_TYPES.map((c) => (
+                    <option key={c} value={c}>
+                      {options.companyTypes.find((o) => o.code === c)?.name ?? c}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </>
           )}
 
@@ -152,7 +170,7 @@ function CorpChangeControls({
           type="radio"
           name="legal-unit"
           checked={perOfficer}
-          onChange={() => onChange({ ...mark, unit: 'officer', changeTypes: ['OFFICER'], officerKinds: mark.officerKinds ?? [] })}
+          onChange={() => onChange({ ...mark, unit: 'officer', changeTypes: ['OFFICER'], officerKinds: mark.officerKinds ?? [] } satisfies CorpChangeFormMark)}
         />
         임원마다 한 장
       </label>

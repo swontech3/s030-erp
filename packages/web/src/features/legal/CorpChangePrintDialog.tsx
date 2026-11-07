@@ -8,17 +8,28 @@
  * ★★ 값은 서버가 만든다(`GET /legal/corp-changes/:id/print`) — 이 화면은 그리기만 한다. 서류 이름은
  *    양식 이름, 어느 서류가 뜨는지는 양식의 법무 표시다(결정 A). 미리보기와 종이는 같은 컴포넌트
  *    (`FormDocument`)다 — 미리보기는 빈 자리표시를 이름표로 흐리게, 종이는 빈칸.
- * ★★ 출력 직전 입력은 신청일 · 작성일뿐이다(Q8). 내용을 고치려면 [서류수정](E→P)으로 간다.
- *    날짜를 바꾸면 서버에 다시 묻는다 — 날짜 글자 모양도 서버 한 곳에서 만든다.
+ * ★★ 출력 직전 입력은 신청일 · 작성일(Q8)과, 서버가 채우지 않는 자리표시의 「출력 때 입력」 칸이다
+ *    (결정 2026-11-05, `printManualFields` — 사원 총수 · 다른 이사 이름 등 건에 자료가 없는 값).
+ *    내용을 고치려면 [서류수정](E→P)으로 간다. 날짜를 바꾸면 서버에 다시 묻는다 — 날짜 글자 모양도 서버 한 곳에서.
+ *    ★ 「출력 때 입력」 값은 화면에만 든다 — 서버로 보내지 않고 저장 · 출력 이력에 남기지 않는다.
+ *      같은 이름은 서류끼리 같이 쓴다.
  * ★★ 응답에 주민번호 평문이 있다(Q4). 이 화면은 값을 **어디에도 남기지 않는다** — 상태로만 들고,
  *    대화상자를 닫으면 사라진다(인쇄용 포털도 함께 내려간다). 저장소 · 콘솔에 쓰지 않는다.
- * ★ 「기본 양식입니다 …」 안내는 대화상자에만 있다 — 종이(포털)에는 나가지 않는다(사용자 지시 2026-10-11).
+ * ★ 「기본 양식입니다 …」 안내는 지웠다(사용자 지시 2026-11-07). 정관 변경 건 안내는 대화상자에만 있다 — 종이(포털)에는 나가지 않는다.
+ *   안내 문구는 서버가 응답(`articlesNotice`)에 싣는다(2026-11-08 — 정관 최종본 유무 · 완료 여부를 서버가 안다).
+ * ★ 「변경된 정관」(2026-11-08)은 목록 맨 끝의 서류 하나다 — 표양식 양식이 아니라 서버가 조항 목록으로 만든 정의다.
+ *   그리기 · 인쇄 · 출력 이력은 다른 서류와 같다.
  * ★ [인쇄] 를 누르면 출력 이력(040)을 한 줄 남긴다 — 양식 id 와 장 번호만 보낸다(이름은 서버가 찾는다).
  *   **결과를 기다리지 않는다** — 기록이 실패해도 인쇄는 한다(결정 2026-10-11, 실패는 서버 로그).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CORP_CHANGE_PRINT_FIELDS, type CorpChangePrintResponse } from '@swonbiz/shared/domain/corp-change-print';
-import type { FormDefinition } from '@swonbiz/shared/domain/form-template';
+import {
+  CORP_CHANGE_PRINT_FIELDS,
+  printManualFields,
+  withManualValues,
+  type CorpChangePrintResponse,
+} from '@swonbiz/shared/domain/corp-change-print';
+import { definitionTokens, type FormDefinition } from '@swonbiz/shared/domain/form-template';
 import { Icon } from '@/components/ds';
 import { FormDocument } from '@/features/forms/FormDocument';
 import { FormPrintPortal, printFormDocument } from '@/features/forms/FormPrintPortal';
@@ -39,9 +50,6 @@ const LABELS: Readonly<Record<string, string>> = Object.fromEntries(CORP_CHANGE_
  * 흐린 이름표를 보이지 않는다. 다른 칸은 흐린 이름표 그대로다. 종이는 원래 빈칸이다.
  */
 const BLANK_WHEN_EMPTY: readonly string[] = ['officerAddress'];
-
-/** 화면 안내 — 종이에는 나가지 않는다. */
-export const PRINT_NOTICE = '기본 양식입니다. 제출 전 등기소 또는 법무사에게 확인하세요.';
 
 /** 출력 이력 한 줄 — 기다리지 않는다. 실패도 화면에 알리지 않는다(서버 로그에 남는다). */
 function recordPrint(id: string, body: { formId: string; sheet: number; applyDate: string; writeDate: string }) {
@@ -65,6 +73,8 @@ export function CorpChangePrintDialog({ id, onClose }: { id: string; onClose: ()
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pick, setPick] = useState<Pick>({ doc: 0, sheet: 0 });
+  /** 「출력 때 입력」 값 — 자리표시 이름 → 글. 화면에만 든다(위 머리말). */
+  const [manual, setManual] = useState<Record<string, string>>({});
   const seq = useRef(0);
 
   /* 열 때 · 날짜를 바꿀 때 — 늦게 온 옛 응답은 버린다. */
@@ -106,6 +116,12 @@ export function CorpChangePrintDialog({ id, onClose }: { id: string; onClose: ()
   }, [docs, sheet]);
 
   const title = doc ? `${doc.name}${sheet?.officerName ? ` · ${sheet.officerName}` : ''}` : '서류 출력';
+  const manualFields = useMemo(
+    () => (doc && sheet ? printManualFields(definitionTokens(doc.definition), sheet.values, doc.definition.manualFields) : []),
+    [doc, sheet],
+  );
+  const labels = useMemo(() => ({ ...LABELS, ...Object.fromEntries(manualFields.map((m) => [m.name, m.label])) }), [manualFields]);
+  const values = useMemo(() => (sheet ? withManualValues(sheet.values, manual) : {}), [sheet, manual]);
 
   return (
     <div
@@ -146,10 +162,31 @@ export function CorpChangePrintDialog({ id, onClose }: { id: string; onClose: ()
         </div>
 
         {/* ★ 화면 안내 — 대화상자에만 있다. 종이(포털)에는 나가지 않는다. */}
-        <div className={`${styles.banner} ${styles.bannerInfo}`} role="note">
-          <Icon name="info" size={16} />
-          <span>{PRINT_NOTICE}</span>
-        </div>
+        {data?.articlesNotice ? (
+          <div className={`${styles.banner} ${styles.bannerInfo}`} role="note">
+            <Icon name="info" size={16} />
+            <span>{data.articlesNotice}</span>
+          </div>
+        ) : null}
+
+        {manualFields.length > 0 ? (
+          <div className={styles.printManual} aria-label="출력 때 입력">
+            <span className={styles.hint}>출력 때 입력 — 비우면 빈칸으로 나갑니다. 저장하지 않습니다.</span>
+            <div className={styles.printManualFields}>
+              {manualFields.map((m) => (
+                <label key={m.name} className={styles.printDate}>
+                  <span className={styles.label}>{m.label}</span>
+                  <input
+                    type="text"
+                    className={styles.input}
+                    value={manual[m.name] ?? ''}
+                    onChange={(e) => setManual((prev) => ({ ...prev, [m.name]: e.target.value }))}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className={styles.printBody}>
           <nav className={styles.printList} aria-label="서류">
@@ -195,13 +232,13 @@ export function CorpChangePrintDialog({ id, onClose }: { id: string; onClose: ()
           <div className={styles.printPreview} aria-label={title}>
             {error ? <p className={styles.modalErr}>{error}</p> : null}
             {loading && !data ? <p className={styles.hint}>불러오는 중…</p> : null}
-            {doc && sheet ? <FormDocument definition={doc.definition} values={sheet.values} labels={LABELS} showEmpty blankWhenEmpty={BLANK_WHEN_EMPTY} /> : null}
+            {doc && sheet ? <FormDocument definition={doc.definition} values={values} labels={labels} showEmpty blankWhenEmpty={BLANK_WHEN_EMPTY} /> : null}
           </div>
         </div>
       </div>
 
       {/* 종이에 나갈 문서 — 고른 장 하나. 대화상자를 닫으면 함께 내려간다. */}
-      {doc && sheet ? <FormPrintPortal definition={doc.definition} values={sheet.values} /> : null}
+      {doc && sheet ? <FormPrintPortal definition={doc.definition} values={values} inlineBlanks /> : null}
     </div>
   );
 }

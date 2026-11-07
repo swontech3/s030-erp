@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { markAppliesTo, officersForMark, parseLegalMark, personsForIncorpMark, type LegalFormMark } from './legal-form-mark.ts';
+import { incorpMarkCompanyType, markAppliesTo, officersForMark, parseLegalMark, personsForIncorpMark, type LegalFormMark } from './legal-form-mark.ts';
 import { isLegalForm, migrateDefinition, parseDefinition, createEmptyDefinition, FormDefinitionError } from './form-template.ts';
 
 describe('parseLegalMark', () => {
@@ -108,15 +108,30 @@ describe('표양식 정의의 legal 칸', () => {
 });
 
 describe('법인설립 표시(10-5)', () => {
-  it('단위 셋 — 다른 키는 버린다', () => {
+  it('단위 셋 · 회사 형태 — 다른 키는 버린다', () => {
     for (const unit of ['case', 'officer', 'founder']) {
-      expect(parseLegalMark({ domain: 'incorporation', unit, changeTypes: ['NAME'], companyType: 'R' })).toEqual({
+      expect(parseLegalMark({ domain: 'incorporation', unit, changeTypes: ['NAME'] })).toEqual({
         ok: true,
         value: { domain: 'incorporation', unit },
+      });
+      // ★ 회사 형태(2026-10-31) — R · A 는 담는다
+      expect(parseLegalMark({ domain: 'incorporation', unit, changeTypes: ['NAME'], companyType: 'R' })).toEqual({
+        ok: true,
+        value: { domain: 'incorporation', unit, companyType: 'R' },
       });
     }
     expect(parseLegalMark({ domain: 'incorporation', unit: 'page' }).ok).toBe(false);
     expect(parseLegalMark({ domain: 'incorporation' }).ok).toBe(false);
+  });
+  it('회사 형태 — 주식회사 · 유한회사만(「전체」 없음) · 없으면 주식회사로 읽는다', () => {
+    expect(parseLegalMark({ domain: 'incorporation', unit: 'case', companyType: 'A' })).toEqual({
+      ok: true,
+      value: { domain: 'incorporation', unit: 'case', companyType: 'A' },
+    });
+    expect(parseLegalMark({ domain: 'incorporation', unit: 'case', companyType: 'ALL' }).ok).toBe(false);
+    expect(parseLegalMark({ domain: 'incorporation', unit: 'case', companyType: 'C' }).ok).toBe(false);
+    expect(incorpMarkCompanyType({ domain: 'incorporation', unit: 'case' })).toBe('R');
+    expect(incorpMarkCompanyType({ domain: 'incorporation', unit: 'case', companyType: 'A' })).toBe('A');
   });
 
   it('★ 법인변경 서류에는 뜨지 않는다 — 임원 고르기도 빈 목록', () => {

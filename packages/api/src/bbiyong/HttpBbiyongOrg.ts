@@ -135,9 +135,15 @@ const LEGAL_PATCH_KEYS = ['zipCode', 'address', 'detailAddress', 'bizNumber', 'c
 /** 입주사 회사 수정에 실을 수 있는 칸(`BbiyongOrgPatch` 의 `orgCode` 밖, 결정 2026-10-23). */
 const COMPANY_PATCH_KEYS = ['orgName', 'bizNumber', 'corpNumber', 'businessType', 'businessItem'] as const;
 
-/** 단체 조회 규격이 없을 때 운영자에게 보여 줄 문구. */
-const ORG_LOOKUP_UNSUPPORTED_MESSAGE =
-  '삐용 단체 조회가 아직 연결되지 않았습니다(삐용 규격 대기). 개발계에서는 BBIYONG_MOCK=true 로 확인할 수 있습니다';
+/** 단체 조회에서 삐용이 권한으로 거절했을 때(`AUTHZ_DENY`) — 운영자에게 그대로 보여 준다. */
+export const ORG_LOOKUP_FORBIDDEN_MESSAGE = '삐용 단체관리 권한이 필요합니다';
+
+/**
+ * 단체 목록 쪽 크기 · 쪽 상한. 모의 어댑터처럼 **찾은 것을 전부** 준다 — 쪽을 넘겨 끝까지 받는다(`totCnt`).
+ * ★ 상한은 멈추지 않는 반복을 막는 안전장치다(100 × 20 = 2,000줄). 넘으면 거기까지만 준다.
+ */
+const ORG_LIST_PAGE_SIZE = 100;
+const ORG_LIST_MAX_PAGES = 20;
 
 const HALF_DONE_MESSAGE =
   '삐용에 회사는 만들어졌으나 권한 설정이 끝나지 않았습니다. **삐용 담당자에게 즉시 알려 주세요** — ERP 에서 다시 시도하지 마세요';
@@ -384,6 +390,32 @@ export class HttpBbiyongOrg implements BbiyongOrg {
     }
   }
 
+  /**
+   * GET + JSON 파싱 — `#post` 와 같은 규칙(401 = 토큰 만료로 던짐 · 그 밖 HTTP 오류 · 연결 실패 · JSON 아님 = 장애로 던짐).
+   * 업무 실패는 던지지 않는다 — 200 으로 와서 호출자가 해석한다.
+   */
+  async #get(path: string, query: Record<string, string>, accessToken: string, label: string): Promise<unknown> {
+    const url = `${this.#baseUrl}${path}?${new URLSearchParams(query).toString()}`;
+    let res: Response;
+    try {
+      res = await this.#fetch(url, {
+        method: 'GET',
+        headers: { authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(this.#timeoutMs),
+      });
+    } catch (err) {
+      throw new BbiyongUnavailableError(`삐용 ${label} 호출 실패: ${redact((err as Error).message)}`);
+    }
+    if (res.status === 401) throw new BbiyongTokenExpiredError(`삐용 ${label}이 401 — access 토큰이 만료됐다`);
+    if (!res.ok) throw new BbiyongUnavailableError(`삐용 ${label}이 HTTP ${res.status} 로 응답했다`);
+    const text = await res.text();
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      throw new BbiyongUnavailableError(`삐용 ${label} 응답이 JSON 이 아니다 (${text.length}바이트)`);
+    }
+  }
+
   async createOrg(req: BbiyongOrgRequest, accessToken: string): Promise<CreateOrgOutcome> {
     /*
      * ★ 보내는 칸은 `BbiyongOrgRequest` 가 가진 것 그대로다 — 여기서 더하지 않는다.
@@ -574,24 +606,69 @@ export class HttpBbiyongOrg implements BbiyongOrg {
   }
 
   /**
-   * 단체 목록 · 단건 — **삐용 규격이 아직 없다**(2026-10-09).
+   * 단체 목록 · 단건 — 삐용 `org-list`(연동규격 사본 2-1, 2026-11-01 채움). 라우트(`routes/orgLookup.ts`)와
+   *   팝업은 그대로다. `BBIYONG_MOCK=true` 면 `MockBbiyongOrg` 가 대신 답한다.
    *
-   * ★★ 그래서 부르지 않고 `unsupported` 를 돌려준다. 지어낸 경로로 HTTP 를 보내면 404 를
-   *    「장애」로 읽게 되고, 삐용 쪽 로그에도 알 수 없는 호출이 남는다. 규격이 오면 이 두
-   *    메서드만 채운다 — 라우트(`routes/orgLookup.ts`)와 팝업은 그대로다.
-   * ★ `BBIYONG_MOCK=true` 면 `MockBbiyongOrg` 가 대신 답한다.
-   *
-   * ★★ 삐용 회신(2026-10-09) — 규격이 오면 지킬 것:
-   *    ① **호출 계정에 「법무 회사 보기」 권한이 있어야 한다.** 없으면 삐용이 거절한다 —
+   * ★★ 삐용 회신(2026-10-09) — 지킬 것:
+   *    ① **호출 계정에 권한이 있어야 한다**(실측 2026-11-01: 「단체관리」 S021100010). 없으면 삐용이 거절한다 —
    *       ERP 장애가 아니라 삐용 권한 설정 문제로 읽어야 한다(문구도 그렇게 낸다).
    *    ② 목록은 **「법무 서비스를 받은 회사」** 기준이다. Z 코드 조건은 없다 — 거르는 것은
    *       삐용 몫이고, ERP 는 받은 목록을 그대로 보여 준다.
    */
-  async listOrgs(_search: BbiyongOrgSearch, _accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo[]>> {
-    return { kind: 'unsupported', message: ORG_LOOKUP_UNSUPPORTED_MESSAGE };
+  async listOrgs(search: BbiyongOrgSearch, accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo[]>> {
+    /*
+     * ★ 2026-11-01 채웠다 — `GET ${BBIYONG.ORG_LIST_PATH}`(연동규격 사본 2-1). 회사명 일부(`orgName`)로 찾는다.
+     *   쪽을 넘겨 끝까지 받고(`totCnt`), 모의 어댑터와 같이 대소문자 · 앞뒤 공백을 무시해 한 번 더 거르고 코드 순으로 준다.
+     * ★ 권한 거절(본문 `status: 403` · `error: ["AUTHZ_DENY"]`)은 `forbidden` — 장애가 아니다.
+     *   그 밖의 업무 실패(본문 status 가 200 이 아님)는 우리 쪽 호출이 틀린 것이라 장애로 본다.
+     */
+    const name = search.name.trim();
+    const rows: BbiyongOrgInfo[] = [];
+    let total: number | null = null;
+    for (let page = 1; page <= ORG_LIST_MAX_PAGES; page++) {
+      const body = await this.#get(
+        BBIYONG.ORG_LIST_PATH,
+        { orgName: name, memberName: '', limit: String(ORG_LIST_PAGE_SIZE), curPage: String(page) },
+        accessToken,
+        '단체 목록',
+      );
+      const root = asRecord(body);
+      const status = toInt(root?.status);
+      if (status === 403 || readErrorCodes(root).includes('AUTHZ_DENY')) {
+        return { kind: 'forbidden', message: ORG_LOOKUP_FORBIDDEN_MESSAGE };
+      }
+      if (status !== 200 || !Array.isArray(root?.data)) {
+        throw new BbiyongUnavailableError(`삐용 단체 목록이 status ${status ?? '-'} 로 응답했다${readMassage(root) ? ` — ${redact(readMassage(root)!)}` : ''}`);
+      }
+      const data = root.data as unknown[];
+      for (const raw of data) {
+        const r = asRecord(raw);
+        const orgId = toInt(r?.orgId);
+        const orgCode = str(r?.orgCode);
+        const orgName = str(r?.orgName);
+        if (orgId === null || !orgCode || !orgName) continue; // 모양이 다른 줄은 버린다(지어내지 않는다)
+        // 대표자 = 행의 `memberName`(회사 등록 때 대표로 보낸 이름과 같은 칸). 전화 = 행의 `telNo`(빈 글자는 null). 상태 칸은 행에 없다 → null
+        rows.push({ orgId, orgCode, orgName, repName: str(r?.memberName) || null, telNo: str(r?.telNo) || null, status: null });
+        if (total === null) total = toInt(r?.totCnt);
+      }
+      if (data.length < ORG_LIST_PAGE_SIZE || (total !== null && page * ORG_LIST_PAGE_SIZE >= total)) break;
+    }
+    const needle = name.toLowerCase();
+    const value = rows
+      .filter((o, i, all) => all.findIndex((x) => x.orgId === o.orgId) === i)
+      .filter((o) => needle === '' || o.orgName.toLowerCase().includes(needle))
+      .sort((a, b) => a.orgCode.localeCompare(b.orgCode));
+    return { kind: 'ok', value };
   }
 
-  async getOrg(_key: BbiyongOrgKey, _accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo | null>> {
-    return { kind: 'unsupported', message: ORG_LOOKUP_UNSUPPORTED_MESSAGE };
+  /**
+   * 단체 한 곳 — 삐용에 단건 주소가 없어(2026-11-01) 목록 전체에서 **정확히 같은** 단체 ID(또는 단체코드)를 고른다.
+   * 없으면 null(라우트가 `{ org: null }`).
+   */
+  async getOrg(key: BbiyongOrgKey, accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo | null>> {
+    const all = await this.listOrgs({ name: '' }, accessToken);
+    if (all.kind !== 'ok') return all;
+    const found = all.value.find((o) => ('orgId' in key ? o.orgId === key.orgId : o.orgCode === key.orgCode.trim().toUpperCase()));
+    return { kind: 'ok', value: found ?? null };
   }
 }

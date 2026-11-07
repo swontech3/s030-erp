@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildIncorporationSnapshot,
   composeIncorporationName,
+  incorpBareName,
+  incorpEntityWord,
   incorporationDisplayName,
   parseIncorpFirstSave,
   parseIncorpInfo,
@@ -117,5 +119,51 @@ describe('buildIncorporationSnapshot', () => {
     expect(snap.companyTypePosition).toBe('F');
     expect(JSON.stringify(snap)).not.toContain('900101');
     expect(Object.keys(snap.persons[0]!)).not.toEqual(expect.arrayContaining(['id', 'rrnMasked', 'sortOrder']));
+  });
+});
+
+describe('유한회사 — 상호 · 첫 저장 · 스냅샷(결정 2026-10-31)', () => {
+  it('상호는 주식회사와 같은 방식 — 「유한회사」를 위치대로(결정 2026-11-02)', () => {
+    expect(composeIncorporationName('한가람', 'F', 'A')).toBe('유한회사 한가람');
+    expect(composeIncorporationName(' 한가람 ', 'B', 'A')).toBe('한가람 유한회사');
+    expect(composeIncorporationName('한가람', null, 'A')).toBe('유한회사 한가람');
+    expect(composeIncorporationName('', 'B', 'A')).toBe('');
+    expect(composeIncorporationName('한가람', 'B', 'R')).toBe('한가람 주식회사');
+  });
+  it('고른 회사명 → 상호 칸 — 앞뒤 형태 표기를 떼고, 위치 칸으로 다시 붙는다(결정 2026-11-02)', () => {
+    expect(incorpBareName('주식회사 한가람')).toBe('한가람');
+    expect(incorpBareName('한가람 주식회사')).toBe('한가람');
+    expect(incorpBareName('유한회사 한가람')).toBe('한가람');
+    expect(incorpBareName(' 한가람유한회사 ')).toBe('한가람');
+    expect(incorpBareName('(주)한가람')).toBe('한가람');
+    expect(incorpBareName('한가람 (유)')).toBe('한가람');
+    expect(incorpBareName('한가람')).toBe('한가람');
+    expect(incorpBareName('한가람주식회사상사')).toBe('한가람주식회사상사'); // 가운데는 그대로
+    expect(incorpBareName('주식회사')).toBe('주식회사'); // 떼면 비면 원래 이름
+    expect(incorpBareName(null)).toBe('');
+    // 주식회사 · 유한회사 각각 — 고른 회사명이 서류에 쓰이는 상호로
+    expect(composeIncorporationName(incorpBareName('주식회사 한가람'), 'B', 'R')).toBe('한가람 주식회사');
+    expect(composeIncorporationName(incorpBareName('주식회사 한가람'), 'F', 'A')).toBe('유한회사 한가람');
+  });
+  it('형태를 바꾸면 낱말만 바뀐다 — 같은 상호 · 같은 위치', () => {
+    expect(composeIncorporationName('한가람', 'B', 'R')).toBe('한가람 주식회사');
+    expect(composeIncorporationName('한가람', 'B', 'A')).toBe('한가람 유한회사');
+    expect(incorpEntityWord('R')).toBe('주식회사');
+    expect(incorpEntityWord('A')).toBe('유한회사');
+  });
+  it('첫 저장의 회사 형태 — 없으면 R · A 받음 · 그 밖은 칸 오류', () => {
+    const none = parseIncorpFirstSave({ orgId: 9003, info: {} }, OP);
+    expect(none.ok && none.value.entityType).toBe('R');
+    const ltd = parseIncorpFirstSave({ orgId: 9003, entityType: 'A', info: {} }, OP);
+    expect(ltd.ok && ltd.value.entityType).toBe('A');
+    const bad = parseIncorpFirstSave({ orgId: 9003, entityType: 'C', info: {} }, OP);
+    expect(bad.ok ? [] : bad.errors!.map((e) => e.field)).toEqual(['entityType']);
+  });
+  it('스냅샷에 형태가 들고, 상호는 형태대로', () => {
+    const info = parseIncorpInfo({ nameKo: '한가람' });
+    const snap = buildIncorporationSnapshot(info.ok ? info.value : (null as never), [], 'A');
+    expect(snap.entityType).toBe('A');
+    expect(snap.composedName).toBe('유한회사 한가람');
+    expect(buildIncorporationSnapshot(info.ok ? info.value : (null as never), []).entityType).toBe('R');
   });
 });
