@@ -24,6 +24,7 @@ import type { FastifyInstance } from 'fastify';
 import { requireSession } from '../session/hook.ts';
 import { withCompanyScope, type CompanyScope } from '../db/withCompanyScope.ts';
 import { listCodes, listSpaces, type CodeSpec } from '../db/lookups.ts';
+import { DEPOSIT_ACCOUNT_CATEGORY, DEPOSIT_ACCOUNT_USE_TP } from '@swonbiz/shared/domain/deposit-account';
 
 /** 계약 화면과 같은 값이다(`routes/contracts.ts`). */
 const READ_ROLE = 'operator';
@@ -71,6 +72,11 @@ const CONTRACT_FORM_CODES: readonly CodeSpec[] = [
    *   부르는 이름이다(`features/contracts/contract-status-name.ts`).
    */
   { category: 'CONTRACT_ST', useTp: '000' },
+  /**
+   * 입금 계좌(이용계약서 「오피스 정보」 · 정산서, 2026-11-08). **값은 설명 칸**이다 — 응답에 `description` 을 싣는다.
+   * 줄이 없으면 화면이 「입금 계좌가 설정되지 않았습니다」를 보인다(shared `depositAccountOf`).
+   */
+  { category: DEPOSIT_ACCOUNT_CATEGORY, useTp: DEPOSIT_ACCOUNT_USE_TP },
 ];
 
 const scopeOf = (session: { role: string; companyId: string | null }): CompanyScope => ({
@@ -126,7 +132,7 @@ export function registerLookupRoutes(app: FastifyInstance): void {
       listCodes(client, CONTRACT_FORM_CODES),
     );
     return reply.send({
-      codes: rows.map((c) => ({ category: c.category, code: c.code, name: c.name })),
+      codes: rows.map((c) => ({ category: c.category, code: c.code, name: c.name, description: c.description })),
     });
   });
 }
