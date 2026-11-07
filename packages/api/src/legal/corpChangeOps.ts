@@ -44,7 +44,19 @@ import {
   buildSubmitSnapshot,
   parseSeenStatus,
   parseTransitionBody,
+  type SnapshotArticles,
 } from '@swonbiz/shared/domain/corp-change-transition';
+import { readSubmitSnapshot } from '@swonbiz/shared/domain/corp-change-print';
+import {
+  ARTICLES_APPLIED_LOCK_MESSAGE,
+  ARTICLES_BUSY_MESSAGE,
+  ARTICLES_STALE_MESSAGE,
+  applyArticleChanges,
+  articlesRolesFor,
+  changedArticles,
+  planArticleChanges,
+  type ArticleItem,
+} from '@swonbiz/shared/domain/legal-articles';
 import {
   LEGAL_MEMBER_TYPE_CATEGORY,
   LEGAL_MEMBER_TYPE_USE_TP,
@@ -84,9 +96,18 @@ import {
   updateOfficer,
   updatePayload,
   upsertLegalOrg,
+  readSubmitSnapshotRaw,
   type CorpChangeRow,
   type RrnStored,
 } from '../db/corpChanges.ts';
+import {
+  getArticlesHead,
+  isChangeApplied,
+  listArticleItems,
+  listOtherWrittenSnapshots,
+  replaceArticles,
+} from '../db/legalArticles.ts';
+import { articleContext, articlesBase, ensureFinalArticles, readArticlesRules } from './articlesOps.ts';
 
 export type OpError = {
   ok: false;
@@ -394,6 +415,11 @@ export async function readCorpChangeDetail(
   const statusBeforeCancelName = statusBeforeCancel
     ? (await codeNames(client, changeType, statusBeforeCancel)).statusName
     : null;
+  const articles = await articlesView(client, row, changeType);
+  // 정관이 바뀐(최종본에 반영된) 완료 건은 완료 취소 · 취소를 막는다 — 운영사도(결정 2026-11-08)
+  const transitions = availableTransitions(row.status, session.role, statusBeforeCancel).filter(
+    (to) => !(articles?.applied && row.status === 'C' && (to === 'E' || to === 'X')),
+  );
 
   return {
     ok: true,
@@ -410,14 +436,39 @@ export async function readCorpChangeDetail(
       ...view,
       officers,
       // ★ 버튼은 서버가 전이를 받을 때와 **같은 표**로 고른다(`corp-change.ts` 머리말 ★★★).
-      availableTransitions: availableTransitions(row.status, session.role, statusBeforeCancel),
+      availableTransitions: transitions,
       canDelete: checkDelete(row.status, session.role).ok,
       statusBeforeCancel,
       statusBeforeCancelName,
       cancelReason: row.status === 'X' ? row.cancelReason : null,
       writtenOn: row.writtenOn,
       completedOn: row.completedOn,
+      articles,
     },
+  };
+}
+
+/**
+ * 상세의 「변경된 정관 조항」(2026-11-08, 설계 §3-1) — 정관이 바뀌는 구분일 때만.
+ *   base    — 최종본(없으면 설립 건으로 만들 모양 — 메모리에서만)의 바뀌는 역할 조항. 만들 수 없으면 null(안내만)
+ *   written — 작성완료 스냅샷의 바뀐 조항(작성완료 뒤)
+ *   applied — 최종본에 반영됐다(완료 뒤)
+ * ★ 단체는 이 건의 org_id(RLS 를 통과한 값)다.
+ */
+async function articlesView(
+  client: ScopedClient,
+  row: CorpChangeRow,
+  changeType: CorpChangeType,
+): Promise<CorpChangeDetailResponse['articles']> {
+  const roles = articlesRolesFor(changeType, await readArticlesRules(client));
+  if (roles.length === 0) return null;
+  const base = await articlesBase(client, row.orgId);
+  const snapshot = row.status === 'P' ? null : readSubmitSnapshot(await readSubmitSnapshotRaw(client, row.id));
+  return {
+    roles: [...roles],
+    base: base ? { revision: base.revision, items: base.items.filter((i) => i.role !== null && roles.includes(i.role)) } : null,
+    written: snapshot?.articles?.changes ?? null,
+    applied: row.status === 'C' || row.status === 'X' ? await isChangeApplied(client, row.orgId, row.id) : false,
   };
 }
 
@@ -505,6 +556,21 @@ export async function transitionCorpChange(
     return fail(status, check.code, check.reason, status === 400 ? (check.errors ?? []) : undefined);
   }
 
+  // ── 정관(2026-11-08, 설계 §3 · §8) ──
+  // 정관이 바뀐(최종본에 반영된) 완료 건은 완료 취소(C→E) · 취소(C→X)를 막는다 — 운영사도(결정 2026-11-08)
+  if (row.status === 'C' && (to === 'E' || to === 'X') && (await isChangeApplied(client, row.orgId, row.id))) {
+    return fail(409, 'articles_applied', ARTICLES_APPLIED_LOCK_MESSAGE);
+  }
+  let articles: SnapshotArticles | undefined;
+  if (completing && company) {
+    const planned = await planWrittenArticles(client, session, row, company);
+    if (!planned.ok) return planned;
+    articles = planned.value;
+  }
+  // 완료(E→C · 취소에서 완료로 복원 X→C) — 최종본 반영을 미리 본다(쓰기는 상태를 바꾼 뒤)
+  const applying = to === 'C' && (row.status === 'E' || row.status === 'X') ? await prepareArticlesApply(client, row) : null;
+  if (applying && !applying.ok) return applying;
+
   const snapshot =
     completing && company
     ? buildSubmitSnapshot({
@@ -512,6 +578,7 @@ export async function transitionCorpChange(
         company,
         payload: row.payload,
         officers,
+        articles,
       })
     : undefined;
 
@@ -525,7 +592,77 @@ export async function transitionCorpChange(
   });
   // 잠가 두었으므로 생기지 않는다. 생기면 판정 없이 쓴 것이 없도록 멈춘다.
   if (!changed) return STALE;
+  if (applying?.ok && applying.value) {
+    await replaceArticles(client, { orgId: row.orgId, items: applying.value, changeId: row.id, actor: actorOf(session) });
+  }
   return readCorpChangeDetail(client, session, id, companyEditor);
+}
+
+/**
+ * 작성완료(P→E) 때 정관 변경 계획(설계 §3-1 · §3-2 · §8-5) — 정관이 바뀌는 구분이고 최종본이 있거나 설립 건으로 만들 수
+ * 있을 때만. 아니면 undefined(정관을 다루지 않는다 — 다른 곳 설립 회사는 지금처럼 안내만).
+ *   · 바꿀 자리를 찾지 못한 조항이 있고 사람이 고치지도 않았으면 400(자리 `articlesItems.<역할>`)
+ *   · 실제로 바뀐 조항이 있고, 같은 단체의 다른 작성완료 건이 같은 역할을 바꾸면 409(§8-5 — 둘째 건을 막는다)
+ *   · 통과하면 최종본이 없을 때 설립 건으로 만들어 확정한다(첫 정관 변경 때, 확인 화면 없이)
+ */
+async function planWrittenArticles(
+  client: ScopedClient,
+  session: ErpSession,
+  row: CorpChangeRow,
+  company: { legalName: string | null; memberType: string | null; headAddress: string | null },
+): Promise<OpResult<SnapshotArticles | undefined>> {
+  const roles = articlesRolesFor(row.changeType, await readArticlesRules(client));
+  if (roles.length === 0) return { ok: true, value: undefined };
+  const base = await articlesBase(client, row.orgId);
+  if (!base) return { ok: true, value: undefined };
+  const ctx = articleContext({
+    changeType: row.changeType,
+    payload: row.payload,
+    company,
+    namePosition: await completedIncorpNamePosition(client, row.orgId),
+  });
+  const plan = planArticleChanges(base.items, roles, ctx);
+  if (plan.errors.length > 0) {
+    return fail(
+      400,
+      'invalid_request',
+      '입력 내용을 확인하세요',
+      plan.errors.map((e) => ({ field: `articlesItems.${e.role}`, message: e.message })),
+    );
+  }
+  const changes = changedArticles(plan.items);
+  if (changes.length > 0) {
+    const mine = new Set(changes.map((c) => c.role));
+    for (const other of await listOtherWrittenSnapshots(client, row.orgId, row.id)) {
+      const theirs = readSubmitSnapshot(other.snapshot)?.articles?.changes ?? [];
+      if (theirs.some((c) => mine.has(c.role))) return fail(409, 'articles_busy', ARTICLES_BUSY_MESSAGE);
+    }
+  }
+  const final = await ensureFinalArticles(client, session, row.orgId);
+  if (!final) return { ok: true, value: undefined };
+  return { ok: true, value: { revision: final.revision, changes } };
+}
+
+/**
+ * 완료 때 최종본 반영 준비(설계 §3-4 · §8-3) — 바꿀 조항 목록(개정 부칙 포함)을 돌려준다. 반영할 것이 없으면 null.
+ * 최종본을 잠그고 작성완료 때 개정 번호와 대조한다 — 다르면 409(그 사이 다른 건이 최종본을 바꿨다).
+ * ★ 이미 반영된 건(그 건의 부칙 줄이 있다)은 다시 반영하지 않는다.
+ */
+async function prepareArticlesApply(
+  client: ScopedClient,
+  row: CorpChangeRow,
+): Promise<OpResult<ArticleItem[] | null>> {
+  const snapshot = readSubmitSnapshot(await readSubmitSnapshotRaw(client, row.id));
+  const art = snapshot?.articles;
+  if (!snapshot || !art || art.changes.length === 0) return { ok: true, value: null };
+  if (await isChangeApplied(client, row.orgId, row.id)) return { ok: true, value: null };
+  const head = await getArticlesHead(client, row.orgId, { forUpdate: true });
+  if (!head || head.state !== 'FINAL' || head.revision !== art.revision) return fail(409, 'articles_stale', ARTICLES_STALE_MESSAGE);
+  const resolutionDate = typeof snapshot.payload.resolutionDate === 'string' ? snapshot.payload.resolutionDate : null;
+  return {
+    ok: true,
+    value: applyArticleChanges(await listArticleItems(client, row.orgId), art.changes, { changeId: row.id, resolutionDate }),
+  };
 }
 
 /**

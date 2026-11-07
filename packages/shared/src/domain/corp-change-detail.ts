@@ -44,6 +44,7 @@ import {
   type OfficerChangeKind,
 } from './corp-change.ts';
 import type { CodeOption } from './corp-change-list.ts';
+import { isArticleRole, type ArticleChange, type ArticleItem, type ArticleRole } from './legal-articles.ts';
 import { DIGIT_MASK_RULE, isDigitMaskComplete, maskValue, type DigitMaskKind } from './masked-caret.ts';
 
 /**
@@ -167,6 +168,11 @@ export function parseCreateBody(
 
 const ADDRESS_KEYS = ['zipCode', 'address', 'addressDetail'] as const;
 
+/** payload 의 「변경된 정관 조항」 칸 — 사람이 고친 조항 문구(역할 → 글, 2026-11-08). 모든 구분이 받는다(쓰는 곳은 정관이 바뀌는 구분뿐). */
+export const ARTICLES_ITEMS_KEY = 'articlesItems';
+/** 조항 한 개의 최대 글자 수. */
+export const ARTICLE_TEXT_MAX = 5000;
+
 /**
  * 변경 내용 `{ payload }` 의 payload — 그 구분의 칸 정의(`CHANGE_TYPE_DEFS`)대로 읽는다.
  *
@@ -180,10 +186,28 @@ export function parsePayload(changeType: CorpChangeType, raw: unknown): Parsed<R
   const defs = CHANGE_TYPE_DEFS[changeType].fields;
   const known = new Set(defs.map((d) => d.name));
   const errors: CorpChangeFieldError[] = Object.keys(raw)
-    .filter((k) => !known.has(k))
+    .filter((k) => !known.has(k) && k !== ARTICLES_ITEMS_KEY)
     .map((k) => ({ field: k, message: `이 변경 구분에 없는 칸입니다: ${k}` }));
 
   const out: Record<string, unknown> = {};
+  // 「변경된 정관 조항」에서 사람이 고친 문구(2026-11-08, 설계 §3-1) — 역할 → 글. 빈 글은 버린다(자동 문구로 돌아간다)
+  if (raw[ARTICLES_ITEMS_KEY] !== undefined && raw[ARTICLES_ITEMS_KEY] !== null) {
+    const v = raw[ARTICLES_ITEMS_KEY];
+    if (!isPlainObject(v) || Object.entries(v).some(([k, s]) => !isArticleRole(k) || (typeof s !== 'string' && s !== null))) {
+      errors.push({ field: ARTICLES_ITEMS_KEY, message: '변경된 정관 조항 형식이 올바르지 않습니다' });
+    } else {
+      const items: Record<string, string> = {};
+      for (const [k, s] of Object.entries(v)) {
+        if (typeof s !== 'string' || s.trim() === '') continue;
+        if (s.length > ARTICLE_TEXT_MAX) {
+          errors.push({ field: `${ARTICLES_ITEMS_KEY}.${k}`, message: `조항은 ${ARTICLE_TEXT_MAX}자 이내로 입력하세요` });
+          continue;
+        }
+        items[k] = s.replace(/\r\n/g, '\n').trimEnd();
+      }
+      if (Object.keys(items).length > 0) out[ARTICLES_ITEMS_KEY] = items;
+    }
+  }
   for (const def of defs) {
     const v = raw[def.name];
     if (def.type === 'address') {
@@ -689,6 +713,25 @@ export interface CorpChangeDetailResponse extends CorpChangeDraftResponse {
   writtenOn: string | null;
   /** 완료일 `YYYY-MM-DD`. */
   completedOn: string | null;
+
+  // ── 정관 변경(2026-11-08, 설계 §3) ─────────────────────────────────────────
+  /** 정관이 바뀌는 구분(`LAW_CNG_AR`)일 때만. null = 정관이 안 바뀌는 구분. */
+  articles: CorpChangeArticlesView | null;
+}
+
+/** 상세의 「변경된 정관 조항」 — 화면이 미리 채움(`planArticleChanges`)을 그 자리에서 계산한다. */
+export interface CorpChangeArticlesView {
+  /** 이 구분이 바꾸는 조항 역할. */
+  roles: ArticleRole[];
+  /**
+   * 정관 최종본(없으면 설립 건으로 만들 모양)의 조항 — 바뀌는 역할의 조항만. 개정 번호는 최종본이 아직 없으면 null.
+   * null = 최종본이 없고 만들 수도 없다(다른 곳 설립 회사 — 1단계 밖, 지금처럼 안내만).
+   */
+  base: { revision: number | null; items: ArticleItem[] } | null;
+  /** 작성완료 스냅샷의 바뀐 조항 — 작성완료 뒤(E · C · X). 없으면 null. */
+  written: ArticleChange[] | null;
+  /** 이 건이 최종본에 반영됐다(완료 뒤) — 완료 취소 · 취소를 막는다(결정 2026-11-08). */
+  applied: boolean;
 }
 
 /**

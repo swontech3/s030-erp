@@ -29,7 +29,8 @@
  * 저장 · 로그 · 스냅샷에 남기지 않는 것은 부르는 쪽의 일이다 — 응답은 no-store.
  */
 import { purposeLines, DEFAULT_RESIGN_REASON, OFFICER_CHANGE_KIND_LABEL, isOfficerChangeKind } from './corp-change.ts';
-import type { CorpChangeSubmitSnapshot, SnapshotAddress, SnapshotOfficer } from './corp-change-transition.ts';
+import type { CorpChangeSubmitSnapshot, SnapshotAddress, SnapshotArticles, SnapshotOfficer } from './corp-change-transition.ts';
+import { isArticleRole } from './legal-articles.ts';
 import { isLegalFormCompanyType, markAppliesTo, officersForMark, type LegalFormMark } from './legal-form-mark.ts';
 import { parseDay } from './day.ts';
 import { composeIncorporationName, hasIncorpEntityMark } from './incorporation-detail.ts';
@@ -143,7 +144,19 @@ export function readSubmitSnapshot(raw: unknown): CorpChangeSubmitSnapshot | nul
       addressDetail: str(o.addressDetail),
       resignReason: str(o.resignReason),
     })),
+    ...readSnapshotArticles(raw.articles),
   };
+}
+
+/** 스냅샷의 정관 변경(2026-11-08) — 모양이 틀리면 없는 것으로 본다. */
+function readSnapshotArticles(v: unknown): { articles?: SnapshotArticles } {
+  if (!isObj(v) || typeof v.revision !== 'number' || !Array.isArray(v.changes)) return {};
+  const changes = v.changes.filter(isObj).flatMap((c) =>
+    isArticleRole(c.role) && typeof c.before === 'string' && typeof c.after === 'string'
+      ? [{ role: c.role, articleNo: str(c.articleNo), title: str(c.title), before: c.before, after: c.after }]
+      : [],
+  );
+  return { articles: { revision: v.revision, changes } };
 }
 
 // =============================================================================
@@ -558,6 +571,11 @@ export interface CorpChangePrintResponse<D = unknown> {
   changeType: string;
   status: string;
   documents: PrintDocument<D>[];
+  /**
+   * 대화상자 위쪽 안내 한 줄(종이에는 나가지 않는다, 2026-11-08 서버로 옮김) — 정관 최종본이 없는 회사의 정관 변경 건
+   * 「변경된 정관은 따로 준비하세요」 · 완료 건의 「변경된 정관」 다시 출력 안내. 없으면 null.
+   */
+  articlesNotice: string | null;
 }
 
 // =============================================================================

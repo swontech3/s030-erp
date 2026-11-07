@@ -29,6 +29,7 @@ import type { ErpSession } from '@swonbiz/shared';
 import {
   CORP_CHANGE_CODE_USE_TP,
   CORP_CHANGE_TYPE_CATEGORY,
+  articlesChangeNotice,
   canPrintCorpChange,
 } from '@swonbiz/shared/domain/corp-change';
 import { randomUUID } from 'node:crypto';
@@ -36,6 +37,7 @@ import {
   buildPrintDocuments,
   parsePrintInputs,
   parsePrintLogBody,
+  type PrintDocument,
   type PrintLogItem,
   pickDocFormSetting,
   readSubmitSnapshot,
@@ -43,8 +45,18 @@ import {
   type MarkedForm,
   type PrintOfficer,
 } from '@swonbiz/shared/domain/corp-change-print';
+import type { CorpChangeSubmitSnapshot } from '@swonbiz/shared/domain/corp-change-transition';
 import { migrateDefinition, type FormDefinition } from '@swonbiz/shared/domain/form-template';
 import { markAppliesTo, officersForMark } from '@swonbiz/shared/domain/legal-form-mark';
+import {
+  AMENDED_ARTICLES_FORM_ID,
+  AMENDED_ARTICLES_NAME,
+  AMENDED_ARTICLES_REPRINT_NOTICE,
+  amendedArticlesCompanyName,
+  amendedArticlesDefinition,
+  applyArticleChanges,
+  articlesRolesFor,
+} from '@swonbiz/shared/domain/legal-articles';
 import { decrypt } from '../lib/crypto.ts';
 import type { ScopedClient } from '../db/withCompanyScope.ts';
 import { listCodes } from '../db/lookups.ts';
@@ -57,6 +69,8 @@ import {
 } from '../db/corpChanges.ts';
 import { listMarkedFormTemplates } from '../db/formTemplates.ts';
 import { listCorpChangeSettings } from '../db/docFormSettings.ts';
+import { getArticlesHead, listArticleItems } from '../db/legalArticles.ts';
+import { articleContextOfSnapshot, readArticlesRules } from './articlesOps.ts';
 import { completedIncorpNamePosition } from '../db/incorporations.ts';
 import type { OpResult } from './corpChangeOps.ts';
 
@@ -140,15 +154,72 @@ export async function readCorpChangePrint(
     }
   }
 
+  const documents = buildPrintDocuments(forms, src, officers);
+  const amended = await amendedArticles(client, row, snapshot, namePosition);
+  if (amended) documents.push(amended);
   return {
     ok: true,
     value: {
       id: row.id,
       changeType: row.changeType,
       status: row.status,
-      documents: buildPrintDocuments(forms, src, officers),
+      documents,
+      articlesNotice: await articlesNoticeOf(client, row, snapshot, amended !== null),
     },
   };
+}
+
+/**
+ * 「변경된 정관」(2026-11-08, 설계 §3-3 · §8-1~§8-4) — 작성완료 스냅샷에 바뀐 조항이 있고 최종본이 있을 때만, 목록 맨 끝.
+ * 지금 최종본에 이 건의 바뀐 조항을 넣고 개정 부칙을 덧붙인다(완료 뒤에는 이미 들어 있어 그대로 — 지금 최종본 기준).
+ * ★ 표양식 양식이 아니다 — 정의를 코드가 만든다(표양식 원칙의 예외, §8-1). 자리표시가 없다.
+ */
+async function amendedArticles(
+  client: ScopedClient,
+  row: { id: string; orgId: number },
+  snapshot: CorpChangeSubmitSnapshot,
+  namePosition: string | null,
+): Promise<PrintDocument<FormDefinition> | null> {
+  const art = snapshot.articles;
+  if (!art || art.changes.length === 0) return null;
+  const head = await getArticlesHead(client, row.orgId);
+  if (!head || head.state !== 'FINAL') return null;
+  const resolutionDate = typeof snapshot.payload.resolutionDate === 'string' ? snapshot.payload.resolutionDate : null;
+  const items = applyArticleChanges(await listArticleItems(client, row.orgId), art.changes, { changeId: row.id, resolutionDate });
+  const ctx = articleContextOfSnapshot(snapshot, namePosition);
+  return {
+    formId: AMENDED_ARTICLES_FORM_ID,
+    name: AMENDED_ARTICLES_NAME,
+    unit: 'case',
+    definition: amendedArticlesDefinition({
+      items,
+      companyName: amendedArticlesCompanyName(ctx),
+      ceoName: snapshot.company.ceoName ?? '',
+      amendedOn: resolutionDate,
+    }),
+    sheets: [{ officerName: null, values: {} }],
+  };
+}
+
+/**
+ * [서류 출력] 위쪽 안내 한 줄(종이에는 나가지 않는다).
+ *   · 「변경된 정관」이 있고 완료된 건 — 지금 최종본 기준으로 나온다(§8-4)
+ *   · 정관을 다룬 그 밖의 건(스냅샷에 정관 칸이 있다) — 안내 없음
+ *   · 정관을 다루지 않은 정관 변경 건(최종본이 없는 다른 곳 설립 회사 · 이 기능 전에 작성완료한 건) — 지금처럼
+ *     「변경된 정관은 따로 준비하세요」(`articlesChangeNotice`, 역할은 공통 코드 LAW_CNG_AR)
+ */
+async function articlesNoticeOf(
+  client: ScopedClient,
+  row: { status: string },
+  snapshot: CorpChangeSubmitSnapshot,
+  hasAmended: boolean,
+): Promise<string | null> {
+  if (hasAmended) return row.status === 'C' ? AMENDED_ARTICLES_REPRINT_NOTICE : null;
+  if (snapshot.articles) return null;
+  const roles = articlesRolesFor(snapshot.changeType, await readArticlesRules(client));
+  const newHq = snapshot.payload.newHqAddress;
+  const newHqAddress = typeof newHq === 'object' && newHq !== null ? (newHq as { address?: unknown }).address : null;
+  return articlesChangeNotice(roles, snapshot.company.head.address, typeof newHqAddress === 'string' ? newHqAddress : null);
 }
 
 /**
@@ -172,6 +243,27 @@ export async function recordCorpChangePrint(
   if (!canPrintCorpChange(row.status)) return fail(409, 'not_printable', '서류는 작성완료 · 완료 건만 출력할 수 있습니다');
   const snapshot = readSubmitSnapshot(await readSubmitSnapshotRaw(client, row.id));
   if (!snapshot || snapshot.changeType !== row.changeType) return fail(409, 'no_snapshot', '작성완료 기록이 없습니다');
+
+  // 「변경된 정관」(2026-11-08) — 표양식 양식이 아니다. 이 건에 뜰 때만(스냅샷에 바뀐 조항 · 최종본) 받는다
+  if (input.formId === AMENDED_ARTICLES_FORM_ID) {
+    const shown =
+      (snapshot.articles?.changes.length ?? 0) > 0 && (await getArticlesHead(client, row.orgId))?.state === 'FINAL';
+    if (!shown) return fail(400, 'invalid_request', '이 건에 뜨는 서류가 아닙니다', 'formId');
+    if (input.sheet !== 0) return fail(400, 'invalid_request', '없는 장입니다', 'sheet');
+    await insertPrintLog(client, {
+      id: randomUUID(),
+      corpChangeId: row.id,
+      orgId: row.orgId,
+      formId: AMENDED_ARTICLES_FORM_ID,
+      formName: AMENDED_ARTICLES_NAME,
+      officerName: null,
+      applyDate: input.applyDate,
+      writeDate: input.writeDate,
+      printedBy: String(session.s020MemberId),
+      printedRole: session.role,
+    });
+    return { ok: true, value: null };
+  }
 
   const form = (await markedForms(client)).find(
     (f) => f.id === input.formId && markAppliesTo(f.mark, snapshot.changeType, snapshot.company.memberType),

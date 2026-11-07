@@ -9,6 +9,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ErpSession, ScopeRole } from '@swonbiz/shared';
 import type { CorpChangeListFilter } from '@swonbiz/shared/domain/corp-change-list';
+import { ARTICLES_APPLIED_LOCK_MESSAGE, ARTICLES_STALE_MESSAGE } from '@swonbiz/shared/domain/legal-articles';
 import { registerCorpChangeRoutes, type CorpChangeDeps } from './corpChanges.ts';
 import { listCorpChanges } from '../db/corpChanges.ts';
 import { encrypt } from '../lib/crypto.ts';
@@ -1133,6 +1134,62 @@ describe('POST /legal/corp-changes/:id/transition — 상태 전이', () => {
     expect(statusUpdate(undo.db)!.sql).not.toMatch(/written_at|submit_snapshot/);
     const back = await press('operator', { change_type: 'NAME', status: 'E' }, 'P');
     expect(statusUpdate(back.db)!.sql).not.toMatch(/written_at|submit_snapshot|completed_at/);
+  });
+
+  // ── 정관 최종본(2026-11-08, 설계 §3-4 · §8) ──
+  /** 작성완료 스냅샷 — 상호 조항 a → b, 작성완료 때 최종본 개정 번호 `revision`. */
+  const SNAP = (revision: number) => ({
+    version: 3,
+    changeType: 'NAME',
+    company: { head: {}, ceoHome: {} },
+    payload: { newName: '새', resolutionDate: '2026-10-01' },
+    officers: [],
+    articles: { revision, changes: [{ role: 'TRADE_NAME', articleNo: '1', title: '상호', before: 'a', after: 'b' }] },
+  });
+  const HEAD = (revision: number) => ({
+    match: /FROM public\.tb_s080_legal_articles WHERE org_id/,
+    rows: [{ org_id: 9003, state: 'FINAL', revision, origin: 'INCORP' }],
+  });
+  const ITEMS = {
+    match: /FROM public\.tb_s080_legal_article_items WHERE org_id = \$1 ORDER BY seq/,
+    rows: [{ kind: 'ARTICLE', article_no: '1', title: '상호', body: 'a', role: 'TRADE_NAME', section: 'MAIN', change_id: null }],
+  };
+  const APPLIED = { match: /tb_s080_legal_article_items WHERE org_id = \$1 AND change_id = \$2/, rows: [{ n: 1 }] };
+
+  it.each([['E'], ['X']])('★ 정관이 바뀐(최종본에 반영된) 완료 건은 C→%s 409 — 운영사도 · 상태를 바꾸지 않는다', async (to) => {
+    const { res, db } = await press('operator', { change_type: 'NAME', status: 'C' }, to, {}, [APPLIED]);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().message).toBe(ARTICLES_APPLIED_LOCK_MESSAGE);
+    expect(statusUpdate(db)).toBeUndefined();
+  });
+
+  it('정관이 안 바뀐 완료 건의 완료 취소는 지금과 같다', async () => {
+    const { res } = await press('operator', { change_type: 'OFFICER', status: 'C' }, 'E');
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('★ 완료(E→C) 때 최종본 개정 번호가 작성완료 때와 다르면 409 — 상태 · 최종본을 바꾸지 않는다', async () => {
+    const { res, db } = await press('operator', { change_type: 'NAME', status: 'E', submit_snapshot: SNAP(1) }, 'C', {}, [HEAD(2)]);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().message).toBe(ARTICLES_STALE_MESSAGE);
+    expect(statusUpdate(db)).toBeUndefined();
+    expect(db.seen.some((s) => /INSERT INTO public\.tb_s080_legal_article_items/.test(s.sql))).toBe(false);
+  });
+
+  it('★ 완료(E→C) — 최종본을 잠그고, 상태를 바꾼 뒤 그 역할 조항을 바꾸고 개정 부칙 두 줄을 덧붙인다 · 개정 번호 +1', async () => {
+    const { res, db } = await press('operator', { change_type: 'NAME', status: 'E', submit_snapshot: SNAP(1) }, 'C', {}, [HEAD(1), ITEMS]);
+    expect(res.statusCode).toBe(200);
+    expect(db.seen.find((s) => /FROM public\.tb_s080_legal_articles WHERE org_id/.test(s.sql))!.sql).toContain('FOR UPDATE');
+    const at = (re: RegExp) => db.seen.findIndex((s) => re.test(s.sql));
+    expect(at(/UPDATE public\.tb_s080_corp_changes SET status/)).toBeLessThan(at(/INSERT INTO public\.tb_s080_legal_article_items/));
+    const inserts = db.seen.filter((s) => /INSERT INTO public\.tb_s080_legal_article_items/.test(s.sql));
+    expect(inserts.map((s) => [s.params[5], s.params[7], s.params[8]])).toEqual([
+      ['b', 'MAIN', null],
+      ['부　칙 (2026. 10. 1.)', 'SUPPLEMENT', 'cc-1'],
+      ['이 정관은 2026년 10월 1일부터 시행한다.', 'SUPPLEMENT', 'cc-1'],
+    ]);
+    const bump = db.seen.find((s) => /UPDATE public\.tb_s080_legal_articles\s+SET revision = revision \+ 1/.test(s.sql))!;
+    expect(bump.params).toEqual([9003, 'cc-1', '1']);
   });
 });
 

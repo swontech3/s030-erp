@@ -16,6 +16,9 @@
  * ★★ 응답에 주민번호 평문이 있다(Q4). 이 화면은 값을 **어디에도 남기지 않는다** — 상태로만 들고,
  *    대화상자를 닫으면 사라진다(인쇄용 포털도 함께 내려간다). 저장소 · 콘솔에 쓰지 않는다.
  * ★ 「기본 양식입니다 …」 안내는 지웠다(사용자 지시 2026-11-07). 정관 변경 건 안내는 대화상자에만 있다 — 종이(포털)에는 나가지 않는다.
+ *   안내 문구는 서버가 응답(`articlesNotice`)에 싣는다(2026-11-08 — 정관 최종본 유무 · 완료 여부를 서버가 안다).
+ * ★ 「변경된 정관」(2026-11-08)은 목록 맨 끝의 서류 하나다 — 표양식 양식이 아니라 서버가 조항 목록으로 만든 정의다.
+ *   그리기 · 인쇄 · 출력 이력은 다른 서류와 같다.
  * ★ [인쇄] 를 누르면 출력 이력(040)을 한 줄 남긴다 — 양식 id 와 장 번호만 보낸다(이름은 서버가 찾는다).
  *   **결과를 기다리지 않는다** — 기록이 실패해도 인쇄는 한다(결정 2026-10-11, 실패는 서버 로그).
  */
@@ -63,16 +66,7 @@ interface Pick {
   sheet: number;
 }
 
-export function CorpChangePrintDialog({
-  id,
-  articlesNotice,
-  onClose,
-}: {
-  id: string;
-  /** 정관 변경 건 안내(`articlesChangeNotice`, 결정 2026-11-07) — 있으면 위쪽에 한 줄. 종이에는 나가지 않는다. */
-  articlesNotice?: string | null;
-  onClose: () => void;
-}) {
+export function CorpChangePrintDialog({ id, onClose }: { id: string; onClose: () => void }) {
   const [applyDate, setApplyDate] = useState(localToday);
   const [writeDate, setWriteDate] = useState(localToday);
   const [data, setData] = useState<PrintData | null>(null);
@@ -168,10 +162,10 @@ export function CorpChangePrintDialog({
         </div>
 
         {/* ★ 화면 안내 — 대화상자에만 있다. 종이(포털)에는 나가지 않는다. */}
-        {articlesNotice ? (
+        {data?.articlesNotice ? (
           <div className={`${styles.banner} ${styles.bannerInfo}`} role="note">
             <Icon name="info" size={16} />
-            <span>{articlesNotice}</span>
+            <span>{data.articlesNotice}</span>
           </div>
         ) : null}
 

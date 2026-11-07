@@ -149,18 +149,21 @@ export function hqOutTaxHint(
 export const ARTICLES_CHANGE_NOTICE = '정관 변경 건입니다 — 변경된 정관은 따로 준비하세요';
 
 /**
- * 정관 변경 건 안내(결정 2026-11-07) — 상호(NAME) · 목적(PURPOSE)은 늘, 본점이전(HQ · HQ_OUT)은 지금 본점과
- * 새 본점의 시·도가 다를 때만 `ARTICLES_CHANGE_NOTICE`, 그 밖(임원 · 대표자 주소 · 시·도가 같은 본점이전)은 null.
+ * 정관 변경 건 안내(결정 2026-11-07) — **정관 최종본이 없는 회사**(다른 곳 설립, 2026-11-08 1단계 밖)의 정관 변경 건.
+ * 어느 구분이 정관을 바꾸는지는 공통 코드 `LAW_CNG_AR`(`legal-articles.ts`, 2026-11-08 — 소스에 박지 않는다)의 역할이다:
+ *   · 역할이 없으면(임원 · 대표자 주소) null
+ *   · 본점 · 공고 밖의 역할(상호 · 목적)이 있으면 늘 `ARTICLES_CHANGE_NOTICE`
+ *   · 본점 · 공고만이면 지금 본점과 새 본점의 시·도가 다를 때만
  * 시·도는 세금 안내와 같은 `sidoOf`(정관 제3조 「본점은 ○○에 둔다」가 시·도 단위다).
  * 두 주소 중 하나라도 비면 비교할 수 없으므로 null.
  */
 export function articlesChangeNotice(
-  changeType: string,
+  roles: readonly string[],
   currentHqAddress: string | null | undefined,
   newHqAddress: string | null | undefined,
 ): string | null {
-  if (changeType === 'NAME' || changeType === 'PURPOSE') return ARTICLES_CHANGE_NOTICE;
-  if (changeType !== 'HQ' && changeType !== 'HQ_OUT') return null;
+  if (roles.length === 0) return null;
+  if (roles.some((r) => r !== 'HQ' && r !== 'NOTICE')) return ARTICLES_CHANGE_NOTICE;
   const from = sidoOf(currentHqAddress);
   const to = sidoOf(newHqAddress);
   if (!from || !to) return null;
