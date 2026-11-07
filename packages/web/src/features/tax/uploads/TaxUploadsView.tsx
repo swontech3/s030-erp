@@ -32,9 +32,10 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Icon, type IconName } from '@/components/ds';
+import { Button, Icon, type IconName } from '@/components/ds';
 import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
 import t from '../common/tax.module.css';
+import { TaxEmpty } from '../common/TaxEmpty';
 import { TaxConfirmDialog } from '../common/TaxConfirmDialog';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { TaxMonthBar, monthShort, todayNote } from '../common/TaxMonthBar';
@@ -293,7 +294,7 @@ export function TaxUploadsView({ month }: { month: string }) {
               {data.files.length === 0 ? (
                 <tr>
                   <td colSpan={6} className={t.empty}>
-                    아직 올린 파일이 없습니다
+                    <TaxEmpty icon="upload" lead="아직 올린 파일이 없습니다" />
                   </td>
                 </tr>
               ) : (
@@ -756,12 +757,12 @@ function UploadModal({ month, kind: initialKind, data, onClose, onDone }: ModalP
         <div className={t.mF}>
           {p && !same && p.toInsert === 0 ? <span className={t.sm}>넣을 줄이 없습니다</span> : null}
           <span className={t.sp} />
-          <button type="button" className={t.btn} onClick={onClose}>
+          <Button size="sm" variant="ghost" onClick={onClose}>
             취소
-          </button>
-          <button type="button" className={`${t.btn} ${t.btnPrimary}`} disabled={!ready} onClick={doUpload}>
+          </Button>
+          <Button size="sm" variant="primary" disabled={!ready} onClick={doUpload}>
             {ready ? `${won(total)}${unit} ${isXfer ? '덧붙이기' : '올리기'}` : '올리기'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

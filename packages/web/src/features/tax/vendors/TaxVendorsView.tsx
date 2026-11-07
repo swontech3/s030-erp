@@ -19,8 +19,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { digitsOnly, formatBizNumber, isBizNumberChecksumOk, isBizNumberLength } from '@swonbiz/shared/domain/tax-number';
 import { TAX_KIND_INVOICE, TAX_VENDOR_GENERAL, TAX_VENDOR_MAIN, withRo } from '@swonbiz/shared/domain/tax-uploads';
-import { Icon } from '@/components/ds';
+import { Button, Icon } from '@/components/ds';
 import t from '../common/tax.module.css';
+import { TaxEmpty } from '../common/TaxEmpty';
 import { TaxConfirmDialog } from '../common/TaxConfirmDialog';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { monthShort } from '../common/TaxMonthBar';
@@ -268,7 +269,7 @@ export function TaxVendorsView({ month }: { month: string }) {
               {list.length === 0 ? (
                 <tr>
                   <td colSpan={6} className={t.empty}>
-                    찾는 거래처가 없습니다
+                    <TaxEmpty icon="building-2" lead="찾는 거래처가 없습니다" />
                   </td>
                 </tr>
               ) : (
@@ -415,12 +416,12 @@ function EditModal({ vendor, onClose, onDone }: { vendor: TaxVendorView; onClose
       onClose={onClose}
       footer={
         <>
-          <button type="button" className={t.btn} onClick={onClose}>
+          <Button size="sm" variant="ghost" onClick={onClose}>
             취소
-          </button>
-          <button type="button" className={`${t.btn} ${t.btnPrimary}`} disabled={busy} onClick={save}>
+          </Button>
+          <Button size="sm" variant="primary" disabled={busy} onClick={save}>
             저장
-          </button>
+          </Button>
         </>
       }
     >
@@ -491,12 +492,12 @@ function MergeModal({ vendors, firstOf, onClose, onDone }: {
       onClose={onClose}
       footer={
         <>
-          <button type="button" className={t.btn} onClick={onClose}>
+          <Button size="sm" variant="ghost" onClick={onClose}>
             취소
-          </button>
-          <button type="button" className={`${t.btn} ${t.btnPrimary}`} disabled={busy} onClick={run}>
+          </Button>
+          <Button size="sm" variant="primary" disabled={busy} onClick={run}>
             합치기
-          </button>
+          </Button>
         </>
       }
     >

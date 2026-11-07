@@ -20,9 +20,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { thisMonthOf } from '@swonbiz/shared/domain/tax-uploads';
 import { vatPeriodMonth } from '@swonbiz/shared/domain/tax-vat';
 import { handoffLogPeriodLabel, type HandoffCell, type HandoffSheetKey } from '@swonbiz/shared/domain/tax-handoff';
-import { Icon } from '@/components/ds';
+import { Button, Icon } from '@/components/ds';
 import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
 import t from '../common/tax.module.css';
+import { TaxEmpty } from '../common/TaxEmpty';
 import { TaxConfirmDialog } from '../common/TaxConfirmDialog';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { TaxMonthBar } from '../common/TaxMonthBar';
@@ -218,7 +219,7 @@ export function TaxHandoffView({ month }: { month: string }) {
                 {sheet.rows.length === 0 ? (
                   <tr>
                     <td colSpan={sheet.columns.length} className={t.empty}>
-                      {data.rangeLabel} {sheet.name} 자료가 없습니다
+                      <TaxEmpty icon="mail" lead={`${data.rangeLabel} ${sheet.name} 자료가 없습니다`} />
                     </td>
                   </tr>
                 ) : (
@@ -288,10 +289,10 @@ export function TaxHandoffView({ month }: { month: string }) {
       </div>
 
       <div className={t.row} style={{ gap: 12 }}>
-        <button type="button" className={`${t.btn} ${t.btnPrimary}`} disabled={blockedWhy !== null || sending} onClick={() => setAsking(true)}>
+        <Button size="sm" variant="primary" disabled={blockedWhy !== null || sending} onClick={() => setAsking(true)}>
           <Icon name="mail" size={16} />
           {sending ? '보내는 중…' : '메일 보내기'}
-        </button>
+        </Button>
         <ExcelDownloadButton href={exportHref(query)} className={t.btn} onError={setFailed} />
         {blockedWhy ? <span className={t.help}>{blockedWhy}</span> : null}
       </div>
@@ -318,7 +319,7 @@ export function TaxHandoffView({ month }: { month: string }) {
               {data.logs.length === 0 ? (
                 <tr>
                   <td colSpan={8} className={t.empty}>
-                    아직 보내지 않았습니다
+                    <TaxEmpty icon="mail" lead="아직 보내지 않았습니다" />
                   </td>
                 </tr>
               ) : (

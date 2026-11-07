@@ -26,6 +26,7 @@ import {
 import { Icon } from '@/components/ds';
 import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
 import t from '../common/tax.module.css';
+import { TaxEmpty } from '../common/TaxEmpty';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { TaxMonthBar, monthLabel, todayNote } from '../common/TaxMonthBar';
 import { won } from '../uploads/tax-uploads-model';
@@ -179,7 +180,7 @@ export function TaxPaymentsView({ month, initialTab, fileId: initialFile }: Prop
   const empty = (cols: number) => (
     <tr>
       <td colSpan={cols} className={t.empty}>
-        해당하는 줄이 없습니다
+        <TaxEmpty icon="receipt" lead="해당하는 줄이 없습니다" />
       </td>
     </tr>
   );

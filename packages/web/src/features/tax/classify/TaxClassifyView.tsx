@@ -38,6 +38,7 @@ import { TAX_INV_DIR_PURCHASE, TAX_INV_DIR_SALES } from '@swonbiz/shared/domain/
 import { Icon } from '@/components/ds';
 import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
 import t from '../common/tax.module.css';
+import { TaxEmpty } from '../common/TaxEmpty';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { TaxMonthBar, monthLabel, todayNote } from '../common/TaxMonthBar';
 import { TaxToast, useTaxToast } from '../common/TaxToast';
@@ -378,11 +379,9 @@ export function TaxClassifyView({ month, initialView, fileId: initialFile }: Pro
                     <tr>
                       <td colSpan={6} className={t.empty}>
                         {tab === 'todo' ? (
-                          <>
-                            <Icon name="circle-check" size={18} /> 이번 달 정리를 마쳤습니다
-                          </>
+                          <TaxEmpty icon="circle-check" lead="이번 달 정리를 마쳤습니다" />
                         ) : (
-                          '해당하는 줄이 없습니다'
+                          <TaxEmpty icon="file-pen-line" lead="해당하는 줄이 없습니다" />
                         )}
                       </td>
                     </tr>
@@ -521,7 +520,7 @@ export function TaxClassifyView({ month, initialView, fileId: initialFile }: Pro
                   {data.rows.length === 0 ? (
                     <tr>
                       <td colSpan={5} className={t.empty}>
-                        해당하는 줄이 없습니다
+                        <TaxEmpty icon="file-pen-line" lead="해당하는 줄이 없습니다" />
                       </td>
                     </tr>
                   ) : (

@@ -29,8 +29,8 @@
 /* ── 카드 ── */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .cardPad { padding: 20px 24px; }
-.secT { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; color: var(--text-heading); }
-.secT::before { content: ""; width: 3px; height: 16px; background: var(--color-primary); }
+/* ★ 2026-11-07 ERP 디자인 컨셉에 맞춤 — 16px + 왼쪽 인디고 막대 → 18px/700 막대 없음(05-patterns §2) */
+.secT { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; color: var(--text-heading); }
 .help { margin: 0; font-size: 13px; color: var(--text-muted); line-height: 1.6; text-wrap: pretty; }
 .sm { font-size: 12px; color: var(--text-muted); }
 .tnum { font-variant-numeric: tabular-nums; }
@@ -45,12 +45,19 @@
   height: 40px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--text-heading);
   font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; text-decoration: none;
-  transition: background var(--dur) var(--ease-out);
+  letter-spacing: -.01em;
+  transition: background var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out), color var(--dur) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
+/* ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(03-components Button) — 크기는 그대로, 글자색 · 그림자 · 눌림 · 초점 · 위험 꼴을 ERP 값으로.
+ *   40px 버튼은 화면에서 ERP 공통 Button(sm)을 쓰고, 이 클래스는 32px · 빨강 · 링크 · 엑셀 · 확인 팝업(44px)에만 남는다. */
 .btn:hover { background: var(--surface-alt); color: var(--text-heading); }
-.btnPrimary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; box-shadow: var(--shadow-primary); }
-.btnPrimary:hover { background: var(--color-primary-hover); color: #fff; }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.btnPrimary { background: var(--color-primary); border-color: transparent; color: var(--text-on-primary); box-shadow: var(--shadow-primary); }
+.btnPrimary:hover { background: var(--color-primary-hover); color: var(--text-on-primary); box-shadow: var(--shadow-primary-hover); }
 .btnDanger { color: var(--color-danger); }
+.btnDanger:hover { background: var(--color-danger-bg); color: var(--color-danger); }
 .btnDangerSolid { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
 .btnDangerSolid:hover { background: var(--red-800); color: #fff; }
 .btnSm { height: 32px; padding: 0 12px; font-size: 13px; }
@@ -95,21 +102,26 @@
   border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-overlay); overflow: hidden;
 }
 .confirm { padding: 28px 28px 8px; text-align: center; }
+/* ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(계약 폼 확인 모달) — 아이콘 52 → 56px, 제목 20/700 → 22/600, 본문 줄 간격 1.6, 버튼 높이 44px */
 .confirmIc {
-  width: 52px; height: 52px; margin: 0 auto; border-radius: 999px; display: grid; place-items: center;
+  width: 56px; height: 56px; margin: 0 auto; border-radius: 999px; display: grid; place-items: center;
   background: var(--color-accent-bg); color: var(--color-primary);
 }
 .confirmIcRed { background: var(--color-danger-bg); color: var(--color-danger); }
-.confirm h3 { margin: 14px 0 0; font-size: 20px; font-weight: 700; color: var(--text-heading); }
-.confirm p { margin: 8px 0 0; font-size: 14px; text-wrap: pretty; }
-.confirmF { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 20px 28px 28px; }
+.confirm h3 { margin: 16px 0 0; font-size: 22px; font-weight: 600; color: var(--text-heading); }
+.confirm p { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: var(--text-body); text-wrap: pretty; }
+.confirmF { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 24px 28px 28px; }
+.confirmF .btn { height: 44px; }
 
-/* ── 토스트(결과서 0-6 — 아래 가운데 44px 검정, 2.4초) ── */
+/* ── 토스트 — ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(월별 청구 · 03-components Toast): 아래 가운데 44px 검정 →
+ *   오른쪽 아래 380px 흰 카드 + 인디고 점, 2.4초 → 2.8초 ── */
 .toast {
-  position: fixed; left: 50%; bottom: 28px; z-index: 200; transform: translate(-50%, 0);
-  display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: var(--radius-md);
-  background: var(--surface-inverse); color: #fff; font-size: 14px; font-weight: 700; white-space: nowrap;
+  position: fixed; right: 32px; bottom: 32px; z-index: 200;
+  display: flex; align-items: center; gap: 10px; width: 380px; padding: 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-float);
 }
+.toastDot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 999px; background: var(--color-primary); }
+.toastMsg { flex: 1; font-size: 14px; font-weight: 700; color: var(--text-heading); }
 
 /* ══ 1-2 에서 더함 — 자료 올리기 · 거래처(시안 tax.css 그대로 옮김) ══════════════════════════ */
 
@@ -154,11 +166,12 @@
 .chipOn { border-color: var(--color-primary); background: var(--color-accent-bg); color: var(--color-primary-hover); font-weight: 700; }
 .chipOn b { color: var(--color-primary-hover); }
 
-/* ── 탭 — 시안 tax.css `.tabs` · `.tab` ── */
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+/* ── 탭 — ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(월별 청구 탭 · 03-components Tabs underline): 사이 4 → 24px,
+ *   높이 44px · 좌우 14px → 위 10 · 아래 12px · 좌우 0, 글자 14 → 15px ── */
+.tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--border); overflow-x: auto; }
 .tab {
-  height: 44px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: transparent;
-  color: var(--text-muted); font-family: inherit; font-size: 14px; cursor: pointer; white-space: nowrap;
+  padding: 10px 0 12px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: transparent;
+  color: var(--text-muted); font-family: inherit; font-size: 15px; cursor: pointer; white-space: nowrap;
 }
 .tabOn { border-bottom-color: var(--color-primary); color: var(--text-heading); font-weight: 700; }
 
@@ -167,7 +180,7 @@
 .tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .tbl th {
   height: 44px; padding: 0 12px; font-size: 12px; font-weight: 700; color: var(--text-muted); text-align: left;
-  background: var(--surface); border-bottom: 1px solid var(--border); white-space: nowrap;
+  background: var(--surface-alt); border-bottom: 1px solid var(--border); white-space: nowrap; /* ★ 2026-11-07 바탕 --surface → --surface-alt */
 }
 .tbl td {
   padding: 13px 12px; font-size: 14px; color: var(--text-heading); border-bottom: 1px solid var(--border);
@@ -181,7 +194,12 @@
 .clickable:hover td { background: var(--surface-alt); }
 .pick td { background: var(--color-accent-bg); }
 .ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.empty { text-align: center; padding: 32px !important; color: var(--text-muted) !important; }
+/* ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(월별 청구 BillingEmpty) — 글자 한 줄 → 가운데 아이콘 40px + 16px 문구 + 14px 보조 문구.
+ *   표 안이면 <td className={t.empty}> 에 `TaxEmpty` 를 넣는다. */
+.empty { text-align: center; padding: 56px 24px !important; }
+.emptyIcon { color: var(--text-caption); }
+.emptyLead { margin: 12px 0 0; font-size: 16px; color: var(--text-muted); }
+.emptySub { margin: 4px 0 0; font-size: 14px; color: var(--text-caption); }
 
 /* ── 목록 위 버튼 줄 ── */
 .tbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border); }
