@@ -9,10 +9,11 @@
  *
  * ★ 회사 거르기는 서버가 한다 — 입주사 세션의 `GET /reservations` 는 RLS 로 자기 회사 예약만 온다.
  *   여기서는 상태 · 시각으로만 거른다.
- * ★ 「끝났는가」는 예약 화면의 `shownStatus`(web BookingForm)와 같은 규칙이다 —
- *   취소면 뺀다 · 종료 처리됐거나 끝 시각이 지금 이전(같음 포함)이면 끝난 것이다.
+ * ★★ 「끝났는가」 규칙은 **여기 한 곳**이다(`bookingShownStatus` · 6-나 덧붙임 2026-11-07) —
+ *   예약 화면(web BookingForm `shownStatus`)과 이 목록이 같이 부른다. 두 곳에 두면 한쪽만 고쳐지는 날이 온다.
  */
 import { parseDay, toDay } from './day';
+import { timeToMinutes } from './reservation-rules';
 
 /**
  * ★ 내 예약 목록이 보는 기간 — **오늘 포함 183일(6개월)**. 대표 답 2026-11-07.
@@ -43,10 +44,6 @@ export interface MyBooking {
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const minutesOf = (hhmm: string): number => {
-  const [h, m] = hhmm.split(':').map(Number) as [number, number];
-  return h * 60 + m;
-};
 
 /** 목록을 받을 기간 — 오늘부터 오늘 포함 183일(끝 = 오늘 + 182) */
 export function myBookingsRange(today: string): { from: string; to: string } {
@@ -55,21 +52,29 @@ export function myBookingsRange(today: string): { from: string; to: string } {
   return { from: today, to: toDay(new Date(at.getTime() + (MY_BOOKINGS_RANGE_DAYS - 1) * DAY_MS)) };
 }
 
-/** 아직 안 끝난 확정 예약인가 — 예약 화면 `shownStatus` 가 'confirmed' 인 것과 같다 */
-function upcoming(r: MyBooking, asOf: { day: string; minutes: number }): boolean {
-  if (r.status !== 'confirmed') return false;
-  if (r.day < asOf.day) return false;
-  return !(r.day === asOf.day && minutesOf(r.endTime) <= asOf.minutes);
+/**
+ * 예약이 지금 어떤 상태로 보이는가 — 「끝났는가」 규칙 하나(예약 화면 · 내 예약 목록이 같이 부른다).
+ *   취소면 'cancelled' · 종료 처리됐거나 끝 시각이 지금 이전(같음 포함)이면 'completed' · 그 밖은 'confirmed'.
+ * ★ 끝난 확정 예약을 종료로 보이는 것은 **보이는 값**이다 — 저장된 상태를 바꾸지 않는다(자동 종료 배치 없음).
+ */
+export function bookingShownStatus(
+  r: { status: string; day: string; endTime: string },
+  asOf: { day: string; minutes: number },
+): 'cancelled' | 'completed' | 'confirmed' {
+  if (r.status === 'cancelled') return 'cancelled';
+  const ended = r.day < asOf.day || (r.day === asOf.day && timeToMinutes(r.endTime) <= asOf.minutes);
+  if (r.status === 'completed' || ended) return 'completed';
+  return 'confirmed';
 }
 
 /** 확정 · 아직 안 끝난 것만 · 가까운 순(날짜 → 시작 시각 → 회의실 이름). 받은 배열은 바꾸지 않는다 */
 export function pickMyBookings<T extends MyBooking>(list: readonly T[], asOf: { day: string; minutes: number }): T[] {
   return list
-    .filter((r) => upcoming(r, asOf))
+    .filter((r) => bookingShownStatus(r, asOf) === 'confirmed')
     .sort(
       (a, b) =>
         a.day.localeCompare(b.day) ||
-        minutesOf(a.startTime) - minutesOf(b.startTime) ||
+        timeToMinutes(a.startTime) - timeToMinutes(b.startTime) ||
         a.roomName.localeCompare(b.roomName, 'ko'),
     );
 }

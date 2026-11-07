@@ -28,6 +28,7 @@ import {
   validateReservation,
   type ReservationReason,
 } from '@swonbiz/shared/domain/reservation-rules';
+import { bookingShownStatus } from '@swonbiz/shared/domain/my-bookings';
 import { Icon } from '@/components/ds';
 import styles from './booking.module.css';
 import {
@@ -606,12 +607,11 @@ export function BookingForm({
  *
  * ★ 저장값을 바꾸는 것은 운영자의 [종료 처리] 다. 화면이 먼저 그렇게 그리는 이유는,
  *   운영자가 아직 닫지 않았다고 해서 지난 예약이 「확정」으로 보이면 안 되기 때문이다.
+ * ★★ 규칙은 shared 한 곳이다(`bookingShownStatus` · 6-나 덧붙임 2026-11-07) — 내 예약 목록(/booking/mine)도
+ *    같은 함수를 부른다. 여기서 다시 적지 않는다(두 곳이면 한쪽만 고쳐지는 날이 온다).
  */
 export function shownStatus(r: Reservation, asOf: { day: string; minutes: number }): string {
-  if (r.status === 'cancelled') return 'cancelled';
-  const ended = r.day < asOf.day || (r.day === asOf.day && timeToMinutes(r.endTime) <= asOf.minutes);
-  if (r.status === 'completed' || ended) return 'completed';
-  return 'confirmed';
+  return bookingShownStatus(r, asOf);
 }
 
 /** 시안 문구 — 규칙 사유를 그 방의 값으로 풀어 쓴다(`05-logic.md` §4). */

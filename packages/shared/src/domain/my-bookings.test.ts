@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BOOK_HREF,
   MY_BOOKINGS_RANGE_DAYS,
+  bookingShownStatus,
   myBookingHref,
   myBookingLine,
   myBookingsRange,
@@ -117,5 +118,73 @@ describe('누를 때 가는 주소 — 링크 이동', () => {
   });
   it('「예약하기」 → /booking', () => {
     expect(BOOK_HREF).toBe('/booking');
+  });
+});
+
+/**
+ * 6-나 덧붙임 (대표 지시 2026-11-07) — 「끝났는가」 규칙은 shared 한 곳(`bookingShownStatus`)에만 둔다.
+ * 예약 화면(web BookingForm `shownStatus`)과 내 예약 목록(`pickMyBookings`)이 이것을 부른다.
+ *
+ * ★ 예약 화면 동작이 바뀌지 않았음을 보이려고, 바꾸기 전 BookingForm 의 `shownStatus` 를 **그대로** 옮겨 둔다
+ *   (아래 `beforeShownStatus`). 여러 경우를 만들어 두 결과가 하나도 다르지 않은지 본다.
+ */
+const beforeShownStatus = (
+  r: { status: string; day: string; endTime: string },
+  asOf: { day: string; minutes: number },
+): string => {
+  const toMin = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number) as [number, number];
+    return h * 60 + m;
+  };
+  if (r.status === 'cancelled') return 'cancelled';
+  const ended = r.day < asOf.day || (r.day === asOf.day && toMin(r.endTime) <= asOf.minutes);
+  if (r.status === 'completed' || ended) return 'completed';
+  return 'confirmed';
+};
+
+describe('bookingShownStatus — 「끝났는가」 규칙 하나(예약 화면 · 내 예약 목록이 같이 부른다)', () => {
+  it.each([
+    ['취소 · 앞날', 'cancelled', { status: 'cancelled', day: '2026-11-08', endTime: '10:00' }],
+    ['취소 · 이미 지남', 'cancelled', { status: 'cancelled', day: '2026-11-06', endTime: '10:00' }],
+    ['종료 처리 · 앞날', 'completed', { status: 'completed', day: '2026-11-08', endTime: '10:00' }],
+    ['확정 · 어제', 'completed', { status: 'confirmed', day: '2026-11-06', endTime: '23:30' }],
+    ['확정 · 오늘 끝 시각 = 지금', 'completed', { status: 'confirmed', day: '2026-11-07', endTime: '14:30' }],
+    ['확정 · 오늘 진행 중', 'confirmed', { status: 'confirmed', day: '2026-11-07', endTime: '15:00' }],
+    ['확정 · 내일', 'confirmed', { status: 'confirmed', day: '2026-11-08', endTime: '09:30' }],
+  ])('%s → %s', (_n, want, row) => {
+    expect(bookingShownStatus(row, NOW)).toBe(want);
+  });
+
+  it('바꾸기 전 예약 화면 규칙과 모든 경우가 같다(상태 3 × 날짜 3 × 끝 시각 5 × 지금 3)', () => {
+    const statuses = ['confirmed', 'cancelled', 'completed'];
+    const days = ['2026-11-06', '2026-11-07', '2026-11-08'];
+    const ends = ['00:30', '14:00', '14:30', '15:00', '24:00'];
+    const nows = [{ day: '2026-11-07', minutes: 0 }, NOW, { day: '2026-11-07', minutes: 1439 }];
+    const diff: string[] = [];
+    for (const status of statuses)
+      for (const day of days)
+        for (const endTime of ends)
+          for (const asOf of nows) {
+            const row = { status, day, endTime };
+            if (bookingShownStatus(row, asOf) !== beforeShownStatus(row, asOf)) {
+              diff.push(`${status} ${day} ${endTime} @${asOf.minutes}`);
+            }
+          }
+    expect(diff).toEqual([]);
+  });
+
+  it('내 예약 목록은 이 규칙이 confirmed 인 것만 남긴다 — 두 화면이 같은 결과', () => {
+    const rows = [
+      r({ reservationId: 'a', status: 'cancelled', day: '2026-11-08' }),
+      r({ reservationId: 'b', status: 'completed', day: '2026-11-08' }),
+      r({ reservationId: 'c', day: '2026-11-06' }),
+      r({ reservationId: 'd', day: '2026-11-07', startTime: '14:00', endTime: '14:30' }),
+      r({ reservationId: 'e', day: '2026-11-07', startTime: '14:00', endTime: '15:00' }),
+      r({ reservationId: 'f', day: '2026-11-08' }),
+    ];
+    const kept = pickMyBookings(rows, NOW).map((x) => x.reservationId);
+    const confirmed = rows.filter((x) => bookingShownStatus(x, NOW) === 'confirmed').map((x) => x.reservationId);
+    expect(kept).toEqual(confirmed);
+    expect(kept).toEqual(['e', 'f']);
   });
 });
