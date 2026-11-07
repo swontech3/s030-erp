@@ -90,6 +90,7 @@ import { CorpChangeConfirmDialog, type CorpChangeConfirmKind } from './CorpChang
 import { CorpChangePrintDialog } from './CorpChangePrintDialog';
 import { CorpChangePrintHistory } from './CorpChangePrintHistory';
 import { BizPurposePickerDialog } from './BizPurposePickerDialog';
+import { ArticlesFileField } from './ArticlesFileField';
 import { appendPurposeLines } from '@swonbiz/shared/domain/biz-purpose';
 import styles from './corp-change-detail.module.css';
 
@@ -794,6 +795,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
           ) : null}
 
           <CompanySection
+            orgId={draft.orgId}
             company={company}
             form={companyInput}
             editable={companyEditable}
@@ -1224,6 +1226,7 @@ function payloadColumns(fields: readonly CorpChangeFieldDef[]): number {
 const DOC_NAME_LABEL = '서류에 쓰이는 상호';
 
 function CompanySection({
+  orgId,
   company,
   form,
   editable,
@@ -1234,6 +1237,8 @@ function CompanySection({
   onChange,
   onError,
 }: {
+  /** 단체 — 「정관 파일」 칸이 쓴다(결정 2026-11-07). */
+  orgId: number;
   company: CorpChangeCompanyInfo;
   form: CompanyForm;
   /** 비입주사이고 건을 고칠 수 있다(임시 모드 · 서류작성중). */
@@ -1294,6 +1299,8 @@ function CompanySection({
               {label === '대표자 자택 주소' && errorFor('ceo') ? <span className={styles.fieldError}>{errorFor('ceo')}</span> : null}
             </div>
           ))}
+          {/* 정관 파일 — 입주사도 법무 쪽에서 관리(운영사만 올린다, 결정 2026-11-07) */}
+          <ArticlesFileField orgId={orgId} onError={onError} />
         </div>
       </section>
     );
@@ -1386,6 +1393,8 @@ function CompanySection({
           <span className={styles.label}>{DOC_NAME_LABEL}</span>
           <span className={`${styles.readValue}${docName ? '' : ` ${styles.readEmpty}`}`}>{docName || '—'}</span>
         </div>
+        {/* 정관 파일 — 건의 [저장] 과 따로, 고르는 즉시 올라간다(결정 2026-11-07) */}
+        <ArticlesFileField orgId={orgId} onError={onError} />
       </div>
     </section>
   );

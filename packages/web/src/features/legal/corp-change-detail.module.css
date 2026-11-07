@@ -395,6 +395,19 @@
   color: var(--text-caption);
 }
 
+/* ── 정관 파일(결정 2026-11-07) — 파일 이름 · 보기 · 올리기 · 설립 건 바로가기를 한 줄에 ── */
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fileName {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
 /* ── 딱지 ── */
 .badge {
   height: 24px;
