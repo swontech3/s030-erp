@@ -127,6 +127,12 @@ describe('★ 타관할로의 본점이전(HQ_OUT) · 회사 형태(결정 2026-
     expect(allowedTypes(null)).toEqual(allowedTypes('R'));
     expect(allowedTypes('')).toEqual(allowedTypes('R'));
   });
+  it('회사유형이 R · A 가 아니면(C · S · P · Z 등) 주식회사로 보고 거른다 — 예전 동작 유지', () => {
+    for (const t of ['C', 'S', 'P', 'Z', 'X', ' ']) expect(allowedTypes(t)).toEqual(allowedTypes('R'));
+    const both = parseChangeTypeRules([{ code: 'NAME', name: 'A' }]);
+    expect(changeTypeAllowedFor('NAME', 'C', both)).toBe(false);
+    expect(changeTypeMemberTypeError('HQ_OUT', 'C', rules)).not.toBeNull();
+  });
   it('이름을 「R,A」로 바꾸면 둘 다 고를 수 있다', () => {
     const both = parseChangeTypeRules([{ code: 'NAME', name: 'R,A' }, { code: 'HQ_OUT', name: 'A' }]);
     expect(changeTypeAllowedFor('NAME', 'A', both)).toBe(true);
@@ -147,7 +153,7 @@ describe('★ 타관할로의 본점이전(HQ_OUT) · 회사 형태(결정 2026-
     [null, 'HQ_OUT', false],
     [null, 'HQ', true],
     ['C', 'HQ_OUT', false],
-    ['C', 'NAME', false],
+    ['C', 'NAME', true],
     ['A', 'NAME', false],
     ['A', 'OFFICER', false],
     [null, 'CEO_ADDR', true],

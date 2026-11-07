@@ -69,7 +69,7 @@ export type CorpChangeType = (typeof CORP_CHANGE_TYPES)[number];
  * 유한회사 회사유형 코드(`MEMBER_TYPE` — 입주사 000 · 비입주사 002 모두 `A`).
  */
 export const LTD_MEMBER_TYPE = 'A';
-/** 주식회사 회사유형 코드 — 회사유형이 빈 회사는 이것으로 본다 · 규칙 줄이 없는 구분은 이것만 고른다(결정 2026-11-07). */
+/** 주식회사 회사유형 코드 — 회사유형이 비었거나 R · A 가 아닌 회사는 이것으로 본다 · 규칙 줄이 없는 구분은 이것만 고른다(결정 2026-11-07). */
 export const STOCK_MEMBER_TYPE = 'R';
 
 /**
@@ -98,7 +98,8 @@ export function parseChangeTypeRules(rows: readonly { code: string; name: string
 /**
  * 이 회사유형의 건이 고를 수 있는 구분인가(결정 2026-11-01 → 2026-11-07 공통 코드로).
  *   · 규칙은 공통코드 `LAW_CNG_MT`(`parseChangeTypeRules`) — 구분의 이름에 회사유형 코드가 있으면 고를 수 있다
- *   · 줄이 없는 구분은 주식회사(`R`)만 · 회사유형이 빈 회사는 주식회사로 본다
+ *   · 줄이 없는 구분은 주식회사(`R`)만 · 회사유형이 비었거나 R · A 가 아닌 회사(C · S · P · Z 등)는 주식회사로 본다
+     (예전 동작 유지, 결정 2026-11-07)
  * ★ 화면(새 건 대화상자 선택지)과 서버(첫 저장 · 저장 · 작성완료 거절)가 이 함수 하나를 쓴다.
  */
 export function changeTypeAllowedFor(
@@ -107,7 +108,7 @@ export function changeTypeAllowedFor(
   rules: ChangeTypeRules,
 ): boolean {
   const allowed = rules[changeType] ?? [STOCK_MEMBER_TYPE];
-  const type = memberType === null || memberType === undefined || memberType.trim() === '' ? STOCK_MEMBER_TYPE : memberType;
+  const type = memberType === STOCK_MEMBER_TYPE || memberType === LTD_MEMBER_TYPE ? memberType : STOCK_MEMBER_TYPE;
   return allowed.includes(type);
 }
 

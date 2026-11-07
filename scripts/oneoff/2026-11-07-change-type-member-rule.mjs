@@ -5,7 +5,7 @@
  *   · 분류 `LAW_CNG_MT`(법인변경 구분별 회사유형), 파티션 `000`(공통)
  *     코드값 = 변경 구분(`LAW_CNG_TP` 의 코드값), 이름 = 쓸 수 있는 회사유형 코드를 쉼표로(예 `R` · `A` · `R,A`)
  *   · 시작 값: NAME · PURPOSE · OFFICER · CEO_ADDR · HQ = R / HQ_OUT = A
- *   · 줄이 없는 구분은 주식회사(R)만 · 회사유형이 빈 회사는 주식회사로 본다
+ *   · 줄이 없는 구분은 주식회사(R)만 · 회사유형이 비었거나 R · A 가 아닌 회사는 주식회사로 본다
  *   · 새 건 대화상자 거르기 · 서버 거절(첫 저장 · 저장 · 작성완료)이 이 코드 하나를 읽는다
  *     (shared `parseChangeTypeRules` · `changeTypeAllowedFor`, api `readChangeTypeRules`)
  *   · 바꿀 때는 코드 관리(s030100030)에서 이름을 고친다(한 업무는 한 화면)
@@ -49,7 +49,7 @@ const USE_TP = CORP_CHANGE_MEMBER_RULE_USE_TP;
 const MASTER = {
   name: '법인변경 구분별 회사유형',
   description:
-    '법인변경 변경 구분별로 쓸 수 있는 회사유형. 코드값 = 변경 구분(LAW_CNG_TP), 이름 = 회사유형 코드를 쉼표로(예 R · A · R,A). 줄이 없는 구분은 주식회사(R)만 · 회사유형이 빈 회사는 주식회사로 본다',
+    '법인변경 변경 구분별로 쓸 수 있는 회사유형. 코드값 = 변경 구분(LAW_CNG_TP), 이름 = 회사유형 코드를 쉼표로(예 R · A · R,A). 줄이 없는 구분은 주식회사(R)만 · 회사유형이 비었거나 R · A 가 아닌 회사는 주식회사로 본다',
 };
 const PARTITION_DESC = '단일 파티션. 법인변경 새 건 대화상자 거르기 · 첫 저장 · 저장 · 작성완료 거절이 쓴다';
 
@@ -95,9 +95,9 @@ const START = { NAME: 'R', HQ: 'R', PURPOSE: 'R', OFFICER: 'R', CEO_ADDR: 'R', H
     const rules = parseChangeTypeRules(LINES.map(([code, name]) => ({ code, name })));
     const appTypes = ['NAME', 'HQ', 'HQ_OUT', 'PURPOSE', 'OFFICER', 'CEO_ADDR'];
     console.log('■ 회사유형별 고를 수 있는 구분');
-    for (const m of ['R', 'A', null]) {
+    for (const m of ['R', 'A', 'C', null]) {
       const ok = types.filter((t) => appTypes.includes(t.code) && changeTypeAllowedFor(t.code, m, rules)).map((t) => t.name);
-      console.log(`  ${m ?? '(빔 → 주식회사로 봄)'}: ${ok.join(' · ') || '없음'}`);
+      console.log(`  ${m === null ? '(빔 → 주식회사로 봄)' : m === 'C' ? 'C(R · A 아님 → 주식회사로 봄)' : m}: ${ok.join(' · ') || '없음'}`);
     }
 
     if (!APPLY) { console.log('보기만 했습니다. 쓰려면 --apply.'); await c.query('ROLLBACK'); return; }
