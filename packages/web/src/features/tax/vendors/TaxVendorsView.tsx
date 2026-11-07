@@ -3,7 +3,8 @@
 /**
  * 거래처(s050100020) 본문 — 시안 S05-06 을 2026-11-07 대표 수정 ③ 으로 바꾼 것.
  *
- *   검색 조건 카드(검색어 · 구분 · 종료여부 — ERP 목록 화면처럼 라벨 + 칸, 바꾸면 바로 걸러짐) ·
+ *   검색 조건 카드(검색어 · 구분 · 종료여부 — 바꾸면 바로 걸러짐. 2026-11-08 라벨을 지우고 검색칸은 안쪽 안내 글,
+ *   선택 상자는 첫 줄 「구분 전체」 · 「종료여부 전체」로 뜻을 보인다) ·
  *   버튼 줄(카드 밖 — 왼쪽 [수정] [거래종료] · 오른쪽 끝 [주거래처로] [일반으로] [엑셀 내려받기]) · 목록 카드(표만)
  * ★ 2026-11-07 — 목록만 스크롤 · 머리 줄 고정(세무 목록 화면의 기준). ERP 센터 관리(s030100010)와 같은 꼴:
  *   화면이 셸 높이를 채우고(`pageFill`) 목록 카드만 남는 높이를 받아 안에서 스크롤한다(`listCard` · `listScroll` · `tblSticky`).
@@ -42,7 +43,7 @@ type Modal = { kind: 'edit'; vendor: TaxVendorView } | { kind: 'close'; ids: str
 
 const bizView = (biz: string | null) => (biz ? formatBizNumber(biz) : null);
 const CLOSED_OPTIONS: [VendorClosedFilter, string][] = [
-  ['all', '전체'],
+  ['all', '종료여부 전체'],
   ['open', '거래 중'],
   ['closed', '종료'],
 ];
@@ -123,48 +124,42 @@ export function TaxVendorsView() {
   return (
     <div className={`${t.page} ${t.pageFill}`}>
       <div className={`${t.card} ${t.cardPad}`}>
-        <div className={t.row} style={{ gap: 12, alignItems: 'flex-end' }}>
-          <label className={t.field}>
-            <span className={t.lab}>검색어</span>
-            <input
-              className={t.input}
-              style={{ width: 240 }}
-              placeholder="거래처명 · 사업자번호"
-              value={query.q}
-              onChange={(e) => patchQuery({ q: e.target.value })}
-            />
-          </label>
-          <label className={t.field}>
-            <span className={t.lab}>구분</span>
-            <select
-              className={t.select}
-              style={{ width: 150 }}
-              value={query.tp ?? ''}
-              onChange={(e) => patchQuery({ tp: e.target.value === '' ? null : e.target.value })}
-            >
-              <option value="">전체</option>
-              {[TAX_VENDOR_MAIN, TAX_VENDOR_GENERAL].map((code) => (
-                <option key={code} value={code}>
-                  {tpName(code)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={t.field}>
-            <span className={t.lab}>종료여부</span>
-            <select
-              className={t.select}
-              style={{ width: 150 }}
-              value={query.closed}
-              onChange={(e) => patchQuery({ closed: e.target.value as VendorClosedFilter })}
-            >
-              {CLOSED_OPTIONS.map(([v, label]) => (
-                <option key={v} value={v}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className={t.row} style={{ gap: 12, alignItems: 'center' }}>
+          <input
+            className={t.input}
+            style={{ width: 240 }}
+            placeholder="거래처명 · 사업자번호"
+            aria-label="검색어"
+            value={query.q}
+            onChange={(e) => patchQuery({ q: e.target.value })}
+          />
+          <select
+            className={t.select}
+            style={{ width: 150 }}
+            aria-label="구분"
+            value={query.tp ?? ''}
+            onChange={(e) => patchQuery({ tp: e.target.value === '' ? null : e.target.value })}
+          >
+            <option value="">구분 전체</option>
+            {[TAX_VENDOR_MAIN, TAX_VENDOR_GENERAL].map((code) => (
+              <option key={code} value={code}>
+                {tpName(code)}
+              </option>
+            ))}
+          </select>
+          <select
+            className={t.select}
+            style={{ width: 150 }}
+            aria-label="종료여부"
+            value={query.closed}
+            onChange={(e) => patchQuery({ closed: e.target.value as VendorClosedFilter })}
+          >
+            {CLOSED_OPTIONS.map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

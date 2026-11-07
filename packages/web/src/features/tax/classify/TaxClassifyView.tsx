@@ -9,6 +9,7 @@
  *      `pageFill` · `listCard` · `listScroll` · `tblSticky`)
  *
  * ★ 탭(미지정 건 · 지정 건 · 이번 달 자료 전체) · 자료 종류 칩 · 기간 직접 지정 · 설명 글 · 「오늘 … · 사업자 유형」을 없앴다.
+ * ★ 검색조건 라벨(구분 · 출처 · 계정과목)은 지웠다(2026-11-08 거래처와 같게) — 선택 상자 첫 줄 「구분 전체」 · 「출처 전체」 · 「계정과목 전체」로 뜻을 보인다.
  * ★ 같은 날 추가 수정: 「무엇에 쓴 돈인가요?」 → 「계정과목」. 검색조건 「계정과목」(그 회사 출금 항목 TAX_ITEM_OUT, 고르면 그 계정과목으로
  *   확정된 줄만 — 서버 `filterClassifyRows`). 설명 · 안내 문구(항목 목록 안내 띠 · 「지난번 항목을 골라 두었습니다」)를 지웠다 —
  *   남기는 글은 「세무 설정 먼저」 띠 · 오류 · 빈 목록 · 파일 띠 · 토스트처럼 무엇을 해야 하는지(무슨 일이 일어났는지) 알리는 것만.
@@ -187,7 +188,6 @@ export function TaxClassifyView({ month, fileId }: Props) {
       {/* ① 검색조건 — 바꾸면 바로 걸러진다 */}
       <div className={`${t.card} ${t.secLow}`}>
         <TaxMonthBar month={month} note={fileNote}>
-          <span className={t.ctxLab}>구분</span>
           <select
             className={t.select}
             style={FILTER_STYLE}
@@ -195,14 +195,13 @@ export function TaxClassifyView({ month, fileId }: Props) {
             value={status}
             onChange={(e) => setStatus(e.target.value as ClassifyStatus)}
           >
-            <option value="all">전체</option>
+            <option value="all">구분 전체</option>
             {data.codes.statuses.map((c) => (
               <option key={c.code} value={c.code}>
                 {c.name}
               </option>
             ))}
           </select>
-          <span className={t.ctxLab}>출처</span>
           <select
             className={t.select}
             style={FILTER_STYLE}
@@ -210,14 +209,13 @@ export function TaxClassifyView({ month, fileId }: Props) {
             value={kind}
             onChange={(e) => setKind(e.target.value as ClassifyKind)}
           >
-            <option value="all">전체</option>
+            <option value="all">출처 전체</option>
             {data.codes.sources.map((c) => (
               <option key={c.code} value={c.code}>
                 {c.name}
               </option>
             ))}
           </select>
-          <span className={t.ctxLab}>계정과목</span>
           <select
             className={t.select}
             style={{ ...FILTER_STYLE, maxWidth: 200 }}
@@ -225,7 +223,7 @@ export function TaxClassifyView({ month, fileId }: Props) {
             value={item}
             onChange={(e) => setItem(e.target.value)}
           >
-            <option value="">전체</option>
+            <option value="">계정과목 전체</option>
             {data.codes.items.map((i) => (
               <option key={i.code} value={i.code}>
                 {i.name}

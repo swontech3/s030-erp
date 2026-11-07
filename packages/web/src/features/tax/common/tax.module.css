@@ -6,12 +6,11 @@
  * ★ 시안의 1280px 틀 · 삐용 메뉴 · 제목줄 · 개발 확인 막대는 옮기지 않는다(본문만 그린다 — 결과서 0-1).
  */
 
-/* ── 본문 — 영역 사이 20px, 내용 폭 960px(결과서 0-1) ── */
+/* ── 본문 — 영역 사이 20px. ★ 2026-11-08 대표 지시: 내용 폭 960px 고정을 없애 ERP 청구 · 센터 관리처럼 셸 폭을 다 쓴다(결과서 0-1) ── */
 .page {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 960px;
   color: var(--text-body);
   font-size: 14px;
   line-height: 1.6;
@@ -252,7 +251,8 @@
 /* 2행 — 등록현황 왼쪽 · [표준양식 받기] 오른쪽(현금 경비, 2026-11-08) */
 .kindCntRow { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 32px; }
 /* ★ 2026-11-08 — 2행은 한 줄: 등록현황 글자는 줄바꿈 없음, [양식받기](아이콘 + 글자)는 작게(28px · 12px · 좌우 6px).
- *   세무 화면은 960px 고정(셸 최소 1440px)이라 카드 안쪽 폭은 늘 약 194px — 등록현황(약 88) + 틈 6 + 버튼(약 80) ≈ 174px 로 들어간다.
+ *   카드 안쪽 폭은 가장 좁을 때(셸 최소 1440px) 약 230px — 등록현황(약 88) + 틈 6 + 버튼(약 80) ≈ 174px 로 들어간다.
+ *   (2026-11-08 세무 화면 폭 960px 고정을 없앤 뒤 — 그 전에는 늘 약 194px)
  *   마우스를 올리면 감싼 칸의 title 「표준양식 받기」. */
 .kindCntTxt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tplBtn { height: 28px; padding: 0 6px; font-size: 12px; gap: 4px; flex: 0 0 auto; }

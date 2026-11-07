@@ -332,7 +332,8 @@ export function TaxSettingsView() {
 
   /** 세무사 메일 4칸 — 한 줄에 두 사람(이름 · 메일 · 이름 · 메일), 2줄. 빈 칸 허용(서버가 둘 다 빈 사람은 버린다). */
   const emailGrid = (
-    <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1.4fr 1fr 1.4fr', gap: 8 }}>
+    // ★ 2026-11-08 — 화면 폭 고정(960px)을 없앤 뒤에도 메일 칸이 늘어지지 않게 예전 카드 안쪽 폭(920px)까지만
+    <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1.4fr 1fr 1.4fr', gap: 8, maxWidth: 920 }}>
       {draft.taxEmails.map((e, i) => [
         <input
           key={`${e.key}-n`}
@@ -393,7 +394,7 @@ export function TaxSettingsView() {
             ) : (
               <select
                 className={`${t.select} ${errCls('bizType')}`}
-                style={{ marginTop: 2 }}
+                style={{ marginTop: 2, maxWidth: 240 }}
                 value={draft.bizType ?? ''}
                 aria-label="사업자 유형"
                 onChange={(e) => {
