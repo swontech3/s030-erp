@@ -47,9 +47,11 @@ interface Props {
   onReply: (kind: 'text' | 'phone', body: string) => Promise<boolean>;
   onEdit: (messageId: string, body: string) => Promise<boolean>;
   onAskDelete: () => void;
+  /** [글 삭제] 를 그리는가 — 앱 안에서는 감춘다(PC 만 · 앱 1단계 5-나). 기본은 그린다 */
+  showDelete?: boolean;
 }
 
-export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit, onAskDelete }: Props) {
+export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit, onAskDelete, showDelete = true }: Props) {
   const [draft, setDraft] = useState('');
   const [draftErr, setDraftErr] = useState(false);
   /** 고치고 있는 답변. `null` 이면 아무것도 고치지 않는 중이다. */
@@ -111,15 +113,17 @@ export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit,
             확인 창을 거친다. 보관 기간이 지나지 않은 글도 지울 수 있다(스팸 제거 —
             2026-09-28 결정, 03-thread §5 가 운영 판단으로 남긴 자리다).
         */}
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnDanger} ${styles.btnSm}`}
-          data-delete="1"
-          onClick={onAskDelete}
-        >
-          <Icon name="trash-2" size={16} />
-          글 삭제
-        </button>
+        {showDelete ? (
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnDanger} ${styles.btnSm}`}
+            data-delete="1"
+            onClick={onAskDelete}
+          >
+            <Icon name="trash-2" size={16} />
+            글 삭제
+          </button>
+        ) : null}
       </div>
 
       <div className={styles.detailBody}>

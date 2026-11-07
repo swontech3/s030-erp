@@ -35,6 +35,7 @@ import { SIDEBAR_COOKIE, SIDEBAR_COOKIE_MAX_AGE, screenNameForPath, type NavItem
 import styles from './AppShell.module.css';
 /* ★ 2026-10-22 — 서로 안에 뜨는 모드 · 로그인 한 번(대표 지시 「2번」) */
 import { embeddedNow, startOuterLogin } from '@/lib/embed';
+import { shellHidden } from '@swonbiz/shared/domain/app-client';
 
 export interface AppShellDisplay {
   memberName: string;
@@ -54,6 +55,13 @@ export interface AppShellLinkAlert {
 export interface AppShellProps {
   /** ★ 서버가 쿠키에서 읽어 넘긴 값. 클라이언트가 다시 읽지 않는다. */
   initialCollapsed: boolean;
+  /**
+   * ★ 앱(s02-app) 웹뷰 안인가 — 서버가 UA 꼬리표로 읽어 넘긴 값(앱 1단계 5-나 · 2026-11-07).
+   *   참이면 iframe 안일 때(`embedded`)처럼 사이드바 · 접기 · 상단 띠를 그리지 않는다 — 서버가 준
+   *   값이라 첫 렌더부터 감춘 채로 그린다(깜빡임 없음). 1440px 고정도 풀어 폰 폭에 맞춘다.
+   *   **화면 모양에만 쓴다.**
+   */
+  inApp?: boolean;
   /** 삐용이 준 화면 목록에서 만들어진 항목. 여기서 더 거르지 않는다. */
   items: NavItem[];
   /** 로고를 눌렀을 때 가는 곳. 홈 분기 결과(/dashboard · /booking …)다. */
@@ -86,7 +94,7 @@ export interface AppShellProps {
 /** 반응형으로 그리는 화면 — 여기 없는 경로는 1440px 고정 그대로다. */
 const RESPONSIVE_ROUTES = new Set(['/booking']);
 
-export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote, linkAlert, children }: AppShellProps) {
+export function AppShell({ initialCollapsed, inApp = false, items, homeRoute, display, roleNote, linkAlert, children }: AppShellProps) {
   /*
    * ★★ 초기값이 서버가 준 prop 그대로다 — 이것이 깜빡임 없음의 전부다.
    *    useEffect 로 마운트 후에 고치거나, 여기서 document.cookie 를 다시 읽으면
@@ -105,6 +113,9 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
     setEmbedded(embeddedNow());
   }, []);
   useEffect(() => startOuterLogin(), []);
+
+  /** ★ 셸을 감추는가 — iframe 안이거나 앱 웹뷰 안(판정 규칙은 shared 하나 · 5-나) */
+  const hideShell = shellHidden({ inApp, embedded });
 
   /*
    * ★★★ **반응형은 정해진 화면에서만** 한다 — 회의실 예약·현황판 둘뿐이다
@@ -197,10 +208,11 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
         `${styles.shell}` +
         (collapsed ? ` ${styles.collapsed}` : '') +
         (responsive ? ` ${styles.responsive}` : '') +
+        (inApp ? ` ${styles.inApp}` : '') +
         (drawer ? ` ${styles.drawerOpen}` : '')
       }
     >
-      {embedded ? null : (
+      {hideShell ? null : (
       <aside className={styles.aside}>
         <div className={styles.logoWrap}>
           {/* 원본에서도 로고가 곧 홈 진입점이다(data-nav="dashboard"). */}
@@ -255,7 +267,7 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
         />
       ) : null}
 
-      {embedded ? null : (
+      {hideShell ? null : (
       <button type="button" className={styles.toggle} onClick={onToggle} aria-label={toggleLabel}>
         <Icon name={collapsed ? 'chevron-right' : 'chevron-left'} size={14} />
         <span className={styles.toggleTip}>{toggleLabel}</span>
@@ -263,7 +275,7 @@ export function AppShell({ initialCollapsed, items, homeRoute, display, roleNote
       )}
 
       <div className={styles.column}>
-        {embedded ? null : (
+        {hideShell ? null : (
         <header className={styles.header}>
           {responsive ? (
             <button

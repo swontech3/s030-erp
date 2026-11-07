@@ -857,3 +857,56 @@
   font-weight: 700;
   color: var(--text-heading);
 }
+
+/* =============================================================================
+ * 앱(s02-app) 웹뷰 안 — 휴대폰 모양 `.phone` (앱 1단계 5-나 · 2026-11-07)
+ * =============================================================================
+ * 서버가 UA 꼬리표로 「앱 안」을 알 때만 붙는다(InquiryAdminView). PC 브라우저는 좁은 창이어도
+ * 지금 2단 그대로다. 색 · 글꼴은 위의 값 그대로이고, 여기서는 **배치와 여백만** 바꾼다.
+ *   - 목록 ↔ 상세 한 장씩 : 고른 문의가 없으면 목록, 있으면 상세(`.phoneDetail`)
+ *   - 목록은 폭을 다 쓴다(420px 고정을 푼다)
+ * ============================================================================= */
+.phone {
+  min-height: 0;
+}
+
+.phone .body {
+  padding-top: 12px;
+}
+
+.phone .list {
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.phone .detail {
+  display: none;
+}
+
+.phone.phoneDetail .list {
+  display: none;
+}
+
+.phone.phoneDetail .detail {
+  display: flex;
+}
+
+.phone .detailHead {
+  padding: 16px;
+}
+
+.phone .detailBody {
+  padding: 16px;
+}
+
+.phone .who h2 {
+  white-space: normal;
+}
+
+.phone .composeActions {
+  width: 100%;
+}
+
+.phone .composeActions .btn {
+  flex: 1;
+}
