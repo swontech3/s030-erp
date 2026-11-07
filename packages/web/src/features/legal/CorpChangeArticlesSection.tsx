@@ -9,6 +9,8 @@
  *   (`planArticleChanges` — 서버의 작성완료와 같은 함수). 사람이 고치면 그 문구가 payload `articlesItems` 로 [저장] 에
  *   실린다. [자동 문구로] 는 고친 문구를 버린다. 고친 문구가 자동 문구와 같으면 싣지 않는다.
  * ★ 작성완료 뒤(E · C · X) — 작성완료 스냅샷의 바뀐 조항을 읽기만 한다.
+ * ★ 역할마다 「변경 전」(지금 최종본 · 설립 건으로 만든 조항 — 읽기만) → 「변경 후」를 보이고, 바뀐 낱말은 양쪽에서 굵게
+ *   (2026-11-08). 고칠 수 있을 때 글 칸은 굵게 할 수 없어, 글 칸 아래에 바뀐 부분을 굵게 한 읽기 칸을 하나 더 둔다.
  * ★ 바뀐 조항이 하나도 없으면(시·도가 같은 본점이전 등) 정관 변경이 아니다 — 「변경된 정관」은 출력되지 않는다(§3-2).
  */
 import { useId } from 'react';
@@ -29,6 +31,65 @@ export type ArticleOverrides = Partial<Record<ArticleRole, string>>;
 
 const NOT_CHANGED = '정관 변경이 아닙니다 — 조항 문구가 지금 정관과 같아 「변경된 정관」은 출력되지 않습니다.';
 
+/**
+ * 낱말 단위 비교(2026-11-08) — 공백으로 자른 낱말의 최장 공통 부분열(LCS)에 들지 않은 낱말을 「바뀜」으로 표시한다.
+ * 공백 조각은 굵게 하지 않는다. 너무 길면(낱말 수 곱이 100만 넘음) 비교하지 않고 전부 바뀜으로 본다.
+ */
+export interface DiffPiece {
+  text: string;
+  changed: boolean;
+}
+
+const isSpace = (t: string) => /^\s+$/.test(t);
+
+export function wordDiff(before: string, after: string): { before: DiffPiece[]; after: DiffPiece[] } {
+  const a = before.split(/(\s+)/).filter((t) => t !== '');
+  const b = after.split(/(\s+)/).filter((t) => t !== '');
+  const aw = a.flatMap((t, i) => (isSpace(t) ? [] : [{ t, i }]));
+  const bw = b.flatMap((t, i) => (isSpace(t) ? [] : [{ t, i }]));
+  const keepA = new Set<number>();
+  const keepB = new Set<number>();
+  const n = aw.length;
+  const m = bw.length;
+  if (n * m <= 1_000_000) {
+    const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+    for (let i = n - 1; i >= 0; i--) {
+      for (let j = m - 1; j >= 0; j--) {
+        dp[i]![j] = aw[i]!.t === bw[j]!.t ? dp[i + 1]![j + 1]! + 1 : Math.max(dp[i + 1]![j]!, dp[i]![j + 1]!);
+      }
+    }
+    let i = 0;
+    let j = 0;
+    while (i < n && j < m) {
+      if (aw[i]!.t === bw[j]!.t) {
+        keepA.add(aw[i]!.i);
+        keepB.add(bw[j]!.i);
+        i++;
+        j++;
+      } else if (dp[i + 1]![j]! >= dp[i]![j + 1]!) i++;
+      else j++;
+    }
+  }
+  const mark = (tokens: string[], keep: Set<number>): DiffPiece[] =>
+    tokens.map((t, i) => ({ text: t, changed: !isSpace(t) && !keep.has(i) }));
+  return { before: mark(a, keepA), after: mark(b, keepB) };
+}
+
+/** 비교 결과를 읽기 칸으로 — 바뀐 낱말은 굵게. */
+function DiffText({ pieces, label }: { pieces: DiffPiece[]; label: string }) {
+  return (
+    <div
+      className={styles.textarea}
+      role="textbox"
+      aria-readonly="true"
+      aria-label={label}
+      style={{ whiteSpace: 'pre-wrap', background: 'var(--surface-alt)', cursor: 'default', minHeight: 38 }}
+    >
+      {pieces.map((p, i) => (p.changed ? <strong key={i}>{p.text}</strong> : <span key={i}>{p.text}</span>))}
+    </div>
+  );
+}
+
 function RoleText({
   change,
   editable,
@@ -46,27 +107,48 @@ function RoleText({
 }) {
   const id = useId();
   const same = change.after === change.before;
+  const diff = wordDiff(change.before, change.after);
+  const heading = articleHeading(change);
   return (
     <div className={`${styles.field} ${styles.spanAll}`}>
       <div className={styles.fieldHead}>
-        <label htmlFor={id}>
-          {articleHeading(change)}
+        <span style={{ fontWeight: 600 }}>
+          {heading}
           <span className={styles.labelNote}> {same ? '(바뀌지 않음)' : overridden ? '(직접 고침)' : '(자동 문구)'}</span>
-        </label>
+        </span>
         {editable && overridden ? (
           <button type="button" className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`} onClick={onReset}>
             자동 문구로
           </button>
         ) : null}
       </div>
-      <textarea
-        id={id}
-        className={`${styles.textarea}${error ? ` ${styles.inputInvalid}` : ''}`}
-        rows={Math.min(12, Math.max(2, change.after.split('\n').length + 1))}
-        value={change.after}
-        disabled={!editable}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <span className={styles.labelNote}>변경 전</span>
+      <DiffText pieces={diff.before} label={`${heading} 변경 전`} />
+      {editable ? (
+        <>
+          <label htmlFor={id} className={styles.labelNote}>
+            변경 후
+          </label>
+          <textarea
+            id={id}
+            className={`${styles.textarea}${error ? ` ${styles.inputInvalid}` : ''}`}
+            rows={Math.min(12, Math.max(2, change.after.split('\n').length + 1))}
+            value={change.after}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          {same ? null : (
+            <>
+              <span className={styles.labelNote}>변경 후 — 바뀐 부분</span>
+              <DiffText pieces={diff.after} label={`${heading} 변경 후 바뀐 부분`} />
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <span className={styles.labelNote}>변경 후</span>
+          <DiffText pieces={diff.after} label={`${heading} 변경 후`} />
+        </>
+      )}
       {error ? <span className={styles.fieldError}>{error}</span> : null}
     </div>
   );
