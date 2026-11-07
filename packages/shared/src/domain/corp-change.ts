@@ -92,8 +92,11 @@ export function changeTypeMemberTypeError(changeType: string, memberType: string
     : '유한회사 건은 동일관할 본점이전을 고를 수 없습니다 — 타관할로의 본점이전으로 새 건을 만드세요';
 }
 
-/** 타관할 본점이전 세금 안내 — 대도시 밖 → 대도시로 옮길 때만 새 본점 칸 아래에 보인다(`hqOutTaxHint`). */
-export const HQ_OUT_TAX_HINT = '대도시 신설 전입으로 중과세금 확인을 하세요.';
+/**
+ * 타관할 본점이전 세금 안내 — 대도시 밖 → 대도시로 옮길 때만 「신규 본점주소*」 이름표 바로 옆에 괄호로
+ * 보인다(`hqOutTaxHint`, 결정 2026-11-07).
+ */
+export const HQ_OUT_TAX_HINT = '인구과밀지역 대도시 신설 전입으로 중과세금 확인을 하세요.';
 
 /**
  * 타관할 본점이전 세금 안내(결정 2026-11-06) — 지금 본점(회사 정보)이 대도시 밖이고 새 본점이 대도시면

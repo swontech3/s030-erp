@@ -982,8 +982,17 @@ function PayloadField({
   if (def.type === 'address') {
     return (
       <div className={`${styles.field} ${styles.spanAll}`}>
-        {label}
-        {note ?? def.hint ? <span className={styles.hint}>{note ?? def.hint}</span> : null}
+        {/* 조건부 안내(note)는 이름표 바로 옆에 괄호로 — 「신규 본점주소* (…)」(결정 2026-11-07).
+            칸 정의의 고정 hint 는 그대로 이름표 아래다. */}
+        {note ? (
+          <span className={styles.label}>
+            {def.label} {def.required ? <span className={styles.req}>*</span> : null}{' '}
+            <span className={styles.labelNote}>({note})</span>
+          </span>
+        ) : (
+          label
+        )}
+        {!note && def.hint ? <span className={styles.hint}>{def.hint}</span> : null}
         <AddressInput value={value as Address} disabled={disabled} onChange={onChange} onError={onError} />
         {serverError}
       </div>

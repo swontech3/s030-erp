@@ -286,6 +286,13 @@
   color: var(--text-muted);
 }
 
+/* 이름표 바로 옆 괄호 안내 — 「신규 본점주소* (…)」(결정 2026-11-07) */
+.labelNote {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
 /* 칸 이름 줄 — 이름 왼쪽, 칸에 딸린 단추 오른쪽(사업목적의 [목록에서 고르기]). */
 .fieldHead {
   display: flex;

@@ -101,7 +101,7 @@ describe('★ 타관할로의 본점이전(HQ_OUT) · 회사 형태(결정 2026-
     expect(hqOutTaxHint(current, next)).toBe(expected);
   });
   it('세금 안내 문구', () => {
-    expect(HQ_OUT_TAX_HINT).toBe('대도시 신설 전입으로 중과세금 확인을 하세요.');
+    expect(HQ_OUT_TAX_HINT).toBe('인구과밀지역 대도시 신설 전입으로 중과세금 확인을 하세요.');
   });
   it.each([
     ['A', 'HQ_OUT', true],
