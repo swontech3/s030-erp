@@ -609,6 +609,36 @@ export interface CorpChangeOfficerView {
 }
 
 /**
+ * 새 건 대화상자의 회사유형(`GET /legal/corp-changes/company-type`, 2026-11-01 · 11-07).
+ * 비입주사이고 회사유형이 비었고 회사 정보를 고칠 수 있으면 대화상자가 그 자리에서 고르게 한다(결정 2026-11-07).
+ */
+export interface CorpChangeCompanyTypeResponse {
+  /** 입주사 = ERP 회원구분, 비입주사 = 법무 회사 정보. 비었으면 null. */
+  memberType: string | null;
+  isTenant: boolean;
+  /** 회사 정보를 고칠 수 있는가 — 기본정보의 `canEditCompany` 와 같은 판정(입주사는 늘 false). */
+  canEditCompany: boolean;
+  /** 고를 수 있는 회사유형(공통 코드 MEMBER_TYPE 법무 파티션). 입주사는 빈 목록. */
+  memberTypes: CodeOption[];
+}
+
+/**
+ * 새 건 대화상자에서 고른 회사유형을 새 건 화면 회사 정보에 넣을 값(결정 2026-11-07) — 비입주사 · 저장된 회사유형이
+ * 비었음 · 회사 정보를 고칠 수 있음 · 고른 값이 선택지에 있음일 때만 그 값, 아니면 null(그대로 둔다).
+ * 「저장된 회사유형이 비었음」은 값이 없거나, 있어도 상호에서 추정해 채운 값(`defaultedFields` 의 memberType)인 경우다 —
+ * 대화상자가 본 것도 저장된 값(비었음)이고, 사람이 고른 값이 추정보다 앞선다.
+ * 넣은 값은 저장된 값과 달라 첫 [저장] 에 회사 정보로 실린다(`upsertLegalOrg`).
+ */
+export function presetMemberTypeFor(
+  draft: Pick<CorpChangeDraftResponse, 'company' | 'memberTypes' | 'canEditCompany'>,
+  picked: string | null | undefined,
+): string | null {
+  const storedEmpty = !draft.company.memberType || draft.company.defaultedFields.includes('memberType');
+  if (!picked || draft.company.isTenant || !storedEmpty || !draft.canEditCompany) return null;
+  return draft.memberTypes.some((m) => m.code === picked) ? picked : null;
+}
+
+/**
  * 임시 모드(`/legal/corp-changes/new`) — 건이 아직 없다. DB 의 건을 읽지 않고, 기본정보만
  * 읽어서 보여 준다. 저장된 건의 상세(`CorpChangeDetailResponse`)는 이것에 건의 값을 더한 것이다.
  */

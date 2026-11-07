@@ -13,6 +13,7 @@ import {
   parseLegalOrgBody,
   parseOfficerBody,
   parsePayload,
+  presetMemberTypeFor,
   type CorpChangeCompanyInfo,
 } from './corp-change-detail.ts';
 
@@ -382,5 +383,50 @@ describe('corpChangeDateLine — 상태에 맞는 날짜만', () => {
   });
   it('값이 없는 날짜는 뺀다', () => {
     expect(line('C', null, { ...all, writtenOn: null })).toBe('등록 2026-10-01 · 완료 2026-10-03');
+  });
+});
+
+describe('presetMemberTypeFor — 새 건 대화상자에서 고른 회사유형(결정 2026-11-07)', () => {
+  const company: CorpChangeCompanyInfo = {
+    isTenant: false,
+    tenantCompanyId: null,
+    displayName: 'Z99',
+    legalName: null,
+    corpNumber: null,
+    bizNumber: null,
+    ceoName: null,
+    tel: null,
+    head: { zipCode: null, address: null, addressDetail: null },
+    ceo: { zipCode: null, address: null, addressDetail: null },
+    memberType: null,
+    memberTypeName: null,
+    hasLegalOrg: false,
+    namePosition: null,
+    defaultedFields: [],
+  };
+  const memberTypes = [
+    { code: 'R', name: '주식회사' },
+    { code: 'A', name: '유한회사' },
+  ];
+  const draft = (over: Partial<CorpChangeCompanyInfo> = {}, canEditCompany = true) => ({
+    company: { ...company, ...over },
+    memberTypes,
+    canEditCompany,
+  });
+
+  it('비입주사 · 비었음 · 고칠 수 있음 → 고른 값', () => {
+    expect(presetMemberTypeFor(draft(), 'A')).toBe('A');
+  });
+  it('상호에서 추정해 채운 값(저장 안 됨)보다 고른 값이 앞선다', () => {
+    expect(presetMemberTypeFor(draft({ memberType: 'R', defaultedFields: ['memberType'] }), 'A')).toBe('A');
+  });
+  it.each([
+    ['안 고름', draft(), null],
+    ['저장된 회사유형 있음', draft({ memberType: 'R' }), 'A'],
+    ['입주사', draft({ isTenant: true }), 'A'],
+    ['회사 정보를 고칠 수 없음', draft({}, false), 'A'],
+    ['선택지에 없는 값', draft(), 'X'],
+  ] as const)('%s → null(그대로)', (_c, d, picked) => {
+    expect(presetMemberTypeFor(d, picked)).toBeNull();
   });
 });

@@ -100,6 +100,11 @@ interface Props {
   saved: CorpChangeDetailResponse | null;
   /** 「입주사 화면에서 입력」 링크를 보여 줄까 — 그 화면(s030200030)을 받은 사람에게만. */
   canOpenTenantScreen: boolean;
+  /**
+   * 새 건 대화상자에서 고른 회사유형(임시 모드만, 결정 2026-11-07 — `presetMemberTypeFor` 가 거른 값).
+   * 회사 정보의 회사유형 칸에 넣는다 — 저장된 값과 달라 첫 [저장] 에 회사 정보로 실려 법무 회사 정보에 저장된다.
+   */
+  presetMemberType?: string | null;
 }
 
 export type Address = { zipCode: string; address: string; addressDetail: string };
@@ -263,7 +268,7 @@ interface OfficerDraft {
   rrnMasked: string | null;
 }
 
-export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScreen }: Props) {
+export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScreen, presetMemberType }: Props) {
   const router = useRouter();
   /**
    * ★ 저장된 건은 **상태로** 든다 — 상태 전이가 돌려준 새 상세, 409 뒤에 다시 읽은 상세로 바꿔
@@ -301,7 +306,12 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
    *    [저장] 전체를 거절한다).
    */
   const [company, setCompany] = useState<CorpChangeCompanyInfo>(draft.company);
-  const [companyInput, setCompanyInput] = useState<CompanyForm>(() => companyForm(draft.company));
+  // 새 건 대화상자에서 고른 회사유형(임시 모드만) — 입력값에만 넣는다. 저장본(companySaved)은 그대로라 첫 [저장] 에 실린다.
+  const [companyInput, setCompanyInput] = useState<CompanyForm>(() =>
+    initialSaved === null && presetMemberType
+      ? { ...companyForm(draft.company), memberType: presetMemberType }
+      : companyForm(draft.company),
+  );
   const [companySaved, setCompanySaved] = useState(() => JSON.stringify(companyForm(draft.company)));
   const companyEditable = draft.canEditCompany && editable && !company.isTenant;
   const companyDirty = companyEditable && JSON.stringify(companyInput) !== companySaved;

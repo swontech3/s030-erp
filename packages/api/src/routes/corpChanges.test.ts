@@ -1677,7 +1677,7 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
       const a = await build(session('operator', 1), db.deps);
       const res = await a.inject({ method: 'GET', url: '/legal/corp-changes/company-type?orgId=9003&orgCode=Z99' });
       expect(res.statusCode).toBe(200);
-      expect(res.json()).toEqual({ memberType: want });
+      expect(res.json().memberType).toBe(want);
       expect(db.seen.some((s) => /tb_s080_corp_changes/.test(s.sql))).toBe(false);
       await a.close();
       app = null;
@@ -1690,8 +1690,31 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
     expect((await a.inject({ method: 'GET', url: '/legal/corp-changes/company-type?orgId=9001' })).statusCode).toBe(403);
     expect(db.runs()).toBe(0);
     const res = await a.inject({ method: 'GET', url: '/legal/corp-changes/company-type' });
-    expect(res.json()).toEqual({ memberType: 'A' });
+    expect(res.json().memberType).toBe('A');
     expect(db.seen.find((s) => /tb_s080_legal_orgs/.test(s.sql))!.params).toEqual([9003]);
+  });
+
+  it('GET /company-type — 입주사 여부 · 회사 정보 수정 가능 · 선택지(결정 2026-11-07)', async () => {
+    const codes = { match: /FROM public.tb_s080_codes_line/, rows: [{ category: 'MEMBER_TYPE', code: 'R', name: '주식회사' }, { category: 'MEMBER_TYPE', code: 'A', name: '유한회사' }] };
+    const ask = async (s: ReturnType<typeof session>, answers: unknown[]) => {
+      const db = fakeDb(answers as never);
+      const a = await build(s, db.deps);
+      const res = await a.inject({ method: 'GET', url: '/legal/corp-changes/company-type' + (s.role === 'operator' ? '?orgId=9003&orgCode=Z99' : '') });
+      await a.close();
+      app = null;
+      return res.json();
+    };
+    // 비입주사 · 비었음 · 운영사 → 고를 수 있다
+    expect(await ask(session('operator', 1), [LEGAL_ORG(null), codes])).toEqual({
+      memberType: null,
+      isTenant: false,
+      canEditCompany: true,
+      memberTypes: [{ code: 'R', name: '주식회사' }, { code: 'A', name: '유한회사' }],
+    });
+    // 회사 세션 · 수정 권한 없음 → 고칠 수 없다
+    expect((await ask(session('tenant', 9003), [LEGAL_ORG(null), codes])).canEditCompany).toBe(false);
+    // 입주사 → 고칠 수 없고 선택지도 없다
+    expect(await ask(session('operator', 1), [TENANT(null), codes])).toEqual({ memberType: null, isTenant: true, canEditCompany: false, memberTypes: [] });
   });
 
   it.each([
@@ -1717,6 +1740,10 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
     const company = { legalName: '유한회사 에이', memberType: 'A' };
     const res = await a.inject({ method: 'POST', url: '/legal/corp-changes', payload: { changeType: 'HQ_OUT', orgId: 9003, orgCode: 'Z99', payload: HQ_PAYLOAD, company } });
     expect(res.statusCode).toBe(201);
+    // 새 건 대화상자에서 고른 회사유형이 이렇게 실려 온다 — 법무 회사 정보에 A 로 저장(결정 2026-11-07)
+    const upsert = db.seen.find((s) => /INSERT INTO public\.tb_s080_legal_orgs/.test(s.sql));
+    expect(upsert?.params?.[0]).toBe(9003);
+    expect(upsert?.params?.[12]).toBe('A');
   });
 
   it('★ [저장] — 유한회사로 저장된 회사의 동일관할(HQ) 건은 400 · 변경 내용을 쓰지 않는다', async () => {

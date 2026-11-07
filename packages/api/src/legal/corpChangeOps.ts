@@ -51,6 +51,7 @@ import {
   parseOfficerBody,
   parsePayload,
   type CorpChangeCompanyInfo,
+  type CorpChangeCompanyTypeResponse,
   type CorpChangeCreateInput,
   type CorpChangeDetailResponse,
   type CorpChangeDraftResponse,
@@ -254,14 +255,32 @@ async function checkChangeTypeForCompany(
 /**
  * 새 건 대화상자의 회사유형(결정 2026-11-01) — 구분 선택지를 거르는 데만 쓴다(건을 읽지 않는다).
  * 입주사 = ERP 회원구분, 비입주사 = 법무 회사 정보의 회사유형. 비었으면 null(화면은 주식회사로 본다).
+ * ★ 비입주사이고 회사유형이 비었으면 대화상자가 그 자리에서 고르게 한다(결정 2026-11-07) — 그래서
+ *   입주사 여부 · 회사 정보를 고칠 수 있는지(`canEditCompany`, 기본정보와 같은 판정) · 선택지(법무 파티션)를 같이 준다.
+ *   고른 값은 여기서 쓰지 않는다 — 첫 [저장] 의 회사 정보에 실려 `upsertLegalOrg` 가 저장한다.
  * ★ 단체는 `parseOrgTarget` 을 거친 것이다 — 회사 세션이 남의 단체를 적으면 그 전에 403.
  */
 export async function readCorpChangeCompanyType(
   client: ScopedClient,
   target: OrgTarget,
-): Promise<OpResult<{ memberType: string | null }>> {
+  companyEditor = false,
+): Promise<OpResult<CorpChangeCompanyTypeResponse>> {
   const source = await readCompanySource(client, target.orgId);
-  return { ok: true, value: { memberType: source.memberType } };
+  const memberTypes = source.isTenant
+    ? []
+    : (await listCodes(client, [{ category: LEGAL_MEMBER_TYPE_CATEGORY, useTp: LEGAL_MEMBER_TYPE_USE_TP }])).map((c) => ({
+        code: c.code,
+        name: c.name,
+      }));
+  return {
+    ok: true,
+    value: {
+      memberType: source.memberType,
+      isTenant: source.isTenant,
+      canEditCompany: companyEditor && !source.isTenant,
+      memberTypes,
+    },
+  };
 }
 
 /**

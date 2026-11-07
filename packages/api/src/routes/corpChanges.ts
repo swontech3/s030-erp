@@ -9,6 +9,7 @@
  *   POST   /legal/corp-changes                       첫 저장 = 새 건 { changeType, orgId?, orgCode?, payload, officers[], company? }
  *   GET    /legal/corp-changes/draft                 임시 모드 기본정보 ?changeType=&orgId=&orgCode= (건을 읽지 않는다)
  *   GET    /legal/corp-changes/company-type          새 건 대화상자의 회사유형 ?orgId=&orgCode= → { memberType } (2026-11-01)
+ *                                                    + { isTenant, canEditCompany, memberTypes } — 비입주사 빈 회사유형을 그 자리에서 고른다 (2026-11-07)
  *   GET    /legal/corp-changes/:id                   상세 + 임원 + 기본정보
  *   PATCH  /legal/corp-changes/:id                   [저장] { payload, company? } — P 만 · 새 상세를 돌려준다
  *   DELETE /legal/corp-changes/:id?from=             삭제 — 운영사 · P/X 만, 임원도 함께
@@ -247,7 +248,9 @@ export function registerCorpChangeRoutes(app: FastifyInstance, deps: CorpChangeD
     const q = req.query ?? {};
     const parsed = parseOrgTarget(q.orgId, q.orgCode, session);
     if (!parsed.ok) return refuse(reply, parsed);
-    return send(reply, await deps.run(session, (client) => readCorpChangeCompanyType(client, parsed.value)));
+    // 회사 정보를 고칠 수 있는가 — 기본정보와 같은 판정(트랜잭션 밖에서 한 번, 결정 2026-11-07)
+    const editor = await deps.companyEditor(session);
+    return send(reply, await deps.run(session, (client) => readCorpChangeCompanyType(client, parsed.value, editor)));
   });
 
   app.get<{ Params: { id: string } }>('/legal/corp-changes/:id', async (req, reply) => {
