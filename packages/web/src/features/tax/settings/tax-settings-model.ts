@@ -5,8 +5,11 @@
  *   눌러야 반영). 입력 모양 검사는 **서버가 한다**(shared `tax-settings.ts`) — 화면은 서버의 칸별 오류
  *   (`errors[]`)를 받아 그 칸에 빨간 테두리를 그린다. 같은 규칙을 화면에 두 벌 두지 않는다.
  * ★ 브라우저는 Fastify 에 직접 붙지 않는다 — `/api/tax/settings`(Next 중계)를 부른다.
+ * ★ 2026-11-07 대표 수정: 세무사 메일은 늘 4칸(한 사람 = 이름 + 메일, 빈 칸 허용). 원천세 신고 주기 · 쓰지 않는 자료는
+ *   화면에서 지웠다 — 초안 · 저장 본문에 싣지 않는다(서버가 저장된 값을 그대로 둔다).
  */
 import {
+  TAX_EMAILS_MAX,
   TAX_FIN_KIND_BANK,
   TAX_FIN_KIND_CARD,
   type TaxFieldError,
@@ -85,11 +88,10 @@ export interface DraftFin {
 
 export interface Draft {
   bizType: string | null;
-  withholdingCycle: string;
+  /** 늘 `TAX_EMAILS_MAX`(4)칸 — 저장된 것 뒤에 빈 칸을 채운다. */
   taxEmails: DraftEmail[];
   accounts: DraftFin[];
   cards: DraftFin[];
-  unusedKinds: string[];
 }
 
 export function draftOf(data: TaxSettingsResponse): Draft {
@@ -104,13 +106,13 @@ export function draftOf(data: TaxSettingsResponse): Draft {
       isActive: a.isActive,
     }),
   );
+  const saved = data.settings.taxEmails.slice(0, TAX_EMAILS_MAX).map((e) => ({ key: newKey(), name: e.name ?? '', email: e.email }));
+  const blanks = Array.from({ length: TAX_EMAILS_MAX - saved.length }, () => ({ key: newKey(), name: '', email: '' }));
   return {
     bizType: data.settings.bizType,
-    withholdingCycle: data.settings.withholdingCycle,
-    taxEmails: data.settings.taxEmails.map((e) => ({ key: newKey(), name: e.name ?? '', email: e.email })),
+    taxEmails: [...saved, ...blanks],
     accounts: fins.filter((f) => f.kind === TAX_FIN_KIND_BANK),
     cards: fins.filter((f) => f.kind === TAX_FIN_KIND_CARD),
-    unusedKinds: [...data.settings.unusedKinds],
   };
 }
 
@@ -127,9 +129,7 @@ export function sameDraft(a: Draft, b: Draft): boolean {
 
 export interface TaxSettingsBody {
   bizType: string | null;
-  withholdingCycle: string;
   taxEmails: { name: string; email: string }[];
-  unusedKinds: string[];
   finAccounts: {
     id: string | null;
     kind: TaxFinKind;
@@ -149,9 +149,7 @@ export interface TaxSettingsBody {
 export function bodyOf(d: Draft): TaxSettingsBody {
   return {
     bizType: d.bizType,
-    withholdingCycle: d.withholdingCycle,
     taxEmails: d.taxEmails.map((e) => ({ name: e.name, email: e.email })),
-    unusedKinds: d.unusedKinds,
     finAccounts: finOrder(d).map((f) => ({
       id: f.id,
       kind: f.kind,
@@ -169,7 +167,7 @@ export const finOrder = (d: Draft): DraftFin[] => [...d.accounts, ...d.cards];
 /**
  * 서버의 칸 이름 → 화면 칸 열쇠.
  *   `taxEmails[2].email` → `email:{줄 열쇠}:email` · `finAccounts[3].number` → `fin:{줄 열쇠}:number` ·
- *   `bizType` · `withholdingCycle` · `taxEmails` · `unusedKinds` 는 그대로.
+ *   `bizType` · `taxEmails` 는 그대로.
  * ★ 기관 코드 칸(`bankCode` · `cardCoCode`)은 화면의 한 선택 칸(`inst`)이다.
  */
 export function errorKeyOf(field: string, d: Draft): string {

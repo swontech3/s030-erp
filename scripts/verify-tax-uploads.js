@@ -756,6 +756,12 @@ async function main() {
       // ══ 현금 경비(1-4) ══
       await c.query(`INSERT INTO public.tb_s050_settings (org_id, biz_type, withholding_cycle, tax_emails, unused_kinds)
         VALUES ($1, 'C', 'M', '[]'::jsonb, '{}')`, [ORG_A]);
+      // ★ 2026-11-07 대표 결정 — 자료 올리기는 「쓰지 않는 자료」를 보지 않는다(값 · DB 칸은 그대로, 2단계 이번 달 할 일에서 쓴다)
+      await c.query(`UPDATE public.tb_s050_settings SET unused_kinds = '{CASH,SOCIAL}' WHERE org_id = $1`, [ORG_A]);
+      const unusedCards = (await listUploadsOp(c, ORG_A, MONTH)).cards;
+      check('X0', '★ 쓰지 않는 자료가 저장돼 있어도 자료 올리기 카드에 그 값이 없다(배지 · 링크 · 「다 한 자료」 세기 없음)',
+        unusedCards.length === 8 && unusedCards.every((k) => !('unused' in k)), unusedCards.map((k) => Object.keys(k).join('/')).slice(0, 1));
+      await c.query(`UPDATE public.tb_s050_settings SET unused_kinds = '{}' WHERE org_id = $1`, [ORG_A]);
       const cashMap = await loadImportMap(c, 'CASH');
       if (!cashMap) throw new Error('대응표 TAX_CASH_STD 가 없다 — 209 를 먼저');
       // ★ 210 — 1줄 제목 · 구분 + 금액. 첫 줄 날짜는 엑셀 날짜 값(46278 = 2026-09-13) — 하루 밀리지 않는지(readSheet UTC)

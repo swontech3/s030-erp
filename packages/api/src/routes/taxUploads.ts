@@ -155,7 +155,6 @@ export async function listUploadsOp(client: ScopedClient, orgId: number, month: 
     cards: kinds.map((k) => ({
       kind: k.code,
       enabled: TAX_UPLOADABLE_KINDS.includes(k.code),
-      unused: settings?.unusedKinds.includes(k.code) ?? false,
       fileCount: counts.get(k.code) ?? 0,
     })),
     files,

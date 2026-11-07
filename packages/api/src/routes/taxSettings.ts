@@ -33,6 +33,7 @@ import {
   TAX_KIND_CATEGORY,
   TAX_WH_CYCLE_CATEGORY,
   TAX_WH_CYCLE_DEFAULT,
+  lockedBizType,
   parseTaxSettingsSave,
   type TaxCodeOption,
   type TaxCodeSets,
@@ -121,10 +122,13 @@ export async function readTaxSettingsOp(client: ScopedClient, orgId: number): Pr
   const finAccounts = await listFinAccounts(client, orgId);
   const codes = await loadTaxCodes(client);
   const company = await companyOf(client, orgId);
+  // ★ 법인등록번호가 있으면 법인으로 고정 — 저장된 값과 상관없이 법인을 보인다(2026-11-07 대표 결정)
+  const locked = lockedBizType(company.corpNumber);
+  const settings = row
+    ? { saved: true, ...row }
+    : { saved: false, bizType: null, withholdingCycle: TAX_WH_CYCLE_DEFAULT, taxEmails: [], unusedKinds: [] };
   return {
-    settings: row
-      ? { saved: true, ...row }
-      : { saved: false, bizType: null, withholdingCycle: TAX_WH_CYCLE_DEFAULT, taxEmails: [], unusedKinds: [] },
+    settings: { ...settings, bizType: locked ?? settings.bizType, bizTypeLocked: locked !== null },
     finAccounts,
     codes,
     company,
@@ -148,7 +152,9 @@ export async function saveTaxSettingsOp(
     return { ok: false, status: 404, message: '없는 계좌 · 카드입니다' };
   }
 
-  await upsertTaxSettings(client, orgId, save, actor);
+  // ★ 법인등록번호가 있는 회사는 보낸 값과 상관없이 법인으로 저장한다(화면은 보이기만 — 2026-11-07)
+  const locked = lockedBizType((await companyOf(client, orgId)).corpNumber);
+  await upsertTaxSettings(client, orgId, locked ? { ...save, bizType: locked } : save, actor);
   await deleteFinAccountsExcept(
     client,
     orgId,

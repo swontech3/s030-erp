@@ -156,13 +156,13 @@ async function rowChecks(ec, tx) {
       await log('v218-x2', ORG_A, { from: '2026-07-02' }),
       await log('v218-x3', ORG_A, { from: '2026-09-01', to: '2026-07-31' }),
       await log('v218-x4', ORG_A, { to_: [] }),
-      await log('v218-x5', ORG_A, { to_: ['a@x.com', 'b@x.com', 'c@x.com', 'd@x.com'] }),
+      await log('v218-x5', ORG_A, { to_: ['a@x.com', 'b@x.com', 'c@x.com', 'd@x.com', 'e@x.com'] }),
       await log('v218-x6', ORG_A, { file: '   ' }),
       await log('v218-x7', ORG_A, { rows: -1 }),
       await log('v218-x8', ORG_A, { ok: false, reason: null }),
       await log('v218-x9', ORG_A, { ok: true, reason: '성공인데 사유' }),
     ];
-    check('H2', '★ CHECK — 종류 T/M · 기간 첫날은 1일 · 끝 ≥ 시작 · 받는 사람 1~3 · 파일 이름 빈칸 없음 · 줄 수 0 이상 · 실패일 때만 사유(23514)',
+    check('H2', '★ CHECK — 종류 T/M · 기간 첫날은 1일 · 끝 ≥ 시작 · 받는 사람 1~4(219) · 파일 이름 빈칸 없음 · 줄 수 0 이상 · 실패일 때만 사유(23514)',
       bad.every((r) => r.code === '23514'), bad.map((r) => r.code).join(' '));
 
     await scope('tenant', ORG_A);

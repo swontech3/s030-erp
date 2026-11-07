@@ -21,6 +21,7 @@ import { parseTaxSettingsSave } from '../packages/shared/src/domain/tax-settings
 
 const ORG_A = 990001;
 const ORG_B = 990002;
+const ORG_C = 990003;
 const ACTOR = 'v-tax';
 const results = [];
 const check = (id, what, cond, note = '') =>
@@ -172,6 +173,36 @@ async function main() {
         check('T16', '회사 정보 — 법무 비입주사 단체는 source legal · 번호는 숫자만',
           co.source === 'legal' && [co.bizNumber, co.corpNumber].every((v) => v === null || /^\d+$/.test(v)), { org: legalOrg, ...shape(co) });
       } else check('T16', '회사 정보 — 법무 비입주사 예시', false, '개발 DB 에 법무 회사 정보 줄이 없다');
+
+      // ── 2026-11-07 대표 수정 — 원천세 주기 · 쓰지 않는 자료는 화면에서 지움 · 사업자 유형은 법인등록번호로 고정 ──
+      const rowOf = async (orgId) => (await c.query(
+        `SELECT biz_type, withholding_cycle, unused_kinds FROM public.tb_s050_settings WHERE org_id = $1`, [orgId])).rows[0] ?? null;
+      await c.query(`UPDATE public.tb_s050_settings SET withholding_cycle = 'H', unused_kinds = '{SOCIAL,LOAN}' WHERE org_id = $1`, [ORG_A]);
+      const keepBody = { bizType: 'C', taxEmails: [], finAccounts: [] };
+      const kept = await saveTaxSettingsOp(c, ORG_A, parse(keepBody), ACTOR);
+      const keptRow = await rowOf(ORG_A);
+      check('T17', '★ 원천세 주기 · 쓰지 않는 자료를 안 보내고 저장하면 저장된 값 그대로(H · SOCIAL,LOAN)',
+        kept.ok && keptRow?.withholding_cycle === 'H' && keptRow.unused_kinds.join() === 'SOCIAL,LOAN', keptRow);
+      const fresh = await saveTaxSettingsOp(c, ORG_C, parse(keepBody), ACTOR);
+      const freshRow = await rowOf(ORG_C);
+      check('T18', '★ 처음 저장하는 회사가 안 보내면 칸 기본값(원천세 주기 M · 쓰지 않는 자료 없음)',
+        fresh.ok && freshRow?.withholding_cycle === 'M' && freshRow.unused_kinds.length === 0, freshRow);
+      check('T19', '법인등록번호가 없는 회사 — 사업자 유형은 저장된 값 · 고정 아님',
+        fresh.ok && fresh.data.settings.bizType === 'C' && fresh.data.settings.bizTypeLocked === false, fresh.ok ? fresh.data.settings : fresh);
+
+      const corpOrg = (await c.query(
+        `SELECT link_s020_org_id o FROM public.tb_s080_companies
+          WHERE link_s020_org_id IS NOT NULL AND regexp_replace(coalesce(corp_number, ''), '\\D', '', 'g') <> ''
+          ORDER BY link_s020_org_id LIMIT 1`)).rows[0]?.o;
+      if (corpOrg) {
+        const before = await readTaxSettingsOp(c, corpOrg);
+        const saved = await saveTaxSettingsOp(c, corpOrg, parse({ bizType: 'I', taxEmails: [], finAccounts: before.finAccounts.map((a) => ({
+          id: a.id, kind: a.kind, bankCode: a.bankCode, cardCoCode: a.cardCoCode, number: a.number, alias: a.alias ?? '', isActive: a.isActive })) }), ACTOR);
+        const corpRow = await rowOf(corpOrg);
+        check('T20', '★ 법인등록번호가 있는 회사 — 읽으면 법인 · 고정, 개인을 보내도 법인으로 저장',
+          before.settings.bizType === 'C' && before.settings.bizTypeLocked === true && saved.ok && corpRow?.biz_type === 'C' &&
+          saved.data.settings.bizTypeLocked === true, { org: corpOrg, read: before.settings.bizType, locked: before.settings.bizTypeLocked, stored: corpRow?.biz_type });
+      } else check('T20', '법인등록번호가 있는 회사 예시', false, '개발 DB 에 법인등록번호가 있는 연결 입주사가 없다');
     } finally {
       await c.query('ROLLBACK');
     }
@@ -181,7 +212,7 @@ async function main() {
     try {
       await applyCompanyScope(c, OPERATOR);
       const n = async (t) =>
-        (await c.query(`SELECT count(*)::int n FROM public.${t} WHERE org_id = ANY($1::int[])`, [[ORG_A, ORG_B]])).rows[0].n;
+        (await c.query(`SELECT count(*)::int n FROM public.${t} WHERE org_id = ANY($1::int[])`, [[ORG_A, ORG_B, ORG_C]])).rows[0].n;
       const s = await n('tb_s050_settings');
       const f = await n('tb_s050_fin_accounts');
       check('Z1', '롤백 후 시험 줄 0 (운영사 스코프로 센다)', s === 0 && f === 0, `설정 ${s} · 계좌 카드 ${f}`);

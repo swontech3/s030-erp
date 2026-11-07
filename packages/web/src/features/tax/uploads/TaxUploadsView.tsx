@@ -134,7 +134,8 @@ export function TaxUploadsView({ month }: { month: string }) {
   const socialLabel = (x: { insTp: string; noticeMonth: string }) =>
     `${data.codes.socialInsTps.find((c) => c.code === x.insTp)?.name ?? x.insTp} · ${monthShort(x.noticeMonth)} 고지`;
   const enabled = data.cards.filter((c) => c.enabled);
-  const up = enabled.filter((c) => c.fileCount > 0 || c.unused).length;
+  // ★ 「쓰지 않는 자료」는 보지 않는다 — 파일이 있는 카드만 「다 한 자료」(2026-11-07 대표 결정)
+  const up = enabled.filter((c) => c.fileCount > 0).length;
   const left = enabled.length - up;
 
   const toggle = (id: string) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -186,8 +187,8 @@ export function TaxUploadsView({ month }: { month: string }) {
           let sub = null;
           if (!c.enabled) badge = <span className={`${t.badge} ${t.bGray}`}>준비 중</span>;
           else if (isUp) badge = <span className={`${t.badge} ${t.bDone}`}>{c.fileCount}개 파일</span>;
-          // 현금 경비 — 표준 양식 내려받기(1-4). 「쓰지 않는 자료」면 세무 설정 링크가 먼저
-          if (c.enabled && c.kind === KIND_CASH && !(c.unused && !isUp)) {
+          // 현금 경비 — 늘 표준 양식 내려받기(1-4 · 2026-11-07 「쓰지 않는 자료」 배지 · 세무 설정 링크 뺌)
+          if (c.enabled && c.kind === KIND_CASH) {
             sub = (
               <ExcelDownloadButton
                 href={templateHref(c.kind)}
@@ -195,14 +196,6 @@ export function TaxUploadsView({ month }: { month: string }) {
                 label="양식 내려받기"
                 onError={setFailed}
               />
-            );
-          }
-          else if (c.unused) {
-            badge = <span className={`${t.badge} ${t.bGray}`}>쓰지 않는 자료</span>;
-            sub = (
-              <Link href="/tax/settings" className={`${t.btn} ${t.btnLink}`} style={{ fontSize: 12 }}>
-                세무 설정
-              </Link>
             );
           }
           return (

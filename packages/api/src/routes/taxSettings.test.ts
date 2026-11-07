@@ -21,7 +21,7 @@ const session = (role: ScopeRole): ErpSession => ({
 });
 
 const RESPONSE: TaxSettingsResponse = {
-  settings: { saved: false, bizType: null, withholdingCycle: 'M', taxEmails: [], unusedKinds: [] },
+  settings: { saved: false, bizType: null, bizTypeLocked: false, withholdingCycle: 'M', taxEmails: [], unusedKinds: [] },
   finAccounts: [],
   codes: { bizTypes: [], withholdingCycles: [], kinds: [], finKinds: [], banks: [], cardCompanies: [] },
   company: { source: 'none', name: '에스원테크', bizNumber: null, corpNumber: null },
@@ -94,9 +94,9 @@ describe('PUT /tax/settings — 잘못된 본문은 400, 저장에 닿지 않는
     ['본문이 객체가 아님', [], 'body'],
     ['사업자 유형 없음', { ...body(), bizType: '' }, 'bizType'],
     ['코드 표에 없는 원천세 주기', { ...body(), withholdingCycle: 'Q' }, 'withholdingCycle'],
-    ['세무사 메일 4개', {
+    ['세무사 메일 5개', {
       ...body(),
-      taxEmails: [1, 2, 3, 4].map((i) => ({ name: '', email: `m${i}@example.com` })),
+      taxEmails: [1, 2, 3, 4, 5].map((i) => ({ name: '', email: `m${i}@example.com` })),
     }, 'taxEmails'],
     ['은행 계좌에 카드사', { ...body(), finAccounts: [{ kind: 'B', bankCode: '004', cardCoCode: 'KB', number: '1234567890' }] },
       'finAccounts[0].cardCoCode'],

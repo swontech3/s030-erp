@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TAX_EMAILS_MAX, parseTaxSettingsSave, type TaxCodeSets } from './tax-settings.ts';
+import { TAX_BIZ_TP_CORP, TAX_EMAILS_MAX, lockedBizType, parseTaxSettingsSave, type TaxCodeSets } from './tax-settings.ts';
 
 /** 코드 표에서 읽었다고 치는 값 — 202 와 같은 코드값. */
 const CODES: TaxCodeSets = {
@@ -58,8 +58,11 @@ describe('사업자 유형 · 원천세 신고 주기', () => {
 describe('세무사 메일', () => {
   const mail = (i: number) => ({ name: `담당 ${i}`, email: `m${i}@example.com` });
 
-  it(`★ ${TAX_EMAILS_MAX + 1}개는 거절`, () => {
-    const r = parseTaxSettingsSave({ ...base(), taxEmails: [mail(1), mail(2), mail(3), mail(4)] }, CODES);
+  it('★ 4명까지 — 4명은 통과, 5명은 거절(2026-11-07 대표 결정)', () => {
+    expect(TAX_EMAILS_MAX).toBe(4);
+    const ok = parseTaxSettingsSave({ ...base(), taxEmails: [mail(1), mail(2), mail(3), mail(4)] }, CODES);
+    expect(ok.ok && ok.value.taxEmails.map((e) => e.name)).toEqual(['담당 1', '담당 2', '담당 3', '담당 4']);
+    const r = parseTaxSettingsSave({ ...base(), taxEmails: [mail(1), mail(2), mail(3), mail(4), mail(5)] }, CODES);
     expect(fieldsOf(r)).toEqual(['taxEmails']);
   });
 
@@ -119,6 +122,28 @@ describe('계좌 · 카드', () => {
     const a = { id: 'acc-1', kind: 'B', bankCode: '004', number: '1234567890' };
     const r = parseTaxSettingsSave({ ...base(), finAccounts: [a, { ...a }] }, CODES);
     expect(fieldsOf(r)).toEqual(['finAccounts[1].id']);
+  });
+});
+
+describe('★ 원천세 신고 주기 · 쓰지 않는 자료 — 화면에서 지웠다(2026-11-07). 안 보내면 null = 저장된 값 그대로', () => {
+  it('둘 다 안 보내면 null', () => {
+    const { withholdingCycle: _w, unusedKinds: _u, ...rest } = base();
+    const r = parseTaxSettingsSave(rest, CODES);
+    expect(r.ok && [r.value.withholdingCycle, r.value.unusedKinds]).toEqual([null, null]);
+  });
+  it('보내면 지금처럼 검사한다', () => {
+    const { unusedKinds: _u, ...rest } = base();
+    expect(fieldsOf(parseTaxSettingsSave({ ...rest, withholdingCycle: 'Q' }, CODES))).toEqual(['withholdingCycle']);
+  });
+});
+
+describe('★ 사업자 유형 — 법인등록번호가 있으면 법인으로 고정(2026-11-07)', () => {
+  it('법인등록번호(숫자)가 있으면 법인 코드, 없거나 숫자가 없으면 null(직접 고름)', () => {
+    expect(TAX_BIZ_TP_CORP).toBe('C');
+    expect(lockedBizType('1101111234567')).toBe('C');
+    expect(lockedBizType('110111-1234567')).toBe('C');
+    expect(lockedBizType(null)).toBeNull();
+    expect(lockedBizType('  ')).toBeNull();
   });
 });
 

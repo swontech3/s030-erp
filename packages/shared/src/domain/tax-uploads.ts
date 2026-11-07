@@ -595,12 +595,11 @@ export interface TaxUploadBankAccount {
   fileTps: string[];
 }
 
+/** ★ 세무 설정의 「쓰지 않는 자료」는 싣지 않는다 — 자료 올리기는 그 값을 보지 않는다(2026-11-07 대표 결정, 값은 2단계 이번 달 할 일에서). */
 export interface TaxUploadKindCard {
   kind: string;
   /** 올릴 수 있는가(`TAX_UPLOADABLE_KINDS`) — 아니면 「준비 중」. */
   enabled: boolean;
-  /** 세무 설정의 「쓰지 않는 자료」. */
-  unused: boolean;
   /** 그 달에 줄이 들어간 파일 수. */
   fileCount: number;
 }

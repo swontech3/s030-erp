@@ -8,7 +8,7 @@
  * ★ 코드값 설명은 여기서 읽는다(`listCodeDescriptions`) — 기존 `listCodes` 는 설명을 읽지 않고, 고치지 않는다.
  */
 import { randomUUID } from 'node:crypto';
-import type { TaxEmail, TaxFinAccountSave, TaxFinAccountView, TaxFinKind, TaxSettingsSave } from '@swonbiz/shared/domain/tax-settings';
+import { TAX_WH_CYCLE_DEFAULT, type TaxEmail, type TaxFinAccountSave, type TaxFinAccountView, type TaxFinKind, type TaxSettingsSave } from '@swonbiz/shared/domain/tax-settings';
 import type { ScopedClient } from './withCompanyScope.ts';
 
 interface Rows<T> {
@@ -54,21 +54,24 @@ export async function readTaxSettingsRow(client: ScopedClient, orgId: number): P
   return r ? { bizType: r.biz_type, withholdingCycle: r.withholding_cycle, taxEmails: r.tax_emails, unusedKinds: r.unused_kinds } : null;
 }
 
-/** 설정 줄을 만들거나 고친다 — 회사당 1줄(PK org_id). */
+/**
+ * 설정 줄을 만들거나 고친다 — 회사당 1줄(PK org_id).
+ * ★ 원천세 주기 · 쓰지 않는 자료가 null(본문에 없음)이면 저장된 값 그대로, 처음이면 칸 기본값(M · 빈 목록) — 2026-11-07.
+ */
 export async function upsertTaxSettings(client: ScopedClient, orgId: number, save: TaxSettingsSave, actor: string): Promise<void> {
   await q(
     client,
     `INSERT INTO public.tb_s050_settings
        (org_id, biz_type, withholding_cycle, tax_emails, unused_kinds, created_by, updated_by)
-     VALUES ($1, $2, $3, $4::jsonb, $5::text[], $6, $6)
+     VALUES ($1, $2, COALESCE($3::varchar, $7::varchar), $4::jsonb, COALESCE($5::text[], '{}'::text[]), $6, $6)
      ON CONFLICT (org_id) DO UPDATE
        SET biz_type = EXCLUDED.biz_type,
-           withholding_cycle = EXCLUDED.withholding_cycle,
+           withholding_cycle = COALESCE($3::varchar, tb_s050_settings.withholding_cycle),
            tax_emails = EXCLUDED.tax_emails,
-           unused_kinds = EXCLUDED.unused_kinds,
+           unused_kinds = COALESCE($5::text[], tb_s050_settings.unused_kinds),
            updated_at = CURRENT_TIMESTAMP,
            updated_by = EXCLUDED.updated_by`,
-    [orgId, save.bizType, save.withholdingCycle, JSON.stringify(save.taxEmails), save.unusedKinds, actor],
+    [orgId, save.bizType, save.withholdingCycle, JSON.stringify(save.taxEmails), save.unusedKinds, actor, TAX_WH_CYCLE_DEFAULT],
   );
 }
 

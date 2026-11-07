@@ -8,8 +8,11 @@
  *    코드값인지는 부르는 쪽이 읽어 온 코드값(`TaxCodeSets`)으로 본다. 여기에 코드값 목록을 박지 않는다.
  *    예외는 구분 B · C 하나다 — 201 의 번호 검사(DB CHECK)가 그 값에 기댄다(고정 코드).
  * ★ 틀린 칸은 **모두** 알린다(칸마다 하나) — 화면이 빨간 테두리 N곳을 그린다(08 S05-11 [저장]).
- * ★ 세무사 메일: 이름 · 역할은 선택, 메일은 필수. 둘 다 빈 줄은 버리고, 버린 뒤 3개까지.
- *   「최대 3」은 여기(서버)만 본다 — DB 는 강제하지 않는다(201).
+ * ★ 세무사 메일: 이름 · 역할은 선택, 메일은 필수. 둘 다 빈 줄은 버리고, 버린 뒤 4개까지(2026-11-07 대표 결정 — 3 → 4).
+ *   「최대 4」는 여기(서버)만 본다 — DB 는 강제하지 않는다(201).
+ * ★ 원천세 신고 주기 · 쓰지 않는 자료는 화면에서 지웠다(2026-11-07) — 본문에 없으면 null(저장된 값 그대로, 없으면 칸 기본값).
+ *   보내면 지금처럼 검사한다. 값 · DB 칸은 2단계(원천세 · 이번 달 할 일)에서 다시 쓴다.
+ * ★ 사업자 유형: 법인등록번호가 있는 회사는 법인으로 고정한다(`lockedBizType`) — 화면은 보이기만, 서버가 저장 때 법인으로 둔다.
  * ★ 계좌번호는 숫자와 `-` 를 받아 **숫자만** 저장한다. 카드는 끝 4자리뿐이다.
  */
 import { digitsOnly, isAccountNumberInput, isCardLast4, isEmailShape } from './tax-number.ts';
@@ -31,7 +34,15 @@ export type TaxFinKind = typeof TAX_FIN_KIND_BANK | typeof TAX_FIN_KIND_CARD;
 /** 원천세 신고 주기 기본값 — 201 의 칸 기본값(`DEFAULT 'M'`)과 같다. 설정 줄이 아직 없을 때 보여 준다. */
 export const TAX_WH_CYCLE_DEFAULT = 'M';
 
-export const TAX_EMAILS_MAX = 3;
+export const TAX_EMAILS_MAX = 4;
+
+/** 사업자 유형 법인 — 코드 TAX_BIZ_TP 의 코드값(부가세 신고 기간 계산도 C · I 에 기댄다). */
+export const TAX_BIZ_TP_CORP = 'C';
+
+/** 법인등록번호(삐용 · ERP · 법무와 같은 값)가 있으면 법인 코드, 없으면 null — null 이면 세무 설정에서 직접 고른다. */
+export function lockedBizType(corpNumber: string | null): string | null {
+  return corpNumber && digitsOnly(corpNumber) !== '' ? TAX_BIZ_TP_CORP : null;
+}
 const EMAIL_NAME_MAX = 100;
 const EMAIL_MAX = 254;
 /** 201 `alias varchar(50)`. */
@@ -66,9 +77,11 @@ export interface TaxFinAccountSave {
 
 export interface TaxSettingsSave {
   bizType: string;
-  withholdingCycle: string;
+  /** null = 본문에 없음 — 저장된 값 그대로(없으면 칸 기본값 M). */
+  withholdingCycle: string | null;
   taxEmails: TaxEmail[];
-  unusedKinds: string[];
+  /** null = 본문에 없음 — 저장된 값 그대로(없으면 빈 목록). */
+  unusedKinds: string[] | null;
   /** 계좌 · 카드 — 보낸 순서가 화면 순서다. 빠진 줄은 지운다. */
   finAccounts: TaxFinAccountSave[];
 }
@@ -119,6 +132,8 @@ export interface TaxSettingsResponse {
     /** 설정 줄이 저장돼 있는가 — false 면 아래 값은 처음 상태다. */
     saved: boolean;
     bizType: string | null;
+    /** 법인등록번호가 있어 법인으로 고정했는가 — 화면은 보이기만 한다. 이때 bizType 은 법인 코드다. */
+    bizTypeLocked: boolean;
     withholdingCycle: string;
     taxEmails: TaxEmail[];
     unusedKinds: string[];
@@ -283,18 +298,21 @@ export function parseTaxSettingsSave(raw: unknown, codes: TaxCodeSets): TaxSetti
   if (bizType === null || bizType === '') errors.push({ field: 'bizType', message: '사업자 유형을 고르세요' });
   else if (!codes.bizTypes.includes(bizType)) errors.push({ field: 'bizType', message: '없는 사업자 유형입니다' });
 
-  const withholdingCycle = textOf(raw.withholdingCycle);
-  if (withholdingCycle === null || !codes.withholdingCycles.includes(withholdingCycle)) {
-    errors.push({ field: 'withholdingCycle', message: '원천세 신고 주기를 고르세요' });
+  let withholdingCycle: string | null = null;
+  if (raw.withholdingCycle !== undefined) {
+    withholdingCycle = textOf(raw.withholdingCycle);
+    if (withholdingCycle === null || !codes.withholdingCycles.includes(withholdingCycle)) {
+      errors.push({ field: 'withholdingCycle', message: '원천세 신고 주기를 고르세요' });
+    }
   }
 
   const taxEmails = parseEmails(raw.taxEmails, errors);
   const finAccounts = parseFinAccounts(raw.finAccounts, codes, errors);
-  const unusedKinds = parseUnusedKinds(raw.unusedKinds, codes, errors);
+  const unusedKinds = raw.unusedKinds === undefined ? null : parseUnusedKinds(raw.unusedKinds, codes, errors);
 
   if (errors.length > 0) return { ok: false, errors };
   return {
     ok: true,
-    value: { bizType: bizType!, withholdingCycle: withholdingCycle!, taxEmails, unusedKinds, finAccounts },
+    value: { bizType: bizType!, withholdingCycle, taxEmails, unusedKinds, finAccounts },
   };
 }

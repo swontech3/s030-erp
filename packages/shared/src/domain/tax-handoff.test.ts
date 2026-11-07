@@ -114,8 +114,13 @@ describe('보내기 본문', () => {
     if (!r.ok) expect(r.errors[0]).toEqual({ field: 'to', message: '받는 사람을 한 명 이상 고르세요' });
   });
 
-  it('넷 이상 · 메일 꼴이 아님 · 목록이 아님 · 기간 없음 · 원천세는 거절', () => {
-    expect(parseHandoffSend({ ...base, to: ['a@x.com', 'b@x.com', 'c@x.com', 'd@x.com'] }).ok).toBe(false);
+  it('★ 받는 사람 4명까지 — 4명 통과(2026-11-07 대표 결정)', () => {
+    const r = parseHandoffSend({ ...base, to: ['a@x.com', 'b@x.com', 'c@x.com', 'd@x.com'] });
+    expect(r.ok && r.value.to).toHaveLength(4);
+  });
+
+  it('다섯 이상 · 메일 꼴이 아님 · 목록이 아님 · 기간 없음 · 원천세는 거절', () => {
+    expect(parseHandoffSend({ ...base, to: ['a@x.com', 'b@x.com', 'c@x.com', 'd@x.com', 'e@x.com'] }).ok).toBe(false);
     expect(parseHandoffSend({ ...base, to: ['not-mail'] }).ok).toBe(false);
     expect(parseHandoffSend({ ...base, to: 'tax@example.com' }).ok).toBe(false);
     expect(parseHandoffSend({ ...base, period: undefined }).ok).toBe(false);
