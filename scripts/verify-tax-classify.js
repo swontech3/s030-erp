@@ -18,7 +18,6 @@ import * as XLSX from 'xlsx';
 import { pool, closePool } from '../packages/api/src/db/pool.ts';
 import { applyCompanyScope } from '../packages/api/src/db/withCompanyScope.ts';
 import { confirmClassifyOp, exportClassifyOp, listClassifyOp } from '../packages/api/src/routes/taxClassify.ts';
-import { mergeVendorsOp } from '../packages/api/src/routes/taxVendors.ts';
 
 const ORG_A = 990001;
 const ORG_B = 990002;
@@ -166,16 +165,15 @@ async function main() {
         indiv.data.codes.itemNames.find((n) => n.code === 'NONBIZ_TAXPRO')?.name === '사업과 무관 — 세무사 판단' && p3b?.suggestedItemCode === null,
         { p3b, items: indiv.ok ? indiv.data.codes.items.length : indiv });
 
-      // ── 거래처 합치기 뒤에도 기억이 따라온다 ──
+      // ★ K15(거래처 합치기 뒤에도 기억이 따라온다)는 2026-11-07 합치기를 없애며 뺐다
       await c.query(`UPDATE public.tb_s050_settings SET biz_type = 'C' WHERE org_id = $1`, [ORG_A]);
+      // ★ K19 준비 — 예전에는 K15 합치기로 카드 거래처(vcls-v2)에 「통신비」 기억이 들어왔다. 이제 그 거래처에 통신비로 확정된
+      //   계산서를 직접 넣는다(7월 줄 — 9월 셈(K18)에 섞이지 않게, 확정 시각은 가장 늦게 — 가장 최근 확정 항목이 되게)
       await applyCompanyScope(c, OPERATOR);
-      await c.query(`UPDATE public.tb_s050_invoices SET classified_at = classified_at - interval '2 day' WHERE id = 'vcls-p8'`);
+      await invoice('vcls-p9', ORG_A, 'vcls-fp', 'vcls-v2', 'P', '2026-07-15');
+      await c.query(`UPDATE public.tb_s050_invoices SET item_code = 'TEL', classified_at = CURRENT_TIMESTAMP + interval '1 second', classified_by = $2
+        WHERE id = 'vcls-p9' AND org_id = $1`, [ORG_A, ACTOR]);
       await applyCompanyScope(c, tenant(ORG_A));
-      const merged = await mergeVendorsOp(c, ORG_A, 'vcls-v2', ['vcls-v1'], ACTOR);
-      const afterMerge = await listClassifyOp(c, ORG_A, query());
-      const p3c = afterMerge.ok ? afterMerge.data.rows.find((r) => r.id === 'vcls-p3') : null;
-      check('K15', '거래처를 합친 뒤 — 합친 거래처의 최근 확정 항목(통신비)을 골라 둔다(저장하지 않고 그때 셈)',
-        merged.ok && p3c?.vendorId === 'vcls-v2' && p3c.suggestedItemCode === 'TEL', p3c);
 
       // ── 회사 B ──
       await applyCompanyScope(c, tenant(ORG_B));

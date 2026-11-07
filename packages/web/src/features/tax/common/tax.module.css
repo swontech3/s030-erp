@@ -203,6 +203,23 @@
 
 /* ── 목록 위 버튼 줄 ── */
 .tbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border); }
+/* 목록 카드 밖에 따로 두는 버튼 줄(2026-11-07 거래처 — 검색 조건 카드 / 버튼 줄 / 목록 카드) */
+.tbarOut { padding: 0; border-top: 0; }
+
+/* ── 목록만 스크롤 · 머리 줄 고정 — ★ 2026-11-07 거래처부터 세무 목록 화면의 기준.
+ *   ERP 센터 관리(s030100010, facility.module.css)와 같은 꼴: 화면이 셸 `.main` 높이를 채우고(height 100% · 최소 520px),
+ *   목록 카드만 남는 높이를 받아(flex 1 · min-height 0) 그 안에서만 스크롤한다. 표 머리는 sticky.
+ *   ★ sticky 머리의 아래 테두리가 함께 굴러 사라지지 않게 표는 border-collapse: separate(센터 관리와 같은 까닭). ── */
+.pageFill { height: 100%; min-height: 520px; }
+.pageFill > * { flex: 0 0 auto; }
+.pageFill > .listCard { flex: 1 1 auto; }
+.listCard { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.listScroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.listScroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.listScroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.listScroll:hover::-webkit-scrollbar-thumb { background: var(--text-caption); }
+.tblSticky { border-collapse: separate; border-spacing: 0; }
+.tblSticky th { position: sticky; top: 0; z-index: 1; }
 .tbar .sm { margin-left: 4px; }
 .tbarSep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
 

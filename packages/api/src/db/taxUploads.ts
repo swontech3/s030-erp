@@ -363,10 +363,8 @@ interface VendorRow {
   biz_no: string | null;
   vendor_tp: string;
   tp_set_by_user: boolean;
-  first_kind: string;
-  first_direction: string | null;
-  month_count: number;
-  total_count: number;
+  is_closed: boolean;
+  first_month: string | null;
 }
 const vendorView = (r: VendorRow): TaxVendorView => ({
   id: r.id,
@@ -374,33 +372,28 @@ const vendorView = (r: VendorRow): TaxVendorView => ({
   bizNo: r.biz_no,
   vendorTp: r.vendor_tp,
   tpSetByUser: r.tp_set_by_user,
-  firstKind: r.first_kind,
-  firstDirection: r.first_direction,
-  monthCount: r.month_count,
-  totalCount: r.total_count,
+  closed: r.is_closed,
+  firstMonth: r.first_month,
 });
 
-/** 거래처 목록 — 먼저 생긴 순. `ids` 를 주면 그 거래처만. */
-export async function listVendors(
-  client: ScopedClient,
-  orgId: number,
-  month: string,
-  ids?: readonly string[],
-): Promise<TaxVendorView[]> {
-  const [from, to] = monthRange(month);
+/**
+ * 거래처 목록 — 먼저 생긴 순. `ids` 를 주면 그 거래처만.
+ * ★ 첫 거래월 = 그 거래처가 붙은 계산서(작성일) · 카드(사용일) 줄 가운데 가장 이른 날짜의 달 — 읽을 때 셈한다(저장하지 않음, 2026-11-07).
+ *   현금 경비는 거래처 연결 칸이 없어 세지 않는다(대표 결정). 줄이 없으면 null.
+ */
+export async function listVendors(client: ScopedClient, orgId: number, ids?: readonly string[]): Promise<TaxVendorView[]> {
   const { rows } = await q<VendorRow>(
     client,
-    `SELECT v.id, v.name, v.biz_no, v.vendor_tp, v.tp_set_by_user, v.first_kind, v.first_direction,
-            count(i.vendor_id) FILTER (WHERE i.d >= $2::date AND i.d < $3::date)::int AS month_count,
-            count(i.vendor_id)::int AS total_count
+    `SELECT v.id, v.name, v.biz_no, v.vendor_tp, v.tp_set_by_user, v.is_closed,
+            to_char(min(i.d), 'YYYY-MM') AS first_month
        FROM public.tb_s050_vendors v
        LEFT JOIN (SELECT org_id, vendor_id, write_date AS d FROM public.tb_s050_invoices
                   UNION ALL SELECT org_id, vendor_id, use_date FROM public.tb_s050_card_txns) i
               ON i.org_id = v.org_id AND i.vendor_id = v.id
-      WHERE v.org_id = $1 AND ($4::text[] IS NULL OR v.id = ANY($4::text[]))
+      WHERE v.org_id = $1 AND ($2::text[] IS NULL OR v.id = ANY($2::text[]))
       GROUP BY v.id
       ORDER BY v.created_at, v.id`,
-    [orgId, from, to, ids ?? null],
+    [orgId, ids ?? null],
   );
   return rows.map(vendorView);
 }
@@ -421,12 +414,12 @@ export async function lockVendors(
   return rows.map((r) => ({ id: r.id, bizNo: r.biz_no, vendorTp: r.vendor_tp, tpSetByUser: r.tp_set_by_user }));
 }
 
-/** 이름 · 번호 고치기 — 이름 null 은 그대로, 번호 undefined 는 그대로. */
+/** 이름 · 번호 · 종료 여부 고치기 — 이름 null 은 그대로, 번호 · 종료 여부 undefined 는 그대로. */
 export async function updateVendor(
   client: ScopedClient,
   orgId: number,
   id: string,
-  edit: { name: string | null; bizNo?: string | null },
+  edit: { name: string | null; bizNo?: string | null; closed?: boolean },
   actor: string,
 ): Promise<void> {
   await q(
@@ -434,10 +427,23 @@ export async function updateVendor(
     `UPDATE public.tb_s050_vendors
         SET name = COALESCE($3, name),
             biz_no = CASE WHEN $4::boolean THEN $5 ELSE biz_no END,
+            is_closed = COALESCE($7::boolean, is_closed),
             updated_at = CURRENT_TIMESTAMP, updated_by = $6
       WHERE org_id = $1 AND id = $2`,
-    [orgId, id, edit.name, edit.bizNo !== undefined, edit.bizNo ?? null, actor],
+    [orgId, id, edit.name, edit.bizNo !== undefined, edit.bizNo ?? null, actor, edit.closed ?? null],
   );
+}
+
+/** [거래종료] — 고른 거래처를 종료로(지우지 않는다, 2026-11-07). 바꾼 수. */
+export async function closeVendors(client: ScopedClient, orgId: number, ids: readonly string[], actor: string): Promise<number> {
+  const r = await q(
+    client,
+    `UPDATE public.tb_s050_vendors
+        SET is_closed = true, updated_at = CURRENT_TIMESTAMP, updated_by = $3
+      WHERE org_id = $1 AND id = ANY($2::text[])`,
+    [orgId, ids, actor],
+  );
+  return r.rowCount ?? 0;
 }
 
 /** 사용자가 정한 구분 — tp_set_by_user = true(그 뒤로 업로드가 바꾸지 않는다). */
@@ -449,42 +455,5 @@ export async function setVendorType(client: ScopedClient, orgId: number, ids: re
       WHERE org_id = $1 AND id = ANY($2::text[])`,
     [orgId, ids, tp, actor],
   );
-  return r.rowCount ?? 0;
-}
-
-/** 합치기 ① — 계산서 · 카드 줄(1-4)을 남길 곳으로 옮긴다. 옮긴 줄 수. */
-export async function moveInvoicesToVendor(client: ScopedClient, orgId: number, keepId: string, fromIds: readonly string[]): Promise<number> {
-  let moved = 0;
-  for (const table of ['tb_s050_invoices', 'tb_s050_card_txns']) {
-    const r = await q(
-      client,
-      `UPDATE public.${table} SET vendor_id = $2 WHERE org_id = $1 AND vendor_id = ANY($3::text[])`,
-      [orgId, keepId, fromIds],
-    );
-    moved += r.rowCount ?? 0;
-  }
-  return moved;
-}
-
-/** 합치기 ② — 남길 곳의 구분 · 번호. */
-export async function updateMergedVendor(
-  client: ScopedClient,
-  orgId: number,
-  keepId: string,
-  v: { vendorTp: string; tpSetByUser: boolean; bizNo: string | null },
-  actor: string,
-): Promise<void> {
-  await q(
-    client,
-    `UPDATE public.tb_s050_vendors
-        SET vendor_tp = $3, tp_set_by_user = $4, biz_no = $5, updated_at = CURRENT_TIMESTAMP, updated_by = $6
-      WHERE org_id = $1 AND id = $2`,
-    [orgId, keepId, v.vendorTp, v.tpSetByUser, v.bizNo, actor],
-  );
-}
-
-/** 합치기 ③ — 합친 곳 지우기. 계산서가 남아 있으면 FK RESTRICT 가 막는다. */
-export async function deleteVendors(client: ScopedClient, orgId: number, ids: readonly string[]): Promise<number> {
-  const r = await q(client, `DELETE FROM public.tb_s050_vendors WHERE org_id = $1 AND id = ANY($2::text[])`, [orgId, ids]);
   return r.rowCount ?? 0;
 }

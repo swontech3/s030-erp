@@ -18,9 +18,13 @@ import {
   taxMonthOptions,
   pickTaxMonth,
   parseVendorEdit,
-  parseVendorIds,
-  parseVendorMerge,
+  parseVendorClose,
+  parseVendorQuery,
   parseVendorType,
+  filterVendors,
+  vendorSearch,
+  vendorsExportFileName,
+  type TaxVendorView,
   summarizeAlreadyWhere,
   type InvoiceImportMap,
 } from './tax-uploads.ts';
@@ -352,22 +356,65 @@ describe('parseVendorType — 주거래처 / 일반', () => {
   });
 });
 
-describe('parseVendorMerge — 합치기', () => {
-  it('남길 곳 하나 + 합칠 곳 하나 이상, 남길 곳은 합칠 곳에 없어야 한다', () => {
-    expect(parseVendorMerge({ keepId: 'k', ids: ['a', 'b'] })).toEqual({ ok: true, value: { keepId: 'k', ids: ['a', 'b'] } });
-    expect(parseVendorMerge({ keepId: 'k', ids: [] })).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
-    expect(parseVendorMerge({ keepId: 'k', ids: ['k'] })).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
-    expect(parseVendorMerge({ keepId: '', ids: ['a'] })).toMatchObject({ ok: false, errors: [{ field: 'keepId' }] });
+describe('★ 거래처 종료 여부 — 수정 팝업의 거래 중 / 거래 종료(2026-11-07)', () => {
+  it('closed 를 보내면 담고, 안 보내면 그대로(undefined)', () => {
+    const on = parseVendorEdit({ name: '가', closed: true });
+    expect(on.ok && on.value.closed).toBe(true);
+    const off = parseVendorEdit({ name: '가', closed: false });
+    expect(off.ok && off.value.closed).toBe(false);
+    const none = parseVendorEdit({ name: '가' });
+    expect(none.ok && 'closed' in none.value).toBe(false);
+  });
+  it('참/거짓이 아니면 400', () => {
+    expect(parseVendorEdit({ name: '가', closed: 'Y' })).toMatchObject({ ok: false, errors: [{ field: 'closed' }] });
   });
 });
 
-describe('parseVendorIds — 거래처 지우기', () => {
+describe('★ parseVendorClose — [거래종료] 본문', () => {
   it('하나 이상, 겹친 id 는 하나로', () => {
-    expect(parseVendorIds({ ids: ['a', 'a', 'b'] })).toEqual({ ok: true, value: ['a', 'b'] });
-    expect(parseVendorIds({ ids: [] })).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
-    expect(parseVendorIds({ ids: [1] })).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
-    expect(parseVendorIds(null)).toMatchObject({ ok: false, errors: [{ field: 'ids' }] });
+    expect(parseVendorClose({ ids: ['a', 'a', 'b'] })).toEqual({ ok: true, value: ['a', 'b'] });
+    expect(parseVendorClose({ ids: [] })).toEqual({ ok: false, errors: [{ field: 'ids', message: '거래를 종료할 거래처를 고르세요' }] });
+    expect(parseVendorClose(null)).toMatchObject({ ok: false });
   });
+});
+
+describe('★ 거래처 검색 조건 — 검색어 · 구분 · 종료여부(처음 값 거래 중)', () => {
+  it('처음 값 — 검색어 없음 · 구분 전체 · 거래 중', () => {
+    expect(parseVendorQuery({})).toEqual({ q: '', tp: null, closed: 'open' });
+  });
+  it('값을 읽는다 — 모르는 종료여부는 거래 중으로', () => {
+    expect(parseVendorQuery({ q: ' 한빛 ', tp: 'M', closed: 'closed' })).toEqual({ q: '한빛', tp: 'M', closed: 'closed' });
+    expect(parseVendorQuery({ closed: 'all' }).closed).toBe('all');
+    expect(parseVendorQuery({ closed: 'x' }).closed).toBe('open');
+    expect(parseVendorQuery({ tp: '' }).tp).toBeNull();
+  });
+  it('주소 글자 — 처음 값은 싣지 않는다', () => {
+    expect(vendorSearch({ q: '', tp: null, closed: 'open' })).toBe('');
+    expect(vendorSearch({ q: '한빛', tp: 'G', closed: 'all' })).toBe('?q=%ED%95%9C%EB%B9%9B&tp=G&closed=all');
+  });
+});
+
+describe('★ filterVendors — 화면 목록과 엑셀이 같은 거르기', () => {
+  const v = (id: string, name: string, bizNo: string | null, vendorTp: string, closed: boolean): TaxVendorView => ({
+    id, name, bizNo, vendorTp, tpSetByUser: false, closed, firstMonth: null,
+  });
+  const list = [v('1', '한빛상사', '1234567890', 'M', false), v('2', '두리식당', null, 'G', false), v('3', '한빛문구', '9990001111', 'G', true)];
+  const ids = (q: Parameters<typeof filterVendors>[1]) => filterVendors(list, q).map((x) => x.id).join();
+
+  it('처음 값은 거래 중만', () => expect(ids({ q: '', tp: null, closed: 'open' })).toBe('1,2'));
+  it('종료 · 전체', () => {
+    expect(ids({ q: '', tp: null, closed: 'closed' })).toBe('3');
+    expect(ids({ q: '', tp: null, closed: 'all' })).toBe('1,2,3');
+  });
+  it('검색어 — 거래처명 일부 또는 사업자번호 숫자 일부(하이픈 무시)', () => {
+    expect(ids({ q: '한빛', tp: null, closed: 'all' })).toBe('1,3');
+    expect(ids({ q: '123-45', tp: null, closed: 'all' })).toBe('1');
+  });
+  it('구분', () => expect(ids({ q: '', tp: 'G', closed: 'all' })).toBe('2,3'));
+});
+
+describe('엑셀 파일 이름', () => {
+  it('거래처_YYYY-MM-DD.xlsx', () => expect(vendorsExportFileName('2026-11-07')).toBe('거래처_2026-11-07.xlsx'));
 });
 
 describe('summarizeAlreadyWhere — 이미 올린 줄이 어디 있는지(그 줄 날짜의 달 · 이미 올린 파일)', () => {

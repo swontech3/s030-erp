@@ -32,10 +32,10 @@ import {
 } from '../packages/api/src/routes/taxUploads.ts';
 import { cashTemplateOp } from '../packages/api/src/routes/taxCardCash.ts';
 import {
-  deleteVendorsOp,
+  closeVendorsOp,
   editVendorOp,
+  exportVendorsOp,
   listVendorsOp,
-  mergeVendorsOp,
   setVendorTypeOp,
 } from '../packages/api/src/routes/taxVendors.ts';
 
@@ -521,7 +521,10 @@ async function main() {
       const map = await loadImportMap(c, 'INVOICE');
       if (!map) throw new Error('대응표 HOMETAX_TAX_INVOICE 가 없다 — 204 를 먼저');
       const xls = (o) => makeXls(map.headerSignature, o);
-      const vendorsOf = async (orgId) => (await listVendorsOp(c, orgId, MONTH)).vendors;
+      const vendorsOf = async (orgId) => (await listVendorsOp(c, orgId)).vendors;
+      // ★ 2026-11-07 — 목록 API 에서 「처음 생긴 자료」(first_kind · first_direction)를 뺐다. 자동 등록 규칙은 그대로라 DB 칸에서 읽는다
+      const firstOf = async (id) =>
+        (await c.query(`SELECT first_kind k, first_direction d FROM public.tb_s050_vendors WHERE id = $1`, [id])).rows[0] ?? null;
       const vendorByBiz = async (orgId, biz) => (await vendorsOf(orgId)).filter((v) => v.bizNo === biz);
       const invoiceVendor = async (orgId, no) =>
         (await c.query(`SELECT vendor_id FROM public.tb_s050_invoices WHERE org_id = $1 AND approval_no = $2`, [orgId, `V-TAXUP-${no}`])).rows[0]?.vendor_id ?? null;
@@ -541,10 +544,12 @@ async function main() {
         pv1.ok ? { dir: pv1.data.direction, toInsert: pv1.data.toInsert, byMonth: pv1.data.byMonth } : pv1);
       const up1 = await upload(ORG_A, 'f1.xls', f1);
       const v1 = await vendorByBiz(ORG_A, P.p1);
-      check('U2', '올리기 — 3줄 · 거래처 2곳 자동 등록 · 주거래처(M) · 처음 생긴 자료 INVOICE/S',
+      const f1First = v1[0] ? await firstOf(v1[0].id) : null;
+      check('U2', '올리기 — 3줄 · 거래처 2곳 자동 등록 · 주거래처(M) · 거래 중 · 처음 생긴 자료 INVOICE/S(DB) · 첫 거래월 9월',
         up1.ok && up1.data.insertedCount === 3 && up1.data.vendorsCreated === 2 &&
-        v1.length === 1 && v1[0].vendorTp === 'M' && v1[0].firstKind === 'INVOICE' && v1[0].firstDirection === 'S' && v1[0].monthCount === 2,
-        up1.ok ? { inserted: up1.data.insertedCount, created: up1.data.vendorsCreated, v1 } : up1);
+        v1.length === 1 && v1[0].vendorTp === 'M' && v1[0].closed === false && f1First?.k === 'INVOICE' && f1First.d === 'S' &&
+        v1[0].firstMonth === MONTH,
+        up1.ok ? { inserted: up1.data.insertedCount, created: up1.data.vendorsCreated, v1, f1First } : up1);
 
       // ── 같은 파일 409 ──
       const again = await upload(ORG_A, 'f1-다시.xls', f1);
@@ -580,8 +585,8 @@ async function main() {
         { promoted: up3.data?.vendorsPromoted, v4 });
       check('U6', '★ 사용자가 내린 일반은 업로드가 바꾸지 않는다(tp_set_by_user)',
         setG.ok && v5.vendorTp === 'G' && v5.tpSetByUser === true, v5);
-      check('U7', '★ 덮지 않기 — 이미 있는 거래처의 이름은 파일 이름으로 바뀌지 않는다',
-        v4.name === '미리 있던 일반' && v4.firstKind === 'BANK', v4);
+      check('U7', '★ 덮지 않기 — 이미 있는 거래처의 이름은 파일 이름으로 바뀌지 않는다(처음 생긴 자료도 그대로, DB)',
+        v4.name === '미리 있던 일반' && (await firstOf(v4.id))?.k === 'BANK', v4);
 
       // ── 사용자가 고친 이름 · 번호는 다시 올려도 그대로 ──
       const edit = await editVendorOp(c, ORG_A, v1[0].id, { name: '사용자가 고친 이름' }, ACTOR);
@@ -597,16 +602,15 @@ async function main() {
       await c.query(`UPDATE public.tb_s050_vendors SET created_at = created_at + interval '1 second' WHERE id = $1`, [dupP2]);
       const f5 = xls({ tag: 'f5', rows: [{ no: 9, partner: P.p2, name: '지어낸 나' }] });
       await upload(ORG_A, 'f5.xls', f5);
-      const list = await listVendorsOp(c, ORG_A, MONTH);
-      check('U9', '★ 같은 사업자번호 거래처 둘 — 업로드는 먼저 생긴 곳에 붙이고, 목록은 묶음으로 알린다',
-        (await invoiceVendor(ORG_A, 9)) === v2.id && list.sameBizNoGroups.some((g) => g.join() === [v2.id, dupP2].join()),
-        list.sameBizNoGroups);
+      // ★ 2026-11-07 — 「같은 사업자번호」 묶음 알림은 합치기와 함께 없앴다. 업로드가 먼저 생긴 곳에 붙이는 규칙만 본다
+      check('U9', '★ 같은 사업자번호 거래처 둘 — 업로드는 먼저 생긴 곳에 붙인다',
+        (await invoiceVendor(ORG_A, 9)) === v2.id && dupP2 !== v2.id, { v2: v2.id, dupP2 });
 
       // ── 매입 파일 ──
       const f6 = xls({ tag: 'f6', sales: false, rows: [{ no: 10, partner: P.p6, name: '지어낸 공급자' }] });
       const up6 = await upload(ORG_A, 'f6.xls', f6);
       const v6 = (await vendorByBiz(ORG_A, P.p6))[0];
-      check('U10', '매입 파일 — 공급자 칸이 거래처 · 구분 P', up6.ok && up6.data.file.direction === 'P' && v6?.firstDirection === 'P' && v6.name === '지어낸 공급자', v6);
+      check('U10', '매입 파일 — 공급자 칸이 거래처 · 구분 P(DB)', up6.ok && up6.data.file.direction === 'P' && (await firstOf(v6?.id))?.d === 'P' && v6.name === '지어낸 공급자', v6);
 
       // ── 목록 ──
       const ups = await listUploadsOp(c, ORG_A, MONTH);
@@ -620,31 +624,53 @@ async function main() {
         ups.codes.kinds.every((k) => 'description' in k) && 'bizTypeName' in ups && ups.bizTypeName === null,
         { inv, files: ups.files.length, dirs: ups.codes.invDirs });
 
-      // ── 합치기 ──
+      // ── ★ 2026-11-07 거래처 — 첫 거래월 · [거래종료] · [수정]으로 되돌리기 · 엑셀(합치기 · 지우기는 없앴다) ──
       const v3 = (await vendorByBiz(ORG_A, P.p3))[0];
-      const nullBiz = await insertVendor(c, ORG_A, { name: '번호 없는 남길 곳', bizNo: P.p6, vendorTp: 'G', firstKind: 'CASH', firstDirection: null }, ACTOR);
-      await editVendorOp(c, ORG_A, nullBiz, { name: null, bizNo: null }, ACTOR);
-      const merge = await mergeVendorsOp(c, ORG_A, nullBiz, [v3.id], ACTOR);
-      const after = (await vendorsOf(ORG_A)).find((v) => v.id === nullBiz);
-      check('U12', '★ 합치기 — 계산서를 남길 곳으로 옮기고 · 주거래처면 주거래처 · 빈 번호는 다른 곳 번호 · 합친 곳 지움',
-        merge.ok && merge.data.movedRows === 1 && after?.vendorTp === 'M' && after.bizNo === P.p3 &&
-        (await invoiceVendor(ORG_A, 4)) === nullBiz && !(await vendorsOf(ORG_A)).some((v) => v.id === v3.id),
-        { merge: merge.ok ? merge.data.movedRows : merge, after });
+      const dbFirst = (await c.query(`SELECT to_char(min(write_date), 'YYYY-MM') m FROM public.tb_s050_invoices WHERE org_id = $1 AND vendor_id = $2`,
+        [ORG_A, v3.id])).rows[0].m;
+      const noDeal = await insertVendor(c, ORG_A, { name: '거래 없는 곳', bizNo: null, vendorTp: 'G', firstKind: 'CASH', firstDirection: null }, ACTOR);
+      check('V1', '★ 첫 거래월 — 붙은 계산서의 가장 이른 달(읽을 때 셈) · 줄이 없으면 null',
+        v3.firstMonth === dbFirst && dbFirst !== null && (await vendorsOf(ORG_A)).find((v) => v.id === noDeal)?.firstMonth === null,
+        { v3: v3.firstMonth, dbFirst });
+      const closed = await closeVendorsOp(c, ORG_A, [v3.id, noDeal], ACTOR);
+      const afterClose = await vendorsOf(ORG_A);
+      const xOpen = await exportVendorsOp(c, ORG_A, { q: '', tp: null, closed: 'open' }, '2026-11-07');
+      const xClosed = await exportVendorsOp(c, ORG_A, { q: '', tp: null, closed: 'closed' }, '2026-11-07');
+      const rowsOf = (x) => {
+        const wb = XLSX.read(x.data.bytes, { type: 'array' });
+        return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: null });
+      };
+      const openRows = xOpen.ok ? rowsOf(xOpen) : [];
+      const closedRows = xClosed.ok ? rowsOf(xClosed) : [];
+      check('V2', '★ [거래종료] — 2곳을 종료로(지우지 않음) · 엑셀은 걸린 조건 결과만(거래 중 / 종료) · 파일 이름 · 칸 다섯',
+        closed.ok && closed.data.closed === 2 && afterClose.filter((v) => v.closed).map((v) => v.id).sort().join() === [v3.id, noDeal].sort().join() &&
+        xOpen.ok && xOpen.data.fileName === '거래처_2026-11-07.xlsx' && openRows[0]?.join() === '거래처명,사업자번호,구분,종료여부,첫 거래월' &&
+        openRows.length === 1 + afterClose.filter((v) => !v.closed).length && closedRows.length === 3 &&
+        closedRows.slice(1).every((r) => r[3] === '종료'),
+        { closed: closed.ok ? closed.data : closed, open: openRows.length, closedRows: closedRows.length });
+      const reopen = await editVendorOp(c, ORG_A, noDeal, { name: null, closed: false }, ACTOR);
+      // 종료된 거래처(v3)의 사업자번호로 새 계산서를 올린다 — 붙는지 본 뒤 그 파일은 지워 뒤 검증의 파일 수를 그대로 둔다
+      const f7 = xls({ tag: 'f7', rows: [{ no: 11, partner: P.p3, name: '종료 뒤 계산서' }] });
+      const up7 = await upload(ORG_A, 'f7.xls', f7);
+      const after7 = (await invoiceVendor(ORG_A, 11)) === v3.id && up7.ok && up7.data.vendorsCreated === 0;
+      if (up7.ok) await deleteUploadsOp(c, ORG_A, [up7.data.file.id]);
+      check('V3', '★ [수정] 「거래 중」으로 되돌리기 · 종료된 거래처에 새 계산서가 와도 그대로 붙는다(자동 등록 · 연결 규칙 그대로) · 종료는 그대로',
+        reopen.ok && reopen.data.closed === false && after7 &&
+        (await vendorsOf(ORG_A)).find((v) => v.id === v3.id)?.closed === true,
+        { reopen: reopen.ok ? reopen.data.closed : reopen, after7 });
 
       // ── 회사별 막기 ──
-      const aZero = await insertVendor(c, ORG_A, { name: '남의 단체가 지우려는 곳', bizNo: null, vendorTp: 'G', firstKind: 'BANK', firstDirection: null }, ACTOR);
       await applyCompanyScope(c, tenant(ORG_B));
       const bList = await vendorsOf(ORG_B);
       const bEdit = await editVendorOp(c, ORG_B, v1[0].id, { name: '가로챔' }, ACTOR);
       const bType = await setVendorTypeOp(c, ORG_B, [v1[0].id], 'G', ACTOR);
-      const bMerge = await mergeVendorsOp(c, ORG_B, v1[0].id, [v2.id], ACTOR);
+      const bClose = await closeVendorsOp(c, ORG_B, [v1[0].id], ACTOR);
       const bDel = await deleteUploadsOp(c, ORG_B, [up1.data.file.id]);
-      // 거래 0건인 A 의 거래처 — B 가 지우려 해도 404 · 그대로 남는다
-      const bVDel = await deleteVendorsOp(c, ORG_B, [aZero]);
-      check('U13', '★ 회사 B — A 의 거래처 · 파일이 안 보이고, A 의 id 로 고치기 · 구분 · 합치기 · 파일 지우기 · 거래처 지우기는 404',
-        bList.length === 0 && [bEdit, bType, bMerge, bDel, bVDel].every((r) => !r.ok && r.status === 404) &&
-        (await listUploadsOp(c, ORG_B, MONTH)).files.length === 0,
-        [bEdit, bType, bMerge, bDel, bVDel].map((r) => r.status));
+      const bX = await exportVendorsOp(c, ORG_B, { q: '', tp: null, closed: 'all' }, '2026-11-07');
+      check('U13', '★ 회사 B — A 의 거래처 · 파일이 안 보이고, A 의 id 로 고치기 · 구분 · 거래종료 · 파일 지우기는 404 · 엑셀에도 A 거래처 없음',
+        bList.length === 0 && [bEdit, bType, bClose, bDel].every((r) => !r.ok && r.status === 404) &&
+        (await listUploadsOp(c, ORG_B, MONTH)).files.length === 0 && bX.ok && rowsOf(bX).length === 1,
+        [bEdit, bType, bClose, bDel].map((r) => r.status));
       const bUp = await upload(ORG_B, 'f1.xls', f1);
       check('U14', '같은 파일 · 같은 승인번호라도 다른 단체면 따로 들어간다', bUp.ok && bUp.data.insertedCount === 3, bUp.ok ? bUp.data.insertedCount : bUp);
       const crossWrite = await attempt(c, () => upload(ORG_A, 'b가-a에.xls', xls({ tag: 'x', rows: [{ no: 99, partner: P.p1, name: '가' }] })));
@@ -673,26 +699,7 @@ async function main() {
       check('U18', '없는 id 가 섞이면 404 · 아무것도 지우지 않는다',
         !ghost.ok && ghost.status === 404 && (await listUploadsOp(c, ORG_A, MONTH)).files.some((f) => f.id === up2.data.file.id));
 
-      // ── 거래처 지우기 — 거래 0건(전체 기간)만 ──
-      check('U19a', '★ 남의 단체가 지우려 한 거래 0건 거래처는 A 에 그대로 남아 있다',
-        (await vendorsOf(ORG_A)).some((v) => v.id === aZero));
-      const z2 = await insertVendor(c, ORG_A, { name: '거래 없는 곳', bizNo: null, vendorTp: 'G', firstKind: 'CASH', firstDirection: null }, ACTOR);
-      const v1c = (await vendorByBiz(ORG_A, P.p1))[0];
-      // 8월에는 거래가 없는 거래처 — 그 달 0건이어도 9월 거래가 있으니 막혀야 한다
-      const v1Aug = (await listVendorsOp(c, ORG_A, '2026-08')).vendors.find((v) => v.id === v1c.id);
-      const mixed = await deleteVendorsOp(c, ORG_A, [z2, v1c.id]);
-      const afterMixed = await vendorsOf(ORG_A);
-      check('U19', '★ 거래가 있는 거래처가 하나라도 섞이면 409 · 아무것도 지우지 않는다(이번 달 거래 0건이어도 전체 기간으로 본다)',
-        !mixed.ok && mixed.status === 409 && mixed.message === '거래가 있는 거래처는 지울 수 없습니다' &&
-        v1Aug?.monthCount === 0 && v1c.totalCount > 0 && afterMixed.some((v) => v.id === z2) && afterMixed.some((v) => v.id === v1c.id),
-        { mixed, v1Aug: v1Aug?.monthCount, v1Total: v1c.totalCount });
-      const vDel = await deleteVendorsOp(c, ORG_A, [z2, aZero]);
-      const afterDel = await vendorsOf(ORG_A);
-      check('U20', '★ 거래 0건 거래처 지우기 — 고른 2곳이 지워진다',
-        vDel.ok && vDel.data.deleted === 2 && !afterDel.some((v) => v.id === z2 || v.id === aZero),
-        vDel.ok ? vDel.data : vDel);
-      const vGhost = await deleteVendorsOp(c, ORG_A, [v1c.id, 'v-tax-up-none']);
-      check('U21', '없는 거래처 id 가 섞이면 404', !vGhost.ok && vGhost.status === 404, vGhost);
+      // ★ 거래처 지우기(U19a ~ U21)는 2026-11-07 화면 · API 에서 없앴다
 
       // ══ 카드 사용 내역(1-4) ══
       const cardMap = await loadImportMap(c, 'CARD');
@@ -728,7 +735,8 @@ async function main() {
       const stored = (await c.query(`SELECT card_last4, merchant_name_src, deduct_note_src, vat_deduct FROM public.tb_s050_card_txns WHERE org_id = $1`, [ORG_A])).rows;
       check('C3', '★ 카드 올리기 — 4줄 · 새 가맹점은 일반(G) 거래처 · 처음 생긴 자료 CARD · 매입/매출 없음 · 있는 주거래처는 그대로(승격 · 이름 덮기 없음) · 파일 매입/매출 비움',
         cup.ok && cup.data.insertedCount === 4 && cup.data.vendorsCreated === 1 && cup.data.vendorsPromoted === 0 && cup.data.file.direction === null &&
-        newV.length === 1 && newV[0].vendorTp === 'G' && newV[0].firstKind === 'CARD' && newV[0].firstDirection === null && newV[0].totalCount === 2 &&
+        newV.length === 1 && newV[0].vendorTp === 'G' && (await firstOf(newV[0].id))?.k === 'CARD' && (await firstOf(newV[0].id))?.d === null &&
+        newV[0].firstMonth === (await c.query(`SELECT to_char(min(use_date), 'YYYY-MM') m FROM public.tb_s050_card_txns WHERE org_id = $1 AND vendor_id = $2`, [ORG_A, newV[0].id])).rows[0].m &&
         p1v.length === 1 && p1v[0].vendorTp === 'M' && p1v[0].name !== '지어낸 가맹점',
         { cup: cup.ok ? { ins: cup.data.insertedCount, created: cup.data.vendorsCreated, dir: cup.data.file.direction } : cup, newV, p1v });
       check('C4', '★★ DB 에도 끝 4자리만 · 공제 모름은 비움 · 불공제 사유는 글 그대로',
@@ -817,11 +825,7 @@ async function main() {
         listOf('구분 목록').join() === '구분,매입,매출' && listOf('결제방법 목록').join() === '결제방법,현금,계좌이체,대표 개인 돈',
         { name: tpl.ok ? tpl.data.fileName : tpl, sheets: twb?.SheetNames, items: itemsAoa.length, dirs: listOf('구분 목록'), pays: listOf('결제방법 목록') });
 
-      const delCardV = await deleteVendorsOp(c, ORG_A, [newV[0].id]);
-      check('X6', '★ 카드 줄이 있는 거래처는 지울 수 없다(409)', !delCardV.ok && delCardV.status === 409, delCardV);
-      const mergedCard = await mergeVendorsOp(c, ORG_A, p1v[0].id, [newV[0].id], ACTOR);
-      const movedCard = (await c.query(`SELECT count(*)::int n FROM public.tb_s050_card_txns WHERE org_id = $1 AND vendor_id = $2`, [ORG_A, p1v[0].id])).rows[0].n;
-      check('X7', '★ 합치기 — 카드 줄도 남길 곳으로 옮긴다', mergedCard.ok && movedCard === 3, { merged: mergedCard.ok, movedCard });
+      // ★ X6 · X7(카드 거래처 지우기 · 합치기)은 2026-11-07 화면 · API 에서 없앴다
 
       const k1File = ups2.files.find((f) => f.fileName === 'k1.xls');
       const delCheck = await deleteUploadsOp(c, ORG_A, [k1File.id], true);

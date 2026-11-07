@@ -447,6 +447,8 @@ export interface VendorEdit {
   name: string | null;
   /** 없음(undefined) = 그대로 · null = 번호 없음 · 숫자 10자리. */
   bizNo?: string | null;
+  /** 없음(undefined) = 그대로 · true 거래 종료 · false 거래 중(2026-11-07 [수정] 팝업). */
+  closed?: boolean;
 }
 
 export type VendorEditParsed =
@@ -486,8 +488,15 @@ export function parseVendorEdit(raw: unknown): VendorEditParsed {
       }
     }
   }
+  let closed: boolean | undefined;
+  if (raw.closed !== undefined) {
+    if (typeof raw.closed !== 'boolean') errors.push({ field: 'closed', message: '거래 중 · 거래 종료 가운데 고르세요' });
+    else closed = raw.closed;
+  }
   if (errors.length > 0) return { ok: false, errors };
-  return { ok: true, value: bizNo === undefined ? { name } : { name, bizNo }, warnings };
+  const value: VendorEdit = bizNo === undefined ? { name } : { name, bizNo };
+  if (closed !== undefined) value.closed = closed;
+  return { ok: true, value, warnings };
 }
 
 export type VendorTypeParsed = { ok: true; value: { ids: string[]; tp: string } } | { ok: false; errors: TaxFieldError[] };
@@ -503,27 +512,64 @@ export function parseVendorType(raw: unknown, vendorTps: readonly string[]): Ven
   return ids && tp ? { ok: true, value: { ids, tp } } : { ok: false, errors };
 }
 
-export type VendorMergeParsed = { ok: true; value: { keepId: string; ids: string[] } } | { ok: false; errors: TaxFieldError[] };
-
-/** 합치기 — 남길 곳(keepId) + 합칠 곳(ids, 하나 이상). 남길 곳은 합칠 곳에 없어야 한다. */
-export function parseVendorMerge(raw: unknown): VendorMergeParsed {
-  if (!isObj(raw)) return { ok: false, errors: [{ field: 'body', message: '본문 형식이 올바르지 않습니다' }] };
-  const errors: TaxFieldError[] = [];
-  const keepId = typeof raw.keepId === 'string' && raw.keepId.trim() !== '' ? raw.keepId.trim() : null;
-  if (!keepId) errors.push({ field: 'keepId', message: '남길 거래처를 고르세요' });
-  const ids = idsOf(raw.ids);
-  if (!ids || (keepId !== null && ids.includes(keepId))) {
-    errors.push({ field: 'ids', message: '합칠 거래처를 하나 이상 고르세요(남길 거래처 말고)' });
-  }
-  return keepId && ids && !ids.includes(keepId) ? { ok: true, value: { keepId, ids } } : { ok: false, errors };
-}
-
 export type VendorIdsParsed = { ok: true; value: string[] } | { ok: false; errors: TaxFieldError[] };
 
-/** 거래처 지우기 `{ ids[] }`. */
-export function parseVendorIds(raw: unknown): VendorIdsParsed {
+/** [거래종료] `{ ids[] }` — 고른 거래처를 종료로(지우지 않는다, 2026-11-07). */
+export function parseVendorClose(raw: unknown): VendorIdsParsed {
   const ids = isObj(raw) ? idsOf(raw.ids) : null;
-  return ids ? { ok: true, value: ids } : { ok: false, errors: [{ field: 'ids', message: '지울 거래처를 고르세요' }] };
+  return ids ? { ok: true, value: ids } : { ok: false, errors: [{ field: 'ids', message: '거래를 종료할 거래처를 고르세요' }] };
+}
+
+/* ── 거래처 검색 조건(2026-11-07 대표 수정 ③) — 검색어 · 구분 · 종료여부 ──────────────────────── */
+
+/** 종료여부 — open 거래 중(처음 값) · closed 종료 · all 전체. */
+export type VendorClosedFilter = 'open' | 'closed' | 'all';
+const VENDOR_CLOSED_FILTERS: readonly VendorClosedFilter[] = ['open', 'closed', 'all'];
+
+export interface VendorQuery {
+  /** 거래처명 일부 또는 사업자번호 숫자 일부. 빈 글자 = 거르지 않음. */
+  q: string;
+  /** 구분 코드(TAX_VENDOR_TP) — null 전체. */
+  tp: string | null;
+  closed: VendorClosedFilter;
+}
+
+/** 주소 → 검색 조건. 틀린 값은 처음 값으로(목록 · 엑셀이 400 을 내지 않는다). */
+export function parseVendorQuery(raw: Record<string, unknown>): VendorQuery {
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  const closed = str(raw.closed) as VendorClosedFilter;
+  return {
+    q: str(raw.q).slice(0, VENDOR_NAME_MAX),
+    tp: str(raw.tp) === '' ? null : str(raw.tp),
+    closed: VENDOR_CLOSED_FILTERS.includes(closed) ? closed : 'open',
+  };
+}
+
+/** 검색 조건 → 주소 글자. 처음 값은 싣지 않는다. */
+export function vendorSearch(q: VendorQuery): string {
+  const p = new URLSearchParams();
+  if (q.q) p.set('q', q.q);
+  if (q.tp) p.set('tp', q.tp);
+  if (q.closed !== 'open') p.set('closed', q.closed);
+  const out = p.toString();
+  return out ? `?${out}` : '';
+}
+
+/** 화면 목록과 엑셀이 같이 쓰는 거르기 — 순서는 그대로. */
+export function filterVendors<T extends Pick<TaxVendorView, 'name' | 'bizNo' | 'vendorTp' | 'closed'>>(vendors: readonly T[], q: VendorQuery): T[] {
+  const word = q.q.trim();
+  const digits = digitsOnly(word);
+  return vendors.filter(
+    (v) =>
+      (q.closed === 'all' || v.closed === (q.closed === 'closed')) &&
+      (q.tp === null || v.vendorTp === q.tp) &&
+      (word === '' || v.name.includes(word) || (digits !== '' && (v.bizNo ?? '').includes(digits))),
+  );
+}
+
+/** 엑셀 파일 이름 — 「거래처_YYYY-MM-DD.xlsx」(내려받은 날). */
+export function vendorsExportFileName(day: string): string {
+  return `거래처_${day}.xlsx`;
 }
 
 export type FileIdsParsed = { ok: true; value: string[] } | { ok: false; errors: TaxFieldError[] };
@@ -704,18 +750,17 @@ export interface TaxVendorView {
   bizNo: string | null;
   vendorTp: string;
   tpSetByUser: boolean;
-  firstKind: string;
-  firstDirection: string | null;
-  /** 작업할 달의 계산서 줄 수. */
-  monthCount: number;
-  /** 모든 달의 계산서 줄 수 — 합치기 창의 건수. */
-  totalCount: number;
+  /** 종료 여부(220) — true 거래 종료 · false 거래 중. */
+  closed: boolean;
+  /**
+   * 첫 거래월 `YYYY-MM` — 그 거래처가 붙은 계산서 · 카드 줄 가운데 가장 이른 날짜의 달. 읽을 때 셈한다(저장하지 않음).
+   * 줄이 없으면 null(화면 「—」). ★ 현금 경비는 거래처 연결 칸이 없어 세지 않는다(2026-11-07 대표 결정).
+   */
+  firstMonth: string | null;
 }
 
+/** 거래처 목록 — 전부(거르기는 화면 · 엑셀이 `filterVendors` 로). 2026-11-07 「N월 거래」 · 같은 사업자번호 묶음을 뺐다. */
 export interface TaxVendorsResponse {
-  month: string;
   vendors: TaxVendorView[];
-  /** 같은 사업자번호 거래처 묶음(id 목록, 먼저 생긴 순). */
-  sameBizNoGroups: string[][];
-  codes: { vendorTps: TaxCodeName[]; kinds: TaxCodeName[]; invDirs: TaxCodeName[] };
+  codes: { vendorTps: TaxCodeName[] };
 }

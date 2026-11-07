@@ -1,57 +1,56 @@
 'use client';
 
 /**
- * 거래처(s050100020) 본문 — 시안 `doc/tax-service/prototypes/s05-tax/tax-screens-b.js` 의 S05-06 ·
- * 결과서 `08-screen-report.md` S05-06 그대로(결정 2026-10-26 「가」).
+ * 거래처(s050100020) 본문 — 시안 S05-06 을 2026-11-07 대표 수정 ③ 으로 바꾼 것.
  *
- *   안내 줄(달 선택 없음) · 제목 · (같은 사업자번호가 있으면) 주황 띠 + [둘 다 고르기] ·
- *   표 카드 — 검색칸 + 칩 「전체 · 주거래처 · 일반」(처음은 전체) → 목록 위 버튼 줄 → 표
- *   팝업: 거래처 고치기(480) · 거래처 N곳 합치기(480) · 지우기 확인
+ *   검색 조건 카드(검색어 · 구분 · 종료여부 — ERP 목록 화면처럼 라벨 + 칸, 바꾸면 바로 걸러짐) ·
+ *   버튼 줄(카드 밖 — 왼쪽 [수정] [거래종료] · 오른쪽 끝 [주거래처로] [일반으로] [엑셀 내려받기]) · 목록 카드(표만)
+ * ★ 2026-11-07 — 목록만 스크롤 · 머리 줄 고정(세무 목록 화면의 기준). ERP 센터 관리(s030100010)와 같은 꼴:
+ *   화면이 셸 높이를 채우고(`pageFill`) 목록 카드만 남는 높이를 받아 안에서 스크롤한다(`listCard` · `listScroll` · `tblSticky`).
+ *   팝업: 거래처 수정(480, 거래 중 / 거래 종료) · 거래종료 확인
  *
- * ★ [삭제] 는 시안에 없던 것(대표 결정 2026-10-27) — 고른 곳이 모두 거래 0건(**전체 기간**, totalCount)일 때만 눌린다.
- *   거래가 있으면 흐리게 + 「합치기를 쓰세요」 안내. 서버도 같은 조건으로 409 를 낸다.
- *
- * ★★ 구분 이름(주거래처 · 일반) · 자료 종류 · 계산서 구분은 **API 가 준 코드 값으로만** 그린다.
- * ★ 「처음 생긴 자료」는 계산서면 「{구분 이름} 계산서」(매출 계산서), 그 밖은 자료 종류 이름(결정 2026-10-26).
- * ★ 사업자번호 끝자리가 틀리면 **주황 경고만** — 저장은 된다(결정 3, 결과서의 빨간 막음과 다르다).
- * ★ 아이콘 집합(ERP 공용)에 시안의 star · merge 가 없어 sparkles · copy-plus 로 대신했다.
+ * ★ 2026-11-07: 맨 위 안내 · 설명 · 같은 사업자번호 띠를 지웠고, 합치기 · 삭제를 없앴다(화면 · 팝업 · API).
+ *   목록 칸은 거래처명 · 사업자번호 · 구분 · 종료여부 · 첫 거래월 — 「N월 거래」 · 「처음 생긴 자료」를 뺐다.
+ * ★ 거르기는 엑셀과 같은 shared `filterVendors`. 종료여부 처음 값은 「거래 중」.
+ * ★★ 구분 이름(주거래처 · 일반)은 **API 가 준 코드 값으로만** 그린다.
+ * ★ 사업자번호 끝자리가 틀리면 **주황 경고만** — 저장은 된다(결정 3).
+ * ★ 아이콘 집합(ERP 공용)에 시안의 star 가 없어 sparkles 로 대신했다.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { digitsOnly, formatBizNumber, isBizNumberChecksumOk, isBizNumberLength } from '@swonbiz/shared/domain/tax-number';
-import { TAX_KIND_INVOICE, TAX_VENDOR_GENERAL, TAX_VENDOR_MAIN, withRo } from '@swonbiz/shared/domain/tax-uploads';
+import { TAX_VENDOR_GENERAL, TAX_VENDOR_MAIN, filterVendors, withRo, type VendorClosedFilter } from '@swonbiz/shared/domain/tax-uploads';
 import { Button, Icon } from '@/components/ds';
+import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
 import t from '../common/tax.module.css';
 import { TaxEmpty } from '../common/TaxEmpty';
 import { TaxConfirmDialog } from '../common/TaxConfirmDialog';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
-import { monthShort } from '../common/TaxMonthBar';
 import { TaxToast, useTaxToast } from '../common/TaxToast';
 import {
   TaxVendorError,
-  deleteVendors,
+  closeVendors,
   editVendor,
+  exportHref,
   loadVendors,
-  mergeVendors,
   setVendorType,
   type TaxVendorView,
   type TaxVendorsResponse,
+  type VendorQuery,
 } from './tax-vendors-model';
 
-type Filter = 'all' | typeof TAX_VENDOR_MAIN | typeof TAX_VENDOR_GENERAL;
-type Modal =
-  | { kind: 'edit'; vendor: TaxVendorView }
-  | { kind: 'merge'; ids: string[] }
-  | { kind: 'delete'; ids: string[] }
-  | null;
+type Modal = { kind: 'edit'; vendor: TaxVendorView } | { kind: 'close'; ids: string[] } | null;
 
 const bizView = (biz: string | null) => (biz ? formatBizNumber(biz) : null);
+const CLOSED_OPTIONS: [VendorClosedFilter, string][] = [
+  ['all', '전체'],
+  ['open', '거래 중'],
+  ['closed', '종료'],
+];
 
-export function TaxVendorsView({ month }: { month: string }) {
+export function TaxVendorsView() {
   const [data, setData] = useState<TaxVendorsResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>('all');
-  const [q, setQ] = useState('');
-  /** 고른 순서 그대로 — 합치기 창은 먼저 고른 곳을 처음 골라 둔다. */
+  const [query, setQuery] = useState<VendorQuery>({ q: '', tp: null, closed: 'open' });
   const [sel, setSel] = useState<string[]>([]);
   const [modal, setModal] = useState<Modal>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -59,10 +58,10 @@ export function TaxVendorsView({ month }: { month: string }) {
 
   const reload = useCallback(
     () =>
-      loadVendors(month)
+      loadVendors()
         .then(setData)
         .catch((err: unknown) => setLoadError(err instanceof TaxVendorError ? err.message : '거래처를 불러오지 못했습니다')),
-    [month],
+    [],
   );
   useEffect(() => {
     void reload();
@@ -84,41 +83,12 @@ export function TaxVendorsView({ month }: { month: string }) {
   }
 
   const tpName = (code: string) => data.codes.vendorTps.find((c) => c.code === code)?.name ?? code;
-  const firstOf = (v: TaxVendorView) => {
-    if (v.firstKind === TAX_KIND_INVOICE && v.firstDirection) {
-      return `${data.codes.invDirs.find((d) => d.code === v.firstDirection)?.name ?? v.firstDirection} 계산서`;
-    }
-    return data.codes.kinds.find((k) => k.code === v.firstKind)?.name ?? v.firstKind;
-  };
   const byId = (id: string) => data.vendors.find((v) => v.id === id);
-
-  const qq = q.trim();
-  const qDigits = digitsOnly(qq);
-  const list = data.vendors.filter(
-    (v) =>
-      (filter === 'all' || v.vendorTp === filter) &&
-      (!qq || v.name.includes(qq) || (qDigits !== '' && (v.bizNo ?? '').includes(qDigits))),
-  );
-  const nMain = data.vendors.filter((v) => v.vendorTp === TAX_VENDOR_MAIN).length;
-  const dup = data.sameBizNoGroups[0] ?? null;
+  const list = filterVendors(data.vendors, query);
+  const openSel = sel.filter((id) => byId(id)?.closed === false);
 
   const toggle = (id: string) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
-  /** 고른 곳 중 거래가 있는 곳 — 전체 기간 기준. */
-  const selHasDeals = sel.some((id) => (byId(id)?.totalCount ?? 0) > 0);
-  const DELETE_BLOCKED = '거래가 있는 거래처는 지울 수 없습니다 — 합치기를 쓰세요';
-
-  const runDelete = async (ids: string[]) => {
-    setModal(null);
-    setFailed(null);
-    try {
-      const r = await deleteVendors(ids);
-      setSel([]);
-      notify(`${r.deleted}곳을 지웠습니다`);
-      await reload();
-    } catch (err) {
-      setFailed(err instanceof TaxVendorError ? err.message : '지우지 못했습니다');
-    }
-  };
+  const patchQuery = (p: Partial<VendorQuery>) => setQuery((q) => ({ ...q, ...p }));
 
   const changeType = async (tp: string) => {
     setFailed(null);
@@ -130,6 +100,19 @@ export function TaxVendorsView({ month }: { month: string }) {
     }
   };
 
+  const runClose = async (ids: string[]) => {
+    setModal(null);
+    setFailed(null);
+    try {
+      const r = await closeVendors(ids);
+      setSel([]);
+      notify(`${r.closed}곳의 거래를 종료했습니다`);
+      await reload();
+    } catch (err) {
+      setFailed(err instanceof TaxVendorError ? err.message : '거래를 종료하지 못했습니다');
+    }
+  };
+
   const afterModal = async (msg: string) => {
     setModal(null);
     setSel([]);
@@ -138,122 +121,97 @@ export function TaxVendorsView({ month }: { month: string }) {
   };
 
   return (
-    <div className={t.page}>
-      <div className={t.ctx}>
-        <span className={t.ctxNote}>
-          거래처는 달과 상관없이 하나의 목록입니다 · 「{monthShort(month)} 거래」는 작업할 달 기준
-        </span>
-      </div>
-      <div className={t.pageH}>
-        <div>
-          <p>
-            자료를 올리면 거래처가 자동으로 생깁니다. 이름·사업자번호를 고치고, 같은 곳을 하나로 합치고, 자주 거래하는 곳을
-            주거래처로 표시합니다.
-          </p>
+    <div className={`${t.page} ${t.pageFill}`}>
+      <div className={`${t.card} ${t.cardPad}`}>
+        <div className={t.row} style={{ gap: 12, alignItems: 'flex-end' }}>
+          <label className={t.field}>
+            <span className={t.lab}>검색어</span>
+            <input
+              className={t.input}
+              style={{ width: 240 }}
+              placeholder="거래처명 · 사업자번호"
+              value={query.q}
+              onChange={(e) => patchQuery({ q: e.target.value })}
+            />
+          </label>
+          <label className={t.field}>
+            <span className={t.lab}>구분</span>
+            <select
+              className={t.select}
+              style={{ width: 150 }}
+              value={query.tp ?? ''}
+              onChange={(e) => patchQuery({ tp: e.target.value === '' ? null : e.target.value })}
+            >
+              <option value="">전체</option>
+              {[TAX_VENDOR_MAIN, TAX_VENDOR_GENERAL].map((code) => (
+                <option key={code} value={code}>
+                  {tpName(code)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={t.field}>
+            <span className={t.lab}>종료여부</span>
+            <select
+              className={t.select}
+              style={{ width: 150 }}
+              value={query.closed}
+              onChange={(e) => patchQuery({ closed: e.target.value as VendorClosedFilter })}
+            >
+              {CLOSED_OPTIONS.map(([v, label]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 
-      {dup ? (
-        <div className={`${t.note} ${t.noteWarn}`}>
-          <span>
-            <Icon name="copy" size={16} />
-          </span>
-          <span style={{ flex: 1 }}>
-            <b>사업자번호가 같은 거래처가 있습니다.</b> {dup.map((id) => `「${byId(id)?.name ?? ''}」`).join(' · ')} — 같은 곳이면
-            하나로 합치세요.
-          </span>
-          <button type="button" className={`${t.btn} ${t.btnSm}`} onClick={() => setSel(dup)}>
-            둘 다 고르기
-          </button>
-        </div>
-      ) : null}
+      <div className={`${t.tbar} ${t.tbarOut}`}>
+        <button
+          type="button"
+          className={`${t.btn} ${t.btnSm}`}
+          disabled={sel.length !== 1}
+          onClick={() => {
+            const v = byId(sel[0] ?? '');
+            if (v) setModal({ kind: 'edit', vendor: v });
+          }}
+        >
+          <Icon name="pencil-line" size={16} />
+          수정
+        </button>
+        <button
+          type="button"
+          className={`${t.btn} ${t.btnSm}`}
+          disabled={openSel.length === 0}
+          onClick={() => setModal({ kind: 'close', ids: openSel })}
+        >
+          <Icon name="circle-x" size={16} />
+          거래종료
+        </button>
+        <span className={t.sp} />
+        <button type="button" className={`${t.btn} ${t.btnSm}`} disabled={!sel.length} onClick={() => changeType(TAX_VENDOR_MAIN)}>
+          <Icon name="sparkles" size={16} />
+          {withRo(tpName(TAX_VENDOR_MAIN))}
+        </button>
+        <button type="button" className={`${t.btn} ${t.btnSm}`} disabled={!sel.length} onClick={() => changeType(TAX_VENDOR_GENERAL)}>
+          {withRo(tpName(TAX_VENDOR_GENERAL))}
+        </button>
+        <ExcelDownloadButton href={exportHref(query)} className={`${t.btn} ${t.btnSm}`} onError={setFailed} />
+      </div>
+      {failed ? <TaxFormErrorBanner kind="failed" message={failed} /> : null}
 
-      <div className={t.card}>
-        <div className={`${t.cardPad} ${t.row}`} style={{ paddingBottom: 12, gap: 12 }}>
-          <input
-            className={t.input}
-            style={{ width: 240 }}
-            placeholder="거래처명 · 사업자번호"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <span className={t.chips}>
-            <button type="button" className={`${t.chip} ${filter === 'all' ? t.chipOn : ''}`} onClick={() => setFilter('all')}>
-              전체 <b>{data.vendors.length}</b>
-            </button>
-            <button
-              type="button"
-              className={`${t.chip} ${filter === TAX_VENDOR_MAIN ? t.chipOn : ''}`}
-              onClick={() => setFilter(TAX_VENDOR_MAIN)}
-            >
-              {tpName(TAX_VENDOR_MAIN)} <b>{nMain}</b>
-            </button>
-            <button
-              type="button"
-              className={`${t.chip} ${filter === TAX_VENDOR_GENERAL ? t.chipOn : ''}`}
-              onClick={() => setFilter(TAX_VENDOR_GENERAL)}
-            >
-              {tpName(TAX_VENDOR_GENERAL)} <b>{data.vendors.length - nMain}</b>
-            </button>
-          </span>
-        </div>
-        <div className={t.tbar}>
-          <button
-            type="button"
-            className={`${t.btn} ${t.btnSm} ${t.btnDanger}`}
-            disabled={!sel.length || selHasDeals}
-            title={selHasDeals ? DELETE_BLOCKED : undefined}
-            onClick={() => setModal({ kind: 'delete', ids: sel })}
-          >
-            <Icon name="trash-2" size={16} />
-            삭제{sel.length ? ` (${sel.length})` : ''}
-          </button>
-          <button
-            type="button"
-            className={`${t.btn} ${t.btnSm}`}
-            disabled={sel.length !== 1}
-            onClick={() => {
-              const v = byId(sel[0] ?? '');
-              if (v) setModal({ kind: 'edit', vendor: v });
-            }}
-          >
-            <Icon name="pencil-line" size={16} />
-            고치기
-          </button>
-          <button type="button" className={`${t.btn} ${t.btnSm}`} disabled={!sel.length} onClick={() => changeType(TAX_VENDOR_MAIN)}>
-            <Icon name="sparkles" size={16} />
-            {withRo(tpName(TAX_VENDOR_MAIN))}
-          </button>
-          <button type="button" className={`${t.btn} ${t.btnSm}`} disabled={!sel.length} onClick={() => changeType(TAX_VENDOR_GENERAL)}>
-            {withRo(tpName(TAX_VENDOR_GENERAL))}
-          </button>
-          <button
-            type="button"
-            className={`${t.btn} ${t.btnSm}`}
-            disabled={sel.length < 2}
-            onClick={() => setModal({ kind: 'merge', ids: sel })}
-          >
-            <Icon name="copy-plus" size={16} />
-            합치기{sel.length >= 2 ? ` (${sel.length})` : ''}
-          </button>
-          <span className={t.sm}>
-            {sel.length ? (selHasDeals ? DELETE_BLOCKED : '') : '줄을 고르세요 · 고치기는 한 곳, 합치기는 두 곳 이상'}
-          </span>
-        </div>
-        {failed ? (
-          <div style={{ padding: '0 16px 12px' }}>
-            <TaxFormErrorBanner kind="failed" message={failed} />
-          </div>
-        ) : null}
-        <div className={t.tblWrap}>
-          <table className={t.tbl} style={{ borderTop: '1px solid var(--border)' }}>
+      <div className={`${t.card} ${t.listCard}`}>
+        <div className={t.listScroll}>
+          <table className={`${t.tbl} ${t.tblSticky}`}>
             <colgroup>
               <col className={t.wChk} />
               <col />
               <col style={{ width: 140 }} />
               <col style={{ width: 120 }} />
-              <col style={{ width: 84 }} />
-              <col style={{ width: 160 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 110 }} />
             </colgroup>
             <thead>
               <tr>
@@ -261,8 +219,8 @@ export function TaxVendorsView({ month }: { month: string }) {
                 <th>거래처명</th>
                 <th>사업자번호</th>
                 <th>구분</th>
-                <th className={t.num}>{monthShort(month)} 거래</th>
-                <th>처음 생긴 자료</th>
+                <th>종료여부</th>
+                <th>첫 거래월</th>
               </tr>
             </thead>
             <tbody>
@@ -301,8 +259,8 @@ export function TaxVendorsView({ month }: { month: string }) {
                           <span className={`${t.badge} ${t.bGray}`}>{tpName(v.vendorTp)}</span>
                         )}
                       </td>
-                      <td className={t.num}>{v.monthCount}건</td>
-                      <td className={t.mut}>{firstOf(v)}</td>
+                      <td>{v.closed ? <span className={`${t.badge} ${t.bGray}`}>종료</span> : '거래 중'}</td>
+                      <td className={`${t.mut} ${t.tnum}`}>{v.firstMonth ?? '—'}</td>
                     </tr>
                   );
                 })
@@ -313,25 +271,22 @@ export function TaxVendorsView({ month }: { month: string }) {
       </div>
 
       {modal?.kind === 'edit' ? (
-        <EditModal vendor={modal.vendor} onClose={() => setModal(null)} onDone={() => afterModal('거래처를 고쳤습니다')} />
+        <EditModal vendor={modal.vendor} onClose={() => setModal(null)} onDone={() => afterModal('거래처를 수정했습니다')} />
       ) : null}
-      {modal?.kind === 'merge' ? (
-        <MergeModal
-          vendors={modal.ids.map((id) => byId(id)).filter((v): v is TaxVendorView => !!v)}
-          firstOf={firstOf}
-          onClose={() => setModal(null)}
-          onDone={(name) => afterModal(`「${name}」${withRo(name).slice(name.length)} 합쳤습니다`)}
-        />
-      ) : null}
-      {modal?.kind === 'delete' ? (
+      {modal?.kind === 'close' ? (
         <TaxConfirmDialog
-          icon="trash-2"
-          danger
-          title={`${modal.ids.length}곳을 지웁니다`}
-          okLabel="삭제"
+          icon="circle-x"
+          title={`${modal.ids.length}곳의 거래를 종료하시겠습니까?`}
+          okLabel="거래종료"
           onCancel={() => setModal(null)}
-          onOk={() => runDelete(modal.ids)}
-          body={modal.ids.map((id) => byId(id)?.name ?? '').join(' · ')}
+          onOk={() => runClose(modal.ids)}
+          body={
+            <>
+              {modal.ids.map((id) => byId(id)?.name ?? '').join(' · ')}
+              <br />
+              지우지 않고 「종료」로 표시합니다. [수정]에서 「거래 중」으로 되돌릴 수 있습니다.
+            </>
+          }
         />
       ) : null}
       <TaxToast message={toast} />
@@ -383,11 +338,12 @@ function Frame({ title, sub, onClose, children, footer }: {
   );
 }
 
-/* ── 9-1 거래처 고치기 ───────────────────────────────────────────────────── */
+/* ── 9-1 거래처 수정 ─────────────────────────────────────────────────────── */
 
 function EditModal({ vendor, onClose, onDone }: { vendor: TaxVendorView; onClose: () => void; onDone: () => void }) {
   const [name, setName] = useState(vendor.name);
   const [biz, setBiz] = useState(bizView(vendor.bizNo) ?? '');
+  const [closed, setClosed] = useState(vendor.closed);
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -399,7 +355,7 @@ function EditModal({ vendor, onClose, onDone }: { vendor: TaxVendorView; onClose
     setBusy(true);
     setFailed(null);
     try {
-      await editVendor(vendor.id, name, biz);
+      await editVendor(vendor.id, name, biz, closed);
       onDone();
     } catch (err) {
       if (err instanceof TaxVendorError && err.errors.length) {
@@ -411,7 +367,7 @@ function EditModal({ vendor, onClose, onDone }: { vendor: TaxVendorView; onClose
 
   return (
     <Frame
-      title="거래처 고치기"
+      title="거래처 수정"
       sub="고친 이름은 모든 달의 자료에 함께 바뀝니다"
       onClose={onClose}
       footer={
@@ -454,74 +410,19 @@ function EditModal({ vendor, onClose, onDone }: { vendor: TaxVendorView; onClose
           <span className={t.warnT}>사업자번호 끝자리 검증 번호가 맞지 않습니다 — 그대로 저장할 수 있습니다</span>
         ) : null}
       </label>
-      {failed ? <TaxFormErrorBanner kind="failed" message={failed} /> : null}
-    </Frame>
-  );
-}
-
-/* ── 9-2 거래처 N곳 합치기 ───────────────────────────────────────────────── */
-
-function MergeModal({ vendors, firstOf, onClose, onDone }: {
-  vendors: TaxVendorView[];
-  firstOf: (v: TaxVendorView) => string;
-  onClose: () => void;
-  onDone: (name: string) => void;
-}) {
-  const [keep, setKeep] = useState(vendors[0]?.id ?? '');
-  const [failed, setFailed] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const run = async () => {
-    const kept = vendors.find((v) => v.id === keep);
-    if (!kept) return;
-    setBusy(true);
-    setFailed(null);
-    try {
-      await mergeVendors(keep, vendors.filter((v) => v.id !== keep).map((v) => v.id));
-      onDone(kept.name);
-    } catch (err) {
-      setFailed(err instanceof TaxVendorError ? err.message : '합치지 못했습니다');
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Frame
-      title={`거래처 ${vendors.length}곳 합치기`}
-      sub="남길 이름을 고르세요. 나머지 거래처의 자료는 모두 이 이름으로 옮겨집니다"
-      onClose={onClose}
-      footer={
-        <>
-          <Button size="sm" variant="ghost" onClick={onClose}>
-            취소
-          </Button>
-          <Button size="sm" variant="primary" disabled={busy} onClick={run}>
-            합치기
-          </Button>
-        </>
-      }
-    >
-      <div className={`${t.note} ${t.noteDanger}`}>
-        <span>
-          <Icon name="circle-alert" size={16} />
-        </span>
-        <span>
-          <b>되돌릴 수 없습니다.</b> 합친 뒤에는 다시 나눌 수 없습니다. {vendors.map((v) => `${v.name} ${v.totalCount}건`).join(' · ')}
-        </span>
-      </div>
-      <div className={t.cands}>
-        {vendors.map((v) => (
-          <label key={v.id} className={`${t.cand} ${keep === v.id ? t.candOn : ''}`}>
-            <input type="radio" name="keep" checked={keep === v.id} onChange={() => setKeep(v.id)} />
-            <span>
-              <span className={t.candT}>{v.name}</span>
-              <span className={t.sm} style={{ display: 'block' }}>
-                {[bizView(v.bizNo), firstOf(v)].filter(Boolean).join(' · ')}
-              </span>
-            </span>
-            <span className={t.tnum}>{v.totalCount}건</span>
+      <div className={t.field}>
+        <span className={t.lab}>거래 상태</span>
+        <span className={t.row} style={{ gap: 24 }}>
+          <label className={t.chk}>
+            <input type="radio" name="vendor-closed" checked={!closed} onChange={() => setClosed(false)} />
+            거래 중
           </label>
-        ))}
+          <label className={t.chk}>
+            <input type="radio" name="vendor-closed" checked={closed} onChange={() => setClosed(true)} />
+            거래 종료
+          </label>
+        </span>
+        {errs.closed ? <span className={t.errT}>{errs.closed}</span> : null}
       </div>
       {failed ? <TaxFormErrorBanner kind="failed" message={failed} /> : null}
     </Frame>

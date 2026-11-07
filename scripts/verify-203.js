@@ -50,7 +50,7 @@ async function structure(q) {
       'inserted_count', 'uploaded_at', 'uploaded_by', 'bank_file_tp', 'account_no', 'bank_code',
       'social_ins_tp', 'notice_month'],
     [V]: ['id', 'org_id', 'name', 'biz_no', 'vendor_tp', 'tp_set_by_user', 'first_kind', 'first_direction',
-      'created_at', 'updated_at', 'created_by', 'updated_by'],
+      'created_at', 'updated_at', 'created_by', 'updated_by', 'is_closed'], // ★ 220 is_closed(2026-11-07)
     [I]: ['id', 'org_id', 'file_id', 'vendor_id', 'direction', 'approval_no', 'write_date', 'partner_name_src',
       'partner_biz_no_src', 'supply_amount', 'tax_amount', 'total_amount', 'inv_class', 'inv_type', 'created_at',
       'item_code', 'classified_at', 'classified_by'],
