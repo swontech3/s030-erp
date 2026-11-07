@@ -35,6 +35,7 @@ import {
   TAX_KIND_INVOICE,
   TAX_SKIP_REASON_CATEGORY,
   TAX_UPLOADABLE_KINDS,
+  isUploadCardKind,
   TAX_UPLOAD_MAX_BYTES,
   TAX_VENDOR_MAIN,
   convertInvoiceSheet,
@@ -152,7 +153,8 @@ export async function listUploadsOp(client: ScopedClient, orgId: number, month: 
   return {
     month,
     bizTypeName: bizType?.name ?? null,
-    cards: kinds.map((k) => ({
+    // ★ 2026-11-07 ④ — 4대보험 카드는 싣지 않는다(인사 시스템으로 넘김). 코드 이름(kinds)은 올린 파일 구분에 쓰여 그대로 싣는다
+    cards: kinds.filter((k) => isUploadCardKind(k.code)).map((k) => ({
       kind: k.code,
       enabled: TAX_UPLOADABLE_KINDS.includes(k.code),
       fileCount: counts.get(k.code) ?? 0,

@@ -33,6 +33,30 @@ export const TAX_SKIP_REASON_CATEGORY = 'TAX_SKIP_REASON';
 export const TAX_KIND_INVOICE = 'INVOICE';
 export const TAX_UPLOADABLE_KINDS: readonly string[] = [TAX_KIND_INVOICE, 'CARD', 'CASH', 'BANK', 'NTAX', 'LTAX', 'SOCIAL', 'LOAN'];
 
+/**
+ * ★ 자료 올리기 카드에서 빼는 자료(2026-11-07 대표 수정 ④) — 4대보험은 인사 시스템으로 넘긴다.
+ *   이미 올린 4대보험 파일 · 세금 · 4대보험 · 대출 화면의 탭 · DB · 올리기 API 는 그대로다. 등록현황 분모에서도 빠진다.
+ */
+export const TAX_UPLOAD_HIDDEN_KINDS: readonly string[] = ['SOCIAL'];
+export const isUploadCardKind = (kind: string): boolean => !TAX_UPLOAD_HIDDEN_KINDS.includes(kind);
+
+/**
+ * 자료마다 올려야 할 파일 수 — 정해진 자료만(매출 · 매입 2, 나머지 1). 은행 · 대출은 계좌 · 대출 수에 따라 달라 없다(건수만 센다).
+ */
+export const TAX_UPLOAD_EXPECTED_FILES: Readonly<Record<string, number>> = { [TAX_KIND_INVOICE]: 2, CARD: 1, CASH: 1, NTAX: 1, LTAX: 1 };
+
+/** 카드 2행 — 정해진 자료 「등록현황 : 등록 / 올려야 할」, 가변 자료 「등록현황 : N건」. */
+export function uploadCountLabel(kind: string, fileCount: number): string {
+  const expected = TAX_UPLOAD_EXPECTED_FILES[kind];
+  return expected === undefined ? `등록현황 : ${fileCount}건` : `등록현황 : ${fileCount} / ${expected}`;
+}
+
+/** 위 섹션 「등록현황 : N종 / M종」 — N = 파일이 하나라도 있는 자료 수, M = 올릴 수 있는 자료 수(준비 중 빼고). */
+export function uploadSummary(cards: readonly { enabled: boolean; fileCount: number }[]): { done: number; total: number } {
+  const on = cards.filter((c) => c.enabled);
+  return { done: on.filter((c) => c.fileCount > 0).length, total: on.length };
+}
+
 /** 매입 · 매출 — ★ 고정 코드(code-usage.ts `PINNED_CODES`). 203 CHECK 가 기댄다. */
 export const TAX_INV_DIR_PURCHASE = 'P';
 export const TAX_INV_DIR_SALES = 'S';
@@ -641,7 +665,10 @@ export interface TaxUploadBankAccount {
   fileTps: string[];
 }
 
-/** ★ 세무 설정의 「쓰지 않는 자료」는 싣지 않는다 — 자료 올리기는 그 값을 보지 않는다(2026-11-07 대표 결정, 값은 2단계 이번 달 할 일에서). */
+/**
+ * ★ 세무 설정의 「쓰지 않는 자료」는 싣지 않는다 — 자료 올리기는 그 값을 보지 않는다(2026-11-07 대표 결정, 값은 2단계 이번 달 할 일에서).
+ * ★ 4대보험(`TAX_UPLOAD_HIDDEN_KINDS`)은 카드로 싣지 않는다(2026-11-07 ④).
+ */
 export interface TaxUploadKindCard {
   kind: string;
   /** 올릴 수 있는가(`TAX_UPLOADABLE_KINDS`) — 아니면 「준비 중」. */

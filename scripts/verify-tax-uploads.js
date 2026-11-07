@@ -367,11 +367,13 @@ async function paySocialLoanChecks(c) {
 
   // ── 목록 — 여덟 카드 · 코드 이름 ──
   const list = await listUploadsOp(c, ORG_A, MONTH);
-  check('D1', '목록 — 여덟 카드가 모두 열림 · 4대보험 종류(NP · HI · LTC · EI · IA) · 대출 거래 구분(D · R) 이름은 코드 표에서 · 카드 설명 SOCIAL · LOAN 은 215 문구',
-    list.cards.filter((k) => k.enabled).map((k) => k.kind).join() === 'INVOICE,CARD,CASH,BANK,NTAX,LTAX,SOCIAL,LOAN' &&
+  // ★ 2026-11-07 ④ — 4대보험 카드를 뺐다(인사 시스템으로 넘김 · 코드 이름 · 올린 파일 · 올리기는 그대로) · LOAN 설명은 221 문구
+  check('D1', '목록 — 일곱 카드가 모두 열림(4대보험 카드 없음) · 4대보험 종류(NP · HI · LTC · EI · IA) · 대출 거래 구분(D · R) 이름은 코드 표에서 · 카드 설명 SOCIAL 은 215 · LOAN 은 221 문구',
+    list.cards.filter((k) => k.enabled).map((k) => k.kind).join() === 'INVOICE,CARD,CASH,BANK,NTAX,LTAX,LOAN' &&
+    !list.cards.some((k) => k.kind === 'SOCIAL') && list.codes.kinds.some((k) => k.code === 'SOCIAL') &&
     list.codes.socialInsTps.map((x) => x.code).join() === 'NP,HI,LTC,EI,IA' && list.codes.loanTps.map((x) => x.code).join() === 'D,R' &&
     list.codes.kinds.find((k) => k.code === 'SOCIAL')?.description?.startsWith('사회보험 통합징수포털') === true &&
-    list.codes.kinds.find((k) => k.code === 'LOAN')?.description?.startsWith('은행 대출거래내역') === true,
+    list.codes.kinds.find((k) => k.code === 'LOAN')?.description?.startsWith('원금 · 이자가 있는 은행별 대출내역') === true,
     { socialInsTps: list.codes.socialInsTps, loanTps: list.codes.loanTps });
 
   // ── 국세 ──
@@ -472,10 +474,12 @@ async function paySocialLoanChecks(c) {
   const list2 = await listUploadsOp(c, ORG_A, MONTH);
   const cardOf = (k) => list2.cards.find((x) => x.kind === k)?.fileCount;
   const hiFile = list2.files.find((f) => f.fileName === 'hi1.csv');
-  check('D13', '9월 목록 — 국세 1(미리보기만 한 nt2 는 없음) · 지방세 1 · 4대보험 3(건강 · 고용 · 산재) · 대출 1 파일 · 4대보험 파일에 보험 · 연월',
-    cardOf('NTAX') === 1 && cardOf('LTAX') === 1 && cardOf('SOCIAL') === 3 && cardOf('LOAN') === 1 &&
+  // ★ 2026-11-07 ④ — 4대보험 카드는 없다. 이미 올린 4대보험 파일은 올린 파일 목록에 그대로 있다
+  const socialFiles = list2.files.filter((f) => f.kind === 'SOCIAL').length;
+  check('D13', '9월 목록 — 국세 1(미리보기만 한 nt2 는 없음) · 지방세 1 · 대출 1 파일 · 4대보험 카드 없음 · 올린 파일에 4대보험 3(건강 · 고용 · 산재) · 4대보험 파일에 보험 · 연월',
+    cardOf('NTAX') === 1 && cardOf('LTAX') === 1 && cardOf('SOCIAL') === undefined && socialFiles === 3 && cardOf('LOAN') === 1 &&
     hiFile?.social?.insTp === 'HI' && hiFile.social.noticeMonth === MONTH && hiFile.account === null,
-    { NTAX: cardOf('NTAX'), LTAX: cardOf('LTAX'), SOCIAL: cardOf('SOCIAL'), LOAN: cardOf('LOAN') });
+    { NTAX: cardOf('NTAX'), LTAX: cardOf('LTAX'), SOCIAL: cardOf('SOCIAL'), socialFiles, LOAN: cardOf('LOAN') });
   await applyCompanyScope(c, tenant(ORG_B));
   const bSeen = [
     (await c.query(`SELECT count(*)::int n FROM public.tb_s050_tax_payments`)).rows[0].n,
@@ -616,9 +620,10 @@ async function main() {
       const ups = await listUploadsOp(c, ORG_A, MONTH);
       const inv = ups.cards.find((k) => k.kind === 'INVOICE');
       // ★ 1-5(2026-11-01): 은행 입출금(BANK) 카드도 열린다 · 1-6(2026-11-01): 국세 · 지방세 · 4대보험 · 대출도(D1 이 자세히 본다)
-      check('U11', '자료 올리기 목록 — 여덟 카드가 모두 열림(1-4 · 1-5 · 1-6) · 그 달 파일 수 · 코드 이름은 코드 표에서',
+      // ★ 2026-11-07 ④ — 4대보험 카드를 뺐다(일곱 카드)
+      check('U11', '자료 올리기 목록 — 일곱 카드가 모두 열림(1-4 · 1-5 · 1-6, 4대보험 뺌) · 그 달 파일 수 · 코드 이름은 코드 표에서',
         inv?.enabled === true && inv.fileCount === 6 &&
-        ups.cards.filter((k) => k.enabled).map((k) => k.kind).join() === 'INVOICE,CARD,CASH,BANK,NTAX,LTAX,SOCIAL,LOAN' &&
+        ups.cards.filter((k) => k.enabled).map((k) => k.kind).join() === 'INVOICE,CARD,CASH,BANK,NTAX,LTAX,LOAN' &&
         ups.files.length === 6 && ups.codes.invDirs.map((d) => d.code).join() === 'P,S' &&
         // 카드 설명은 코드 설명 칸에서(비어 있으면 null) · 사업자 유형 이름(설정이 없으면 null)
         ups.codes.kinds.every((k) => 'description' in k) && 'bizTypeName' in ups && ups.bizTypeName === null,
@@ -768,7 +773,7 @@ async function main() {
       await c.query(`UPDATE public.tb_s050_settings SET unused_kinds = '{CASH,SOCIAL}' WHERE org_id = $1`, [ORG_A]);
       const unusedCards = (await listUploadsOp(c, ORG_A, MONTH)).cards;
       check('X0', '★ 쓰지 않는 자료가 저장돼 있어도 자료 올리기 카드에 그 값이 없다(배지 · 링크 · 「다 한 자료」 세기 없음)',
-        unusedCards.length === 8 && unusedCards.every((k) => !('unused' in k)), unusedCards.map((k) => Object.keys(k).join('/')).slice(0, 1));
+        unusedCards.length === 7 && unusedCards.every((k) => !('unused' in k)), unusedCards.map((k) => Object.keys(k).join('/')).slice(0, 1));
       await c.query(`UPDATE public.tb_s050_settings SET unused_kinds = '{}' WHERE org_id = $1`, [ORG_A]);
       const cashMap = await loadImportMap(c, 'CASH');
       if (!cashMap) throw new Error('대응표 TAX_CASH_STD 가 없다 — 209 를 먼저');

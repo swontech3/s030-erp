@@ -234,6 +234,37 @@
 .kindDs { font-size: 12px; color: var(--text-muted); line-height: 1.5; text-wrap: pretty; }
 .kindFt { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
+/* ── ★ 2026-11-07 ④ 자료 올리기 — 테두리 있는 세 섹션. 위 둘(년월 · 파일 올리기)은 낮게, 올린 파일 목록이 많이 보이게.
+ *   카드 3행: 제목 + [파일 첨부] · [표준양식 받기] / 등록현황 / 설명 한 줄(작은 회색, 넘치면 …).
+ *   카드를 누르면 그 자료의 파일만(고른 표시 = 고르기 카드 `.candOn` 과 같은 테두리), 다시 누르면 전체. ── */
+.secLow { padding: 12px 20px; }
+.kindCard {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 10px 12px; cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+.kindCard:hover { border-color: var(--border-strong); }
+.kindOn, .kindOn:hover { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.kindOff { cursor: default; }
+.kindOff:hover { border-color: var(--border); }
+.kindHead { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.kindHead .kindNm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kindCnt { font-size: 13px; color: var(--text-heading); font-variant-numeric: tabular-nums; }
+/* 2행 — 등록현황 왼쪽 · [표준양식 받기] 오른쪽(현금 경비, 2026-11-08) */
+.kindCntRow { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 32px; }
+/* ★ 2026-11-08 — 2행은 한 줄: 등록현황 글자는 줄바꿈 없음, [양식받기](아이콘 + 글자)는 작게(28px · 12px · 좌우 6px).
+ *   세무 화면은 960px 고정(셸 최소 1440px)이라 카드 안쪽 폭은 늘 약 194px — 등록현황(약 88) + 틈 6 + 버튼(약 80) ≈ 174px 로 들어간다.
+ *   마우스를 올리면 감싼 칸의 title 「표준양식 받기」. */
+.kindCntTxt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tplBtn { height: 28px; padding: 0 6px; font-size: 12px; gap: 4px; flex: 0 0 auto; }
+/* 올린 파일 표 — 고정 칸 합 694 + 파일 이름 최소 160. 더 좁으면 목록 안에서 옆으로 스크롤(작업 칸 버튼이 잘리지 않게, 2026-11-08) */
+.tblUploads { min-width: 854px; }
+.kindCard .kindDs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 올리기 팝업 — 파일마다 한 칸(미리보기 · 같은 파일 · 오류). 은행은 한 줄 = 계좌 · 파일 종류 · 파일 */
+.fileBlk { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.fileBlkH { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bankRow { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.6fr) 32px; gap: 8px; align-items: center; }
+
 /* ── 상태 띠 더함 ── */
 .noteWarn { background: var(--color-warning-bg); border-color: rgba(217, 119, 6, .25); color: var(--color-warning-text); }
 .noteInfo { background: var(--color-accent-bg); border-color: rgba(79, 70, 229, .18); color: var(--color-primary-hover); }

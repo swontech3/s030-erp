@@ -51,8 +51,9 @@ const SKIP_NEW = [
   ['badDirection', '구분이 비었거나 목록에 없음'],
 ];
 const KIND_DESC = {
-  CARD: '홈택스 사업용 신용카드 사용내역 엑셀 그대로 올립니다',
-  CASH: '표준양식. 항목 칸을 비워 두면 매출 · 매입 항목 지정에서 붙입니다',
+  // ★ 221(2026-11-07) 에서 CARD · CASH 설명을 바꿨다
+  CARD: '홈택스 사업용 신용카드 엑셀 파일 업로드',
+  CASH: '표준양식을 받아 작성한 엑셀 파일 업로드',
 };
 
 const CARD_MAP = 'HOMETAX_BIZ_CARD';

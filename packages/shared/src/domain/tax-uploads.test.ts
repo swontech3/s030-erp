@@ -27,6 +27,10 @@ import {
   type TaxVendorView,
   summarizeAlreadyWhere,
   type InvoiceImportMap,
+  TAX_UPLOAD_EXPECTED_FILES,
+  isUploadCardKind,
+  uploadCountLabel,
+  uploadSummary,
 } from './tax-uploads.ts';
 
 const HEADER = [
@@ -435,5 +439,35 @@ describe('summarizeAlreadyWhere — 이미 올린 줄이 어디 있는지(그 �
 
   it('건너뛴 줄이 없으면 빈 목록', () => {
     expect(summarizeAlreadyWhere([])).toEqual([]);
+  });
+});
+
+describe('★ 자료 올리기 카드 — 4대보험 뺌 · 등록현황(2026-11-07 ④)', () => {
+  it('4대보험(SOCIAL)은 카드에서 빠진다 — 나머지는 남는다', () => {
+    expect(isUploadCardKind('SOCIAL')).toBe(false);
+    for (const k of ['INVOICE', 'CARD', 'CASH', 'BANK', 'NTAX', 'LTAX', 'LOAN']) expect(isUploadCardKind(k)).toBe(true);
+  });
+  it('정해진 파일 수 — 매출 · 매입 2, 카드 · 현금 · 국세 · 지방세 1, 은행 · 대출은 없음(가변)', () => {
+    expect(TAX_UPLOAD_EXPECTED_FILES).toEqual({ INVOICE: 2, CARD: 1, CASH: 1, NTAX: 1, LTAX: 1 });
+  });
+  it('정해진 파일 — 「등록현황 : 등록 / 올려야 할」', () => {
+    expect(uploadCountLabel('INVOICE', 0)).toBe('등록현황 : 0 / 2');
+    expect(uploadCountLabel('INVOICE', 1)).toBe('등록현황 : 1 / 2');
+    expect(uploadCountLabel('CARD', 1)).toBe('등록현황 : 1 / 1');
+    expect(uploadCountLabel('LTAX', 0)).toBe('등록현황 : 0 / 1');
+  });
+  it('가변 파일(은행 · 대출) — 「등록현황 : N건」', () => {
+    expect(uploadCountLabel('BANK', 3)).toBe('등록현황 : 3건');
+    expect(uploadCountLabel('LOAN', 0)).toBe('등록현황 : 0건');
+  });
+  it('위 섹션 — 파일이 하나라도 있는 자료 수 / 올릴 수 있는 자료 수(준비 중 빼고)', () => {
+    const cards = [
+      { enabled: true, fileCount: 2 },
+      { enabled: true, fileCount: 0 },
+      { enabled: true, fileCount: 1 },
+      { enabled: false, fileCount: 0 },
+    ];
+    expect(uploadSummary(cards)).toEqual({ done: 2, total: 3 });
+    expect(uploadSummary([])).toEqual({ done: 0, total: 0 });
   });
 });

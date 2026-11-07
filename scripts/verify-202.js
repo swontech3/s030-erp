@@ -27,8 +27,9 @@ const apiEnv = readEnv(process.argv[3] || 'packages/api/.env');
 const WANT = {
   TAX_WH_CYCLE: ['원천세 신고 주기', [['M', '매월'], ['H', '반기']], true],
   TAX_KIND: ['세무 자료 종류', [
-    ['INVOICE', '매입·매출 계산서'], ['CARD', '카드 사용 내역'], ['CASH', '현금 경비'], ['BANK', '은행 입출금'],
-    ['NTAX', '국세 납부'], ['LTAX', '지방세 납부'], ['SOCIAL', '4대보험'], ['LOAN', '대출 내역'],
+    // ★ 221(2026-11-07) 에서 INVOICE · BANK · NTAX · LTAX 이름을 바꿨다
+    ['INVOICE', '매출 · 매입파일'], ['CARD', '카드 사용 내역'], ['CASH', '현금 경비'], ['BANK', '은행거래 및 이체내역'],
+    ['NTAX', '국세 납부 내역'], ['LTAX', '지방세 내역'], ['SOCIAL', '4대보험'], ['LOAN', '대출 내역'],
   ], true],
   TAX_BIZ_TP: ['사업자 유형', [['I', '개인 일반과세자'], ['C', '법인 (유한회사 포함)']], false],
   TAX_FIN_KIND: ['계좌·카드 구분', [['B', '은행'], ['C', '카드']], true],

@@ -55,7 +55,8 @@ const SKIP_NEW = [
 /** 카드 설명 — 206 문구를 바꿈(2026-11-01 대표 승인 A). NTAX · LTAX 는 206 그대로. */
 const KIND_DESC = {
   SOCIAL: '사회보험 통합징수포털 가입자별 고지 내역 CSV. 보험 종류와 고지 연월을 고릅니다',
-  LOAN: '은행 대출거래내역 엑셀. 원금 · 이자를 나눠 읽습니다 — 이자만 비용입니다',
+  // ★ 221(2026-11-07) 에서 LOAN 설명을 바꿨다
+  LOAN: '원금 · 이자가 있는 은행별 대출내역 엑셀 파일 업로드',
 };
 const KINDS_UNCHANGED =['INVOICE', 'CARD', 'CASH', 'BANK', 'NTAX', 'LTAX', 'SOCIAL', 'LOAN'];
 const OLD_MAPS = ['BANK_004_TXN', 'BANK_020_TXN', 'BANK_020_XFER', 'BANK_081_TXN', 'HOMETAX_BIZ_CARD', 'HOMETAX_TAX_INVOICE', 'TAX_CASH_STD'];
