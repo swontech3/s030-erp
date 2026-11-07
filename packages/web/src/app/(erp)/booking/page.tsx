@@ -23,6 +23,7 @@
  * 데이터는 클라이언트가 받는다 — 주를 넘길 때마다 서버 렌더를 다시 돌리지 않으려고.
  */
 import { redirect } from 'next/navigation';
+import { parseDay } from '@swonbiz/shared/domain/day';
 import { getMe, verifyScreen } from '@/lib/session';
 import { BookingView } from '@/features/booking/BookingView';
 
@@ -33,13 +34,16 @@ export default async function BookingPage({
    * ★ 현황판 QR 이 달고 들어온다 — `?room={회의실}&src=kiosk`(06-kiosk §6).
    *   `src` 는 유입 집계용이라 화면 동작에 쓰지 않는다. 지금은 집계할 곳이 없어
    *   **읽지 않는다** — 파라미터는 유지하라는 명세를 QR 쪽에서 지킨다.
+   * ★ 내 예약(/booking/mine · 6-나)이 달고 들어온다 — `?day={YYYY-MM-DD}&room={회의실}`.
+   *   그날 · 그 회의실이 열린다. 읽을 수 없는 날짜면 무시하고 오늘이다.
    */
-  searchParams: Promise<{ room?: string; src?: string }>;
+  searchParams: Promise<{ room?: string; src?: string; day?: string }>;
 }) {
   await verifyScreen('s030600010', '/booking');
   const me = await getMe();
   if (!me) redirect('/login');
-  const { room } = await searchParams;
+  const { room, day } = await searchParams;
+  const askedDay = (day ?? '').trim();
 
   return (
     <BookingView
@@ -47,6 +51,8 @@ export default async function BookingPage({
       companyId={me.companyId}
       /* ★ 스캔해 들어오면 그 회의실이 열린다. 목록에 없는 값이면 무시하고 첫 회의실이다. */
       initialRoomId={(room ?? '').trim() || null}
+      /* ★ 내 예약에서 누르면 그날이 열린다(6-나). 날짜 모양이 아니거나 없는 날이면 무시하고 오늘이다. */
+      initialDay={parseDay(askedDay) ? askedDay : null}
       // ★ 예약자 정보 블록의 기본값 — 표시 전용이다(판정에 쓰지 않는다).
       me={{ memberName: me.display?.memberName ?? '', orgName: me.display?.orgName ?? '' }}
     />

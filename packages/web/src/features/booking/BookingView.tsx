@@ -92,6 +92,11 @@ interface Props {
    *   목록 자체가 서버가 준 것이다.
    */
   initialRoomId?: string | null;
+  /**
+   * 처음 열 날짜(`YYYY-MM-DD`) — 내 예약(/booking/mine · 6-나)에서 한 건을 눌러 들어온 경우다.
+   * ★ 날짜 모양 검사는 페이지가 했다. 없으면 오늘이다. 그 밖의 동작은 그대로다.
+   */
+  initialDay?: string | null;
 }
 
 interface DragState {
@@ -103,12 +108,12 @@ interface DragState {
   capped: boolean;
 }
 
-export function BookingView({ operator, companyId, me, initialRoomId = null }: Props) {
+export function BookingView({ operator, companyId, me, initialRoomId = null, initialDay = null }: Props) {
   const [rooms, setRooms] = useState<Room[] | null>(null);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [roomId, setRoomId] = useState('');
   /** 기준 날짜 — 월↔주 전환과 하루 보기가 **이 날짜 하나를 함께 쓴다**(시안 `state.anchor`). */
-  const [anchor, setAnchor] = useState(() => today());
+  const [anchor, setAnchor] = useState(() => initialDay || today());
   const [view, setView] = useState<'week' | 'month'>('week');
   const [list, setList] = useState<Reservation[] | null>(null);
   const [busy, setBusy] = useState<Busy[]>([]);
