@@ -220,6 +220,13 @@ export const SCREENS = {
    * 보기만. 계산은 shared `tax-vat.ts`.
    */
   s050400020: { route: '/tax/vat', name: '부가세 조회', group: '040' },
+
+  // --- 050 세무사 전달 ---
+  /**
+   * 세무사 전달 서류(1-9, 2026-11-07) — 부가세 신고 기간의 자료를 시트 아홉 엑셀로 묶어 미리 보고, 세무사 메일로 보내거나 내려받는다.
+   * 종류(코드 TAX_HANDOFF_TP)는 T 부가세 납부만 동작 — M 원천세 납부는 「준비 중」. 보낸 이력은 218 tb_s050_handoff_logs.
+   */
+  s050500010: { route: '/tax/handoff', name: '세무사 전달 서류', group: '050' },
 } as const satisfies Record<string, ScreenMeta>;
 
 export type ScreenId = keyof typeof SCREENS;

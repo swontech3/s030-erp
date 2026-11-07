@@ -42,6 +42,7 @@ import { registerTaxPlRoutes } from './routes/taxPl.ts';
 import { registerTaxSettingRoutes } from './routes/taxSettings.ts';
 import { registerSpreadsheetBodyParser, registerTaxUploadRoutes } from './routes/taxUploads.ts';
 import { registerTaxVatRoutes } from './routes/taxVat.ts';
+import { registerTaxHandoffRoutes } from './routes/taxHandoff.ts';
 import { registerTaxVendorRoutes } from './routes/taxVendors.ts';
 import { closePool } from './db/pool.ts';
 import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
@@ -185,6 +186,8 @@ registerTaxClassifyRoutes(app);
 registerTaxPaymentsRoutes(app);
 registerTaxPlRoutes(app);
 registerTaxVatRoutes(app);
+// ★ 세무사 전달 서류(s050500010) — 엑셀 아홉 시트 · 메일(SMTP 설정이 없으면 보내기만 503).
+registerTaxHandoffRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,

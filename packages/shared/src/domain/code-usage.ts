@@ -193,6 +193,9 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
   { category: 'TAX_SOCIAL_INS', useTp: '000', table: 'tb_s050_upload_files', column: 'social_ins_tp', label: '세무 올린 파일' },
   { category: 'BANK', useTp: '000', table: 'tb_s050_loan_txns', column: 'bank_code', label: '세무 대출 거래' },
   { category: 'TAX_LOAN_TP', useTp: '000', table: 'tb_s050_loan_txns', column: 'txn_tp', label: '세무 대출 거래' },
+
+  // --- 세무 세무사 전달 서류 (s050500010) — 2026-11-07 추가. 218_tax_handoff.sql ---
+  { category: 'TAX_HANDOFF_TP', useTp: '000', table: 'tb_s050_handoff_logs', column: 'handoff_tp', label: '세무 세무사 전달 이력' },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */
@@ -418,6 +421,14 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     codes: ['noPayNo', 'dupPayNo', 'noMemberName', 'noLoanAmount'],
     source: 'packages/shared/src/domain/tax-pay-social-loan.ts (PayExcluded · SocialExcluded · LoanExcluded)',
     label: '세무 납부 · 4대보험 · 대출 뺀 줄 종류',
+  },
+  /** 세무사 전달 종류 — 218 CHECK(보낸 이력)가 T · M 에 기대고, 화면 · API 가 T 만 동작시킨다(M 은 준비 중). 2026-11-07 추가. */
+  {
+    category: 'TAX_HANDOFF_TP',
+    useTp: '000',
+    codes: ['T', 'M'],
+    source: 'packages/shared/src/domain/tax-handoff.ts (HANDOFF_TP_VAT · HANDOFF_TP_WH) · 218 (ck_s050_handoff_logs_tp)',
+    label: '세무 세무사 전달 종류',
   },
 ] as const;
 
