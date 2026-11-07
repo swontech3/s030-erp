@@ -124,6 +124,26 @@ export async function tenantOrgCode(client: ScopedClient, orgId: number): Promis
 }
 
 /**
+ * 구분별 회사유형 규칙 줄(공통 코드 `LAW_CNG_MT`, 결정 2026-11-07) — 코드값(변경 구분)과 **설명**(쓸 수 있는 회사유형).
+ * 이름은 사람이 읽는 구분 이름이라 읽지 않는다. 사용 중인 줄만. `listCodes` 는 설명을 주지 않아 따로 읽는다.
+ */
+export async function listChangeTypeRuleRows(
+  client: ScopedClient,
+  category: string,
+  useTp: string,
+): Promise<{ code: string; description: string | null }[]> {
+  const { rows } = await q<{ code: string; description: string | null }>(
+    client,
+    `SELECT l.code, l.description
+       FROM public.tb_s080_codes_line l
+      WHERE l.category = ANY($1::text[]) AND l.use_tp = $2 AND l.is_active = true
+      ORDER BY l.sort_order, l.code`,
+    [[category], useTp],
+  );
+  return rows;
+}
+
+/**
  * 새 건 — 첫 [저장] 때만 부른다(결정 2026-10-10). 변경 내용을 **같이** 넣는다 — 빈 건을 먼저
  * 만들고 채우는 길은 없다. 임원은 같은 트랜잭션에서 이어 넣는다(`legal/corpChangeOps.ts`).
  */

@@ -26,9 +26,11 @@ export const PRINT_MARK = 'form-doc';
 interface Props {
   definition: FormDefinition;
   values: Readonly<Record<string, string>>;
+  /** 법무 서류면 true — 글과 함께 있는 빈 자리표시를 일정 너비 빈칸으로(`FormDocument` 의 `inlineBlanks`). */
+  inlineBlanks?: boolean;
 }
 
-export function FormPrintPortal({ definition, values }: Props) {
+export function FormPrintPortal({ definition, values, inlineBlanks = false }: Props) {
   /* ★ SSR 에는 document 가 없다 — 붙은 뒤에만 포털한다. */
   const [body, setBody] = useState<HTMLElement | null>(null);
   useEffect(() => setBody(document.body), []);
@@ -36,7 +38,7 @@ export function FormPrintPortal({ definition, values }: Props) {
 
   return createPortal(
     <div data-print-portal={PRINT_MARK} className={styles.printOnly}>
-      <FormDocument definition={definition} values={values} showEmpty={false} />
+      <FormDocument definition={definition} values={values} showEmpty={false} inlineBlanks={inlineBlanks} />
     </div>,
     body,
   );

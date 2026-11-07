@@ -112,7 +112,7 @@ describe('buildIncorpCasePrintValues', () => {
 
   it('★ 상호는 합친 상호(위치를 따른다) · 시·도는 정식 이름 · 공고방법 기본값', () => {
     expect(v.companyName).toBe('한가람 주식회사');
-    expect(v.hqAddress).toBe('(06164) 서울 강남구 테헤란로 1 3층');
+    expect(v.hqAddress).toBe('(06164) 서울 강남구 테헤란로 1, 3층');
     expect(v.hqSido).toBe('서울특별시');
     expect(v.publicNoticeMethod).toBe('회사의 인터넷 홈페이지');
   });
@@ -305,5 +305,100 @@ describe('readIncorporationSnapshot', () => {
   it('v1 이 아니면 null', () => {
     expect(readIncorporationSnapshot({ version: 2, info: {} })).toBeNull();
     expect(readIncorporationSnapshot(null)).toBeNull();
+  });
+});
+
+// =============================================================================
+// 유한회사(결정 2026-10-31) — 정관(유한회사) 자리표시 3개 · 서류 묶음은 회사 형태로
+// =============================================================================
+describe('유한회사 — 정관 자리표시 · 서류 묶음', () => {
+  const ltdInfo = (() => {
+    const r = parseIncorpInfo({ ...info, nameKo: '한가람', capitalAmount: 20_000_000, parValue: 10_000, unitsAuthorized: null, unitsIssued: null });
+    if (!r.ok) throw new Error('fixture');
+    return r.value;
+  })();
+  const one = [person({ name: '홍길동', isFounder: true, isDirector: true, isRepresentative: true, unitsSubscribed: 2_000, rrn: '9001011234567', zipCode: '06164', address: '서울 강남구 1' })];
+  const two = [
+    person({ name: '홍길동', isFounder: true, isDirector: true, isRepresentative: true, unitsSubscribed: 1_200, rrn: '9001011234567', zipCode: '06164', address: '서울 강남구 1' }),
+    person({ name: '김철수', isFounder: true, unitsSubscribed: 800, rrn: '9102022345678', address: '서울 서초구 2' }),
+  ];
+  const ltdSrc = (ps: IncorpPrintPerson[]): IncorpPrintSource => ({
+    ...src(ps, null),
+    snapshot: buildIncorporationSnapshot(ltdInfo, ps.map((p, i): IncorpPersonView => ({ ...p, id: `p${i}`, rrnMasked: null, sortOrder: i + 1 })), 'A'),
+    methodName: '유한회사 발기설립',
+  });
+
+  it('자리표시 3개가 이름표에 있다', () => {
+    const names = INCORP_PRINT_FIELDS.map((f) => f.name);
+    expect(names).toEqual(expect.arrayContaining(['contributionUnitAmount', 'articlesMemberTable', 'articlesMemberSignList']));
+  });
+  it('사원 1명 — 자본금 · 1좌 금액 · 출자좌수 표 · 서명란 · 상호는 위치대로(뒤)', () => {
+    const v = buildIncorpCasePrintValues(ltdSrc(one));
+    expect(v.companyName).toBe('한가람 유한회사');
+    expect(v.capitalAmount).toBe('20,000,000');
+    expect(v.contributionUnitAmount).toBe('10,000');
+    expect(v.articlesMemberTable).toBe('홍길동　출자 2,000좌(금 20,000,000원)');
+    expect(v.articlesMemberSignList).toBe('사원　성명 : 홍길동 (900101-1234567)　(인)\n주소 : (06164) 서울 강남구 1');
+    expect(v.regPurpose).toBe('유한회사 발기설립');
+  });
+  it('★ 상호 위치 앞(F) — 정관 · 신청서가 함께 쓰는 companyName 이 「유한회사 한가람」(결정 2026-11-02)', () => {
+    const front = { ...ltdInfo, companyTypePosition: 'F' };
+    const ps = one.map((p, i): IncorpPersonView => ({ ...p, id: `p${i}`, rrnMasked: null, sortOrder: i + 1 }));
+    const v = buildIncorpCasePrintValues({ ...ltdSrc(one), snapshot: buildIncorporationSnapshot(front, ps, 'A') });
+    expect(v.companyName).toBe('유한회사 한가람');
+  });
+  it('사원 2명 — 사람마다 줄, 합 = 자본금', () => {
+    const v = buildIncorpCasePrintValues(ltdSrc(two));
+    expect(v.articlesMemberTable.split('\n')).toEqual(['홍길동　출자 1,200좌(금 12,000,000원)', '김철수　출자 800좌(금 8,000,000원)']);
+    expect(v.articlesMemberSignList.split('\n')).toEqual([
+      '사원　성명 : 홍길동 (900101-1234567)　(인)',
+      '주소 : (06164) 서울 강남구 1',
+      '사원　성명 : 김철수 (910202-2345678)　(인)',
+      '주소 : 서울 서초구 2',
+    ]);
+  });
+  it('★ 사원총회의사록 · 설립등기신청서(2026-11-01) — 자리표시 4개가 이름표에 있다', () => {
+    const names = INCORP_PRINT_FIELDS.map((f) => f.name);
+    expect(names).toEqual(expect.arrayContaining(['representativeRrnList', 'minutesOfficerRrnList', 'chairName', 'directorSignList']));
+  });
+  it('사원 1명 — 신청서 대표이사 칸 · 의사록 임원 선임 · 의장 · 이사 기명날인', () => {
+    const v = buildIncorpCasePrintValues(ltdSrc(one));
+    expect(v.representativeRrnList).toBe('대표이사 홍길동(900101-1234567)\n(06164) 서울 강남구 1');
+    expect(v.minutesOfficerRrnList).toBe('대표이사 : 홍길동\n주민등록번호 : 900101-1234567\n주소 : (06164) 서울 강남구 1');
+    expect(v.chairName).toBe('홍길동');
+    expect(v.directorSignList).toBe('대표이사　홍길동　　(인)');
+  });
+  it('★ 사원 2명(이사 둘 · 대표 하나) · 감사 — 직위는 대표이사 · 이사 · 감사(사내이사 없음) · 의장은 첫 번째 사원', () => {
+    const ps = [{ ...two[1]!, isDirector: true }, { ...two[0]! }, person({ name: '이감사', isAuditor: true, rrn: '8803031234567', address: '경기 성남시 3' })];
+    const v = buildIncorpCasePrintValues(ltdSrc(ps));
+    expect(v.minutesOfficerRrnList.split('\n').filter((l) => !l.startsWith('주'))).toEqual(['이사 : 김철수', '대표이사 : 홍길동', '감사 : 이감사']);
+    expect(v.minutesOfficerRrnList).not.toContain('사내이사');
+    expect(v.chairName).toBe('김철수');
+    expect(v.directorSignList.split('\n')).toEqual(['이사　김철수　　(인)', '대표이사　홍길동　　(인)']);
+    expect(v.representativeRrnList.split('\n')).toHaveLength(2);
+    expect(v.directorAuditorList.split('\n')).toEqual(['이사 김철수 (910202-2345678)', '이사 홍길동 (900101-1234567)', '감사 이감사 (880303-1234567)']);
+  });
+  it('★ 세금 — 유한회사 줄의 설정이 발기설립과 같으면 같은 규칙 · 같은 값(자본금 2천만 · 서울 중과)', () => {
+    const ltd = buildIncorpCasePrintValues(ltdSrc(one));
+    // 20,000,000 × 4/1000 = 80,000 < 최소 112,500 → 112,500 × 3 = 337,500, 교육세 20%
+    expect([ltd.regLicenseTax, ltd.localEduTax, ltd.taxTotal, ltd.regFee]).toEqual(['337,500', '67,500', '405,000', '35,000']);
+    const stock = buildIncorpCasePrintValues({ ...src(), snapshot: { ...src().snapshot, info: { ...src().snapshot.info, capitalAmount: 20_000_000 } } });
+    expect([ltd.regLicenseTax, ltd.localEduTax, ltd.taxTotal, ltd.regFee]).toEqual([stock.regLicenseTax, stock.localEduTax, stock.taxTotal, stock.regFee]);
+  });
+  it('★ 서류 묶음 — 유한회사 건은 유한회사 양식만, 주식회사 건은 형태 없는(주식회사) 양식만', () => {
+    const forms = [
+      { id: 'r1', name: '정관', mark: { domain: 'incorporation' as const, unit: 'case' as const }, definition: null, tokens: [] },
+      { id: 'r2', name: '주식인수증', mark: { domain: 'incorporation' as const, unit: 'founder' as const }, definition: null, tokens: [] },
+      { id: 'r3', name: '주식발행사항동의서', mark: { domain: 'incorporation' as const, unit: 'case' as const, companyType: 'R' as const }, definition: null, tokens: [] },
+      { id: 'a1', name: '정관(유한회사)', mark: { domain: 'incorporation' as const, unit: 'case' as const, companyType: 'A' as const }, definition: null, tokens: [] },
+    ];
+    expect(buildIncorpPrintDocuments(forms, ltdSrc(two)).map((d) => d.name)).toEqual(['정관(유한회사)']);
+    expect(buildIncorpPrintDocuments(forms, src()).map((d) => d.name)).toEqual(['정관', '주식발행사항동의서', '주식인수증']);
+  });
+  it('형태가 없던 스냅샷은 주식회사로 읽는다', () => {
+    const raw = JSON.parse(JSON.stringify(snapshotOf(persons)));
+    delete raw.entityType;
+    expect(readIncorporationSnapshot(raw)?.entityType).toBe('R');
+    expect(readIncorporationSnapshot(JSON.parse(JSON.stringify(ltdSrc(one).snapshot)))?.entityType).toBe('A');
   });
 });

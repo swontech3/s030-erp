@@ -31,6 +31,7 @@ import { registerCodeRoutes } from './routes/codes.ts';
 import { registerFormTemplateRoutes } from './routes/formTemplates.ts';
 import { registerOrgLookupRoutes } from './routes/orgLookup.ts';
 import { registerCorpChangeRoutes } from './routes/corpChanges.ts';
+import { registerLegalArticlesFileRoutes } from './routes/legalArticlesFile.ts';
 import { registerLegalOrgReceiveRoutes } from './routes/legalOrgReceive.ts';
 import { registerBizPurposeRoutes } from './routes/bizPurposes.ts';
 import { registerBizRecommendRoutes } from './routes/bizRecommend.ts';
@@ -152,6 +153,8 @@ registerOrgLookupRoutes(app);
 // ★ 법인변경(s040200010) — 운영사 · 회사가 함께 쓴다. 누가 무엇을 보는지는 RLS(037)가
 //   단체 ID 로 가른다(`routes/corpChanges.ts` 머리말). 목록(2단계) · 새 건 · 상세 · 임원(3단계).
 registerCorpChangeRoutes(app);
+// ★ 법무 회사별 정관 파일(2026-11-07) — 법인변경 상세 「기본정보」 카드. 회사 세션은 050 정책으로 자기 단체만.
+registerLegalArticlesFileRoutes(app);
 // ★ 법무 회사 정보 「받기」(삐용 → 법무, 2026-10-23) — ERP 세션 없이 삐용이 부른다(`config.public`).
 //   부르는 쪽 확인은 실어 온 삐용 토큰의 「내 메뉴」로 한다(`legal/legalOrgReceive.ts` 머리말).
 registerLegalOrgReceiveRoutes(app);

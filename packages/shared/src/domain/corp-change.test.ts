@@ -1,13 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ARTICLES_CHANGE_NOTICE,
+  articlesChangeNotice,
   CORP_CHANGE_STATUSES,
   CORP_CHANGE_TYPES,
   CHANGE_TYPE_DEFS,
+  HQ_OUT_TAX_HINT,
+  hqOutTaxHint,
   INITIAL_CORP_CHANGE_STATUS,
   REGISTRATION_DEADLINE_DAYS,
   availableTransitions,
   canEditCorpChange,
   canPrintCorpChange,
+  changeTypeAllowedFor,
+  changeTypeMemberTypeError,
+  CORP_CHANGE_MEMBER_RULE_CATEGORY,
+  parseChangeTypeRules,
   checkDelete,
   checkTransition,
   purposeLines,
@@ -46,8 +54,8 @@ const VALID: Record<string, CorpChangeContent> = {
 
 // =============================================================================
 describe('코드 어휘', () => {
-  it('변경 구분 5종 — CEO_CHG 는 없다(구현 없음, 나중)', () => {
-    expect([...CORP_CHANGE_TYPES]).toEqual(['NAME', 'HQ', 'PURPOSE', 'OFFICER', 'CEO_ADDR']);
+  it('변경 구분 6종(2026-11-01 HQ_OUT) — CEO_CHG 는 없다(구현 없음, 나중)', () => {
+    expect([...CORP_CHANGE_TYPES]).toEqual(['NAME', 'HQ', 'HQ_OUT', 'PURPOSE', 'OFFICER', 'CEO_ADDR']);
     expect(Object.keys(CHANGE_TYPE_DEFS).sort()).toEqual([...CORP_CHANGE_TYPES].sort());
   });
 
@@ -63,6 +71,7 @@ describe('코드 어휘', () => {
     expect(required).toEqual({
       NAME: ['newName', 'resolutionDate'],
       HQ: ['newHqAddress', 'resolutionDate', 'relocationDate'],
+      HQ_OUT: ['newHqAddress', 'resolutionDate', 'relocationDate'],
       PURPOSE: ['purposes', 'resolutionDate'],
       OFFICER: ['resolutionDate'],
       CEO_ADDR: ['newCeoAddress', 'moveInDate'],
@@ -79,6 +88,106 @@ describe('코드 어휘', () => {
 });
 
 // =============================================================================
+describe('★ 타관할로의 본점이전(HQ_OUT) · 회사 형태(결정 2026-11-01)', () => {
+  it('칸은 동일관할(HQ)과 같다 — 세금 안내는 칸 정의에 두지 않는다(조건부, hqOutTaxHint)', () => {
+    expect(CHANGE_TYPE_DEFS.HQ_OUT.fields).toEqual(CHANGE_TYPE_DEFS.HQ.fields);
+    expect(CHANGE_TYPE_DEFS.HQ_OUT.fields.some((f) => f.hint)).toBe(false);
+  });
+  it.each([
+    ['서울→서울', '서울 강남구 테헤란로 1', '서울특별시 중구 세종대로 110', null],
+    ['지방→서울', '경기 성남시 분당구 1', '서울 강남구 테헤란로 1', HQ_OUT_TAX_HINT],
+    ['서울→지방', '서울 강남구 테헤란로 1', '부산 해운대구 1', null],
+    ['지방→지방', '경기 성남시 분당구 1', '부산 해운대구 1', null],
+    ['지금 본점 빔', '', '서울 강남구 테헤란로 1', null],
+    ['지금 본점 null', null, '서울 강남구 테헤란로 1', null],
+    ['새 본점 빔', '경기 성남시 분당구 1', '', null],
+  ] as const)('세금 안내 %s', (_c, current, next, expected) => {
+    expect(hqOutTaxHint(current, next)).toBe(expected);
+  });
+  it('세금 안내 문구', () => {
+    expect(HQ_OUT_TAX_HINT).toBe('인구과밀지역 대도시 신설 전입으로 중과세금 확인을 하세요.');
+  });
+  // 시작 값(일회용 2026-11-07-change-type-member-rule) — NAME · PURPOSE · OFFICER · CEO_ADDR · HQ = R / HQ_OUT = A
+  const rules = parseChangeTypeRules([
+    { code: 'NAME', description: 'R' },
+    { code: 'PURPOSE', description: 'R' },
+    { code: 'OFFICER', description: 'R' },
+    { code: 'CEO_ADDR', description: 'R' },
+    { code: 'HQ', description: 'R' },
+    { code: 'HQ_OUT', description: 'A' },
+  ]);
+  const allowedTypes = (memberType: string | null, r = rules) => CORP_CHANGE_TYPES.filter((t) => changeTypeAllowedFor(t, memberType, r));
+  it('규칙 읽기(설명 칸) — 쉼표로 나누고 공백 · 빈 칸은 버린다', () => {
+    expect(parseChangeTypeRules([{ code: 'HQ', description: ' R , A ,' }, { code: 'NAME', description: '' }, { code: 'PURPOSE', description: null }])).toEqual({ HQ: ['R', 'A'] });
+    expect(CORP_CHANGE_MEMBER_RULE_CATEGORY).toBe('LAW_CNG_MT');
+  });
+  it('유한회사 → 타관할만 · 주식회사 → 지금 5가지 · 비었으면 주식회사로 본다', () => {
+    expect(allowedTypes('A')).toEqual(['HQ_OUT']);
+    expect(allowedTypes('R')).toEqual(['NAME', 'HQ', 'PURPOSE', 'OFFICER', 'CEO_ADDR']);
+    expect(allowedTypes(null)).toEqual(allowedTypes('R'));
+    expect(allowedTypes('')).toEqual(allowedTypes('R'));
+  });
+  it('설명이 비면(빈 글 · 공백 · 쉼표만 · null) 줄이 없는 구분과 같다 — 주식회사(R)만', () => {
+    for (const description of ['', '  ', ' , ', null]) {
+      const r = parseChangeTypeRules([{ code: 'HQ_OUT', description }, { code: 'NAME', description: 'A' }]);
+      expect(changeTypeAllowedFor('HQ_OUT', 'R', r)).toBe(true);
+      expect(changeTypeAllowedFor('HQ_OUT', null, r)).toBe(true);
+      expect(changeTypeAllowedFor('HQ_OUT', 'A', r)).toBe(false);
+      expect(changeTypeAllowedFor('NAME', 'A', r)).toBe(true);
+    }
+  });
+  it('회사유형이 R · A 가 아니면(C · S · P · Z 등) 주식회사로 보고 거른다 — 예전 동작 유지', () => {
+    for (const t of ['C', 'S', 'P', 'Z', 'X', ' ']) expect(allowedTypes(t)).toEqual(allowedTypes('R'));
+    const both = parseChangeTypeRules([{ code: 'NAME', description: 'A' }]);
+    expect(changeTypeAllowedFor('NAME', 'C', both)).toBe(false);
+    expect(changeTypeMemberTypeError('HQ_OUT', 'C', rules)).not.toBeNull();
+  });
+  it('이름을 「R,A」로 바꾸면 둘 다 고를 수 있다', () => {
+    const both = parseChangeTypeRules([{ code: 'NAME', description: 'R,A' }, { code: 'HQ_OUT', description: 'A' }]);
+    expect(changeTypeAllowedFor('NAME', 'A', both)).toBe(true);
+    expect(changeTypeAllowedFor('NAME', 'R', both)).toBe(true);
+    expect(changeTypeAllowedFor('NAME', null, both)).toBe(true);
+  });
+  it('줄이 없는 구분은 주식회사만 · 규칙이 비면 모두 주식회사만', () => {
+    expect(changeTypeAllowedFor('PURPOSE', 'R', { HQ_OUT: ['A'] })).toBe(true);
+    expect(changeTypeAllowedFor('PURPOSE', 'A', { HQ_OUT: ['A'] })).toBe(false);
+    expect(allowedTypes('A', {})).toEqual([]);
+    expect(allowedTypes(null, {})).toEqual([...CORP_CHANGE_TYPES]);
+  });
+  it.each([
+    ['A', 'HQ_OUT', true],
+    ['A', 'HQ', false],
+    ['R', 'HQ_OUT', false],
+    ['R', 'HQ', true],
+    [null, 'HQ_OUT', false],
+    [null, 'HQ', true],
+    ['C', 'HQ_OUT', false],
+    ['C', 'NAME', true],
+    ['A', 'NAME', false],
+    ['A', 'OFFICER', false],
+    [null, 'CEO_ADDR', true],
+  ])('회사유형 %s · %s → %s', (memberType, changeType, ok) => {
+    expect(changeTypeAllowedFor(changeType, memberType, rules)).toBe(ok);
+    expect(changeTypeMemberTypeError(changeType, memberType, rules) === null).toBe(ok);
+  });
+  const hqOut = { changeType: 'HQ_OUT', payload: { newHqAddress: { zipCode: '06164', address: '서울 강남구 1' }, resolutionDate: '2026-10-01', relocationDate: '2026-10-02' }, officers: [] };
+  const co = (isTenant: boolean, memberType: string | null) => ({ isTenant, ceoZipCode: null, ceoAddress: null, memberType, changeTypeRules: rules });
+  it('작성완료 — 유한회사면 통과, 주식회사 · 비었으면 changeType 자리에 거절', () => {
+    expect(validateCorpChange({ ...hqOut, company: co(false, 'A') })).toEqual([]);
+    for (const memberType of ['R', null]) {
+      expect(validateCorpChange({ ...hqOut, company: co(false, memberType) }).map((e) => e.field)).toEqual(['changeType']);
+    }
+  });
+  it('작성완료 — 유한회사의 동일관할(HQ)은 거절, 주식회사는 그대로 통과', () => {
+    const hq = { ...hqOut, changeType: 'HQ' };
+    expect(validateCorpChange({ ...hq, company: co(true, 'A') }).map((e) => e.field)).toEqual(['changeType']);
+    expect(validateCorpChange({ ...hq, company: co(true, 'R') })).toEqual([]);
+  });
+  it('작성완료 — 규칙이 실려 오지 않으면 줄이 없는 것과 같다(주식회사만)', () => {
+    expect(validateCorpChange({ ...hqOut, company: { isTenant: false, ceoZipCode: null, ceoAddress: null, memberType: 'A' } }).map((e) => e.field)).toEqual(['changeType']);
+  });
+});
+
 describe('검증 — 서류작성완료(P→E)', () => {
   it.each(Object.keys(VALID))('%s — 채운 내용은 통과', (t) => {
     expect(validateCorpChange(VALID[t]!)).toEqual([]);
@@ -441,6 +550,7 @@ describe('신청기한 — 모든 구분, 기준일 + 14일', () => {
     ['NAME', { resolutionDate: '2026-10-01', moveInDate: '2026-09-01' }, '결의일', '2026-10-01'],
     ['PURPOSE', { resolutionDate: '2026-10-02' }, '결의일', '2026-10-02'],
     ['HQ', { resolutionDate: '2026-09-01', relocationDate: '2026-10-03' }, '이전일', '2026-10-03'],
+    ['HQ_OUT', { resolutionDate: '2026-09-01', relocationDate: '2026-10-05' }, '이전일', '2026-10-05'],
     ['CEO_ADDR', { moveInDate: '2026-10-04', resolutionDate: '2026-09-01' }, '전입일', '2026-10-04'],
   ])('★ 기준일 — %s 는 %o 에서 %s', (type, payload, label, day) => {
     expect(registrationDeadline(type, payload, '2026-10-20')).toMatchObject({ basisLabel: label, basisDay: day });
@@ -464,5 +574,27 @@ describe('신청기한 — 모든 구분, 기준일 + 14일', () => {
     expect(at('2026-10-01', 'today')).toBeNull();
     expect(registrationDeadline('CEO_ADDR', null, '2026-10-10')).toBeNull();
     expect(registrationDeadline('CEO_CHG', { resolutionDate: '2026-10-01' }, '2026-10-10')).toBeNull();
+  });
+});
+
+describe('정관 변경 건 안내(결정 2026-11-07 → 역할은 공통 코드 LAW_CNG_AR, 2026-11-08)', () => {
+  const SEOUL = '서울 강남구 테헤란로 1';
+  const SEOUL_FULL = '서울특별시 마포구 월드컵북로 2';
+  const GYEONGGI = '경기 성남시 분당구 1';
+  const N = ARTICLES_CHANGE_NOTICE;
+  it.each([
+    ['상호 — 늘', ['TRADE_NAME'], SEOUL, null, N],
+    ['목적 — 늘', ['PURPOSE'], SEOUL, null, N],
+    ['본점 · 시·도 다름', ['HQ', 'NOTICE'], GYEONGGI, SEOUL, N],
+    ['본점 · 시·도 같음(줄임 · 정식 이름)', ['HQ', 'NOTICE'], SEOUL, SEOUL_FULL, null],
+    ['본점만 · 시·도 다름', ['HQ'], SEOUL, GYEONGGI, N],
+    ['본점 · 지금 본점 빔', ['HQ'], '', SEOUL, null],
+    ['본점 · 새 본점 빔', ['HQ'], SEOUL, null, null],
+    ['역할 없음(임원 · 대표자 주소)', [], GYEONGGI, SEOUL, null],
+  ] as const)('%s', (_c, roles, current, next, expected) => {
+    expect(articlesChangeNotice(roles, current, next)).toBe(expected);
+  });
+  it('문구', () => {
+    expect(ARTICLES_CHANGE_NOTICE).toBe('정관 변경 건입니다 — 변경된 정관은 따로 준비하세요');
   });
 });

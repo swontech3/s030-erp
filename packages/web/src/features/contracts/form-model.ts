@@ -26,7 +26,7 @@ import {
   calcTotals,
   type ContractTotals,
 } from '@swonbiz/shared/domain/contract-amounts';
-import { caretForMasked, maskValue } from '@swonbiz/shared/domain/masked-caret';
+import { caretForMasked, maskValue, type DigitMaskKind } from '@swonbiz/shared/domain/masked-caret';
 import { docRuleFor } from '@swonbiz/shared/domain/contract-files';
 
 /** 계약 항목 한 줄. 금액은 전부 원 단위 정수이고, 안 채운 칸은 0 이다. */
@@ -330,7 +330,7 @@ export { maskValue };
  *
  * ★ 자리 계산은 shared 의 `caretForMasked` 다 — 시험이 거기 붙어 있다.
  */
-export function maskInput(el: HTMLInputElement, kind: 'bizno' | 'corpno' | 'phone' | 'emailId'): string {
+export function maskInput(el: HTMLInputElement, kind: DigitMaskKind | 'emailId'): string {
   const raw = el.value;
   const caret = el.selectionStart ?? raw.length;
   const masked = kind === 'emailId' ? maskEmailId(raw) : maskValue(kind, raw);

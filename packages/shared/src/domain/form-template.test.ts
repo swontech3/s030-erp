@@ -4,7 +4,11 @@ import {
   createEmptyPage,
   definitionTokens,
   extractTokens,
+  fitRowsOf,
   FormDefinitionError,
+  INLINE_BLANK_AMOUNT_EM,
+  INLINE_BLANK_EM,
+  inlineBlankWidths,
   inputFieldsOf,
   isLegalForm,
   migrateDefinition,
@@ -124,6 +128,36 @@ describe('자리표시 (레거시와 같은 기대값)', () => {
     expect(splitTokens('글자만')).toEqual([{ kind: 'text', text: '글자만' }]);
     expect(splitTokens('')).toEqual([]);
   });
+  it('★ inlineBlankWidths: 글과 함께 있는 자리표시만 너비 — 금액 자리는 더 넓게(결정 2026-11-06)', () => {
+    const w = (t: string) => inlineBlankWidths(splitTokens(t));
+    expect(w('금 {{regFee}} 원')).toEqual([null, INLINE_BLANK_AMOUNT_EM, null]);
+    expect(w('금{{regLicenseTax}}원')).toEqual([null, INLINE_BLANK_AMOUNT_EM, null]);
+    expect(w('{{capitalAmountKorean}} (금 {{capitalAmount}} 원)')).toEqual([INLINE_BLANK_EM, null, INLINE_BLANK_AMOUNT_EM, null]);
+    expect(w('{{memberCount}}명')).toEqual([INLINE_BLANK_EM, null]);
+    expect(w('{{unitsAuthorized}} 주')).toEqual([INLINE_BLANK_EM, null]);
+    expect(w('일시 : {{resolutionDate}}')).toEqual([null, INLINE_BLANK_EM]);
+    // 자리표시만 있는 칸 — 지금처럼 빈 칸(공백 · 줄바꿈은 글로 치지 않는다)
+    expect(w('{{companyName}}')).toEqual([null]);
+    expect(w('  {{a}} \n {{b}} ')).toEqual([null, null, null, null, null]);
+    expect(w('글자만')).toEqual([null]);
+  });
+  it('★ inlineBlankWidths(fit): 칸에 맞춰 줄인다 — 한 줄 칸은 남는 자리만큼, 넘치는 줄은 칸 폭까지(결정 2026-11-06)', () => {
+    const f = (t: string, widthCm: number, fontPt = 9) => inlineBlankWidths(splitTokens(t), { widthCm, fontPt });
+    // 신청서 세금 칸(9pt) — 2.02cm 「금{{…}}원」 → 3.5em, 2.53cm 「금 {{…}} 원」 → 4em. 한 줄 그대로
+    expect(f('금{{regLicenseTax}}원', 2.02)).toEqual([null, 3.5, null]);
+    expect(f('금 {{localEduTax}} 원', 2.53)).toEqual([null, 4, null]);
+    // 넓은 칸은 정한 너비 그대로
+    expect(f('금 {{regFee}} 원', 10)).toEqual([null, INLINE_BLANK_AMOUNT_EM, null]);
+    expect(f('{{memberCount}}명', 10)).toEqual([INLINE_BLANK_EM, null]);
+    // 한 줄에 둘 — 남는 자리를 같은 비율로
+    expect(f('{{a}}명 {{b}}명', 2)).toEqual([1, null, 1, null]);
+    // 글만으로 줄이 넘치는 칸 — 빈칸은 칸 폭을 넘지 않게만(여기서는 정한 너비 그대로)
+    expect(f(`${'가'.repeat(20)} {{x}}`, 3)).toEqual([null, INLINE_BLANK_EM]);
+    // 줄마다 따로 — 둘째 줄이 짧으면 그 줄 기준
+    expect(f(`${'가'.repeat(40)}\n금{{x}}원`, 2.02)).toEqual([null, 3.5, null]);
+    // 남는 자리가 1em 보다 좁으면 빈칸 없음
+    expect(f('가나다라{{x}}', 1.8)).toEqual([null, null]);
+  });
   it('definitionTokens: 전 셀 토큰 합집합', () => {
     const d = createEmptyDefinition();
     d.pages[0]!.cells.push({ row: 0, col: 0, text: '{{a}}' }, { row: 1, col: 0, text: '{{b}} {{a}}' });
@@ -199,5 +233,24 @@ describe('isLegalForm — 법무 양식은 표양식 화면에서 뽑지 않는�
   it('저장된 정의를 읽어도 원천이 남아 법무 양식으로 판정된다', () => {
     const stored = { ...createEmptyDefinition(), dataSource: 'corp-change' };
     expect(isLegalForm(parseDefinition(JSON.parse(JSON.stringify(stored))))).toBe(true);
+  });
+});
+
+describe('「내용에 맞춤」 행(결정 2026-11-05)', () => {
+  const page = (cells: unknown[]) => ({ colWidths: [1, 2], rowHeights: [1, 10, 1], cells });
+
+  it('parseDefinition 이 fitHeight 를 지키고, 참/거짓이 아니면 거절한다', () => {
+    const def = parseDefinition({ ...createEmptyDefinition(), pages: [page([{ row: 1, col: 1, text: '{{list}}', fitHeight: true }])] });
+    expect(def.pages[0].cells[0].fitHeight).toBe(true);
+    expect(() => parseDefinition({ ...createEmptyDefinition(), pages: [page([{ row: 1, col: 1, fitHeight: 'y' }])] })).toThrow(FormDefinitionError);
+  });
+
+  it('표시가 있는 칸의 행만 — 걸침 1 인 칸만 본다 · 표시가 없으면 빈 집합', () => {
+    const def = parseDefinition({
+      ...createEmptyDefinition(),
+      pages: [page([{ row: 1, col: 1, fitHeight: true }, { row: 0, col: 0, rowSpan: 3, fitHeight: true }, { row: 2, col: 1, fitHeight: false }])],
+    });
+    expect([...fitRowsOf(def.pages[0])]).toEqual([1]);
+    expect(fitRowsOf(createEmptyPage()).size).toBe(0);
   });
 });

@@ -29,6 +29,8 @@ export interface OrgInfo {
   orgCode: string;
   orgName: string;
   repName: string | null;
+  /** 회사 전화(삐용 `telNo`). 없으면 null · 빠짐(2026-11-02 — 법인설립 새 건의 대표자 미리 넣기가 쓴다). */
+  telNo?: string | null;
   status: string | null;
 }
 

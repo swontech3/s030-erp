@@ -286,6 +286,13 @@
   color: var(--text-muted);
 }
 
+/* 이름표 바로 옆 괄호 안내 — 「신규 본점주소* (…)」(결정 2026-11-07) */
+.labelNote {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
 /* 칸 이름 줄 — 이름 왼쪽, 칸에 딸린 단추 오른쪽(사업목적의 [목록에서 고르기]). */
 .fieldHead {
   display: flex;
@@ -386,6 +393,19 @@
 
 .readEmpty {
   color: var(--text-caption);
+}
+
+/* ── 정관 파일(결정 2026-11-07) — 파일 이름 · 보기 · 올리기 · 설립 건 바로가기를 한 줄에 ── */
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fileName {
+  flex: 1 1 200px;
+  min-width: 0;
 }
 
 /* ── 딱지 ── */
@@ -835,4 +855,17 @@
   margin-left: 8px;
   padding-left: 8px;
   border-left: 1px solid var(--border);
+}
+
+/* 「출력 때 입력」(결정 2026-11-05) — 서버가 채우지 않는 자리표시의 입력칸 */
+.printManual {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.printManualFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
