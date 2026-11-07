@@ -14,9 +14,9 @@
  *   ★ 주소의 단체는 화면이 믿지 않는다 — 서버가 임시 모드 읽기와 첫 저장 때 세션과 대조한다(403).
  * ★ 변경 구분은 목록 응답의 선택지(shared `CORP_CHANGE_TYPES` 로 거른 것)를 쓴다.
  *   저장한 뒤에는 바꿀 수 없다.
- * ★ 회사 형태로 한 번 더 거른다(결정 2026-11-01) — 회사를 고르면(회사 사용자는 바로) 회사유형을 읽어
- *   `changeTypeAllowedFor` 로 거른다: 유한회사 = 타관할로의 본점이전만, 그 밖(비었음 포함 = 주식회사로 봄) =
- *   동일관할 본점이전만. 서버도 첫 저장 · 저장 · 작성완료 때 같은 함수로 거절한다.
+ * ★ 회사 형태로 한 번 더 거른다(결정 2026-11-01 → 2026-11-07 공통 코드) — 회사를 고르면(회사 사용자는 바로) 회사유형과
+ *   구분별 회사유형 규칙(공통 코드 `LAW_CNG_MT`, 응답의 `changeTypeRules`)을 읽어 `changeTypeAllowedFor` 로 거른다.
+ *   줄이 없는 구분은 주식회사만 · 비었으면 주식회사로 봄. 서버도 첫 저장 · 저장 · 작성완료 때 같은 코드 · 함수로 거절한다.
  * ★ 비입주사이고 회사유형이 비었으면 그 자리에서 고른다(결정 2026-11-07) — 고른 유형으로 구분을 거르고,
  *   주소에 `memberType` 으로 실어 새 건 화면의 회사 정보에 넣는다(`presetMemberTypeFor`). 법무 회사 정보에는
  *   첫 [저장] 때 회사 정보와 함께 저장된다(`upsertLegalOrg`). 이 대화상자는 여전히 아무것도 쓰지 않는다.
@@ -79,6 +79,7 @@ export function NewCorpChangeDialog({ changeTypes, pickOrg, onClose }: Props) {
             isTenant: body.isTenant ?? false,
             canEditCompany: body.canEditCompany ?? false,
             memberTypes: body.memberTypes ?? [],
+            changeTypeRules: body.changeTypeRules ?? {},
           });
       })
       .catch(() => {
@@ -95,11 +96,11 @@ export function NewCorpChangeDialog({ changeTypes, pickOrg, onClose }: Props) {
   /** 구분을 거를 회사유형 — 저장된 값, 비었으면 고른 값. */
   const memberType =
     typeLoad.state === 'ok' ? (typeLoad.memberType ?? (canPickType && pickedType !== '' ? pickedType : null)) : null;
-  const options = typeLoad.state === 'ok' ? changeTypes.filter((t) => changeTypeAllowedFor(t.code, memberType)) : [];
+  const options = typeLoad.state === 'ok' ? changeTypes.filter((t) => changeTypeAllowedFor(t.code, memberType, typeLoad.changeTypeRules)) : [];
 
   // 회사를 바꿔 고른 구분이 선택지에서 빠지면 비운다
   useEffect(() => {
-    if (changeType !== '' && typeLoad.state === 'ok' && !changeTypeAllowedFor(changeType, memberType)) setChangeType('');
+    if (changeType !== '' && typeLoad.state === 'ok' && !changeTypeAllowedFor(changeType, memberType, typeLoad.changeTypeRules)) setChangeType('');
   }, [changeType, typeLoad, memberType]);
 
   const ready = changeType !== '' && (!pickOrg || org !== null) && typeLoad.state === 'ok';

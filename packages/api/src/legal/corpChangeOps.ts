@@ -20,6 +20,8 @@ import type { ErpSession } from '@swonbiz/shared';
 import {
   CHANGE_TYPE_DEFS,
   CORP_CHANGE_CODE_USE_TP,
+  CORP_CHANGE_MEMBER_RULE_CATEGORY,
+  CORP_CHANGE_MEMBER_RULE_USE_TP,
   CORP_CHANGE_STATUS_CATEGORY,
   CORP_CHANGE_TYPE_CATEGORY,
   INITIAL_CORP_CHANGE_STATUS,
@@ -30,6 +32,8 @@ import {
   checkTransition,
   isCorpChangeStatus,
   isCorpChangeType,
+  parseChangeTypeRules,
+  type ChangeTypeRules,
   type CorpChangeFieldError,
   type CorpChangeOfficerInput,
   type CorpChangeType,
@@ -236,8 +240,15 @@ async function checkCompanyWrite(
 // 임시 모드 · 첫 저장
 // =============================================================================
 
+/** 구분별 회사유형 규칙(공통 코드 `LAW_CNG_MT`, 결정 2026-11-07) — 대화상자 · 첫 저장 · 저장 · 작성완료가 이것 하나를 읽는다. */
+async function readChangeTypeRules(client: ScopedClient): Promise<ChangeTypeRules> {
+  return parseChangeTypeRules(
+    await listCodes(client, [{ category: CORP_CHANGE_MEMBER_RULE_CATEGORY, useTp: CORP_CHANGE_MEMBER_RULE_USE_TP }]),
+  );
+}
+
 /**
- * 회사유형과 맞지 않는 구분 거절(결정 2026-11-01 2 · 11) — 첫 저장 · [저장] 이 쓴다(작성완료는 `validateCorpChange`).
+ * 회사유형과 맞지 않는 구분 거절(결정 2026-11-01 2 · 11 → 2026-11-07 공통 코드 `LAW_CNG_MT`) — 첫 저장 · [저장] 이 쓴다(작성완료는 `validateCorpChange`).
  * 회사 정보가 함께 실려 오면 그 값(이번에 저장될 회사유형), 아니면 저장된 회사유형으로 본다.
  * ★ 단체는 RLS 를 통과한 건의 것이거나 `parseOrgTarget` 을 거친 것만 넣는다(db 머리말 ⚠).
  */
@@ -248,7 +259,7 @@ async function checkChangeTypeForCompany(
   company: LegalOrgInput | null,
 ): Promise<OpError | null> {
   const memberType = company ? company.memberType : (await readCompanySource(client, orgId)).memberType;
-  const message = changeTypeMemberTypeError(changeType, memberType);
+  const message = changeTypeMemberTypeError(changeType, memberType, await readChangeTypeRules(client));
   return message ? fail(400, 'invalid_request', message, [{ field: 'changeType', message }]) : null;
 }
 
@@ -279,6 +290,7 @@ export async function readCorpChangeCompanyType(
       isTenant: source.isTenant,
       canEditCompany: companyEditor && !source.isTenant,
       memberTypes,
+      changeTypeRules: await readChangeTypeRules(client),
     },
   };
 }
@@ -476,7 +488,13 @@ export async function transitionCorpChange(
           payload: row.payload,
           officers: officers.map(officerForValidation),
           company: company
-            ? { isTenant: company.isTenant, ceoZipCode: company.ceoZipCode, ceoAddress: company.ceoAddress, memberType: company.memberType }
+            ? {
+                isTenant: company.isTenant,
+                ceoZipCode: company.ceoZipCode,
+                ceoAddress: company.ceoAddress,
+                memberType: company.memberType,
+                changeTypeRules: await readChangeTypeRules(client),
+              }
             : undefined,
         }
       : undefined,

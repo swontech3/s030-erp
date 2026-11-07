@@ -14,6 +14,8 @@ import {
   canPrintCorpChange,
   changeTypeAllowedFor,
   changeTypeMemberTypeError,
+  CORP_CHANGE_MEMBER_RULE_CATEGORY,
+  parseChangeTypeRules,
   checkDelete,
   checkTransition,
   purposeLines,
@@ -105,6 +107,38 @@ describe('★ 타관할로의 본점이전(HQ_OUT) · 회사 형태(결정 2026-
   it('세금 안내 문구', () => {
     expect(HQ_OUT_TAX_HINT).toBe('인구과밀지역 대도시 신설 전입으로 중과세금 확인을 하세요.');
   });
+  // 시작 값(일회용 2026-11-07-change-type-member-rule) — NAME · PURPOSE · OFFICER · CEO_ADDR · HQ = R / HQ_OUT = A
+  const rules = parseChangeTypeRules([
+    { code: 'NAME', name: 'R' },
+    { code: 'PURPOSE', name: 'R' },
+    { code: 'OFFICER', name: 'R' },
+    { code: 'CEO_ADDR', name: 'R' },
+    { code: 'HQ', name: 'R' },
+    { code: 'HQ_OUT', name: 'A' },
+  ]);
+  const allowedTypes = (memberType: string | null, r = rules) => CORP_CHANGE_TYPES.filter((t) => changeTypeAllowedFor(t, memberType, r));
+  it('규칙 읽기 — 쉼표로 나누고 공백 · 빈 칸은 버린다', () => {
+    expect(parseChangeTypeRules([{ code: 'HQ', name: ' R , A ,' }, { code: 'NAME', name: '' }])).toEqual({ HQ: ['R', 'A'], NAME: [] });
+    expect(CORP_CHANGE_MEMBER_RULE_CATEGORY).toBe('LAW_CNG_MT');
+  });
+  it('유한회사 → 타관할만 · 주식회사 → 지금 5가지 · 비었으면 주식회사로 본다', () => {
+    expect(allowedTypes('A')).toEqual(['HQ_OUT']);
+    expect(allowedTypes('R')).toEqual(['NAME', 'HQ', 'PURPOSE', 'OFFICER', 'CEO_ADDR']);
+    expect(allowedTypes(null)).toEqual(allowedTypes('R'));
+    expect(allowedTypes('')).toEqual(allowedTypes('R'));
+  });
+  it('이름을 「R,A」로 바꾸면 둘 다 고를 수 있다', () => {
+    const both = parseChangeTypeRules([{ code: 'NAME', name: 'R,A' }, { code: 'HQ_OUT', name: 'A' }]);
+    expect(changeTypeAllowedFor('NAME', 'A', both)).toBe(true);
+    expect(changeTypeAllowedFor('NAME', 'R', both)).toBe(true);
+    expect(changeTypeAllowedFor('NAME', null, both)).toBe(true);
+  });
+  it('줄이 없는 구분은 주식회사만 · 규칙이 비면 모두 주식회사만', () => {
+    expect(changeTypeAllowedFor('PURPOSE', 'R', { HQ_OUT: ['A'] })).toBe(true);
+    expect(changeTypeAllowedFor('PURPOSE', 'A', { HQ_OUT: ['A'] })).toBe(false);
+    expect(allowedTypes('A', {})).toEqual([]);
+    expect(allowedTypes(null, {})).toEqual([...CORP_CHANGE_TYPES]);
+  });
   it.each([
     ['A', 'HQ_OUT', true],
     ['A', 'HQ', false],
@@ -113,24 +147,29 @@ describe('★ 타관할로의 본점이전(HQ_OUT) · 회사 형태(결정 2026-
     [null, 'HQ_OUT', false],
     [null, 'HQ', true],
     ['C', 'HQ_OUT', false],
-    ['A', 'NAME', true],
-    ['A', 'OFFICER', true],
+    ['C', 'NAME', false],
+    ['A', 'NAME', false],
+    ['A', 'OFFICER', false],
     [null, 'CEO_ADDR', true],
-  ])('회사유형 %s · %s → %s (비었으면 주식회사로 본다)', (memberType, changeType, ok) => {
-    expect(changeTypeAllowedFor(changeType, memberType)).toBe(ok);
-    expect(changeTypeMemberTypeError(changeType, memberType) === null).toBe(ok);
+  ])('회사유형 %s · %s → %s', (memberType, changeType, ok) => {
+    expect(changeTypeAllowedFor(changeType, memberType, rules)).toBe(ok);
+    expect(changeTypeMemberTypeError(changeType, memberType, rules) === null).toBe(ok);
   });
   const hqOut = { changeType: 'HQ_OUT', payload: { newHqAddress: { zipCode: '06164', address: '서울 강남구 1' }, resolutionDate: '2026-10-01', relocationDate: '2026-10-02' }, officers: [] };
+  const co = (isTenant: boolean, memberType: string | null) => ({ isTenant, ceoZipCode: null, ceoAddress: null, memberType, changeTypeRules: rules });
   it('작성완료 — 유한회사면 통과, 주식회사 · 비었으면 changeType 자리에 거절', () => {
-    expect(validateCorpChange({ ...hqOut, company: { isTenant: false, ceoZipCode: null, ceoAddress: null, memberType: 'A' } })).toEqual([]);
+    expect(validateCorpChange({ ...hqOut, company: co(false, 'A') })).toEqual([]);
     for (const memberType of ['R', null]) {
-      expect(validateCorpChange({ ...hqOut, company: { isTenant: false, ceoZipCode: null, ceoAddress: null, memberType } }).map((e) => e.field)).toEqual(['changeType']);
+      expect(validateCorpChange({ ...hqOut, company: co(false, memberType) }).map((e) => e.field)).toEqual(['changeType']);
     }
   });
   it('작성완료 — 유한회사의 동일관할(HQ)은 거절, 주식회사는 그대로 통과', () => {
     const hq = { ...hqOut, changeType: 'HQ' };
-    expect(validateCorpChange({ ...hq, company: { isTenant: true, ceoZipCode: null, ceoAddress: null, memberType: 'A' } }).map((e) => e.field)).toEqual(['changeType']);
-    expect(validateCorpChange({ ...hq, company: { isTenant: true, ceoZipCode: null, ceoAddress: null, memberType: 'R' } })).toEqual([]);
+    expect(validateCorpChange({ ...hq, company: co(true, 'A') }).map((e) => e.field)).toEqual(['changeType']);
+    expect(validateCorpChange({ ...hq, company: co(true, 'R') })).toEqual([]);
+  });
+  it('작성완료 — 규칙이 실려 오지 않으면 줄이 없는 것과 같다(주식회사만)', () => {
+    expect(validateCorpChange({ ...hqOut, company: { isTenant: false, ceoZipCode: null, ceoAddress: null, memberType: 'A' } }).map((e) => e.field)).toEqual(['changeType']);
   });
 });
 

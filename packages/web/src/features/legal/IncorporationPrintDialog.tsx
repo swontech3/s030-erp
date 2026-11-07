@@ -14,7 +14,7 @@
  *    날짜를 바꾸면 서버에 다시 묻는다 — 날짜 글자 모양도 서버 한 곳에서 만든다.
  * ★★ 응답에 주민번호 평문이 있다(Q4). 이 화면은 값을 **어디에도 남기지 않는다** — 상태로만 들고,
  *    대화상자를 닫으면 사라진다(인쇄용 포털도 함께 내려간다). 저장소 · 콘솔에 쓰지 않는다.
- * ★ 「기본 양식입니다 …」 안내는 대화상자에만 있다 — 종이(포털)에는 나가지 않는다(사용자 지시 2026-10-11).
+ * ★ 「기본 양식입니다 …」 안내는 지웠다(사용자 지시 2026-11-07).
  * ★ [인쇄] 를 누르면 출력 이력(043)을 한 줄 남긴다 — 양식 id 와 장 번호만 보낸다(이름은 서버가 찾는다).
  *   **결과를 기다리지 않는다** — 기록이 실패해도 인쇄는 한다(결정 2026-10-11, 실패는 서버 로그).
  */
@@ -24,7 +24,6 @@ import type { FormDefinition } from '@swonbiz/shared/domain/form-template';
 import { Icon } from '@/components/ds';
 import { FormDocument } from '@/features/forms/FormDocument';
 import { FormPrintPortal, printFormDocument } from '@/features/forms/FormPrintPortal';
-import { PRINT_NOTICE } from './CorpChangePrintDialog';
 import styles from './corp-change-detail.module.css';
 
 type PrintData = IncorporationPrintResponse<FormDefinition>;
@@ -139,12 +138,6 @@ export function IncorporationPrintDialog({ id, onClose }: { id: string; onClose:
               닫기
             </button>
           </div>
-        </div>
-
-        {/* ★ 화면 안내 — 대화상자에만 있다. 종이(포털)에는 나가지 않는다. */}
-        <div className={`${styles.banner} ${styles.bannerInfo}`} role="note">
-          <Icon name="info" size={16} />
-          <span>{PRINT_NOTICE}</span>
         </div>
 
         <div className={styles.printBody}>

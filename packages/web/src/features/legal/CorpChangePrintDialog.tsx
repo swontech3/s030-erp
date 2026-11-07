@@ -15,7 +15,7 @@
  *      같은 이름은 서류끼리 같이 쓴다.
  * ★★ 응답에 주민번호 평문이 있다(Q4). 이 화면은 값을 **어디에도 남기지 않는다** — 상태로만 들고,
  *    대화상자를 닫으면 사라진다(인쇄용 포털도 함께 내려간다). 저장소 · 콘솔에 쓰지 않는다.
- * ★ 「기본 양식입니다 …」 안내는 대화상자에만 있다 — 종이(포털)에는 나가지 않는다(사용자 지시 2026-10-11).
+ * ★ 「기본 양식입니다 …」 안내는 지웠다(사용자 지시 2026-11-07). 정관 변경 건 안내는 대화상자에만 있다 — 종이(포털)에는 나가지 않는다.
  * ★ [인쇄] 를 누르면 출력 이력(040)을 한 줄 남긴다 — 양식 id 와 장 번호만 보낸다(이름은 서버가 찾는다).
  *   **결과를 기다리지 않는다** — 기록이 실패해도 인쇄는 한다(결정 2026-10-11, 실패는 서버 로그).
  */
@@ -47,9 +47,6 @@ const LABELS: Readonly<Record<string, string>> = Object.fromEntries(CORP_CHANGE_
  * 흐린 이름표를 보이지 않는다. 다른 칸은 흐린 이름표 그대로다. 종이는 원래 빈칸이다.
  */
 const BLANK_WHEN_EMPTY: readonly string[] = ['officerAddress'];
-
-/** 화면 안내 — 종이에는 나가지 않는다. */
-export const PRINT_NOTICE = '기본 양식입니다. 제출 전 등기소 또는 법무사에게 확인하세요.';
 
 /** 출력 이력 한 줄 — 기다리지 않는다. 실패도 화면에 알리지 않는다(서버 로그에 남는다). */
 function recordPrint(id: string, body: { formId: string; sheet: number; applyDate: string; writeDate: string }) {
@@ -177,10 +174,6 @@ export function CorpChangePrintDialog({
             <span>{articlesNotice}</span>
           </div>
         ) : null}
-        <div className={`${styles.banner} ${styles.bannerInfo}`} role="note">
-          <Icon name="info" size={16} />
-          <span>{PRINT_NOTICE}</span>
-        </div>
 
         {manualFields.length > 0 ? (
           <div className={styles.printManual} aria-label="출력 때 입력">

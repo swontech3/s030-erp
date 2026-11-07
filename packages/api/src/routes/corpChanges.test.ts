@@ -232,7 +232,12 @@ function fakeDb(
     query: async (sql: string, params?: unknown[]) => {
       seen.push({ sql, params: params ?? [] });
       const hit = answers.find((a) => a.match.test(sql));
-      return { rows: hit ? hit.rows : [], rowCount: hit ? hit.rows.length : 0 };
+      // 코드 읽기(`listCodes`)는 분류로 거른다 — 구분별 회사유형 규칙(LAW_CNG_MT)이 회사유형 줄과 섞이지 않게(결정 2026-11-07)
+      const rows =
+        hit && /FROM public.tb_s080_codes_line/.test(sql) && Array.isArray(params?.[0])
+          ? hit.rows.filter((r) => !(r as { category?: string }).category || (params[0] as string[]).includes((r as { category: string }).category))
+          : (hit?.rows ?? []);
+      return { rows, rowCount: rows.length };
     },
   };
   const deps: CorpChangeDeps = {
@@ -1071,7 +1076,7 @@ describe('POST /legal/corp-changes/:id/transition — 상태 전이', () => {
             biz_number: '123-45-67890',
             ceo_name: '홍대표',
             tel: '02-000-0000',
-            member_type: 'A',
+            member_type: 'R',
             head_zip_code: '06000',
             head_address: '서울 강남구',
             head_address_detail: null,
@@ -1100,7 +1105,7 @@ describe('POST /legal/corp-changes/:id/transition — 상태 전이', () => {
         bizNumber: '123-45-67890',
         ceoName: '홍대표',
         tel: '02-000-0000',
-        memberType: 'A',
+        memberType: 'R',
         head: { zipCode: '06000', address: '서울 강남구', addressDetail: null },
         ceoHome: { zipCode: '04000', address: '서울 마포구', addressDetail: '101호' },
       });
@@ -1666,6 +1671,10 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
   });
   const INS_CHANGE = /INSERT INTO public\.tb_s080_corp_changes/;
   const HQ_PAYLOAD = { newHqAddress: { zipCode: '13500', address: '경기 성남시 1' }, resolutionDate: '2026-10-01', relocationDate: '2026-10-02' };
+  // 구분별 회사유형 규칙(공통 코드 LAW_CNG_MT, 결정 2026-11-07) — 일회용의 시작 값
+  const RULE = (code: string, name: string) => ({ category: 'LAW_CNG_MT', code, name });
+  const START_RULES = [RULE('NAME', 'R'), RULE('PURPOSE', 'R'), RULE('OFFICER', 'R'), RULE('CEO_ADDR', 'R'), RULE('HQ', 'R'), RULE('HQ_OUT', 'A')];
+  const CODES = (more: object[] = [], rules = START_RULES) => ({ match: /FROM public.tb_s080_codes_line/, rows: [...rules, ...more] });
 
   it('GET /company-type — 비입주사는 법무 회사 정보, 입주사는 ERP 회원구분 · 없으면 null', async () => {
     for (const [answers, want] of [
@@ -1673,7 +1682,7 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
       [[TENANT('R')], 'R'],
       [[], null],
     ] as const) {
-      const db = fakeDb([...answers]);
+      const db = fakeDb([...answers, CODES()]);
       const a = await build(session('operator', 1), db.deps);
       const res = await a.inject({ method: 'GET', url: '/legal/corp-changes/company-type?orgId=9003&orgCode=Z99' });
       expect(res.statusCode).toBe(200);
@@ -1685,7 +1694,7 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
   });
 
   it('★★ GET /company-type — 회사 세션이 남의 단체를 적으면 403 · 안 적으면 자기 단체', async () => {
-    const db = fakeDb([LEGAL_ORG('A')]);
+    const db = fakeDb([LEGAL_ORG('A'), CODES()]);
     const a = await build(session('tenant', 9003), db.deps);
     expect((await a.inject({ method: 'GET', url: '/legal/corp-changes/company-type?orgId=9001' })).statusCode).toBe(403);
     expect(db.runs()).toBe(0);
@@ -1695,7 +1704,8 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
   });
 
   it('GET /company-type — 입주사 여부 · 회사 정보 수정 가능 · 선택지(결정 2026-11-07)', async () => {
-    const codes = { match: /FROM public.tb_s080_codes_line/, rows: [{ category: 'MEMBER_TYPE', code: 'R', name: '주식회사' }, { category: 'MEMBER_TYPE', code: 'A', name: '유한회사' }] };
+    const codes = CODES([{ category: 'MEMBER_TYPE', code: 'R', name: '주식회사' }, { category: 'MEMBER_TYPE', code: 'A', name: '유한회사' }]);
+    const changeTypeRules = { NAME: ['R'], PURPOSE: ['R'], OFFICER: ['R'], CEO_ADDR: ['R'], HQ: ['R'], HQ_OUT: ['A'] };
     const ask = async (s: ReturnType<typeof session>, answers: unknown[]) => {
       const db = fakeDb(answers as never);
       const a = await build(s, db.deps);
@@ -1710,11 +1720,12 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
       isTenant: false,
       canEditCompany: true,
       memberTypes: [{ code: 'R', name: '주식회사' }, { code: 'A', name: '유한회사' }],
+      changeTypeRules,
     });
     // 회사 세션 · 수정 권한 없음 → 고칠 수 없다
     expect((await ask(session('tenant', 9003), [LEGAL_ORG(null), codes])).canEditCompany).toBe(false);
     // 입주사 → 고칠 수 없고 선택지도 없다
-    expect(await ask(session('operator', 1), [TENANT(null), codes])).toEqual({ memberType: null, isTenant: true, canEditCompany: false, memberTypes: [] });
+    expect(await ask(session('operator', 1), [TENANT(null), codes])).toEqual({ memberType: null, isTenant: true, canEditCompany: false, memberTypes: [], changeTypeRules });
   });
 
   it.each([
@@ -1725,7 +1736,7 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
     ['HQ', 'R', 201],
     ['HQ', null, 201],
   ])('★ 첫 저장 — %s · 저장된 회사유형 %s → %i (거절이면 건을 만들지 않는다)', async (changeType, memberType, status) => {
-    const db = fakeDb([LEGAL_ORG(memberType)]);
+    const db = fakeDb([LEGAL_ORG(memberType), CODES()]);
     const a = await build(session('operator', 1), db.deps);
     const res = await a.inject({ method: 'POST', url: '/legal/corp-changes', payload: { changeType, orgId: 9003, orgCode: 'Z99', payload: HQ_PAYLOAD } });
     expect(res.statusCode).toBe(status);
@@ -1734,8 +1745,7 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
   });
 
   it('첫 저장 — 회사 정보가 함께 실리면 그 회사유형으로 본다', async () => {
-    const codes = { match: /FROM public.tb_s080_codes_line/, rows: [{ category: 'MEMBER_TYPE', code: 'A', name: '유한회사' }] };
-    const db = fakeDb([LEGAL_ORG(null), codes]);
+    const db = fakeDb([LEGAL_ORG(null), CODES([{ category: 'MEMBER_TYPE', code: 'A', name: '유한회사' }])]);
     const a = await build(session('operator', 1), db.deps);
     const company = { legalName: '유한회사 에이', memberType: 'A' };
     const res = await a.inject({ method: 'POST', url: '/legal/corp-changes', payload: { changeType: 'HQ_OUT', orgId: 9003, orgCode: 'Z99', payload: HQ_PAYLOAD, company } });
@@ -1747,7 +1757,7 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
   });
 
   it('★ [저장] — 유한회사로 저장된 회사의 동일관할(HQ) 건은 400 · 변경 내용을 쓰지 않는다', async () => {
-    const db = fakeDb([CHANGE_ROW({ change_type: 'HQ' }), LEGAL_ORG('A')]);
+    const db = fakeDb([CHANGE_ROW({ change_type: 'HQ' }), LEGAL_ORG('A'), CODES()]);
     const a = await build(session('operator', 1), db.deps);
     const res = await a.inject({ method: 'PATCH', url: '/legal/corp-changes/cc-1', payload: { payload: HQ_PAYLOAD } });
     expect(res.statusCode).toBe(400);
@@ -1757,7 +1767,7 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
   it('★ 작성완료(P→E) — 주식회사 건의 타관할(HQ_OUT)은 400 · 유한회사는 통과 · 완료(E→C)는 막지 않는다', async () => {
     const STATUS_UPDATE = { match: /UPDATE public\.tb_s080_corp_changes SET status/, rows: [{}] };
     const press = async (status: string, to: string, memberType: string) => {
-      const db = fakeDb([CHANGE_ROW({ change_type: 'HQ_OUT', status, payload: HQ_PAYLOAD }), STATUS_UPDATE, LEGAL_ORG(memberType)]);
+      const db = fakeDb([CHANGE_ROW({ change_type: 'HQ_OUT', status, payload: HQ_PAYLOAD }), STATUS_UPDATE, LEGAL_ORG(memberType), CODES()]);
       const a = await build(session('operator', 1), db.deps);
       const res = await a.inject({ method: 'POST', url: '/legal/corp-changes/cc-1/transition', payload: { from: status, to } });
       await a.close();
@@ -1769,5 +1779,22 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
     expect(bad.json().errors.map((e: { field: string }) => e.field)).toEqual(['changeType']);
     expect((await press('P', 'E', 'A')).statusCode).toBe(200);
     expect((await press('E', 'C', 'R')).statusCode).toBe(200);
+  });
+
+  it('규칙 이름을 「R,A」로 바꾸면 유한회사도 고를 수 있다 · 줄이 없는 구분은 주식회사만(결정 2026-11-07)', async () => {
+    const save = async (changeType: string, memberType: string, rules: object[]) => {
+      const db = fakeDb([LEGAL_ORG(memberType), CODES([], rules as never)]);
+      const a = await build(session('operator', 1), db.deps);
+      const res = await a.inject({ method: 'POST', url: '/legal/corp-changes', payload: { changeType, orgId: 9003, orgCode: 'Z99', payload: HQ_PAYLOAD } });
+      await a.close();
+      app = null;
+      return res.statusCode;
+    };
+    expect(await save('HQ', 'A', START_RULES)).toBe(400);
+    expect(await save('HQ', 'A', [RULE('HQ', 'R,A'), RULE('HQ_OUT', 'A')])).toBe(201);
+    expect(await save('HQ', 'R', [RULE('HQ', 'R,A'), RULE('HQ_OUT', 'A')])).toBe(201);
+    // 줄이 하나도 없으면 — 타관할은 아무도 못 고르고, 그 밖은 주식회사만
+    expect(await save('HQ_OUT', 'A', [])).toBe(400);
+    expect(await save('HQ', 'R', [])).toBe(201);
   });
 });

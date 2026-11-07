@@ -37,6 +37,7 @@ import {
   isOfficerChangeKind,
   isRrnShape,
   validateRrn,
+  type ChangeTypeRules,
   type CorpChangeFieldError,
   type CorpChangeStatus,
   type CorpChangeType,
@@ -620,6 +621,8 @@ export interface CorpChangeCompanyTypeResponse {
   canEditCompany: boolean;
   /** 고를 수 있는 회사유형(공통 코드 MEMBER_TYPE 법무 파티션). 입주사는 빈 목록. */
   memberTypes: CodeOption[];
+  /** 구분별 회사유형 규칙(공통 코드 `LAW_CNG_MT`, 결정 2026-11-07) — 대화상자가 `changeTypeAllowedFor` 로 거른다. */
+  changeTypeRules: ChangeTypeRules;
 }
 
 /**
