@@ -5,7 +5,7 @@
  * ★ 엑셀 검사(형식 · 양식 · 매입/매출 · 줄 거르기)는 **서버가 한다**(shared `tax-uploads.ts`). 화면은 결과만 그린다.
  * ★ 엑셀은 바이트 그대로 보낸다 — 본문 형식은 확장자로 정하고(xls · xlsx · 4대보험만 csv), 원래 이름은 `X-File-Name`(URI 인코딩).
  */
-import { tabOfFileKind } from '@swonbiz/shared/domain/tax-payments';
+import { paymentsRouteOfFileKind } from '@swonbiz/shared/domain/tax-payments';
 import type {
   TaxUploadDeleteResult,
   TaxUploadPreview,
@@ -44,13 +44,14 @@ export interface BankChoice {
 export const VIEWABLE_KINDS: readonly string[] = [KIND_INVOICE, 'CARD', KIND_CASH];
 
 /**
- * [보기]가 갈 주소 — 계산서 · 카드 · 현금은 항목 지정 「이번 달 자료 전체」, 국세 · 지방세 · 4대보험 · 대출은
- * 세금 · 4대보험 · 대출(1-7 — 탭은 서버가 파일 종류로 정한다). ★ 은행은 받을 화면(은행 짝 맞추기)이 없어 null(막는다).
+ * [보기]가 갈 주소 — 계산서 · 카드 · 현금은 항목 지정, 국세 · 지방세는 세금 납부 · 4대보험은 4대보험 · 대출은 대출내역
+ * (2026-11-08 메뉴 셋으로 나눔 — shared `paymentsRouteOfFileKind`). ★ 은행은 받을 화면(은행 짝 맞추기)이 없어 null(막는다).
  */
 export function viewHrefOf(kind: string, month: string, fileId: string): string | null {
   const file = encodeURIComponent(fileId);
   if (VIEWABLE_KINDS.includes(kind)) return `/tax/classify?month=${month}&view=all&file=${file}`;
-  if (tabOfFileKind(kind)) return `/tax/payments?month=${month}&file=${file}`;
+  const route = paymentsRouteOfFileKind(kind);
+  if (route) return `${route}?month=${month}&file=${file}`;
   return null;
 }
 

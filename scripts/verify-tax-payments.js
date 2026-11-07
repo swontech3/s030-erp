@@ -1,5 +1,5 @@
 /**
- * 세무 세금 · 4대보험 · 대출(s050300040) 검증 — **앱이 실제 DB 에서** 하는 일만 잰다(1-7, 2026-11-02).
+ * 세무 세금 납부 · 4대보험 · 대출내역(s050300040 · 050 · 060 — 2026-11-08 메뉴 셋으로 나눔, P17~P19) 검증 — **앱이 실제 DB 에서** 하는 일만 잰다(1-7, 2026-11-02).
  *
  * 사용: npm run verify:tax-payments   (= npx tsx scripts/verify-tax-payments.js)
  *
@@ -122,6 +122,24 @@ async function main() {
         o.ok && ids(o.data.loans) === 'vpay-o2,vpay-o1' && sum.length === 1 && sum[0].draw === 10000000 && sum[0].repay === 1000000 &&
         sum[0].interest === 40000 && sum[0].fee === 5000 && !('balance' in sum[0]) && o.data.codes.banks.some((b) => b.code === '020'),
         { rows: o.ok ? ids(o.data.loans) : o, sum });
+
+      // ── ⑥ 메뉴 셋(2026-11-08) — 세금 전체 · 보험 거르기 ──
+      const pa = await listPaymentsOp(c, ORG_A, query({ tab: 'PAY' }));
+      check('P17', '★ 세금 전체(PAY) — 그 달 국세 · 지방세 한 목록 · 납부일 최신순(같은 날은 국세 먼저) · 줄마다 구분(kind) · 선택지 코드 TAX_PAY_SRC 국세 · 지방세',
+        pa.ok && ids(pa.data.pays) === 'vpay-n2,vpay-n1,vpay-l1' && pa.data.pays.map((r) => r.kind).join() === 'NTAX,NTAX,LTAX' &&
+        pa.data.codes.paySrcs.map((x) => `${x.code}=${x.name}`).join() === 'NTAX=국세,LTAX=지방세',
+        pa.ok ? { pays: ids(pa.data.pays), srcs: pa.data.codes.paySrcs } : pa);
+      const hi = await listPaymentsOp(c, ORG_A, query({ tab: 'SOCIAL', ins: 'HI' }));
+      const np = await listPaymentsOp(c, ORG_A, query({ tab: 'SOCIAL', ins: 'NP' }));
+      check('P18', '★ 4대보험 보험 거르기 — 건강보험은 장기요양까지(셋) · 국민연금은 9월 고지 없음(0줄)',
+        hi.ok && ids(hi.data.social) === 'vpay-s1,vpay-s3,vpay-s2' && np.ok && np.data.social.length === 0,
+        { hi: hi.ok ? ids(hi.data.social) : hi, np: np.ok ? np.data.social.length : np });
+      const xp = await exportPaymentsOp(c, ORG_A, query({ tab: 'PAY' }));
+      const xpw = xp.ok ? XLSX.read(xp.data.bytes, { type: 'array' }) : null;
+      const rowsOf = (nm) => (xpw ? XLSX.utils.sheet_to_json(xpw.Sheets[nm], { header: 1 }).length : -1);
+      check('P19', '엑셀 세금 전체 — 이름 세금납부_2026-09.xlsx · 시트 국세(제목 + 2) · 지방세(제목 + 1)',
+        xp.ok && xp.data.fileName === '세금납부_2026-09.xlsx' && JSON.stringify(xpw.SheetNames) === JSON.stringify(['국세', '지방세']) &&
+        rowsOf('국세') === 3 && rowsOf('지방세') === 2, xp.ok ? { name: xp.data.fileName, sheets: xpw.SheetNames } : xp);
 
       // ── 파일로 들어오기 ──
       const f = await listPaymentsOp(c, ORG_A, query({ tab: 'NTAX', fileId: 'vpay-fo' }));

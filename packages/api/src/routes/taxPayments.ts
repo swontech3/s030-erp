@@ -7,6 +7,8 @@
  * ★★★ 운영사 세션도 **자기 단체만** — `org_id = 세션 단체 ID` 를 직접 건다(`db/taxPayments.ts`). 역할로 403 을 내지 않는다.
  * ★ 남의 단체 · 없는 파일 · 이 화면 자료가 아닌 파일은 404(셋을 가르지 않는다).
  * ★ 자료 올리기 [보기]로 오면(`file`) 탭은 파일의 자료 종류로 정한다(`tabOfFileKind`).
+ * ★ 2026-11-08 대표 수정 ⑥ — 메뉴 셋(세금 납부 · 4대보험 · 대출내역)이 이 API 하나를 함께 쓴다. tab=PAY 는 국세 + 지방세 한 목록
+ *   (줄마다 kind), ins 는 4대보험 보험 거르기(건강보험은 장기요양 포함 — shared `filterSocialIns`). 시트 함수는 그대로.
  * ★ 국세 · 지방세 비용 여부는 저장하지 않는다 — 코드 「비용이 아닌 세목」(TAX_TAX_NOEXP) 이름과 견준다(`isExpenseTaxItem`).
  *   「처음 보는 세목」은 이 화면에서 보이지 않는다(1-7 결정 ③).
  */
@@ -23,6 +25,9 @@ import {
 import {
   PAYMENT_TABS,
   PAYMENT_TAB_LABELS,
+  PAY_ALL,
+  TAX_PAY_SRC_CATEGORY,
+  filterSocialIns,
   parsePaymentsQuery,
   paymentsExportFileName,
   paymentsRange,
@@ -65,16 +70,22 @@ export async function listPaymentsOp(client: ScopedClient, orgId: number, query:
     counts[t] = await countPayments(client, orgId, t, { range: paymentsRange({ ...q, tab: t }), fileId: q.fileId });
   }
 
-  const names = await loadCodeNames(client, [TAX_TAX_NOEXP_CATEGORY, TAX_SOCIAL_INS_CATEGORY, TAX_LOAN_TP_CATEGORY, BANK_CATEGORY]);
+  const names = await loadCodeNames(client, [TAX_TAX_NOEXP_CATEGORY, TAX_SOCIAL_INS_CATEGORY, TAX_LOAN_TP_CATEGORY, BANK_CATEGORY, TAX_PAY_SRC_CATEGORY]);
   const filter = { range: paymentsRange(q), fileId: q.fileId };
   let pays: TaxPaymentRow[] = [];
   let social: SocialInsRow[] = [];
   let loans: LoanTxnRow[] = [];
-  if (q.tab === 'NTAX' || q.tab === 'LTAX') {
+  if (q.tab === 'NTAX' || q.tab === 'LTAX' || q.tab === PAY_ALL) {
     const noExp = (names.get(TAX_TAX_NOEXP_CATEGORY) ?? []).map((c) => c.name);
-    pays = (await listPayments(client, orgId, q.tab, filter)).map((r) => ({ ...r, expense: isExpenseTaxItem(r.taxItem, noExp) }));
+    const kinds = q.tab === PAY_ALL ? (['NTAX', 'LTAX'] as const) : [q.tab];
+    for (const kind of kinds) {
+      const got = await listPayments(client, orgId, kind, filter);
+      pays.push(...got.map((r) => ({ ...r, kind, expense: isExpenseTaxItem(r.taxItem, noExp) })));
+    }
+    // 세금 전체 — 납부일 최신순(같은 날은 국세 · 지방세 순, 각 표 안의 순서 그대로 — 안정 정렬)
+    if (q.tab === PAY_ALL) pays = pays.sort((a, b) => b.payDate.localeCompare(a.payDate));
   } else if (q.tab === 'SOCIAL') {
-    social = await listSocialIns(client, orgId, filter);
+    social = filterSocialIns(await listSocialIns(client, orgId, filter), q.ins);
   } else {
     loans = await listLoanTxns(client, orgId, filter);
   }
@@ -89,6 +100,7 @@ export async function listPaymentsOp(client: ScopedClient, orgId: number, query:
       loans,
       file,
       codes: {
+        paySrcs: names.get(TAX_PAY_SRC_CATEGORY) ?? [],
         socialIns: names.get(TAX_SOCIAL_INS_CATEGORY) ?? [],
         loanTps: names.get(TAX_LOAN_TP_CATEGORY) ?? [],
         banks: names.get(BANK_CATEGORY) ?? [],
@@ -189,7 +201,21 @@ export function loanExportSheet(
   };
 }
 
-/** 엑셀 — 지금 탭 거르기 결과(화면과 같은 줄). 4대보험은 사람별 + 보험 종류별 합계 두 시트. */
+/**
+ * 엑셀 시트 — 걸린 조건 결과(화면과 같은 줄). 세금 전체는 국세 · 지방세 두 시트(지금 시트 칸 그대로, 2026-11-08),
+ * 4대보험은 사람별 + 보험 종류별 합계 두 시트, 대출은 하나.
+ */
+export function paymentsSheets(data: TaxPaymentsResponse): XlsxSheet<any>[] {
+  const { query: q, codes } = data;
+  if (q.tab === PAY_ALL) {
+    return (['NTAX', 'LTAX'] as const).map((k) => payExportSheet(k, data.pays.filter((r) => r.kind === k)));
+  }
+  if (q.tab === 'NTAX' || q.tab === 'LTAX') return [payExportSheet(q.tab, data.pays)];
+  if (q.tab === 'SOCIAL') return [socialExportSheet(data.social, codes.socialIns), socialTotalsSheet(data.social, codes.socialIns)];
+  return [loanExportSheet(data.loans, codes.banks, codes.loanTps)];
+}
+
+/** 엑셀 — 지금 걸린 조건 결과. */
 export async function exportPaymentsOp(
   client: ScopedClient,
   orgId: number,
@@ -197,12 +223,7 @@ export async function exportPaymentsOp(
 ): Promise<TaxOp<{ fileName: string; bytes: Uint8Array }>> {
   const r = await listPaymentsOp(client, orgId, query);
   if (!r.ok) return r;
-  const { query: q, codes } = r.data;
-  let sheets: XlsxSheet<any>[];
-  if (q.tab === 'NTAX' || q.tab === 'LTAX') sheets = [payExportSheet(q.tab, r.data.pays)];
-  else if (q.tab === 'SOCIAL') sheets = [socialExportSheet(r.data.social, codes.socialIns), socialTotalsSheet(r.data.social, codes.socialIns)];
-  else sheets = [loanExportSheet(r.data.loans, codes.banks, codes.loanTps)];
-  return { ok: true, data: { fileName: paymentsExportFileName(q), bytes: buildXlsx(sheets) } };
+  return { ok: true, data: { fileName: paymentsExportFileName(r.data.query), bytes: buildXlsx(paymentsSheets(r.data)) } };
 }
 
 /* ── 라우트 ──────────────────────────────────────────────────────────────── */

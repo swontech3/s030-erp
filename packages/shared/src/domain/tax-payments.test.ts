@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { PINNED_CODES } from './code-usage.ts';
 import {
+  PAY_SRCS,
   PAYMENT_TABS,
+  TAX_PAY_SRC_CATEGORY,
+  filterSocialIns,
+  paymentsRouteOfFileKind,
   PAYMENT_TAB_LABELS,
   loanSummary,
   parsePaymentsQuery,
@@ -139,5 +144,49 @@ describe('loanSummary — 대출(은행 · 끝 4자리)별 요약(결정 ⑤ · 
       { bankCode: '004', loanLast4: '9999', count: 1, draw: 0, repay: 0, interest: -10, fee: 0 },
       { bankCode: '020', loanLast4: '1234', count: 3, draw: 10000, repay: 2000, interest: 230, fee: 55 },
     ]);
+  });
+});
+
+describe('⑥ 메뉴 셋(2026-11-08) — 세금 납부 · 4대보험 · 대출내역', () => {
+  it('세금 전체(PAY) — 국세 · 지방세를 한 목록으로. 주소 tab=PAY, 엑셀 이름 「세금납부_」', () => {
+    expect(parsePaymentsQuery({ month: '2026-09', tab: 'PAY' })).toEqual({ ok: true, value: { ...Q, tab: 'PAY' } });
+    expect(paymentsRange({ ...Q, tab: 'PAY' })).toEqual(['2026-09-01', '2026-10-01']);
+    expect(paymentsExportFileName({ ...Q, tab: 'PAY' })).toBe('세금납부_2026-09.xlsx');
+    expect(paymentsSearch({ ...Q, tab: 'PAY' })).toBe('?month=2026-09&tab=PAY');
+  });
+
+  it('세금 납부 구분 코드(TAX_PAY_SRC) 값 = 국세 · 지방세 자료 종류 코드값', () => {
+    expect(TAX_PAY_SRC_CATEGORY).toBe('TAX_PAY_SRC');
+    expect(PAY_SRCS).toEqual(['NTAX', 'LTAX']);
+  });
+
+  it('4대보험 보험 거르기 ins — 국민연금 · 건강보험 · 고용보험 · 산재보험만(장기요양은 따로 없다), 주소에 싣는다', () => {
+    expect(parsePaymentsQuery({ month: '2026-09', tab: 'SOCIAL', ins: 'HI' })).toEqual({ ok: true, value: { ...Q, tab: 'SOCIAL', ins: 'HI' } });
+    const bad = parsePaymentsQuery({ month: '2026-09', tab: 'SOCIAL', ins: 'LTC' });
+    expect(bad.ok ? [] : bad.errors.map((e) => e.field)).toEqual(['ins']);
+    expect(paymentsSearch({ ...Q, tab: 'SOCIAL', ins: 'EI' })).toBe('?month=2026-09&tab=SOCIAL&ins=EI');
+    const q: PaymentsQuery = { ...Q, tab: 'SOCIAL', ins: 'NP' };
+    expect(parsePaymentsQuery(Object.fromEntries(new URLSearchParams(paymentsSearch(q))))).toEqual({ ok: true, value: q });
+  });
+
+  it('★ 건강보험을 고르면 장기요양까지 · 다른 보험은 그 보험만 · 없으면 전부', () => {
+    const rows = [{ insTp: 'NP' }, { insTp: 'HI' }, { insTp: 'LTC' }, { insTp: 'EI' }, { insTp: 'IA' }];
+    expect(filterSocialIns(rows, 'HI').map((r) => r.insTp)).toEqual(['HI', 'LTC']);
+    expect(filterSocialIns(rows, 'EI').map((r) => r.insTp)).toEqual(['EI']);
+    expect(filterSocialIns(rows, null)).toHaveLength(5);
+  });
+
+  it('자료 올리기 [보기] — 파일 종류에 맞는 메뉴(국세 · 지방세 → 세금 납부, 4대보험 → 4대보험, 대출 → 대출내역)', () => {
+    expect(paymentsRouteOfFileKind('NTAX')).toBe('/tax/payments');
+    expect(paymentsRouteOfFileKind('LTAX')).toBe('/tax/payments');
+    expect(paymentsRouteOfFileKind('SOCIAL')).toBe('/tax/social');
+    expect(paymentsRouteOfFileKind('LOAN')).toBe('/tax/loans');
+    expect(paymentsRouteOfFileKind('CARD')).toBeNull();
+  });
+});
+
+describe('★ 고정 코드(code-usage PINNED_CODES) — 세금 납부 구분(223)', () => {
+  it('TAX_PAY_SRC 000 = NTAX · LTAX', () => {
+    expect(PINNED_CODES.find((p) => p.category === TAX_PAY_SRC_CATEGORY && p.useTp === '000')?.codes).toEqual(PAY_SRCS);
   });
 });

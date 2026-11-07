@@ -449,6 +449,14 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     source: 'packages/shared/src/domain/tax-classify.ts (CLASSIFY_KINDS)',
     label: '세무 항목 지정 출처',
   },
+  /** 세금 납부 검색조건 「세금 전체 / 국세 / 지방세」 — 코드값이 자료 종류(주소 tab)와 같아야 거른다. 담는 칸은 없다. 2026-11-08 추가(223). */
+  {
+    category: 'TAX_PAY_SRC',
+    useTp: '000',
+    codes: ['NTAX', 'LTAX'],
+    source: 'packages/shared/src/domain/tax-payments.ts (PAY_SRCS)',
+    label: '세무 세금 납부 구분',
+  },
 ] as const;
 
 /**

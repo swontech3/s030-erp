@@ -45,7 +45,7 @@ const row = (over: Partial<TaxClassifyRow>): TaxClassifyRow => ({
   cardAlias: null, vatDeduct: null, payMethod: null, proof: null, fileId: 'f', itemCode: null, suggestedItemCode: null, ...over,
 });
 const pay = (id: string): TaxPaymentRow => ({
-  id, payDate: '2026-07-10', taxItem: '부가가치세', expense: false, amount: 5000, penalty: 0, belongMonth: null, office: '세무서',
+  id, kind: 'NTAX', payDate: '2026-07-10', taxItem: '부가가치세', expense: false, amount: 5000, penalty: 0, belongMonth: null, office: '세무서',
   payMethod: null, payNo: id,
 });
 const loan: LoanTxnRow = {

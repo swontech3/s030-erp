@@ -12,8 +12,12 @@
  *   ⑥ 4대보험은 고지 연월로 거른다
  * ★ 자료 올리기 [보기]는 `?month=&file=` 로 온다 — 탭은 서버가 파일의 자료 종류로 정한다(`tabOfFileKind`).
  * ★ 주소 검사 · 기간 · 파일 이름 · 합계는 여기 한 곳 — 화면 목록 · 엑셀 · 검증이 같은 것을 쓴다.
+ * ★ 2026-11-08 대표 수정 ⑥: 탭을 없애고 메뉴 셋으로 나눴다 — 세금 납부(s050300040 · /tax/payments) · 4대보험(s050300050 · /tax/social) ·
+ *   대출내역(s050300060 · /tax/loans). 서버 계산 · 엑셀 시트 함수는 그대로 — 주소 tab 에 「세금 전체」(PAY = 국세 + 지방세)를 더하고,
+ *   4대보험에 보험 거르기(ins — 건강보험은 장기요양 포함)를 더했다. 기간 직접 지정은 화면에서 없앴다(from · to 는 세무사 전달 서류가 쓴다).
+ *   결정 ② 의 안내 한 줄(회사 · 직원 부담)은 지웠다.
  */
-import { TAX_KIND_LOAN, TAX_KIND_LTAX, TAX_KIND_NTAX, TAX_KIND_SOCIAL } from './tax-pay-social-loan.ts';
+import { TAX_KIND_LOAN, TAX_KIND_LTAX, TAX_KIND_NTAX, TAX_KIND_SOCIAL, TAX_SOCIAL_FILE_TPS } from './tax-pay-social-loan.ts';
 import { parseMonth, type TaxCodeName, type TaxFieldError } from './tax-uploads.ts';
 
 export const PAYMENT_TABS = [TAX_KIND_NTAX, TAX_KIND_LTAX, TAX_KIND_SOCIAL, TAX_KIND_LOAN] as const;
@@ -28,12 +32,45 @@ export const PAYMENT_TAB_LABELS: Readonly<Record<PaymentTab, string>> = {
 };
 
 /** 엑셀 파일 이름 앞 글자(결정 ④). */
-const FILE_PREFIX: Readonly<Record<PaymentTab, string>> = {
+const FILE_PREFIX: Readonly<Record<PaymentView, string>> = {
+  PAY: '세금납부',
   NTAX: '국세납부',
   LTAX: '지방세납부',
   SOCIAL: '4대보험',
   LOAN: '대출',
 };
+
+/** 세금 전체 — 국세 + 지방세 한 목록(세금 납부 화면, 2026-11-08). */
+export const PAY_ALL = 'PAY';
+/** 주소 tab — 자료 종류 넷(세무사 전달이 하나씩 부른다) + 세금 전체. */
+export type PaymentView = PaymentTab | typeof PAY_ALL;
+
+/**
+ * 세금 납부 검색조건 「세금 전체 / 국세 / 지방세」 — 코드 TAX_PAY_SRC(223). ★ 고정 코드 — 코드값 = 자료 종류 코드값(주소 tab).
+ * 「세금 전체」는 선택 상자 첫 줄이고 코드가 아니다(주소 tab=PAY).
+ */
+export const TAX_PAY_SRC_CATEGORY = 'TAX_PAY_SRC';
+export const PAY_SRCS = [TAX_KIND_NTAX, TAX_KIND_LTAX] as const;
+
+/** 메뉴 셋의 주소 — 자료 올리기 [보기]가 파일 종류에 맞는 메뉴로 간다. */
+export const PAYMENT_ROUTES = { pay: '/tax/payments', social: '/tax/social', loan: '/tax/loans' } as const;
+
+/** 올린 파일의 자료 종류 → 메뉴 주소. 이 세 메뉴의 자료가 아니면 null. */
+export function paymentsRouteOfFileKind(kind: string): string | null {
+  if (kind === TAX_KIND_NTAX || kind === TAX_KIND_LTAX) return PAYMENT_ROUTES.pay;
+  if (kind === TAX_KIND_SOCIAL) return PAYMENT_ROUTES.social;
+  if (kind === TAX_KIND_LOAN) return PAYMENT_ROUTES.loan;
+  return null;
+}
+
+/** 4대보험 보험 거르기 선택지 — 국민연금 · 건강보험 · 고용보험 · 산재보험(장기요양은 건강보험에 들어간다). */
+export const SOCIAL_INS_FILTERS: readonly string[] = TAX_SOCIAL_FILE_TPS;
+
+/** 보험 거르기 — 건강보험(HI)을 고르면 장기요양(LTC)까지. null 이면 전부. */
+export function filterSocialIns<T extends { insTp: string }>(rows: readonly T[], ins: string | null | undefined): T[] {
+  if (!ins) return [...rows];
+  return rows.filter((r) => r.insTp === ins || (ins === 'HI' && r.insTp === 'LTC'));
+}
 
 /** 올린 파일의 자료 종류 → 탭. 이 화면 자료가 아니면 null. */
 export function tabOfFileKind(kind: string): PaymentTab | null {
@@ -44,7 +81,10 @@ export function tabOfFileKind(kind: string): PaymentTab | null {
 
 export interface PaymentsQuery {
   month: string;
-  tab: PaymentTab;
+  /** 자료 종류 하나 또는 세금 전체(PAY). */
+  tab: PaymentView;
+  /** 4대보험 보험 거르기(2026-11-08) — 국민연금 NP · 건강보험 HI(장기요양 포함) · 고용보험 EI · 산재보험 IA. 없으면 전부. */
+  ins?: string | null;
   /** 기간 직접 지정(`YYYY-MM-DD`) — 둘 다 있거나 둘 다 없다. 없으면 작업할 달. */
   from: string | null;
   to: string | null;
@@ -68,8 +108,10 @@ export function parsePaymentsQuery(raw: Record<string, unknown>): PaymentsQueryP
   const month = parseMonth(raw.month);
   if (!month) errors.push({ field: 'month', message: '작업할 달은 YYYY-MM 입니다' });
   const tabRaw = text(raw.tab) ?? TAX_KIND_NTAX;
-  const tab = tabOfFileKind(tabRaw);
+  const tab: PaymentView | null = tabRaw === PAY_ALL ? PAY_ALL : tabOfFileKind(tabRaw);
   if (!tab) errors.push({ field: 'tab', message: '탭이 올바르지 않습니다' });
+  const ins = text(raw.ins);
+  if (ins !== null && !SOCIAL_INS_FILTERS.includes(ins)) errors.push({ field: 'ins', message: '보험 종류가 올바르지 않습니다' });
 
   const fileId = text(raw.file);
   let from = text(raw.from);
@@ -85,7 +127,7 @@ export function parsePaymentsQuery(raw: Record<string, unknown>): PaymentsQueryP
   }
 
   if (errors.length > 0) return { ok: false, errors };
-  return { ok: true, value: { month: month!, tab: tab!, from, to, fileId } };
+  return { ok: true, value: { month: month!, tab: tab!, from, to, fileId, ...(ins ? { ins } : {}) } };
 }
 
 const nextDay = (date: string): string => {
@@ -125,6 +167,7 @@ export function paymentsSearch(q: PaymentsQuery): string {
   if (q.fileId) p.set('file', q.fileId);
   else {
     p.set('tab', q.tab);
+    if (q.ins) p.set('ins', q.ins);
     if (q.from && q.to) {
       p.set('from', q.from);
       p.set('to', q.to);
@@ -138,6 +181,8 @@ export function paymentsSearch(q: PaymentsQuery): string {
 /** 국세 · 지방세 납부 줄. 비용 여부는 읽을 때 정한다(저장하지 않음). */
 export interface TaxPaymentRow {
   id: string;
+  /** 국세 NTAX · 지방세 LTAX — 세금 전체 목록에서 「구분」 칸(2026-11-08). */
+  kind: typeof TAX_KIND_NTAX | typeof TAX_KIND_LTAX;
   payDate: string;
   taxItem: string;
   expense: boolean;
@@ -242,6 +287,8 @@ export interface TaxPaymentsResponse {
   loans: LoanTxnRow[];
   file: { id: string; fileName: string } | null;
   codes: {
+    /** 세금 납부 「세금 전체 / 국세 / 지방세」 선택지(TAX_PAY_SRC, 켜진 것 · 코드 순서). */
+    paySrcs: TaxCodeName[];
     socialIns: TaxCodeName[];
     loanTps: TaxCodeName[];
     banks: TaxCodeName[];

@@ -18,6 +18,7 @@ import { buildXlsx } from '../lib/xlsxExport.ts';
 import {
   loanExportSheet,
   payExportSheet,
+  paymentsSheets,
   registerTaxPaymentsRoutes,
   socialExportSheet,
   socialTotalsSheet,
@@ -42,7 +43,7 @@ const LIST: TaxPaymentsResponse = {
   social: [],
   loans: [],
   file: null,
-  codes: { socialIns: [], loanTps: [], banks: [] },
+  codes: { paySrcs: [], socialIns: [], loanTps: [], banks: [] },
 };
 const NOT_FOUND = { ok: false as const, status: 404 as const, error: 'not_found', message: '없는 파일입니다' };
 
@@ -83,6 +84,15 @@ describe('GET /tax/payments', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['cache-control']).toBe('no-store');
     expect(calls).toEqual([['list', 1, { ...Q, tab: 'LOAN', from: '2026-07-01', to: '2026-09-30' }]]);
+  });
+
+  it('⑥ 세금 전체(tab=PAY) · 4대보험 보험 거르기(ins) 를 그대로 넘긴다', async () => {
+    const { deps, calls } = fakeDeps();
+    const a = await build('tenant', deps);
+    expect((await a.inject({ method: 'GET', url: '/tax/payments?month=2026-09&tab=PAY' })).statusCode).toBe(200);
+    expect((await a.inject({ method: 'GET', url: '/tax/payments?month=2026-09&tab=SOCIAL&ins=HI' })).statusCode).toBe(200);
+    expect(calls).toEqual([['list', 9001, { ...Q, tab: 'PAY' }], ['list', 9001, { ...Q, tab: 'SOCIAL', ins: 'HI' }]]);
+    expect((await a.inject({ method: 'GET', url: '/tax/payments?month=2026-09&tab=SOCIAL&ins=LTC' })).statusCode).toBe(400);
   });
 
   it('주소가 틀리면 400 + errors, 읽지 않는다', async () => {
@@ -130,7 +140,7 @@ function aoa(sheet: Parameters<typeof buildXlsx>[0][number]): unknown[][] {
 }
 
 const PAY: TaxPaymentRow = {
-  id: 'p1', payDate: '2026-09-10', taxItem: '근로소득세(갑)', expense: false, amount: 1000, penalty: 0,
+  id: 'p1', kind: 'NTAX', payDate: '2026-09-10', taxItem: '근로소득세(갑)', expense: false, amount: 1000, penalty: 0,
   belongMonth: null, office: '서초세무서', payMethod: null, payNo: '0126-1',
 };
 
@@ -192,5 +202,20 @@ describe('loanExportSheet — 대출 시트', () => {
       ['거래일', '대출', '구분', '거래종류', '원금', '이자', '수수료', '잔액'],
       ['2026-09-25', '우리은행 · 끝 5678', '상환', '이자납입', 0, 120000, 0, 50000000],
     ]);
+  });
+});
+
+describe('paymentsSheets — [엑셀 내려받기] 시트(⑥ 2026-11-08)', () => {
+  const data = (over: Partial<TaxPaymentsResponse>): TaxPaymentsResponse => ({ ...LIST, ...over });
+  const L = { ...PAY, id: 'l1', kind: 'LTAX' as const, penalty: null };
+  it('세금 전체(PAY) — 국세 · 지방세 두 시트로 나눠 담는다', () => {
+    const sheets = paymentsSheets(data({ query: { ...Q, tab: 'PAY' }, pays: [PAY, L] }));
+    expect(sheets.map((x) => x.name)).toEqual(['국세', '지방세']);
+    expect(sheets.map((x) => x.rows.length)).toEqual([1, 1]);
+  });
+  it('국세만 · 지방세만이면 그 시트 하나, 4대보험은 사람별 + 보험 종류별 합계, 대출은 하나(지금 그대로)', () => {
+    expect(paymentsSheets(data({ query: { ...Q, tab: 'LTAX' }, pays: [L] })).map((x) => x.name)).toEqual(['지방세']);
+    expect(paymentsSheets(data({ query: { ...Q, tab: 'SOCIAL' } })).map((x) => x.name)).toEqual(['4대보험', '보험 종류별 합계']);
+    expect(paymentsSheets(data({ query: { ...Q, tab: 'LOAN' } })).map((x) => x.name)).toEqual(['대출']);
   });
 });
