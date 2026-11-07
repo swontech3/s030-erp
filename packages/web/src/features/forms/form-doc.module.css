@@ -73,6 +73,14 @@
   opacity: 0.85;
 }
 
+/*
+ * ★ 법무 서류 종이의 빈 자리 — 글과 함께 있는 자리표시가 비면 일정 너비로 비워 둔다(손으로 적을 자리,
+ *   결정 2026-11-06). 너비는 `FormDocument` 가 em 으로 준다(`inlineBlankWidths`). 글자 · 밑줄은 넣지 않는다.
+ */
+.blank {
+  display: inline-block;
+}
+
 /* ★ 화면에서는 숨긴다 — 인쇄 때만 `print.css` 가 꺼낸다. */
 .printOnly {
   display: none;

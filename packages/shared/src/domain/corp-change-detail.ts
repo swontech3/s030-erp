@@ -37,12 +37,14 @@ import {
   isOfficerChangeKind,
   isRrnShape,
   validateRrn,
+  type ChangeTypeRules,
   type CorpChangeFieldError,
   type CorpChangeStatus,
   type CorpChangeType,
   type OfficerChangeKind,
 } from './corp-change.ts';
 import type { CodeOption } from './corp-change-list.ts';
+import { isArticleRole, type ArticleChange, type ArticleItem, type ArticleRole } from './legal-articles.ts';
 import { DIGIT_MASK_RULE, isDigitMaskComplete, maskValue, type DigitMaskKind } from './masked-caret.ts';
 
 /**
@@ -166,6 +168,11 @@ export function parseCreateBody(
 
 const ADDRESS_KEYS = ['zipCode', 'address', 'addressDetail'] as const;
 
+/** payload 의 「변경된 정관 조항」 칸 — 사람이 고친 조항 문구(역할 → 글, 2026-11-08). 모든 구분이 받는다(쓰는 곳은 정관이 바뀌는 구분뿐). */
+export const ARTICLES_ITEMS_KEY = 'articlesItems';
+/** 조항 한 개의 최대 글자 수. */
+export const ARTICLE_TEXT_MAX = 5000;
+
 /**
  * 변경 내용 `{ payload }` 의 payload — 그 구분의 칸 정의(`CHANGE_TYPE_DEFS`)대로 읽는다.
  *
@@ -179,10 +186,28 @@ export function parsePayload(changeType: CorpChangeType, raw: unknown): Parsed<R
   const defs = CHANGE_TYPE_DEFS[changeType].fields;
   const known = new Set(defs.map((d) => d.name));
   const errors: CorpChangeFieldError[] = Object.keys(raw)
-    .filter((k) => !known.has(k))
+    .filter((k) => !known.has(k) && k !== ARTICLES_ITEMS_KEY)
     .map((k) => ({ field: k, message: `이 변경 구분에 없는 칸입니다: ${k}` }));
 
   const out: Record<string, unknown> = {};
+  // 「변경된 정관 조항」에서 사람이 고친 문구(2026-11-08, 설계 §3-1) — 역할 → 글. 빈 글은 버린다(자동 문구로 돌아간다)
+  if (raw[ARTICLES_ITEMS_KEY] !== undefined && raw[ARTICLES_ITEMS_KEY] !== null) {
+    const v = raw[ARTICLES_ITEMS_KEY];
+    if (!isPlainObject(v) || Object.entries(v).some(([k, s]) => !isArticleRole(k) || (typeof s !== 'string' && s !== null))) {
+      errors.push({ field: ARTICLES_ITEMS_KEY, message: '변경된 정관 조항 형식이 올바르지 않습니다' });
+    } else {
+      const items: Record<string, string> = {};
+      for (const [k, s] of Object.entries(v)) {
+        if (typeof s !== 'string' || s.trim() === '') continue;
+        if (s.length > ARTICLE_TEXT_MAX) {
+          errors.push({ field: `${ARTICLES_ITEMS_KEY}.${k}`, message: `조항은 ${ARTICLE_TEXT_MAX}자 이내로 입력하세요` });
+          continue;
+        }
+        items[k] = s.replace(/\r\n/g, '\n').trimEnd();
+      }
+      if (Object.keys(items).length > 0) out[ARTICLES_ITEMS_KEY] = items;
+    }
+  }
   for (const def of defs) {
     const v = raw[def.name];
     if (def.type === 'address') {
@@ -500,6 +525,11 @@ export interface CorpChangeCompanyInfo {
   /** 비입주사 법무 회사 정보 줄이 있는가(없으면 첫 저장이 만든다). */
   hasLegalOrg: boolean;
   /**
+   * 그 단체의 완료된 법인설립 건의 상호 위치(F · B) — 없으면 null. 「서류에 쓰이는 상호」(`corpChangeDocName`)가
+   * 회사 형태 낱말을 붙일 자리다(결정 2026-11-06).
+   */
+  namePosition: string | null;
+  /**
    * 삐용 값으로 **채워 보여 준** 칸(`applyCompanyDefaults`) — 아직 저장되지 않았다. 입주사는 늘 빈 배열.
    * 화면은 이 칸에 「저장 전」 표시를 붙이고, [저장] 하면 회사 정보로 남긴다.
    */
@@ -604,6 +634,38 @@ export interface CorpChangeOfficerView {
 }
 
 /**
+ * 새 건 대화상자의 회사유형(`GET /legal/corp-changes/company-type`, 2026-11-01 · 11-07).
+ * 비입주사이고 회사유형이 비었고 회사 정보를 고칠 수 있으면 대화상자가 그 자리에서 고르게 한다(결정 2026-11-07).
+ */
+export interface CorpChangeCompanyTypeResponse {
+  /** 입주사 = ERP 회원구분, 비입주사 = 법무 회사 정보. 비었으면 null. */
+  memberType: string | null;
+  isTenant: boolean;
+  /** 회사 정보를 고칠 수 있는가 — 기본정보의 `canEditCompany` 와 같은 판정(입주사는 늘 false). */
+  canEditCompany: boolean;
+  /** 고를 수 있는 회사유형(공통 코드 MEMBER_TYPE 법무 파티션). 입주사는 빈 목록. */
+  memberTypes: CodeOption[];
+  /** 구분별 회사유형 규칙(공통 코드 `LAW_CNG_MT`, 결정 2026-11-07) — 대화상자가 `changeTypeAllowedFor` 로 거른다. */
+  changeTypeRules: ChangeTypeRules;
+}
+
+/**
+ * 새 건 대화상자에서 고른 회사유형을 새 건 화면 회사 정보에 넣을 값(결정 2026-11-07) — 비입주사 · 저장된 회사유형이
+ * 비었음 · 회사 정보를 고칠 수 있음 · 고른 값이 선택지에 있음일 때만 그 값, 아니면 null(그대로 둔다).
+ * 「저장된 회사유형이 비었음」은 값이 없거나, 있어도 상호에서 추정해 채운 값(`defaultedFields` 의 memberType)인 경우다 —
+ * 대화상자가 본 것도 저장된 값(비었음)이고, 사람이 고른 값이 추정보다 앞선다.
+ * 넣은 값은 저장된 값과 달라 첫 [저장] 에 회사 정보로 실린다(`upsertLegalOrg`).
+ */
+export function presetMemberTypeFor(
+  draft: Pick<CorpChangeDraftResponse, 'company' | 'memberTypes' | 'canEditCompany'>,
+  picked: string | null | undefined,
+): string | null {
+  const storedEmpty = !draft.company.memberType || draft.company.defaultedFields.includes('memberType');
+  if (!picked || draft.company.isTenant || !storedEmpty || !draft.canEditCompany) return null;
+  return draft.memberTypes.some((m) => m.code === picked) ? picked : null;
+}
+
+/**
  * 임시 모드(`/legal/corp-changes/new`) — 건이 아직 없다. DB 의 건을 읽지 않고, 기본정보만
  * 읽어서 보여 준다. 저장된 건의 상세(`CorpChangeDetailResponse`)는 이것에 건의 값을 더한 것이다.
  */
@@ -651,6 +713,25 @@ export interface CorpChangeDetailResponse extends CorpChangeDraftResponse {
   writtenOn: string | null;
   /** 완료일 `YYYY-MM-DD`. */
   completedOn: string | null;
+
+  // ── 정관 변경(2026-11-08, 설계 §3) ─────────────────────────────────────────
+  /** 정관이 바뀌는 구분(`LAW_CNG_AR`)일 때만. null = 정관이 안 바뀌는 구분. */
+  articles: CorpChangeArticlesView | null;
+}
+
+/** 상세의 「변경된 정관 조항」 — 화면이 미리 채움(`planArticleChanges`)을 그 자리에서 계산한다. */
+export interface CorpChangeArticlesView {
+  /** 이 구분이 바꾸는 조항 역할. */
+  roles: ArticleRole[];
+  /**
+   * 정관 최종본(없으면 설립 건으로 만들 모양)의 조항 — 바뀌는 역할의 조항만. 개정 번호는 최종본이 아직 없으면 null.
+   * null = 최종본이 없고 만들 수도 없다(다른 곳 설립 회사 — 1단계 밖, 지금처럼 안내만).
+   */
+  base: { revision: number | null; items: ArticleItem[] } | null;
+  /** 작성완료 스냅샷의 바뀐 조항 — 작성완료 뒤(E · C · X). 없으면 null. */
+  written: ArticleChange[] | null;
+  /** 이 건이 최종본에 반영됐다(완료 뒤) — 완료 취소 · 취소를 막는다(결정 2026-11-08). */
+  applied: boolean;
 }
 
 /**

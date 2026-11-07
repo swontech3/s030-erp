@@ -435,6 +435,8 @@ export interface BbiyongOrgInfo {
   orgName: string;
   /** 대표자명. 삐용이 안 주면 null. */
   repName: string | null;
+  /** 회사 전화(org-list 행의 `telNo`). 삐용이 안 주거나 비면 null — 모의 어댑터는 주지 않는다(2026-11-02). */
+  telNo?: string | null;
   /**
    * 단체 상태. ★ **어휘가 정해지지 않았다**(규격 없음) — 해석하지 않고 그대로 보여 준다.
    *   규격이 오면 그때 코드로 묶는다.
@@ -464,7 +466,9 @@ export type BbiyongOrgKey = { orgId: number } | { orgCode: string };
 export type OrgLookupOutcome<T> =
   | { kind: 'ok'; value: T }
   /** `message` 는 운영자에게 그대로 보여줄 문구다. */
-  | { kind: 'unsupported'; message: string };
+  | { kind: 'unsupported'; message: string }
+  /** 삐용이 권한으로 거절했다(`AUTHZ_DENY` — 「단체관리」 화면 권한 없음). 다시 해도 풀리지 않는다. */
+  | { kind: 'forbidden'; message: string };
 
 export interface BbiyongOrg {
   createOrg(req: BbiyongOrgRequest, accessToken: string): Promise<CreateOrgOutcome>;

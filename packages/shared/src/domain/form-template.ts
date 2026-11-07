@@ -73,6 +73,12 @@ export interface Cell {
   /** pt. 없으면 양식 글꼴 크기. */
   fontSize?: number;
   bold?: boolean;
+  /**
+   * 「내용에 맞춤」(결정 2026-11-05) — 이 칸이 있는 **행**은 저장된 높이를 못 박지 않고 내용 줄 수만큼만 쓴다.
+   * 내용이 적으면 행이 줄고, 저장된 높이만큼 차면 지금과 같다. 걸침(rowSpan) 1 인 칸만 본다(`fitRowsOf`).
+   * 없으면 고정 높이(지금과 같다). ★ 편집기는 이 칸을 그리지 않고 그대로 들고 다닌다(칸 복사 · 행 넣고 빼기).
+   */
+  fitHeight?: boolean;
 }
 
 /** 한 장 — A4 세로 한 장에 표 하나다. 치수는 전부 **cm** 다. */
@@ -239,7 +245,18 @@ function parseCell(v: unknown, where: string): Cell {
     if (typeof v.bold !== 'boolean') fail(where, 'bold 는 참/거짓이어야 합니다');
     cell.bold = v.bold as boolean;
   }
+  if (v.fitHeight !== undefined) {
+    if (typeof v.fitHeight !== 'boolean') fail(where, 'fitHeight 는 참/거짓이어야 합니다');
+    cell.fitHeight = v.fitHeight as boolean;
+  }
   return cell;
+}
+
+/** 「내용에 맞춤」 행 번호들 — 그 행에 앵커가 있고 걸침이 1 인 칸이 `fitHeight` 를 가진 행. */
+export function fitRowsOf(page: Page): Set<number> {
+  const rows = new Set<number>();
+  for (const c of page.cells) if (c.fitHeight === true && (c.rowSpan ?? 1) === 1) rows.add(c.row);
+  return rows;
 }
 
 function parsePage(v: unknown, where: string): Page {
@@ -390,6 +407,80 @@ export function splitTokens(text: string): TextPiece[] {
     last = at + m[0].length;
   }
   if (last < text.length) out.push({ kind: 'text', text: text.slice(last) });
+  return out;
+}
+
+/** 종이의 빈 자리 너비(em ≒ 한글 한 자) — 글과 함께 있는 자리표시가 비었을 때(결정 2026-11-06). */
+export const INLINE_BLANK_EM = 5;
+/** 금액 자리의 빈 자리 너비(em) — 「금 {{…}} 원」. 큰 금액을 손으로 적을 만큼. */
+export const INLINE_BLANK_AMOUNT_EM = 8;
+
+/** 칸 안쪽 여백(좌우 2px씩, cm) — form-doc CSS 의 `.td { padding: 0 2px }`. */
+const CELL_PADDING_CM = (4 * 2.54) / 96;
+/** 글자 너비 어림의 여유(em) — 글꼴마다 폭이 조금씩 달라 한 줄이 넘치지 않게 덜어 둔다. */
+const FIT_SLACK_EM = 0.5;
+/** 줄인 빈칸이 이보다 좁으면 빈칸을 두지 않는다(em). */
+const MIN_BLANK_EM = 1;
+
+/** 글자 너비 어림(em) — 한글 · 한자 · 전각은 1, 그 밖(영숫자 · 공백 · 반각 기호)은 0.5. */
+function textEm(s: string): number {
+  let n = 0;
+  for (const ch of s) n += /[ᄀ-ᇿ⺀-鿿가-힯豈-﫿＀-｠　-〿]/.test(ch) ? 1 : 0.5;
+  return n;
+}
+
+/**
+ * 법무 서류 종이에서 **비어 있는 자리표시**를 찍을 빈칸 너비(em) — 조각마다(글 조각은 null).
+ *
+ * ★ 칸에 글(공백이 아닌 글자)이 함께 있을 때만 너비를 준다(예: 「금 {{regFee}} 원」 · 「{{memberCount}} 명」) —
+ *   손으로 적을 자리를 남긴다. 자리표시만 있는 칸은 모두 null(지금처럼 빈 칸).
+ * ★ 금액 자리 = 바로 앞 글이 「금」으로 끝나거나 바로 뒤 글이 「원」으로 시작 → `INLINE_BLANK_AMOUNT_EM`.
+ * ★ 칸에 맞춰 줄인다(결정 2026-11-06, `fit`) — 그 줄의 글이 한 줄에 들어가면 빈칸은 그 줄에 **남는 자리만큼만**
+ *   (여럿이면 같은 비율로), 글만으로도 줄이 넘치면 칸 폭을 넘지 않게만. 줄이 갈라지거나 칸 밖으로 나가지 않게
+ *   한다. 남는 자리가 `MIN_BLANK_EM` 보다 좁으면 null. 글자 폭은 어림이다(`textEm`).
+ * ★ 값이 있는 자리표시에는 쓰지 않는다 — 부르는 쪽(`FormDocument`)이 값이 빌 때만 본다. 미리보기도 쓰지 않는다.
+ * @param fit 칸 폭(cm, 걸친 열의 합)과 글자 크기(pt). 없으면 줄이지 않는다.
+ */
+export function inlineBlankWidths(
+  pieces: readonly TextPiece[],
+  fit?: { widthCm: number; fontPt: number },
+): (number | null)[] {
+  const hasText = pieces.some((p) => p.kind === 'text' && p.text.trim() !== '');
+  const out: (number | null)[] = pieces.map((p, i) => {
+    if (p.kind !== 'token' || !hasText) return null;
+    const prev = pieces[i - 1];
+    const next = pieces[i + 1];
+    const amount =
+      (prev?.kind === 'text' && prev.text.trimEnd().endsWith('금')) || (next?.kind === 'text' && next.text.trimStart().startsWith('원'));
+    return amount ? INLINE_BLANK_AMOUNT_EM : INLINE_BLANK_EM;
+  });
+  if (!fit || !hasText) return out;
+
+  // 줄마다 — 글 조각의 줄바꿈으로 나눈다. 자리표시는 그 줄에 든다.
+  const lineEm = (fit.widthCm - CELL_PADDING_CM) / ((fit.fontPt * 2.54) / 72) - FIT_SLACK_EM;
+  type Line = { textEm: number; blanks: number[] };
+  const lines: Line[] = [{ textEm: 0, blanks: [] }];
+  pieces.forEach((p, i) => {
+    if (p.kind === 'token') {
+      if (out[i] !== null) lines[lines.length - 1]!.blanks.push(i);
+      return;
+    }
+    p.text.split('\n').forEach((seg, k) => {
+      if (k > 0) lines.push({ textEm: 0, blanks: [] });
+      lines[lines.length - 1]!.textEm += textEm(seg);
+    });
+  });
+  for (const line of lines) {
+    if (line.blanks.length === 0) continue;
+    const want = line.blanks.reduce((a, i) => a + out[i]!, 0);
+    const room = line.textEm <= lineEm ? lineEm - line.textEm : null;
+    for (const i of line.blanks) {
+      // 한 줄에 들어가는 줄 — 남는 자리를 나눠 갖는다. 넘치는 줄 — 칸 폭까지만.
+      let w = room === null ? Math.min(out[i]!, lineEm) : want <= room ? out[i]! : (out[i]! * room) / want;
+      w = Math.floor(w * 2) / 2; // 0.5em 단위로 내림
+      out[i] = w >= MIN_BLANK_EM ? w : null;
+    }
+  }
   return out;
 }
 

@@ -15,10 +15,14 @@
  *     확인 창은 법무 전용 창(`CorpChangeConfirmDialog`)을 그대로 쓴다
  *   · 임시 모드에서 입력이 있으면 나갈 때 확인한다
  *
- * ★★ 칸 이름 · 필수 표시 · 안내는 이 파일에 적지 않는다 — shared `INCORP_FIELD_DEFS` 를 읽는다. 이 파일이
+ * ★★ 칸 이름 · 필수 표시 · 안내는 이 파일에 적지 않는다 — shared `incorpFieldDefsOf`(회사 형태의 칸)를 읽는다. 이 파일이
  *    정하는 것은 **묶음(배치)** 뿐이다(회사 · 자본·주식 · 설립 정보 · 사람 · 사업목적, 결정 2026-10-11).
  * ★ 상호는 순수 상호 + 위치(앞/뒤, 코드표 `NAME_POSITION`) — 합친 상호를 미리 보여 준다(shared
  *   `composeIncorporationName`, 서류에 쓰이는 이름과 같은 함수).
+ * ★ 회사 형태(주식회사 · 유한회사, 결정 2026-10-31) — 새 건(임시 모드)에서만 고른다. 저장된 건은 읽기만.
+ *   유한회사는 칸 이름표가 바뀌고(발기인 → 사원 · 인수 주식 수 → 출자좌수 · 1주 → 1좌, shared `incorpTermsOf` ·
+ *   `incorpFieldDefsOf`) 수권 · 발행 주식 수 · 공고방법 칸이 없다. 상호는 주식회사와 같은 방식 — 같은 위치 칸의
+ *   이름표만 「유한회사」 위치로 바뀐다(결정 2026-11-02). 새 건에서 형태를 바꾸면 합친 상호의 낱말도 따라 바뀐다.
  * ★ 사업목적은 [목록에서 고르기] 팝업(`BizPurposePickerDialog`)을 그대로 쓴다 — 카탈로그를 고치는 버튼은 없다.
  * ★ 저장할 때 내용 검증은 하지 않는다(작성 중 임시 저장) — 검증은 작성완료 때 서버가. 경고(1주 100원 미만 ·
  *   자본금 10억 이상인데 감사 없음)는 막지 않고 지금 입력으로 보여 준다(shared `incorporationWarnings`).
@@ -27,7 +31,7 @@
  * ★★ 서버는 주민번호 평문을 돌려주지 않는다(마스킹만). 임시 모드의 평문은 첫 저장 때까지 화면이 들고 있는
  *    것뿐이고, 표에는 마스킹해서 보인다.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -43,20 +47,32 @@ import { metroSurchargeOf } from '@swonbiz/shared/domain/incorporation-tax';
 import {
   DEFAULT_MEETING_TIME,
   INCORP_FIELD_DEFS,
+  INCORP_LTD_ENTITY_TYPE,
+  incorpFieldDefsOf,
+  incorpTermsOf,
   incorporationWarnings,
+  incorpPersonsCapital,
+  type IncorpEntityType,
   type IncorpFieldDef,
+  type IncorpTerms,
   type IncorporationInfo,
 } from '@swonbiz/shared/domain/incorporation';
 import {
   composeIncorporationName,
+  incorpBareName,
+  incorpEntityWord,
   maskRrn,
   type IncorpPersonView,
   type IncorporationDetailResponse,
   type IncorporationDraftResponse,
+  type IncorporationTransitionResponse,
 } from '@swonbiz/shared/domain/incorporation-detail';
 import { appendPurposeLines } from '@swonbiz/shared/domain/biz-purpose';
 import { parseDay } from '@swonbiz/shared/domain/day';
-import { formatMoneyInput } from '@/features/contracts/form-model';
+import { maskValue, type DigitMaskKind } from '@swonbiz/shared/domain/masked-caret';
+import type { OrgInfo } from '@swonbiz/shared/domain/org-lookup';
+import { incorpArticlesFormName } from '@swonbiz/shared/domain/legal-articles-file';
+import { formatMoneyInput, maskInput } from '@/features/contracts/form-model';
 import { Icon } from '@/components/ds';
 import { AddressInput, StatusActions, type Address } from './CorpChangeDetail';
 import { CorpChangeConfirmDialog, type CorpChangeConfirmKind } from './CorpChangeConfirmDialog';
@@ -70,6 +86,52 @@ interface Props {
   draft: IncorporationDraftResponse;
   /** 저장된 건. **null 이면 임시 모드**(건이 아직 없다). */
   saved: IncorporationDetailResponse | null;
+  /**
+   * 새 건에서 고른 회사(삐용 단체 조회, 결정 2026-11-02) — 미리 넣는다, 모두 고칠 수 있다:
+   *   · 회사명 → 상호 칸(형태 표기는 떼고, `incorpBareName`)
+   *   · 대표자(`repName` = 삐용 memberName) → 사람 한 줄(대표이사 · 이사 · 발기인/사원 체크, 주민번호 · 주소는 비움)
+   *   · 전화(`telNo`) → 「대표이사 전화」 칸(사람 줄에는 전화 칸이 없다)
+   * 저장된 건 · 회사를 고르지 않은 새 건 · 조회 실패는 null(넣지 않음).
+   */
+  picked?: Pick<OrgInfo, 'orgName' | 'repName' | 'telNo'> | null;
+  /**
+   * 주소의 `?print=articles`(결정 2026-11-07) — [서류 출력]을 열고 그 건의 정관(`incorpArticlesFormName`)을 골라 둔다.
+   * 서류를 출력할 수 있는 건(작성완료 · 완료)일 때만. 처음 한 번만 — 닫으면 지금과 같다.
+   */
+  openArticlesPrint?: boolean;
+}
+
+/**
+ * 입력하면서 「-」 를 넣는 칸(결정 2026-11-02) — 법인변경 회사 전화와 같은 함수(`maskInput` · shared `maskValue`).
+ * ★ 저장 값 규칙은 그대로다(글자 칸 — 넣은 모양 그대로 저장).
+ */
+const MASKED_FIELDS: Partial<Record<InfoName, DigitMaskKind>> = { ceoPhone: 'phone' };
+
+/** 미리 넣는 대표자 줄의 화면 ID — `new-{n}`(사람이 넣는 줄)과 겹치지 않는다. */
+const PICKED_REP_ID = 'new-rep';
+
+/** 고른 회사의 대표자 → 사람 한 줄(결정 2026-11-02). 대표자가 없으면 없음. */
+function pickedRepPersons(picked: Props['picked']): LocalPerson[] {
+  const name = picked?.repName?.trim() ?? '';
+  if (name === '') return [];
+  return [
+    {
+      id: PICKED_REP_ID,
+      name,
+      isFounder: true,
+      isDirector: true,
+      isAuditor: false,
+      isRepresentative: true,
+      unitsSubscribed: 0,
+      appointmentDate: null,
+      zipCode: null,
+      address: null,
+      addressDetail: null,
+      rrnMasked: null,
+      sortOrder: 1,
+      rrn: '',
+    },
+  ];
 }
 
 type InfoName = keyof IncorporationInfo;
@@ -87,10 +149,9 @@ const toCount = (s: string): number | null => {
   return digits === '' ? null : Number(digits);
 };
 
-const DEF: Record<InfoName, IncorpFieldDef> = Object.fromEntries(INCORP_FIELD_DEFS.map((d) => [d.name, d])) as Record<
-  InfoName,
-  IncorpFieldDef
->;
+/** 회사 형태의 칸 정의 — 이름 → 정의. 형태에 없는 칸은 빠져 있다(`incorpFieldDefsOf`). */
+const defsByName = (entity: IncorpEntityType): Partial<Record<InfoName, IncorpFieldDef>> =>
+  Object.fromEntries(incorpFieldDefsOf(entity).map((d) => [d.name, d]));
 
 /** 묶음 — 배치만 정한다(칸 정의는 shared). 상호(국문) · 본점은 회사 묶음이 따로 그린다. */
 const CAPITAL_FIELDS: InfoName[] = ['capitalAmount', 'parValue', 'unitsAuthorized', 'unitsIssued'];
@@ -218,15 +279,18 @@ interface PersonDraft {
   rrnMasked: string | null;
 }
 
-const ROLES = [
-  ['isFounder', '발기인'],
+type RoleKey = keyof IncorpPersonView & keyof PersonDraft & ('isFounder' | 'isDirector' | 'isAuditor' | 'isRepresentative');
+
+/** 역할 체크 — 발기인 자리는 회사 형태의 이름(발기인 · 사원). */
+const rolesFor = (t: IncorpTerms): readonly (readonly [RoleKey, string])[] => [
+  ['isFounder', t.founder],
   ['isDirector', '이사'],
   ['isAuditor', '감사'],
   ['isRepresentative', '대표이사'],
-] as const satisfies readonly (readonly [keyof IncorpPersonView & keyof PersonDraft, string])[];
+];
 
-const rolesOf = (p: Pick<IncorpPersonView, 'isFounder' | 'isDirector' | 'isAuditor' | 'isRepresentative'>) =>
-  ROLES.filter(([k]) => p[k]).map(([, label]) => label);
+const rolesOf = (p: Pick<IncorpPersonView, RoleKey>, t: IncorpTerms) =>
+  rolesFor(t).filter(([k]) => p[k]).map(([, label]) => label);
 
 /** 보낼 사람 본문 — 서버가 `parseIncorpPersonBody` 로 읽는다. */
 const personBody = (p: {
@@ -256,12 +320,18 @@ const personBody = (p: {
   rrn: p.rrn === '' ? null : p.rrn,
 });
 
-export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
+export function IncorporationDetail({ draft, saved: initialSaved, picked = null, openArticlesPrint = false }: Props) {
   const router = useRouter();
   /** ★ 저장된 건은 **상태로** 든다 — 전이 · 저장이 돌려준 새 상세, 409 뒤에 다시 읽은 상세로 다시 그린다. */
   const [saved, setSaved] = useState<IncorporationDetailResponse | null>(initialSaved);
   const isNew = saved === null;
   const editable = isNew || saved.editable;
+  /** 회사 형태 — 임시 모드는 고르는 값, 저장된 건은 만들 때 고른 값(바꾸지 않는다). */
+  const [chosenEntity, setChosenEntity] = useState<IncorpEntityType>(draft.defaultEntityType);
+  const entityType: IncorpEntityType = saved ? saved.entityType : chosenEntity;
+  const isLtd = entityType === INCORP_LTD_ENTITY_TYPE;
+  const terms = incorpTermsOf(entityType);
+  const DEF = defsByName(entityType);
   const base = initialSaved ? `/api/legal/incorporations/${encodeURIComponent(initialSaved.id)}` : null;
 
   const [toast, setToast] = useState<string | null>(null);
@@ -279,11 +349,24 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
   );
 
   // ── 설립 정보 ────────────────────────────────────────────────────────────
-  const initialForm = useMemo(
-    // 새 건은 개회시간을 기본값(10:00)으로 채워 둔다 — 지우면 빈칸으로 저장된다
-    () => toInfoForm(initialSaved?.info ?? { meetingTime: DEFAULT_MEETING_TIME }, draft.defaultNamePosition),
-    [initialSaved, draft.defaultNamePosition],
-  );
+  const initialForm = useMemo(() => {
+    // 저장된 건은 저장된 값 그대로 — 고른 회사명으로 바꾸지 않는다
+    if (initialSaved) return toInfoForm(initialSaved.info, draft.defaultNamePosition);
+    // 새 건은 개회시간을 기본값(10:00)으로 채워 둔다 — 지우면 빈칸으로 저장된다.
+    // 회사를 골랐으면 그 이름(형태 표기를 뗀 것)을 상호 칸에 미리 넣는다 — 고칠 수 있다(결정 2026-11-02).
+    // 고른 회사의 전화는 「대표이사 전화」 칸에(입력 때와 같은 형식, `maskValue`).
+    // ★ 시작값에만 넣는다 — 입력 중인 칸을 덮어쓰는 자리가 없다.
+    const bare = picked?.orgName ? incorpBareName(picked.orgName) : '';
+    const tel = picked?.telNo?.trim() ? maskValue('phone', picked.telNo) : '';
+    return toInfoForm(
+      {
+        meetingTime: DEFAULT_MEETING_TIME,
+        ...(bare ? { nameKo: bare } : {}),
+        ...(tel ? { ceoPhone: tel } : {}),
+      },
+      draft.defaultNamePosition,
+    );
+  }, [initialSaved, draft.defaultNamePosition, picked]);
   const [form, setForm] = useState<InfoForm>(initialForm);
   const [savedWire, setSavedWire] = useState<string>(() => JSON.stringify(toWire(initialForm)));
   const wire = toWire(form);
@@ -291,17 +374,26 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
   const dirty = JSON.stringify(wire) !== savedWire;
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  /** 완료 때 회사유형을 적지 않은 까닭 한 줄(결정 2026-11-05) — 다음 전이까지 보인다. */
+  const [typeNotice, setTypeNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const setText = (name: Exclude<InfoName, 'hq'>, value: string) =>
     setForm((f) => ({ ...f, text: { ...f.text, [name]: value } }));
 
   // ── 사람 — 두 모드 모두 이 자리가 들고 있다 ─────────────────────────────
-  const [persons, setPersons] = useState<LocalPerson[]>(() => (initialSaved?.persons ?? []).map((p) => ({ ...p, rrn: '' })));
+  // ★ 새 건에서 회사를 골랐으면 대표자 한 줄을 미리 넣는다(결정 2026-11-02) — 저장된 건은 저장된 사람 그대로.
+  const initialPersons = useMemo<LocalPerson[]>(
+    () => (initialSaved ? initialSaved.persons.map((p) => ({ ...p, rrn: '' })) : pickedRepPersons(picked)),
+    [initialSaved, picked],
+  );
+  const [persons, setPersons] = useState<LocalPerson[]>(initialPersons);
   const tempSeq = useRef(0);
 
   // ── 임시 모드 — 나갈 때 확인(법인변경과 같다) ─────────────────────────────
-  const hasInput = isNew && (JSON.stringify(form) !== JSON.stringify(initialForm) || persons.length > 0);
+  // 미리 넣은 것(상호 · 대표자 줄)만 있으면 입력이 아니다 — 시작값과 다를 때만 묻는다
+  const hasInput =
+    isNew && (JSON.stringify(form) !== JSON.stringify(initialForm) || JSON.stringify(persons) !== JSON.stringify(initialPersons));
   const leaving = useRef(false);
   useEffect(() => {
     if (!hasInput) return;
@@ -350,6 +442,7 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
       const res = await send<{ id: string }>('POST', '/api/legal/incorporations', {
         orgId: draft.orgId,
         orgCode: draft.orgCode,
+        entityType,
         info: wire,
         persons: persons.map((p) => personBody(p)),
       });
@@ -482,7 +575,12 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
 
   // ── 상태 전이 · 삭제 — 처리는 이 화면 한 곳이다(목록에는 버튼이 없다) ──────────
   const [confirm, setConfirm] = useState<CorpChangeConfirmKind | null>(null);
-  const [printing, setPrinting] = useState(false);
+  /** 정관을 골라 열기(`?print=articles`) — 처음 한 번만. */
+  const articlesFirst = openArticlesPrint && initialSaved !== null && canPrintCorpChange(initialSaved.status);
+  const [printing, setPrinting] = useState(articlesFirst);
+  const [printDocName, setPrintDocName] = useState<string | null>(
+    articlesFirst && initialSaved ? incorpArticlesFormName(initialSaved.entityType) : null,
+  );
   /** 출력 이력 다시 읽기 — 서류 출력 대화상자를 닫을 때 올린다. */
   const [printLogKey, setPrintLogKey] = useState(0);
 
@@ -500,12 +598,14 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
     if (!saved) return null;
     setBusy(true);
     setSaveError(null);
-    const res = await send<IncorporationDetailResponse>('POST', `${base}/transition`, { from: saved.status, to, cancelReason });
+    setTypeNotice(null);
+    const res = await send<IncorporationTransitionResponse>('POST', `${base}/transition`, { from: saved.status, to, cancelReason });
     setBusy(false);
     if (res.ok) {
       setConfirm(null);
       setFieldErrors({});
       applyDetail(res.body);
+      setTypeNotice(res.body.companyTypeNotice ?? null);
       notify(`「${res.body.statusName}」 상태로 바꿨습니다`);
       return null;
     }
@@ -571,8 +671,8 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
     Object.entries(fieldErrors).find(([k]) => k.startsWith(`${name}.`))?.[1];
 
   // ★ 경고는 지금 입력으로 센다(막지 않는다) — 서버 상세의 `warnings` 와 같은 함수다.
-  const warnings = incorporationWarnings({ info: wire as IncorporationInfo, persons });
-  const composed = composeIncorporationName(form.text.nameKo, form.companyTypePosition);
+  const warnings = incorporationWarnings({ info: wire as IncorporationInfo, persons }, entityType);
+  const composed = composeIncorporationName(form.text.nameKo, form.companyTypePosition, entityType);
   const positions =
     draft.namePositions.length > 0 ? draft.namePositions : [{ code: draft.defaultNamePosition, name: draft.defaultNamePosition }];
   const disabled = !editable || busy;
@@ -580,9 +680,11 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
   /** 글자 · 숫자 · 날짜 칸 하나 — 정의(shared)대로 이름 · 필수 · 안내를 그린다. */
   const field = (name: Exclude<InfoName, 'hq' | 'purposes'>, wide = false) => {
     const d = DEF[name];
+    if (!d) return null; // 이 회사 형태에 없는 칸
     const value = form.text[name];
     const error = errorFor(name);
     const numeric = d.type === 'amount' || d.type === 'count';
+    const mask = MASKED_FIELDS[name];
     const badDate = d.type === 'date' && value !== '' && parseDay(value) === null;
     if (d.type === 'check') {
       // 체크 — 사람이 고치지 않았으면(빈 값) 본점 시·도로 기본값을 보인다(서울이면 체크, `metroSurchargeOf`)
@@ -615,12 +717,14 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
           />
         ) : (
           <input
-            className={`${styles.input}${numeric ? ` ${styles.tabular} ${styles.numInput}` : ''}${d.type === 'monthDay' ? ` ${styles.tabular}` : ''}${error ? ` ${styles.inputInvalid}` : ''}`}
+            className={`${styles.input}${numeric ? ` ${styles.tabular} ${styles.numInput}` : ''}${d.type === 'monthDay' || mask ? ` ${styles.tabular}` : ''}${error ? ` ${styles.inputInvalid}` : ''}`}
             value={value}
             disabled={disabled}
-            inputMode={numeric ? 'numeric' : undefined}
+            inputMode={numeric || mask ? 'numeric' : undefined}
             placeholder={d.type === 'monthDay' ? 'MM-DD' : undefined}
-            onChange={(e) => setText(name, numeric ? formatMoneyInput(e.currentTarget) : e.target.value)}
+            onChange={(e) =>
+              setText(name, numeric ? formatMoneyInput(e.currentTarget) : mask ? maskInput(e.currentTarget, mask) : e.target.value)
+            }
           />
         )}
         {badDate ? (
@@ -633,6 +737,31 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
       </label>
     );
   };
+
+  /*
+   * 자본금 칸 옆 「사람별 합계」(결정 2026-11-02) — 발기인(사원) 인수 주식 수(출자좌수) 합 × 1주(1좌)의 금액.
+   * 자본금과 다르면 차이 금액을 빨간 글자로. 표시만 한다 — 저장 경고 · 작성완료 거절은 지금 그대로(shared 검증).
+   */
+  const personsCapital = incorpPersonsCapital(
+    { capitalAmount: toCount(form.text.capitalAmount), parValue: toCount(form.text.parValue) },
+    persons,
+  );
+  const krw = (n: number) => n.toLocaleString('ko-KR');
+  const personsCapitalField = (
+    <div className={styles.field}>
+      <span className={styles.label}>사람별 합계</span>
+      <span className={`${styles.readValue} ${styles.tabular}${personsCapital ? '' : ` ${styles.readEmpty}`}`}>
+        {personsCapital
+          ? `${krw(personsCapital.units)}${terms.unitWord} × ${krw(personsCapital.parValue)}원 = ${krw(personsCapital.total)}원`
+          : `1${terms.unitWord}의 금액을 넣으면 계산합니다`}
+      </span>
+      {personsCapital && personsCapital.diff !== null && personsCapital.diff !== 0 ? (
+        <span className={styles.fieldError}>
+          자본금과 {krw(Math.abs(personsCapital.diff))}원 차이({personsCapital.diff > 0 ? '합계가 큼' : '합계가 작음'})
+        </span>
+      ) : null}
+    </div>
+  );
 
   return (
     <div className={styles.page}>
@@ -710,6 +839,12 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
               <span>{saveError}</span>
             </div>
           ) : null}
+          {typeNotice ? (
+            <div className={`${styles.banner} ${styles.bannerWarning}`} role="status">
+              <Icon name="triangle-alert" size={16} />
+              <span>{typeNotice}</span>
+            </div>
+          ) : null}
           {saved?.status === 'X' ? (
             <div className={`${styles.banner} ${styles.bannerWarning}`} role="status">
               <Icon name="circle-x" size={16} />
@@ -739,8 +874,9 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
             <div className={styles.sectionRule} />
             <div className={styles.grid4}>
               {field('nameKo', true)}
+              {/* 위치 칸은 하나다 — 이름표만 회사 형태 낱말로(「주식회사」 위치 · 「유한회사」 위치, 결정 2026-11-02) */}
               <label className={styles.field}>
-                <span className={styles.label}>「주식회사」 위치</span>
+                <span className={styles.label}>「{incorpEntityWord(entityType)}」 위치</span>
                 <select
                   className={`${styles.select}${errorFor('companyTypePosition') ? ` ${styles.inputInvalid}` : ''}`}
                   value={form.companyTypePosition}
@@ -762,10 +898,36 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
                 <span className={`${styles.readValue}${composed ? '' : ` ${styles.readEmpty}`}`}>{composed || '—'}</span>
               </div>
               {field('nameEn', true)}
-              <div className={`${styles.field} ${styles.span2}`} />
+              <label className={styles.field}>
+                <span className={styles.label}>
+                  회사 형태 <span className={styles.req}>*</span>
+                </span>
+                {isNew ? (
+                  <select
+                    className={`${styles.select}${errorFor('entityType') ? ` ${styles.inputInvalid}` : ''}`}
+                    value={chosenEntity}
+                    disabled={disabled}
+                    onChange={(e) => setChosenEntity(e.target.value as IncorpEntityType)}
+                  >
+                    {(draft.entityTypes.length > 0 ? draft.entityTypes : [{ code: draft.defaultEntityType, name: draft.defaultEntityType }]).map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className={styles.readValue}>{saved.entityTypeName}</span>
+                )}
+                {errorFor('entityType') ? (
+                  <span className={styles.fieldError}>{errorFor('entityType')}</span>
+                ) : isNew ? (
+                  <span className={styles.hint}>저장한 뒤에는 바꿀 수 없습니다</span>
+                ) : null}
+              </label>
+              <div className={styles.field} />
               <div className={`${styles.field} ${styles.span4}`}>
                 <span className={styles.label}>
-                  {DEF.hq.label} {DEF.hq.required ? <span className={styles.req}>*</span> : null}
+                  {DEF.hq?.label} {DEF.hq?.required ? <span className={styles.req}>*</span> : null}
                 </span>
                 <AddressInput
                   value={form.hq}
@@ -778,13 +940,24 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
             </div>
           </section>
 
-          {/* ── 자본·주식 ── */}
+          {/* ── 자본·주식(유한회사는 자본·출자) ── */}
           <section className={styles.section}>
             <div className={styles.sectionHeader}>
-              <h2>자본·주식</h2>
+              <h2>{terms.capitalSection}</h2>
             </div>
             <div className={styles.sectionRule} />
-            <div className={styles.grid4}>{CAPITAL_FIELDS.map((n) => field(n as Exclude<InfoName, 'hq' | 'purposes'>))}</div>
+            <div className={styles.grid4}>
+              {CAPITAL_FIELDS.map((n) =>
+                n === 'capitalAmount' ? (
+                  <Fragment key={n}>
+                    {field(n)}
+                    {personsCapitalField}
+                  </Fragment>
+                ) : (
+                  field(n as Exclude<InfoName, 'hq' | 'purposes'>)
+                ),
+              )}
+            </div>
           </section>
 
           {/* ── 설립 정보 ── */}
@@ -800,7 +973,11 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
             persons={persons}
             editable={editable}
             isNew={isNew}
+            terms={terms}
+            isLtd={isLtd}
             unitsIssued={toCount(form.text.unitsIssued)}
+            parValue={toCount(form.text.parValue)}
+            capitalAmount={toCount(form.text.capitalAmount)}
             rowErrors={personErrors}
             listError={fieldErrors.persons}
             onSave={savePerson}
@@ -808,7 +985,7 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
           />
 
           <PurposesSection
-            def={DEF.purposes}
+            def={DEF.purposes!}
             value={form.text.purposes}
             disabled={disabled}
             error={errorFor('purposes')}
@@ -834,8 +1011,10 @@ export function IncorporationDetail({ draft, saved: initialSaved }: Props) {
       {printing && saved ? (
         <IncorporationPrintDialog
           id={saved.id}
+          initialDocName={printDocName}
           onClose={() => {
             setPrinting(false);
+            setPrintDocName(null);
             setPrintLogKey((k) => k + 1);
           }}
         />
@@ -926,7 +1105,7 @@ function PurposesSection({
 }
 
 // =============================================================================
-// 사람 — 발기인 · 이사 · 감사 · 대표이사(겹쳐 체크) + 인수 주식 수 + 취임일
+// 사람 — 발기인 · 이사 · 감사 · 대표이사(겹쳐 체크) + 인수 주식 수 + 취임일. 유한회사는 사원 · 출자좌수(이름표만)
 // =============================================================================
 
 const blankDraft = (): PersonDraft => ({
@@ -965,7 +1144,11 @@ function PersonsSection({
   persons,
   editable,
   isNew,
+  terms,
+  isLtd,
   unitsIssued,
+  parValue,
+  capitalAmount,
   rowErrors,
   listError,
   onSave,
@@ -974,8 +1157,15 @@ function PersonsSection({
   persons: IncorpPersonView[];
   editable: boolean;
   isNew: boolean;
+  /** 회사 형태의 이름표(발기인 · 사원 …). */
+  terms: IncorpTerms;
+  /** 유한회사 — 합은 「× 1좌의 금액 = 자본금」으로 보인다. */
+  isLtd: boolean;
   /** 설립 때 발행하는 주식의 총수(지금 입력) — 발기인 인수 합과 나란히 보여 준다. */
   unitsIssued: number | null;
+  /** 1좌의 금액 · 자본금(지금 입력) — 유한회사 합 줄. */
+  parValue: number | null;
+  capitalAmount: number | null;
   /** 저장 · 검증이 돌려준 줄별 오류(보낸 순서 = 표의 순서). */
   rowErrors: Record<number, string[]>;
   listError?: string;
@@ -1042,8 +1232,14 @@ function PersonsSection({
       </div>
       <div className={styles.sectionRule} />
       <p className={styles.sectionNote}>
-        발기인 {founders.length}명 · 인수 주식 수 합 {founderUnits.toLocaleString('ko-KR')}주
-        {unitsIssued !== null ? ` / 설립 때 발행하는 주식의 총수 ${unitsIssued.toLocaleString('ko-KR')}주` : ''}
+        {terms.founder} {founders.length}명 · {terms.units} 합 {founderUnits.toLocaleString('ko-KR')}{terms.unitWord}
+        {isLtd
+          ? parValue !== null
+            ? ` × 1좌의 금액 ${parValue.toLocaleString('ko-KR')}원 = ${(founderUnits * parValue).toLocaleString('ko-KR')}원${capitalAmount !== null ? ` / 자본금 ${capitalAmount.toLocaleString('ko-KR')}원` : ''}`
+            : ''
+          : unitsIssued !== null
+            ? ` / 설립 때 발행하는 주식의 총수 ${unitsIssued.toLocaleString('ko-KR')}주`
+            : ''}
         {isNew ? ' · 사람은 위의 [저장] 을 누를 때 건과 함께 저장됩니다.' : ''}
       </p>
 
@@ -1058,7 +1254,7 @@ function PersonsSection({
         <div className={styles.oHead}>
           <span>성명</span>
           <span>역할</span>
-          <span>인수 주식 수</span>
+          <span>{terms.units}</span>
           <span>취임일</span>
           <span>주민등록번호</span>
           <span>주소</span>
@@ -1071,7 +1267,7 @@ function PersonsSection({
             <div key={p.id} className={styles.oItem}>
               <div className={`${styles.oRow}${draft?.id === p.id ? ` ${styles.oRowEditing}` : ''}`}>
                 <span className={p.name ? styles.ellipsis : styles.muted}>{p.name || '(성명 없음)'}</span>
-                <span className={rolesOf(p).length > 0 ? styles.ellipsis : styles.muted}>{rolesOf(p).join(' · ') || '—'}</span>
+                <span className={rolesOf(p, terms).length > 0 ? styles.ellipsis : styles.muted}>{rolesOf(p, terms).join(' · ') || '—'}</span>
                 <span className={styles.tabular}>{p.unitsSubscribed.toLocaleString('ko-KR')}</span>
                 <span className={`${styles.tabular}${p.appointmentDate ? '' : ` ${styles.muted}`}`}>{p.appointmentDate ?? '—'}</span>
                 <span className={`${styles.tabular}${p.rrnMasked ? '' : ` ${styles.muted}`}`}>{p.rrnMasked ?? '—'}</span>
@@ -1157,7 +1353,7 @@ function PersonsSection({
                 역할 <span className={styles.req}>*</span>
               </span>
               <div className={styles.checkRow}>
-                {ROLES.map(([key, label]) => (
+                {rolesFor(terms).map(([key, label]) => (
                   <label key={key} className={styles.checkItem}>
                     <input
                       type="checkbox"
@@ -1171,7 +1367,7 @@ function PersonsSection({
               </div>
             </div>
             <label className={styles.field}>
-              <span className={styles.label}>인수 주식 수</span>
+              <span className={styles.label}>{terms.units}</span>
               <input
                 className={`${styles.input} ${styles.tabular} ${styles.numInput}`}
                 value={draft.units}
@@ -1179,7 +1375,9 @@ function PersonsSection({
                 inputMode="numeric"
                 onChange={(e) => setDraft({ ...draft, units: formatMoneyInput(e.currentTarget) })}
               />
-              <span className={styles.hint}>발기인의 합이 설립 때 발행하는 주식의 총수와 같아야 합니다</span>
+              <span className={styles.hint}>
+                {isLtd ? '사원 출자좌수 합 × 1좌의 금액이 자본금과 같아야 합니다' : '발기인의 합이 설립 때 발행하는 주식의 총수와 같아야 합니다'}
+              </span>
             </label>
             <label className={styles.field}>
               <span className={styles.label}>취임일</span>
@@ -1200,7 +1398,7 @@ function PersonsSection({
                 inputMode="numeric"
                 autoComplete="off"
                 placeholder={draft.rrnMasked ? `${draft.rrnMasked} — 바꿀 때만 입력` : '숫자 13자리'}
-                onChange={(e) => setDraft({ ...draft, rrn: e.target.value })}
+                onChange={(e) => setDraft({ ...draft, rrn: maskInput(e.currentTarget, 'rrn') })}
               />
               {rrnBad ? (
                 <span className={styles.fieldError}>주민등록번호는 숫자 13자리로 입력하세요</span>

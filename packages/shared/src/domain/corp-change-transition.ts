@@ -30,6 +30,7 @@
  */
 import { isCorpChangeStatus, type CorpChangeFieldError, type CorpChangeStatus } from './corp-change.ts';
 import type { CorpChangeOfficerView, Parsed } from './corp-change-detail.ts';
+import type { ArticleChange } from './legal-articles.ts';
 
 /** 취소 사유 최대 길이 — DB `cancel_reason varchar(200)` 그대로. */
 export const CANCEL_REASON_MAX = 200;
@@ -160,6 +161,19 @@ export interface CorpChangeSubmitSnapshot {
   };
   payload: Record<string, unknown>;
   officers: SnapshotOfficer[];
+  /**
+   * 정관 변경(2026-11-08, 설계 §3) — 정관 최종본이 있는 회사의 정관이 바뀌는 구분만. 없으면 정관을 다루지 않은 건
+   * (정관이 안 바뀌는 구분 · 최종본이 없는 다른 곳 설립 회사). ★ 칸을 더했지만 모양 번호는 그대로다 — 없으면 없는 것.
+   *   revision — 작성완료 때 최종본 개정 번호. 완료 때 다르면 막는다(§3-4)
+   *   changes  — 실제로 바뀐 조항(전 · 후 문구). 비면 정관 변경이 아니다(§3-2 — 시·도가 같은 본점이전)
+   */
+  articles?: SnapshotArticles;
+}
+
+/** 작성완료 스냅샷의 정관 변경. */
+export interface SnapshotArticles {
+  revision: number;
+  changes: ArticleChange[];
 }
 
 /** 스냅샷에 넣을 회사값 — 저장소의 `CompanySourceRow` 에서 이 칸들만 넘긴다. */
@@ -184,6 +198,7 @@ export function buildSubmitSnapshot(args: {
   company: SnapshotCompanySource;
   payload: Record<string, unknown>;
   officers: readonly CorpChangeOfficerView[];
+  articles?: SnapshotArticles;
 }): CorpChangeSubmitSnapshot {
   const c = args.company;
   return {
@@ -206,5 +221,6 @@ export function buildSubmitSnapshot(args: {
       for (const k of SNAPSHOT_OFFICER_KEYS) out[k] = o[k];
       return out as unknown as SnapshotOfficer;
     }),
+    ...(args.articles ? { articles: args.articles } : {}),
   };
 }

@@ -62,12 +62,12 @@ export function caretForMasked({ raw, caret, masked, keep }: MaskedCaretArgs): n
 //   web `features/contracts/form-model.ts` 에 있었다 — 서버가 쓸 수 없어서 옮겼다.
 // ★ 표시 형식이다. 저장된 DB 값을 고쳐 쓰지 않는다 — 읽어 보여 줄 때 씌울 뿐이다.
 
-export type DigitMaskKind = 'bizno' | 'corpno' | 'phone';
+export type DigitMaskKind = 'bizno' | 'corpno' | 'phone' | 'rrn';
 
 /**
  * 마스크 3종 — 시안 `maskValue`(`05-logic.md` §5) 그대로에 **서울 02** 를 더했다.
  *
- *   사업자등록번호 000-00-00000 · 법인등록번호 000000-0000000
+ *   사업자등록번호 000-00-00000 · 법인등록번호 000000-0000000 · 주민등록번호 000000-0000000(법무 화면, 2026-11-02)
  *   전화  02  → 02-XXX-XXXX(9자리) / 02-XXXX-XXXX(10자리)
  *         010 → 010-XXXX-XXXX
  *         그 밖 → 3-3-4, 11자리면 3-4-4
@@ -77,14 +77,14 @@ export type DigitMaskKind = 'bizno' | 'corpno' | 'phone';
  *   (`15881234` → `158-812-34`). 막지는 않는다(`isDigitMaskComplete`).
  */
 export function maskValue(kind: DigitMaskKind, raw: string): string {
-  const max = kind === 'corpno' ? 13 : kind === 'phone' ? 11 : 10;
+  const max = kind === 'corpno' || kind === 'rrn' ? 13 : kind === 'phone' ? 11 : 10;
   const d = raw.replace(/\D/g, '').slice(0, max);
 
   if (kind === 'bizno') {
     if (d.length > 5) return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`;
     return d.length > 3 ? `${d.slice(0, 3)}-${d.slice(3)}` : d;
   }
-  if (kind === 'corpno') {
+  if (kind === 'corpno' || kind === 'rrn') {
     return d.length > 6 ? `${d.slice(0, 6)}-${d.slice(6)}` : d;
   }
   if (d.startsWith('02')) {
@@ -102,6 +102,7 @@ export function maskValue(kind: DigitMaskKind, raw: string): string {
 /** 자릿수 규칙 — 칸 옆 안내 · 서버 오류 문구가 같이 쓴다. */
 export const DIGIT_MASK_RULE: Readonly<Record<DigitMaskKind, string>> = {
   corpno: '숫자 13자리',
+  rrn: '숫자 13자리',
   bizno: '숫자 10자리',
   phone: '지역번호를 포함한 숫자(02 는 9~10자리, 010 은 11자리, 그 밖의 0XX 는 10~11자리)',
 };
@@ -117,7 +118,7 @@ export function isDigitMaskComplete(kind: DigitMaskKind, value: string | null | 
   if (t === '') return true;
   if (/[^\d\s-]/.test(t)) return false;
   const n = t.replace(/\D/g, '').length;
-  if (kind === 'corpno') return n === 13;
+  if (kind === 'corpno' || kind === 'rrn') return n === 13;
   if (kind === 'bizno') return n === 10;
   const d = t.replace(/\D/g, '');
   if (d.startsWith('02')) return n === 9 || n === 10;

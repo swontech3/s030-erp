@@ -18,8 +18,9 @@
  * 삐용 토큰은 서버에만 있다(지시문 1-4). 조회도 `callBbiyong` 을 거친다 — 토큰 만료 시
  * 재발급이 그 안에서 돈다(`session/bbiyongToken.ts`).
  *
- * ★ 삐용 단체 조회 **규격이 아직 없다.** 실연동(`BBIYONG_MOCK=false`)에서는 어댑터가
- *   `unsupported` 를 돌려주고, 여기서 503 + 그 문구로 내린다. 장애(삐용 꺼짐)와는 문구가 다르다.
+ * ★ 실연동(`BBIYONG_MOCK=false`)은 삐용 `org-list` 를 부른다(2026-11-01). 결과별 응답:
+ *   `unsupported` → 503 · 권한 거절(`forbidden`, 삐용 단체관리 권한 없음) → 403 · 연결 실패
+ *   (`BbiyongUnavailableError`) → 503(`index.ts` 오류 처리). 셋 다 이유를 `req.log.warn` 한 줄로 남긴다.
  *
  * ★ 응답은 단체 + 입주사 딱지까지다. 팝업이 부르는 화면에 넘기는 것은 그중 셋뿐이다
  *   (`domain/org-lookup.ts` 의 `toOrgPick`).
@@ -36,6 +37,7 @@ import {
 import { requireSession } from '../session/hook.ts';
 import { callBbiyong } from '../session/bbiyongToken.ts';
 import { bbiyongOrg, type OrgLookupOutcome } from '../bbiyong/index.ts';
+import { BbiyongUnavailableError } from '../bbiyong/types.ts';
 import { scopeOfSession, withCompanyScope } from '../db/withCompanyScope.ts';
 import { listLinkedOrgIds } from '../db/orgLookup.ts';
 
@@ -56,15 +58,41 @@ const defaultDeps: OrgLookupDeps = {
 
 const FORBIDDEN = { error: 'forbidden', message: '회사 조회는 운영사만 할 수 있습니다' } as const;
 
+type Reply = { code(n: number): { send(b: unknown): unknown } };
+type Log = { warn(o: object, m: string): void };
+
+/** 조회 결과가 성공이 아니면 응답을 보내고 true. 이유는 warn 한 줄(결정 2026-11-01). */
+function refuseOutcome(out: OrgLookupOutcome<unknown>, reply: Reply, log: Log): boolean {
+  if (out.kind === 'unsupported') {
+    log.warn({ reason: 'org_lookup_unsupported' }, `[org-lookup] 503 — ${out.message}`);
+    reply.code(503).send({ error: 'org_lookup_unsupported', message: out.message });
+    return true;
+  }
+  if (out.kind === 'forbidden') {
+    log.warn({ reason: 'bbiyong_forbidden' }, `[org-lookup] 403 — ${out.message}`);
+    reply.code(403).send({ error: 'bbiyong_forbidden', message: out.message });
+    return true;
+  }
+  return false;
+}
+
+/** 삐용 연결 실패는 이유를 warn 으로 남기고 그대로 던진다 — 503 은 `index.ts` 오류 처리가 낸다. */
+async function lookup<T>(log: Log, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (err) {
+    if (err instanceof BbiyongUnavailableError) log.warn({ reason: 'bbiyong_unavailable' }, `[org-lookup] 503 — ${err.message}`);
+    throw err;
+  }
+}
+
 export function registerOrgLookupRoutes(app: FastifyInstance, deps: OrgLookupDeps = defaultDeps): void {
   app.get<{ Querystring: { q?: string } }>('/org-lookup', async (req, reply) => {
     const session = requireSession(req);
     if (session.role !== 'operator') return reply.code(403).send(FORBIDDEN);
 
-    const out = await deps.listOrgs(session, normalizeOrgQuery(req.query.q));
-    if (out.kind === 'unsupported') {
-      return reply.code(503).send({ error: 'org_lookup_unsupported', message: out.message });
-    }
+    const out = await lookup(req.log, () => deps.listOrgs(session, normalizeOrgQuery(req.query.q)));
+    if (refuseOutcome(out, reply, req.log) || out.kind !== 'ok') return reply;
     // ★ 받은 목록을 그대로 보여 준다 — 「법무 서비스를 받은 회사」로 거르는 것은 삐용 몫이다
     //   (삐용 회신 2026-10-09). 단체코드 대역(Z 등)으로 거르지 않는다.
     const orgs = out.value;
@@ -83,10 +111,8 @@ export function registerOrgLookupRoutes(app: FastifyInstance, deps: OrgLookupDep
         .send({ error: 'invalid_request', message: '단체 ID 또는 단체코드 중 하나를 바르게 주세요' });
     }
 
-    const out = await deps.getOrg(session, key);
-    if (out.kind === 'unsupported') {
-      return reply.code(503).send({ error: 'org_lookup_unsupported', message: out.message });
-    }
+    const out = await lookup(req.log, () => deps.getOrg(session, key));
+    if (refuseOutcome(out, reply, req.log) || out.kind !== 'ok') return reply;
     if (!out.value) return reply.send({ org: null });
     const linked = await deps.linkedOrgIds(session, [out.value.orgId]);
     return reply.send({ org: markTenants([out.value], linked)[0] });

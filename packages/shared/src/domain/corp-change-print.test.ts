@@ -7,10 +7,13 @@ import {
   buildCasePrintValues,
   buildOfficerPrintValues,
   changeSummary,
+  corpChangeDocName,
   formatAttachments,
   formatKoreanDate,
   formatRrn,
   pickDocFormSetting,
+  printManualFields,
+  withManualValues,
   readSubmitSnapshot,
   type CasePrintSource,
   type DocFormSettingRow,
@@ -180,7 +183,7 @@ describe('changeSummary — 레거시 문장 그대로(결정 I)', () => {
   });
   it('대표주소 — 이전연월일 줄', () => {
     expect(changeSummary(snap())).toBe(
-      '대표이사 홍길동의 주소를 「(04500) 서울 중구 새집로 3 101호」(으)로 변경한다.\n이전연월일 : 2026년 10월 1일',
+      '대표이사 홍길동의 주소를 「(04500) 서울 중구 새집로 3, 101호」(으)로 변경한다.\n이전연월일 : 2026년 10월 1일',
     );
   });
   it('목적 — 빈 줄을 빼고 번호', () => {
@@ -206,6 +209,29 @@ describe('buildCasePrintValues', () => {
     ...over,
   });
 
+  it('★ 상호 — 표기 없으면 회사유형 낱말을 위치대로(결정 2026-11-06) · 입주사 · 비입주사 같다', () => {
+    const v = (company: Partial<CorpChangeSubmitSnapshot['company']>, namePosition?: string | null) =>
+      buildCasePrintValues(src({ snapshot: snap({ company: { ...snap().company, ...company } }), namePosition })).companyName;
+    expect(v({ name: '주식회사 에이' })).toBe('주식회사 에이'); // 표기 있음 — 그대로
+    expect(v({ isTenant: false, name: '기본 권한 회사', memberType: 'A' }, 'F')).toBe('유한회사 기본 권한 회사');
+    expect(v({ isTenant: false, name: '기본 권한 회사', memberType: 'A' }, 'B')).toBe('기본 권한 회사 유한회사');
+    expect(v({ isTenant: true, name: '에이', memberType: 'R' })).toBe('주식회사 에이'); // 설립 건 없음 — 앞
+    expect(v({ isTenant: true, name: '에이', memberType: 'R' }, 'B')).toBe('에이 주식회사');
+    expect(v({ isTenant: false, name: '에이', memberType: null }, 'B')).toBe('에이'); // 회사유형 빔
+  });
+
+  it('★ 본점이전(HQ · HQ_OUT, 2026-11-01) — 새 본점(우편번호 없음) · 이전일, 다른 구분은 빈칸', () => {
+    const payload = { newHqAddress: { zipCode: '06100', address: '경기 성남시 새로 9', addressDetail: '2층' }, resolutionDate: '2026-10-01', relocationDate: '2026-10-05' };
+    for (const changeType of ['HQ', 'HQ_OUT']) {
+      const v = buildCasePrintValues(src({ snapshot: snap({ changeType, payload, company: { ...snap().company, memberType: 'A' } }) }));
+      expect([v.newHqAddress, v.relocationDate]).toEqual(['경기 성남시 새로 9, 2층', '2026년 10월 5일']);
+      expect(v.matterBody).toBe('본점을 「(06100) 경기 성남시 새로 9, 2층」(으)로 이전한다.');
+      expect(v.hqAddress).toBe('서울 강남구 본점로 1, 3층');
+    }
+    const other = buildCasePrintValues(src());
+    expect([other.newHqAddress, other.relocationDate]).toEqual(['', '']);
+  });
+
   it('★ 모든 자리표시 이름에 값이 있다 — 빈 것도 빈칸으로', () => {
     const v = buildCasePrintValues(src());
     expect(Object.keys(v).sort()).toEqual(CORP_CHANGE_PRINT_FIELDS.map((f) => f.name).sort());
@@ -218,7 +244,7 @@ describe('buildCasePrintValues', () => {
       companyName: '주식회사 에이',
       corpNumber: '110111-1234567',
       bizNumber: '123-45-67890',
-      hqAddress: '서울 강남구 본점로 1 3층',
+      hqAddress: '서울 강남구 본점로 1, 3층',
       ceoName: '홍길동',
       ceoAddress: '서울 마포구 자택로 2',
       ceoPhone: '02-123-4567',
@@ -307,7 +333,7 @@ describe('buildOfficerPrintValues', () => {
       officerPosition: '사내이사',
       officerKind: '중임',
       officerRrn: '900101-1234567',
-      officerAddress: '서울 중구 임원로 1 2층',
+      officerAddress: '서울 중구 임원로 1, 2층',
       officerEffectiveDate: '2026년 10월 1일',
     });
   });
@@ -414,5 +440,46 @@ describe('parsePrintLogBody — 출력 이력 기록 본문', () => {
   it('★ 임원 이름 · 주민번호를 실어 와도 버린다(아는 칸만)', () => {
     const r = parsePrintLogBody({ formId: 'f', officerName: '가짜', officerRrn: '9001011234567' });
     expect(r.ok && Object.keys(r.value).sort()).toEqual(['applyDate', 'formId', 'sheet', 'writeDate']);
+  });
+});
+
+describe('출력 때 입력(결정 2026-11-05)', () => {
+  const server = { companyName: '가나다', ceoName: '최현수', resolutionDate: '' };
+
+  it('서버 값에 없는 자리표시만 · 나온 순서 · 중복 없이 · 이름표는 양식 사전(없으면 이름)', () => {
+    expect(
+      printManualFields(['companyName', 'memberCount', 'resolutionDate', 'directorName', 'memberCount'], server, [
+        { name: 'memberCount', label: ' 사원의 총수 ' },
+        { name: 'companyName', label: '상호' },
+      ]),
+    ).toEqual([
+      { name: 'memberCount', label: '사원의 총수' },
+      { name: 'directorName', label: 'directorName' },
+    ]);
+  });
+
+  it('손으로 넣은 값을 얹는다 — 서버 값(빈 값 포함)은 덮지 않고, 빈 입력은 얹지 않는다', () => {
+    expect(withManualValues(server, { memberCount: '2', ceoName: '바꿈', resolutionDate: 'x', directorName: '  ' })).toEqual({
+      ...server,
+      memberCount: '2',
+    });
+  });
+});
+
+describe('corpChangeDocName — 법인변경 서류의 상호(결정 2026-11-06)', () => {
+  it.each([
+    ['표기 있음(앞) — 그대로', '주식회사 한빛', 'A', 'B', '주식회사 한빛'],
+    ['표기 있음(뒤) — 그대로', '한빛 유한회사', 'R', null, '한빛 유한회사'],
+    ['표기 있음((주)) — 그대로', '(주)한빛', 'R', null, '(주)한빛'],
+    ['표기 있음((유)) — 그대로', '한빛(유)', 'A', null, '한빛(유)'],
+    ['표기 없음 + 설립 건 F', '한빛', 'A', 'F', '유한회사 한빛'],
+    ['표기 없음 + 설립 건 B', '한빛', 'A', 'B', '한빛 유한회사'],
+    ['표기 없음 + 설립 건 없음 — 앞', '한빛', 'R', null, '주식회사 한빛'],
+    ['회사유형 빔 — 붙이지 않음', '한빛', null, 'F', '한빛'],
+    ['회사유형이 R · A 가 아님 — 붙이지 않음', '한빛', 'C', 'F', '한빛'],
+    ['회사명 빔', '  ', 'R', 'F', ''],
+    ['앞뒤 공백은 뗀다', ' 한빛 ', 'R', null, '주식회사 한빛'],
+  ] as const)('%s', (_c, name, memberType, position, expected) => {
+    expect(corpChangeDocName(name, memberType, position)).toBe(expected);
   });
 });

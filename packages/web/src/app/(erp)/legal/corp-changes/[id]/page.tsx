@@ -7,6 +7,7 @@
  * 라우트는 `/legal/corp-changes/[id]` 하나이고, **새 건은 `/legal/corp-changes/new`** 다(계약 폼과 같다):
  *
  *   `/legal/corp-changes/new?changeType=&orgId=&orgCode=`   임시 모드 — 건이 아직 없다
+ *     (+ `&memberType=` — 새 건 대화상자에서 고른 회사유형. 회사 정보에 넣어 첫 [저장] 에 함께 저장, 결정 2026-11-07)
  *   `/legal/corp-changes/{id}`                              저장된 건
  *
  * ★★ 임시 모드는 DB 의 건을 읽지 않는다 — 기본정보(회사 정보)만 읽어서 보여 주고, 변경 내용 ·
@@ -24,6 +25,7 @@ import type {
   CorpChangeDetailResponse,
   CorpChangeDraftResponse,
 } from '@swonbiz/shared/domain/corp-change-detail';
+import { presetMemberTypeFor } from '@swonbiz/shared/domain/corp-change-detail';
 import { callApi } from '@/lib/api';
 import { getMe, readSid, requireScreen } from '@/lib/session';
 import { CorpChangeDetail } from '@/features/legal/CorpChangeDetail';
@@ -36,7 +38,7 @@ export default async function CorpChangeDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ changeType?: string; orgId?: string; orgCode?: string }>;
+  searchParams: Promise<{ changeType?: string; orgId?: string; orgCode?: string; memberType?: string }>;
 }) {
   await requireScreen('s040200011', '/legal/corp-changes/[id]');
   const { id } = await params;
@@ -45,7 +47,7 @@ export default async function CorpChangeDetailPage({
   const canOpenTenantScreen = me?.screens.includes('s030200030') ?? false;
 
   if (id === NEW) {
-    const { changeType, orgId, orgCode } = await searchParams;
+    const { changeType, orgId, orgCode, memberType } = await searchParams;
     const qs = new URLSearchParams();
     if (changeType) qs.set('changeType', changeType);
     if (orgId) qs.set('orgId', orgId);
@@ -56,9 +58,10 @@ export default async function CorpChangeDetailPage({
     if (!res.ok) throw new Error(`법인변경 작성 준비 실패(${res.status})`);
     return (
       <CorpChangeDetail
-        key={`new:${qs.toString()}`}
+        key={`new:${qs.toString()}:${memberType ?? ''}`}
         draft={res.body}
         saved={null}
+        presetMemberType={presetMemberTypeFor(res.body, memberType)}
         canOpenTenantScreen={canOpenTenantScreen}
       />
     );

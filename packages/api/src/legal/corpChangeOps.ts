@@ -20,15 +20,20 @@ import type { ErpSession } from '@swonbiz/shared';
 import {
   CHANGE_TYPE_DEFS,
   CORP_CHANGE_CODE_USE_TP,
+  CORP_CHANGE_MEMBER_RULE_CATEGORY,
+  CORP_CHANGE_MEMBER_RULE_USE_TP,
   CORP_CHANGE_STATUS_CATEGORY,
   CORP_CHANGE_TYPE_CATEGORY,
   INITIAL_CORP_CHANGE_STATUS,
   availableTransitions,
   canEditCorpChange,
+  changeTypeMemberTypeError,
   checkDelete,
   checkTransition,
   isCorpChangeStatus,
   isCorpChangeType,
+  parseChangeTypeRules,
+  type ChangeTypeRules,
   type CorpChangeFieldError,
   type CorpChangeOfficerInput,
   type CorpChangeType,
@@ -39,7 +44,19 @@ import {
   buildSubmitSnapshot,
   parseSeenStatus,
   parseTransitionBody,
+  type SnapshotArticles,
 } from '@swonbiz/shared/domain/corp-change-transition';
+import { readSubmitSnapshot } from '@swonbiz/shared/domain/corp-change-print';
+import {
+  ARTICLES_APPLIED_LOCK_MESSAGE,
+  ARTICLES_BUSY_MESSAGE,
+  ARTICLES_STALE_MESSAGE,
+  applyArticleChanges,
+  articlesRolesFor,
+  changedArticles,
+  planArticleChanges,
+  type ArticleItem,
+} from '@swonbiz/shared/domain/legal-articles';
 import {
   LEGAL_MEMBER_TYPE_CATEGORY,
   LEGAL_MEMBER_TYPE_USE_TP,
@@ -50,6 +67,7 @@ import {
   parseOfficerBody,
   parsePayload,
   type CorpChangeCompanyInfo,
+  type CorpChangeCompanyTypeResponse,
   type CorpChangeCreateInput,
   type CorpChangeDetailResponse,
   type CorpChangeDraftResponse,
@@ -62,12 +80,14 @@ import type { CodeOption } from '@swonbiz/shared/domain/corp-change-list';
 import { encrypt } from '../lib/crypto.ts';
 import type { ScopedClient } from '../db/withCompanyScope.ts';
 import { listCodes } from '../db/lookups.ts';
+import { completedIncorpNamePosition } from '../db/incorporations.ts';
 import {
   deleteCorpChange,
   deleteOfficer,
   getCorpChange,
   insertCorpChange,
   insertOfficer,
+  listChangeTypeRuleRows,
   listOfficers,
   readCompanySource,
   tenantOrgCode,
@@ -76,9 +96,18 @@ import {
   updateOfficer,
   updatePayload,
   upsertLegalOrg,
+  readSubmitSnapshotRaw,
   type CorpChangeRow,
   type RrnStored,
 } from '../db/corpChanges.ts';
+import {
+  getArticlesHead,
+  isChangeApplied,
+  listArticleItems,
+  listOtherWrittenSnapshots,
+  replaceArticles,
+} from '../db/legalArticles.ts';
+import { articleContext, articlesBase, ensureFinalArticles, readArticlesRules } from './articlesOps.ts';
 
 export type OpError = {
   ok: false;
@@ -146,6 +175,8 @@ async function companyView(
     ? ((company.isTenant ? tenantTypes : legalTypes).find((c) => c.code === company.memberType)?.name ??
       company.memberType)
     : null;
+  // 「서류에 쓰이는 상호」의 낱말 위치 — 출력과 같다(`corpChangeDocName`, 결정 2026-11-06)
+  const namePosition = await completedIncorpNamePosition(client, org.orgId);
 
   return {
     company: {
@@ -162,6 +193,7 @@ async function companyView(
       memberType: company.memberType,
       memberTypeName,
       hasLegalOrg: company.hasLegalOrg,
+      namePosition,
       // 삐용 기본값은 라우트가 트랜잭션 밖에서 채운다(`applyCompanyDefaults`).
       defaultedFields: [],
     },
@@ -230,6 +262,61 @@ async function checkCompanyWrite(
 // 임시 모드 · 첫 저장
 // =============================================================================
 
+/** 구분별 회사유형 규칙(공통 코드 `LAW_CNG_MT`, 결정 2026-11-07) — 대화상자 · 첫 저장 · 저장 · 작성완료가 이것 하나를 읽는다. */
+async function readChangeTypeRules(client: ScopedClient): Promise<ChangeTypeRules> {
+  return parseChangeTypeRules(
+    await listChangeTypeRuleRows(client, CORP_CHANGE_MEMBER_RULE_CATEGORY, CORP_CHANGE_MEMBER_RULE_USE_TP),
+  );
+}
+
+/**
+ * 회사유형과 맞지 않는 구분 거절(결정 2026-11-01 2 · 11 → 2026-11-07 공통 코드 `LAW_CNG_MT`) — 첫 저장 · [저장] 이 쓴다(작성완료는 `validateCorpChange`).
+ * 회사 정보가 함께 실려 오면 그 값(이번에 저장될 회사유형), 아니면 저장된 회사유형으로 본다.
+ * ★ 단체는 RLS 를 통과한 건의 것이거나 `parseOrgTarget` 을 거친 것만 넣는다(db 머리말 ⚠).
+ */
+async function checkChangeTypeForCompany(
+  client: ScopedClient,
+  changeType: string,
+  orgId: number,
+  company: LegalOrgInput | null,
+): Promise<OpError | null> {
+  const memberType = company ? company.memberType : (await readCompanySource(client, orgId)).memberType;
+  const message = changeTypeMemberTypeError(changeType, memberType, await readChangeTypeRules(client));
+  return message ? fail(400, 'invalid_request', message, [{ field: 'changeType', message }]) : null;
+}
+
+/**
+ * 새 건 대화상자의 회사유형(결정 2026-11-01) — 구분 선택지를 거르는 데만 쓴다(건을 읽지 않는다).
+ * 입주사 = ERP 회원구분, 비입주사 = 법무 회사 정보의 회사유형. 비었으면 null(화면은 주식회사로 본다).
+ * ★ 비입주사이고 회사유형이 비었으면 대화상자가 그 자리에서 고르게 한다(결정 2026-11-07) — 그래서
+ *   입주사 여부 · 회사 정보를 고칠 수 있는지(`canEditCompany`, 기본정보와 같은 판정) · 선택지(법무 파티션)를 같이 준다.
+ *   고른 값은 여기서 쓰지 않는다 — 첫 [저장] 의 회사 정보에 실려 `upsertLegalOrg` 가 저장한다.
+ * ★ 단체는 `parseOrgTarget` 을 거친 것이다 — 회사 세션이 남의 단체를 적으면 그 전에 403.
+ */
+export async function readCorpChangeCompanyType(
+  client: ScopedClient,
+  target: OrgTarget,
+  companyEditor = false,
+): Promise<OpResult<CorpChangeCompanyTypeResponse>> {
+  const source = await readCompanySource(client, target.orgId);
+  const memberTypes = source.isTenant
+    ? []
+    : (await listCodes(client, [{ category: LEGAL_MEMBER_TYPE_CATEGORY, useTp: LEGAL_MEMBER_TYPE_USE_TP }])).map((c) => ({
+        code: c.code,
+        name: c.name,
+      }));
+  return {
+    ok: true,
+    value: {
+      memberType: source.memberType,
+      isTenant: source.isTenant,
+      canEditCompany: companyEditor && !source.isTenant,
+      memberTypes,
+      changeTypeRules: await readChangeTypeRules(client),
+    },
+  };
+}
+
 /**
  * 임시 모드(`/legal/corp-changes/new`) — **건을 읽지 않는다**(아직 없다). 기본정보만 읽어서 보여 준다.
  * ★ 단체는 `parseCreateBody` 를 거친 것이다 — 회사 세션이 주소에 남의 단체를 적으면 그 전에 403.
@@ -274,6 +361,8 @@ export async function createCorpChange(
     const refused = await checkCompanyWrite(client, companyEditor, input.orgId, input.company);
     if (refused) return refused;
   }
+  const wrongType = await checkChangeTypeForCompany(client, input.changeType, input.orgId, input.company ?? null);
+  if (wrongType) return wrongType;
 
   const id = randomUUID();
   const actor = actorOf(session);
@@ -326,6 +415,11 @@ export async function readCorpChangeDetail(
   const statusBeforeCancelName = statusBeforeCancel
     ? (await codeNames(client, changeType, statusBeforeCancel)).statusName
     : null;
+  const articles = await articlesView(client, row, changeType);
+  // 정관이 바뀐(최종본에 반영된) 완료 건은 완료 취소 · 취소를 막는다 — 운영사도(결정 2026-11-08)
+  const transitions = availableTransitions(row.status, session.role, statusBeforeCancel).filter(
+    (to) => !(articles?.applied && row.status === 'C' && (to === 'E' || to === 'X')),
+  );
 
   return {
     ok: true,
@@ -342,14 +436,39 @@ export async function readCorpChangeDetail(
       ...view,
       officers,
       // ★ 버튼은 서버가 전이를 받을 때와 **같은 표**로 고른다(`corp-change.ts` 머리말 ★★★).
-      availableTransitions: availableTransitions(row.status, session.role, statusBeforeCancel),
+      availableTransitions: transitions,
       canDelete: checkDelete(row.status, session.role).ok,
       statusBeforeCancel,
       statusBeforeCancelName,
       cancelReason: row.status === 'X' ? row.cancelReason : null,
       writtenOn: row.writtenOn,
       completedOn: row.completedOn,
+      articles,
     },
+  };
+}
+
+/**
+ * 상세의 「변경된 정관 조항」(2026-11-08, 설계 §3-1) — 정관이 바뀌는 구분일 때만.
+ *   base    — 최종본(없으면 설립 건으로 만들 모양 — 메모리에서만)의 바뀌는 역할 조항. 만들 수 없으면 null(안내만)
+ *   written — 작성완료 스냅샷의 바뀐 조항(작성완료 뒤)
+ *   applied — 최종본에 반영됐다(완료 뒤)
+ * ★ 단체는 이 건의 org_id(RLS 를 통과한 값)다.
+ */
+async function articlesView(
+  client: ScopedClient,
+  row: CorpChangeRow,
+  changeType: CorpChangeType,
+): Promise<CorpChangeDetailResponse['articles']> {
+  const roles = articlesRolesFor(changeType, await readArticlesRules(client));
+  if (roles.length === 0) return null;
+  const base = await articlesBase(client, row.orgId);
+  const snapshot = row.status === 'P' ? null : readSubmitSnapshot(await readSubmitSnapshotRaw(client, row.id));
+  return {
+    roles: [...roles],
+    base: base ? { revision: base.revision, items: base.items.filter((i) => i.role !== null && roles.includes(i.role)) } : null,
+    written: snapshot?.articles?.changes ?? null,
+    applied: row.status === 'C' || row.status === 'X' ? await isChangeApplied(client, row.orgId, row.id) : false,
   };
 }
 
@@ -420,7 +539,15 @@ export async function transitionCorpChange(
           changeType: row.changeType,
           payload: row.payload,
           officers: officers.map(officerForValidation),
-          company: company ? { isTenant: company.isTenant, ceoZipCode: company.ceoZipCode, ceoAddress: company.ceoAddress } : undefined,
+          company: company
+            ? {
+                isTenant: company.isTenant,
+                ceoZipCode: company.ceoZipCode,
+                ceoAddress: company.ceoAddress,
+                memberType: company.memberType,
+                changeTypeRules: await readChangeTypeRules(client),
+              }
+            : undefined,
         }
       : undefined,
   });
@@ -429,6 +556,21 @@ export async function transitionCorpChange(
     return fail(status, check.code, check.reason, status === 400 ? (check.errors ?? []) : undefined);
   }
 
+  // ── 정관(2026-11-08, 설계 §3 · §8) ──
+  // 정관이 바뀐(최종본에 반영된) 완료 건은 완료 취소(C→E) · 취소(C→X)를 막는다 — 운영사도(결정 2026-11-08)
+  if (row.status === 'C' && (to === 'E' || to === 'X') && (await isChangeApplied(client, row.orgId, row.id))) {
+    return fail(409, 'articles_applied', ARTICLES_APPLIED_LOCK_MESSAGE);
+  }
+  let articles: SnapshotArticles | undefined;
+  if (completing && company) {
+    const planned = await planWrittenArticles(client, session, row, company);
+    if (!planned.ok) return planned;
+    articles = planned.value;
+  }
+  // 완료(E→C · 취소에서 완료로 복원 X→C) — 최종본 반영을 미리 본다(쓰기는 상태를 바꾼 뒤)
+  const applying = to === 'C' && (row.status === 'E' || row.status === 'X') ? await prepareArticlesApply(client, row) : null;
+  if (applying && !applying.ok) return applying;
+
   const snapshot =
     completing && company
     ? buildSubmitSnapshot({
@@ -436,6 +578,7 @@ export async function transitionCorpChange(
         company,
         payload: row.payload,
         officers,
+        articles,
       })
     : undefined;
 
@@ -449,7 +592,77 @@ export async function transitionCorpChange(
   });
   // 잠가 두었으므로 생기지 않는다. 생기면 판정 없이 쓴 것이 없도록 멈춘다.
   if (!changed) return STALE;
+  if (applying?.ok && applying.value) {
+    await replaceArticles(client, { orgId: row.orgId, items: applying.value, changeId: row.id, actor: actorOf(session) });
+  }
   return readCorpChangeDetail(client, session, id, companyEditor);
+}
+
+/**
+ * 작성완료(P→E) 때 정관 변경 계획(설계 §3-1 · §3-2 · §8-5) — 정관이 바뀌는 구분이고 최종본이 있거나 설립 건으로 만들 수
+ * 있을 때만. 아니면 undefined(정관을 다루지 않는다 — 다른 곳 설립 회사는 지금처럼 안내만).
+ *   · 바꿀 자리를 찾지 못한 조항이 있고 사람이 고치지도 않았으면 400(자리 `articlesItems.<역할>`)
+ *   · 실제로 바뀐 조항이 있고, 같은 단체의 다른 작성완료 건이 같은 역할을 바꾸면 409(§8-5 — 둘째 건을 막는다)
+ *   · 통과하면 최종본이 없을 때 설립 건으로 만들어 확정한다(첫 정관 변경 때, 확인 화면 없이)
+ */
+async function planWrittenArticles(
+  client: ScopedClient,
+  session: ErpSession,
+  row: CorpChangeRow,
+  company: { legalName: string | null; memberType: string | null; headAddress: string | null },
+): Promise<OpResult<SnapshotArticles | undefined>> {
+  const roles = articlesRolesFor(row.changeType, await readArticlesRules(client));
+  if (roles.length === 0) return { ok: true, value: undefined };
+  const base = await articlesBase(client, row.orgId);
+  if (!base) return { ok: true, value: undefined };
+  const ctx = articleContext({
+    changeType: row.changeType,
+    payload: row.payload,
+    company,
+    namePosition: await completedIncorpNamePosition(client, row.orgId),
+  });
+  const plan = planArticleChanges(base.items, roles, ctx);
+  if (plan.errors.length > 0) {
+    return fail(
+      400,
+      'invalid_request',
+      '입력 내용을 확인하세요',
+      plan.errors.map((e) => ({ field: `articlesItems.${e.role}`, message: e.message })),
+    );
+  }
+  const changes = changedArticles(plan.items);
+  if (changes.length > 0) {
+    const mine = new Set(changes.map((c) => c.role));
+    for (const other of await listOtherWrittenSnapshots(client, row.orgId, row.id)) {
+      const theirs = readSubmitSnapshot(other.snapshot)?.articles?.changes ?? [];
+      if (theirs.some((c) => mine.has(c.role))) return fail(409, 'articles_busy', ARTICLES_BUSY_MESSAGE);
+    }
+  }
+  const final = await ensureFinalArticles(client, session, row.orgId);
+  if (!final) return { ok: true, value: undefined };
+  return { ok: true, value: { revision: final.revision, changes } };
+}
+
+/**
+ * 완료 때 최종본 반영 준비(설계 §3-4 · §8-3) — 바꿀 조항 목록(개정 부칙 포함)을 돌려준다. 반영할 것이 없으면 null.
+ * 최종본을 잠그고 작성완료 때 개정 번호와 대조한다 — 다르면 409(그 사이 다른 건이 최종본을 바꿨다).
+ * ★ 이미 반영된 건(그 건의 부칙 줄이 있다)은 다시 반영하지 않는다.
+ */
+async function prepareArticlesApply(
+  client: ScopedClient,
+  row: CorpChangeRow,
+): Promise<OpResult<ArticleItem[] | null>> {
+  const snapshot = readSubmitSnapshot(await readSubmitSnapshotRaw(client, row.id));
+  const art = snapshot?.articles;
+  if (!snapshot || !art || art.changes.length === 0) return { ok: true, value: null };
+  if (await isChangeApplied(client, row.orgId, row.id)) return { ok: true, value: null };
+  const head = await getArticlesHead(client, row.orgId, { forUpdate: true });
+  if (!head || head.state !== 'FINAL' || head.revision !== art.revision) return fail(409, 'articles_stale', ARTICLES_STALE_MESSAGE);
+  const resolutionDate = typeof snapshot.payload.resolutionDate === 'string' ? snapshot.payload.resolutionDate : null;
+  return {
+    ok: true,
+    value: applyArticleChanges(await listArticleItems(client, row.orgId), art.changes, { changeId: row.id, resolutionDate }),
+  };
 }
 
 /**
@@ -519,6 +732,8 @@ export async function saveCorpChangePayload(
     const refused = await checkCompanyWrite(client, companyEditor, row.orgId, company.value);
     if (refused) return refused;
   }
+  const wrongType = await checkChangeTypeForCompany(client, row.changeType, row.orgId, company.value);
+  if (wrongType) return wrongType;
 
   const actor = actorOf(session);
   await updatePayload(client, { id, payload: parsed.value, actor });
