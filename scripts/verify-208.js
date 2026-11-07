@@ -46,6 +46,7 @@ const CARD_COLS = {
   vat_deduct: ['character varying', 'YES'], deduct_note_src: ['character varying', 'YES'],
   item_code: ['character varying', 'YES'], classified_at: ['timestamp without time zone', 'YES'], classified_by: ['text', 'YES'],
   created_at: ['timestamp without time zone', 'NO'],
+  note: ['character varying', 'YES'], // ★ 222(2026-11-08) — 항목 지정 카드 줄 「내용」. 18 → 19칸
 };
 const CASH_COLS = {
   id: ['text', 'NO'], org_id: ['integer', 'NO'], file_id: ['text', 'NO'], use_date: ['date', 'NO'],

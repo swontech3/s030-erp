@@ -3,7 +3,11 @@
  *
  *   GET  /tax/classify?month&view&kind&from&to&file   목록 · 확인할 줄 수 · 자료 종류 칩 수 · 항목 코드 · 파일 띠
  *   POST /tax/classify/confirm { rows: [{ kind, id, itemCode }] }   [확정] · [선택한 줄에 붙이기] — 한 트랜잭션, 다시 확정하면 덮음
- *   GET  /tax/classify/export?…(목록과 같은 주소)        「전체」 보기 거르기 결과를 엑셀로(ERP 공통 부품 `lib/xlsxExport.ts`)
+ *   GET  /tax/classify/export?…(목록과 같은 주소)        검색조건 결과를 엑셀로 — 목록과 같은 칸(ERP 공통 부품 `lib/xlsxExport.ts`)
+ *
+ * ★ 2026-11-08 대표 수정 ⑤: 탭 · 칩 · 기간 직접 지정을 없애고 검색조건(년월 · 구분 status · 출처 kind)으로 합쳤다.
+ *   구분은 `filterClassifyRows`(shared) 한 곳에서 거른다. 선택지는 코드 TAX_CLS_STATUS · TAX_CLS_SOURCE(222, 켜진 것만).
+ *   카드 줄 「내용」(222 `note`)은 [확정] 때 항목과 함께 저장한다. from · to 는 세무사 전달 서류가 쓴다(화면은 싣지 않는다).
  *
  * ★★★ 운영사 세션도 **자기 단체만** — `org_id = 세션 단체 ID` 를 직접 건다(`db/taxClassify.ts`). 역할로 403 을 내지 않는다.
  * ★ 남의 단체 · 없는 줄 · 없는 파일은 404 이고 아무것도 쓰지 않는다(둘을 가르지 않는다).
@@ -17,17 +21,19 @@ import type { ErpSession } from '@swonbiz/shared';
 import { formatBizNumber } from '@swonbiz/shared/domain/tax-number';
 import { TAX_BIZ_TP_CATEGORY, TAX_KIND_CATEGORY } from '@swonbiz/shared/domain/tax-settings';
 import {
-  TAX_CARD_DEDUCT_CATEGORY,
-  TAX_PAY_METHOD_CATEGORY,
-  TAX_PROOF_CATEGORY,
-} from '@swonbiz/shared/domain/tax-card-cash';
-import {
   CLASSIFY_KINDS,
   CLASSIFY_ROW_KINDS,
+  TAX_CLS_LEFT,
+  TAX_CLS_SOURCE_CATEGORY,
+  TAX_CLS_STATUS_CATEGORY,
   TAX_ITEM_OUT_CATEGORY,
   TAX_ITEM_PARTITIONS,
   classifyDateRange,
+  classifyContentOf,
   classifyExportFileName,
+  classifyPlaceOf,
+  classifySourceLabel,
+  filterClassifyRows,
   itemPartitionOf,
   parseClassifyConfirm,
   parseClassifyQuery,
@@ -40,24 +46,20 @@ import {
   type TaxItemOption,
 } from '@swonbiz/shared/domain/tax-classify';
 import {
-  TAX_INV_CLASS_CATEGORY,
   TAX_INV_DIR_CATEGORY,
   TAX_INV_DIR_PURCHASE,
   TAX_INV_DIR_SALES,
-  TAX_KIND_INVOICE,
   type TaxCodeName,
 } from '@swonbiz/shared/domain/tax-uploads';
 import { requireSession } from '../session/hook.ts';
 import { scopeOfSession, withCompanyScope, type ScopedClient } from '../db/withCompanyScope.ts';
 import { listCodes } from '../db/lookups.ts';
 import { listCodeDescriptions, readTaxSettingsRow } from '../db/taxSettings.ts';
-import { monthRange } from '../db/taxUploads.ts';
 import {
   countCardCash,
   countClassify,
   countInvoicesByDirection,
   findUploadFileById,
-  listCategoryNames,
   lastItemsOfCashVendors,
   lastItemsOfVendors,
   listClassifyCards,
@@ -110,7 +112,7 @@ export async function listClassifyOp(client: ScopedClient, orgId: number, query:
 
   const { bizType, items } = await loadItems(client, orgId);
   const itemNames = await loadItemNames(client, items);
-  const names = await loadCodeNames(client, [TAX_INV_DIR_CATEGORY, TAX_BIZ_TP_CATEGORY, TAX_KIND_CATEGORY]);
+  const names = await loadCodeNames(client, [TAX_INV_DIR_CATEGORY, TAX_BIZ_TP_CATEGORY, TAX_KIND_CATEGORY, TAX_CLS_STATUS_CATEGORY, TAX_CLS_SOURCE_CATEGORY]);
   const invDirs = names.get(TAX_INV_DIR_CATEGORY) ?? [];
   const kindNames = names.get(TAX_KIND_CATEGORY) ?? [];
   const bizTypeName = (names.get(TAX_BIZ_TP_CATEGORY) ?? []).find((b) => b.code === bizType)?.name ?? null;
@@ -126,16 +128,9 @@ export async function listClassifyOp(client: ScopedClient, orgId: number, query:
   kinds.CASH = cc.cash;
   kinds.all = kinds.P + kinds.S + kinds.CARD + kinds.CASH;
 
+  // 출처로 고르고 → 구분으로 거른다(2026-11-08). 구분이 미지정 · 지정이면 매입 줄만 남는다
   let rows: TaxClassifyRow[];
-  if (query.view === 'left') {
-    // 미지정 건 · 지정 건 — 그 달 매입(계산서 · 카드 · 현금 매입)
-    const month = { range: monthRange(query.month), fileId: null, direction: TAX_INV_DIR_PURCHASE };
-    rows = byDateDesc([
-      ...(await listClassifyInvoices(client, orgId, month)),
-      ...(await listClassifyCards(client, orgId, month)),
-      ...(await listClassifyCash(client, orgId, month)),
-    ]);
-  } else if (query.kind === 'all') {
+  if (query.kind === 'all') {
     rows = byDateDesc([
       ...(await listClassifyInvoices(client, orgId, base)),
       ...(await listClassifyCards(client, orgId, base)),
@@ -148,8 +143,9 @@ export async function listClassifyOp(client: ScopedClient, orgId: number, query:
   } else if (query.kind === 'CASH') {
     rows = await listClassifyCash(client, orgId, base);
   } else {
-    rows = []; // 삐용 경비 · 은행 — 뒤 단계
+    rows = []; // 개인카드 · 은행 — 코드 「사용 안 함」(기능이 생기면 켠다)
   }
+  rows = filterClassifyRows(rows, query.status, query.item ?? null); // 계정과목(2026-11-08) — 그 코드값으로 확정된 줄만
 
   // 지난번 항목 — 계산서 · 카드는 거래처, 현금은 거래처 글. 그 회사 목록에 있는 항목만 골라 둔다
   const owned = new Set(items.map((i) => i.code));
@@ -164,7 +160,14 @@ export async function listClassifyOp(client: ScopedClient, orgId: number, query:
 
   return {
     ok: true,
-    data: { query, bizType, bizTypeName, counts: { left, total, kinds }, rows, file, codes: { items, itemNames, invDirs, kinds: kindNames } },
+    data: {
+      query, bizType, bizTypeName, counts: { left, total, kinds }, rows, file,
+      codes: {
+        items, itemNames, invDirs, kinds: kindNames,
+        statuses: names.get(TAX_CLS_STATUS_CATEGORY) ?? [],
+        sources: names.get(TAX_CLS_SOURCE_CATEGORY) ?? [],
+      },
+    },
   };
 }
 
@@ -203,7 +206,7 @@ interface ExportNames {
 const nameOf = (list: readonly TaxCodeName[], code: string) => list.find((c) => c.code === code)?.name ?? code;
 const itemOrNeed = (itemNames: readonly TaxCodeName[], code: string | null) => (code ? nameOf(itemNames, code) : '분류 필요');
 
-/** 계산서 시트 — 표준 양식 칸(명세 07 §1) + 「항목」(결정). 매입에 항목이 없으면 「분류 필요」, 매출은 구분 이름. */
+/** 계산서 시트 — 표준 양식 칸(명세 07 §1) + 「계정과목」(결정 — 2026-11-08 「항목」에서 이름 바꿈, 세무사 전달 서류가 쓴다). 매입에 항목이 없으면 「분류 필요」, 매출은 구분 이름. */
 export function invoiceExportSheet(rows: readonly TaxClassifyRow[], names: ExportNames): XlsxSheet<TaxClassifyRow> {
   return {
     name: names.kindName,
@@ -217,7 +220,7 @@ export function invoiceExportSheet(rows: readonly TaxClassifyRow[], names: Expor
       { header: '세액', value: (r) => r.taxAmount },
       { header: '종류', value: (r) => (r.invClass ? nameOf(names.invClasses, r.invClass) : null) },
       {
-        header: '항목',
+        header: '계정과목',
         value: (r) => (r.direction === TAX_INV_DIR_PURCHASE ? itemOrNeed(names.itemNames, r.itemCode) : nameOf(names.invDirs, r.direction)),
       },
     ],
@@ -229,7 +232,7 @@ export function invoiceExportSheet(rows: readonly TaxClassifyRow[], names: Expor
 export const cardLabelOf = (r: Pick<TaxClassifyRow, 'cardLast4' | 'cardAlias'>): string =>
   r.cardAlias ? `${r.cardAlias} · 끝 ${r.cardLast4}` : `끝 ${r.cardLast4}`;
 
-/** 카드 사용 내역 시트(1-4) — 사용일 · 카드 · 가맹점명 · 사업자번호 · 공급가액 · 세액 · 합계 · 공제 여부 · 항목. */
+/** 카드 사용 내역 시트(1-4) — 사용일 · 카드 · 가맹점명 · 내용(222, 2026-11-08) · 사업자번호 · 공급가액 · 세액 · 합계 · 공제 여부 · 계정과목. 세무사 전달 서류도 쓴다. */
 export function cardExportSheet(
   rows: readonly TaxClassifyRow[],
   names: { kindName: string; itemNames: readonly TaxCodeName[]; deducts: readonly TaxCodeName[] },
@@ -240,19 +243,20 @@ export function cardExportSheet(
       { header: '사용일', value: (r) => r.writeDate },
       { header: '카드', value: cardLabelOf },
       { header: '가맹점명', value: (r) => r.vendorName },
+      { header: '내용', value: (r) => r.note },
       { header: '사업자번호', value: (r) => (r.bizNo ? formatBizNumber(r.bizNo) : null) },
       { header: '공급가액', value: (r) => r.supplyAmount },
       { header: '세액', value: (r) => r.taxAmount },
       { header: '합계', value: (r) => r.totalAmount },
       { header: '공제 여부', value: (r) => (r.vatDeduct ? nameOf(names.deducts, r.vatDeduct) : null) },
-      { header: '항목', value: (r) => itemOrNeed(names.itemNames, r.itemCode) },
+      { header: '계정과목', value: (r) => itemOrNeed(names.itemNames, r.itemCode) },
     ],
     rows,
   };
 }
 
 /**
- * 현금 경비 시트(1-4) — 날짜 · 품명 · 거래처 · 구분 · 금액 · 결제방법 · 증빙 · 항목(매출은 구분 이름).
+ * 현금 경비 시트(1-4) — 날짜 · 품명 · 거래처 · 구분 · 금액 · 결제방법 · 증빙 · 계정과목(매출은 구분 이름).
  * ★ 결제방법 · 증빙 칸 이름은 코드 분류(TAX_PAY_METHOD · TAX_PROOF) 이름 — 글자로 박지 않는다(1-4 보완).
  */
 export function cashExportSheet(
@@ -280,7 +284,7 @@ export function cashExportSheet(
       { header: names.payMethodHeader, value: (r) => (r.payMethod ? nameOf(names.payMethods, r.payMethod) : null) },
       { header: names.proofHeader, value: (r) => (r.proof ? nameOf(names.proofs, r.proof) : null) },
       {
-        header: '항목',
+        header: '계정과목',
         value: (r) => (r.direction === TAX_INV_DIR_PURCHASE ? itemOrNeed(names.itemNames, r.itemCode) : nameOf(names.invDirs, r.direction)),
       },
     ],
@@ -288,50 +292,49 @@ export function cashExportSheet(
   };
 }
 
+/** 목록에 없는 값 — 화면 「—」와 같은 글자. */
+const DASH = '—';
+
 /**
- * 엑셀 — 「전체」 보기 거르기 결과. 시트는 자료 종류마다(계산서 · 카드 · 현금, 이름 = 자료 종류 코드 이름).
- * 자료 종류를 걸면 그 시트만(매입 · 매출은 계산서 시트). 삐용 경비 · 은행은 아직 자료가 없어 빈 계산서 시트 하나.
+ * 항목 지정 [엑셀 내려받기](2026-11-08 대표 수정 ⑤) — 목록과 같은 칸: 날짜 · 출처 · 사용처 · 내용 · 금액 · 계정과목(2026-11-08 「무엇에 쓴 돈인가요?」에서 이름 바꿈)
+ *   출처 · 사용처 · 내용은 화면과 같은 shared 함수. 항목은 확정한 매입 줄 = 항목 이름, 미지정 매입 줄 = 구분 코드 L 이름, 매출 줄 = 「—」.
  */
+export function classifyListSheet(
+  rows: readonly TaxClassifyRow[],
+  names: { invDirs: readonly TaxCodeName[]; kinds: readonly TaxCodeName[]; itemNames: readonly TaxCodeName[]; leftName: string },
+): XlsxSheet<TaxClassifyRow> {
+  return {
+    name: '항목 지정',
+    columns: [
+      { header: '날짜', value: (r) => r.writeDate },
+      { header: '출처', value: (r) => classifySourceLabel(r, names) },
+      { header: '사용처', value: (r) => classifyPlaceOf(r) ?? DASH },
+      { header: '내용', value: (r) => classifyContentOf(r) ?? DASH },
+      { header: '금액', value: (r) => r.totalAmount },
+      {
+        header: '계정과목',
+        value: (r) => (r.direction !== TAX_INV_DIR_PURCHASE ? DASH : r.itemCode ? nameOf(names.itemNames, r.itemCode) : names.leftName),
+      },
+    ],
+    rows,
+  };
+}
+
+/** 엑셀 — 지금 걸린 검색조건(년월 · 구분 · 출처 · 파일) 결과를 시트 하나로. */
 export async function exportClassifyOp(
   client: ScopedClient,
   orgId: number,
   query: ClassifyQuery,
 ): Promise<TaxOp<{ fileName: string; bytes: Uint8Array }>> {
-  const all = { ...query, view: 'all' as const }; // 엑셀은 「전체」 보기 기준(결과서 S05-05)
-  const r = await listClassifyOp(client, orgId, all);
+  const r = await listClassifyOp(client, orgId, query);
   if (!r.ok) return r;
-  const codes = await loadCodeNames(client, [TAX_INV_CLASS_CATEGORY, TAX_CARD_DEDUCT_CATEGORY, TAX_PAY_METHOD_CATEGORY, TAX_PROOF_CATEGORY]);
-  const kindName = (code: string) => r.data.codes.kinds.find((k) => k.code === code)?.name ?? code;
-  const of = (kind: ClassifyRowKind) => r.data.rows.filter((x) => x.kind === kind);
-  const { invDirs, itemNames } = r.data.codes;
-  const k = query.kind;
-
-  const sheets: XlsxSheet<TaxClassifyRow>[] = [];
-  if (k === 'all' || k === TAX_INV_DIR_PURCHASE || k === TAX_INV_DIR_SALES) {
-    sheets.push(invoiceExportSheet(of('INVOICE'), {
-      invDirs, invClasses: codes.get(TAX_INV_CLASS_CATEGORY) ?? [], itemNames, kindName: kindName(TAX_KIND_INVOICE),
-    }));
-  }
-  if (k === 'all' || k === 'CARD') {
-    sheets.push(cardExportSheet(of('CARD'), { kindName: kindName('CARD'), itemNames, deducts: codes.get(TAX_CARD_DEDUCT_CATEGORY) ?? [] }));
-  }
-  if (k === 'all' || k === 'CASH') {
-    const heads = await listCategoryNames(client, [TAX_PAY_METHOD_CATEGORY, TAX_PROOF_CATEGORY]);
-    sheets.push(cashExportSheet(of('CASH'), {
-      kindName: kindName('CASH'), itemNames, invDirs,
-      payMethods: codes.get(TAX_PAY_METHOD_CATEGORY) ?? [], proofs: codes.get(TAX_PROOF_CATEGORY) ?? [],
-      payMethodHeader: heads.get(TAX_PAY_METHOD_CATEGORY) ?? TAX_PAY_METHOD_CATEGORY,
-      proofHeader: heads.get(TAX_PROOF_CATEGORY) ?? TAX_PROOF_CATEGORY,
-    }));
-  }
-  if (sheets.length === 0) {
-    sheets.push(invoiceExportSheet([], {
-      invDirs, invClasses: codes.get(TAX_INV_CLASS_CATEGORY) ?? [], itemNames, kindName: kindName(TAX_KIND_INVOICE),
-    }));
-  }
-  return { ok: true, data: { fileName: classifyExportFileName(all), bytes: buildXlsx(sheets) } };
+  const { invDirs, kinds, itemNames, statuses } = r.data.codes;
+  const leftName = nameOf(statuses, TAX_CLS_LEFT);
+  return {
+    ok: true,
+    data: { fileName: classifyExportFileName(query), bytes: buildXlsx([classifyListSheet(r.data.rows, { invDirs, kinds, itemNames, leftName })]) },
+  };
 }
-
 
 /* ── 라우트 ──────────────────────────────────────────────────────────────── */
 

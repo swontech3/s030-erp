@@ -430,6 +430,25 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     source: 'packages/shared/src/domain/tax-handoff.ts (HANDOFF_TP_VAT · HANDOFF_TP_WH) · 218 (ck_s050_handoff_logs_tp)',
     label: '세무 세무사 전달 종류',
   },
+  /** 항목 지정 검색조건 「구분」 — 서버가 L(미지정) · D(지정)로 거른다(`filterClassifyRows`). 담는 칸은 없다. 2026-11-08 추가(222). */
+  {
+    category: 'TAX_CLS_STATUS',
+    useTp: '000',
+    codes: ['L', 'D'],
+    source: 'packages/shared/src/domain/tax-classify.ts (CLASSIFY_STATUSES)',
+    label: '세무 항목 지정 구분',
+  },
+  /**
+   * 항목 지정 검색조건 「출처」 — 서버가 코드값으로 고를 자료를 정한다(`listClassifyOp`). 담는 칸은 없다. 2026-11-08 추가(222).
+   * PCARD(개인카드) · BANK(은행)는 「사용 안 함」으로 들어 있다 — 기능이 생기면 켠다.
+   */
+  {
+    category: 'TAX_CLS_SOURCE',
+    useTp: '000',
+    codes: ['P', 'S', 'CARD', 'CASH', 'PCARD', 'BANK'],
+    source: 'packages/shared/src/domain/tax-classify.ts (CLASSIFY_KINDS)',
+    label: '세무 항목 지정 출처',
+  },
 ] as const;
 
 /**

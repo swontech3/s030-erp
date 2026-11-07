@@ -1,8 +1,8 @@
 /**
- * 거래 분류(s050300010) 화면 모델 — 불러오기 · 확정 · 엑셀 주소.
+ * 매출 · 매입 항목 지정(s050300010, 옛 이름 거래 분류) 화면 모델 — 불러오기 · 확정 · 엑셀 주소.
  *
  * ★ 브라우저는 Fastify 에 직접 붙지 않는다 — `/api/tax/classify/**`(Next 중계)를 부른다.
- * ★ 주소 · 본문 검사(달 · 기간 · 항목 코드 · 매출 막기 · 단체)는 **서버가 한다**(shared `tax-classify.ts`). 화면은 결과만 그린다.
+ * ★ 주소 · 본문 검사(달 · 구분 · 출처 · 항목 코드 · 카드 내용 · 매출 막기 · 단체)는 **서버가 한다**(shared `tax-classify.ts`). 화면은 결과만 그린다.
  */
 import { classifySearch, type ClassifyConfirmRow, type ClassifyQuery, type TaxClassifyResponse } from '@swonbiz/shared/domain/tax-classify';
 import type { TaxFieldError } from '@swonbiz/shared/domain/tax-uploads';

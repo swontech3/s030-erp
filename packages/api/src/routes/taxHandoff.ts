@@ -205,7 +205,7 @@ export async function handoffOp(
 
   const range = vatRange(period, q.month);
   const { from, to } = handoffRangeDates(range);
-  const cls = await listClassifyOp(client, orgId, { month: q.month, view: 'all', kind: 'all', from, to, fileId: null });
+  const cls = await listClassifyOp(client, orgId, { month: q.month, status: 'all', kind: 'all', from, to, fileId: null });
   if (!cls.ok) return cls;
   const codes = await loadCodeNames(client, [TAX_INV_CLASS_CATEGORY, TAX_CARD_DEDUCT_CATEGORY, TAX_PAY_METHOD_CATEGORY, TAX_PROOF_CATEGORY]);
   const heads = await listCategoryNames(client, [TAX_PAY_METHOD_CATEGORY, TAX_PROOF_CATEGORY]);

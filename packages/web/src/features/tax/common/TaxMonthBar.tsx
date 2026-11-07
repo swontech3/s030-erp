@@ -10,6 +10,7 @@
  * ★ 연도 선택지는 올해 포함 최근 3년(작업할 달이 더 앞이면 그 해부터) — shared `taxYearOptions`(11-06 대표 결정).
  * ★ `picker` 를 주면 선택 상자 대신 그것을 그 자리에 둔다 — 부가세 조회의 신고 기간 선택 상자(11-06).
  * ★ 거래처 · 세무 설정처럼 달과 상관없는 화면은 이 줄 대신 안내 글만 둔다(결과서 0-2).
+ * ★ `children` 은 연도 · 월 선택 상자 뒤에 같은 줄로 둔다 — 항목 지정의 검색조건 「구분」 · 「출처」(2026-11-08).
  */
 import type { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -31,11 +32,13 @@ interface Props {
   note: ReactNode;
   /** 연도 · 월 선택 상자 대신 둘 것(부가세 조회의 신고 기간). */
   picker?: ReactNode;
+  /** 연도 · 월 뒤에 붙일 검색조건. */
+  children?: ReactNode;
 }
 
 const SELECT_STYLE = { height: 32, width: 'auto' } as const;
 
-export function TaxMonthBar({ month, note, picker }: Props) {
+export function TaxMonthBar({ month, note, picker, children }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const now = thisMonthOf(new Date());
@@ -71,6 +74,7 @@ export function TaxMonthBar({ month, note, picker }: Props) {
             </select>
           </>
         )}
+        {children}
       </div>
       <span className={t.ctxNote}>{note}</span>
     </div>

@@ -9,6 +9,9 @@
  * ★★ API 의 풀(`db/pool.ts`)로 접속한다 — erp_app. 라우트가 쓰는 처리(`routes/taxClassify.ts` 의 …Op)를 그대로 부른다.
  * ★ 1-4(2026-10-30): 카드 사용 내역 · 현금 경비 줄도 — 미지정 셈 · 지난번 항목(카드는 거래처, 현금은 거래처 글) ·
  *   확정(kind) · 현금 매출 막기 · 자료 종류 칩 · 엑셀 시트 나누기 · 회사별 막기(K18~K24).
+ * ★ 2026-11-08 대표 수정 ⑤: 탭(view) · 칩을 없애고 검색조건 구분(status 전체 · L 미지정 · D 지정) · 출처(kind)로 —
+ *   K1 · K2 는 구분 L, 나머지 목록은 구분 전체. 엑셀은 목록과 같은 칸의 시트 하나(K13 · K23). 옛 K25(현금 시트 칸 이름)는
+ *   항목 지정 엑셀에 현금 시트가 없어져 뺐다(세무사 전달 서류의 현금 시트는 그대로 — verify:tax-handoff). K25 는 카드 「내용」(222), K26 · K27 은 구분 거르기 · 선택지, K28 은 계정과목 거르기(같은 날 추가).
  * ★ 시험 줄은 지어낸 값으로 **한 트랜잭션 안에서 넣고 ROLLBACK 한다.** DB 에 남는 것이 없다(마지막 Z1 이 센다).
  *   시험 단체는 verify-201 · 203 과 같은 대역(990001 · 990002).
  *
@@ -29,7 +32,8 @@ const check = (id, what, cond, note = '') =>
 
 const tenant = (orgId) => ({ role: 'tenant', companyId: null, orgId });
 const OPERATOR = { role: 'operator', companyId: null, orgId: ORG_A };
-const query = (over = {}) => ({ month: MONTH, view: 'left', kind: 'all', from: null, to: null, fileId: null, ...over });
+const query = (over = {}) => ({ month: MONTH, status: 'all', kind: 'all', from: null, to: null, fileId: null, ...over });
+const LEFT = { status: 'L' };
 
 async function main() {
   const c = await pool.connect();
@@ -65,7 +69,7 @@ async function main() {
 
       // ── 세무 설정 없음 ──
       await applyCompanyScope(c, tenant(ORG_A));
-      const noSet = await listClassifyOp(c, ORG_A, query());
+      const noSet = await listClassifyOp(c, ORG_A, query(LEFT));
       check('K1', '★ 세무 설정이 없으면 사업자 유형 null · 선택 항목 0 — 화면은 막고 안내(결정) · 목록은 보인다',
         noSet.ok && noSet.data.bizType === null && noSet.data.codes.items.length === 0 && noSet.data.rows.length === 3,
         noSet.ok ? { bizType: noSet.data.bizType, items: noSet.data.codes.items.length, rows: noSet.data.rows.length } : noSet);
@@ -73,8 +77,8 @@ async function main() {
         VALUES ($1, 'C', 'M', '[]'::jsonb, '{}')`, [ORG_A]);
 
       // ── 확인할 줄만 ──
-      const l1 = await listClassifyOp(c, ORG_A, query());
-      check('K2', '★ 확인할 줄 — 그 달 매입 계산서만(8월 줄 · 매출 빠짐) · 남은 줄 3 / 모두 3 · 날짜 최신순 · 법인 항목 17개',
+      const l1 = await listClassifyOp(c, ORG_A, query(LEFT));
+      check('K2', '★ 구분 미지정 — 그 달 매입 계산서만(8월 줄 · 매출 빠짐) · 남은 줄 3 / 모두 3 · 날짜 최신순 · 법인 항목 17개',
         l1.ok && l1.data.rows.map((r) => r.id).join() === 'vcls-p2,vcls-p3,vcls-p1' &&
         l1.data.counts.left === 3 && l1.data.counts.total === 3 && l1.data.bizType === 'C' && !!l1.data.bizTypeName &&
         l1.data.codes.items.length === 17,
@@ -117,39 +121,39 @@ async function main() {
         { sale: sale.status, ghost: ghost.status, p8 });
 
       // ── 전체 보기 · 자료 종류 · 기간 ──
-      const all = await listClassifyOp(c, ORG_A, query({ view: 'all' }));
-      check('K8', '전체 보기 — 그 달 매입 · 매출(8월 줄 빠짐) · 칩 수 전체 4 · 매입 3 · 매출 1 · 카드 · 현금 · 삐용 경비 · 은행 0',
+      const all = await listClassifyOp(c, ORG_A, query());
+      check('K8', '구분 · 출처 전체 — 그 달 매입 · 매출(8월 줄 빠짐) · 출처별 수 전체 4 · 매입 3 · 매출 1 · 카드 · 현금 · 개인카드 · 은행 0',
         all.ok && all.data.rows.length === 4 &&
-        JSON.stringify(all.data.counts.kinds) === JSON.stringify({ all: 4, P: 3, S: 1, CARD: 0, CASH: 0, PPIYONG: 0, BANK: 0 }),
+        JSON.stringify(all.data.counts.kinds) === JSON.stringify({ all: 4, P: 3, S: 1, CARD: 0, CASH: 0, PCARD: 0, BANK: 0 }),
         all.ok ? all.data.counts.kinds : all);
-      const sOnly = await listClassifyOp(c, ORG_A, query({ view: 'all', kind: 'S' }));
-      const card = await listClassifyOp(c, ORG_A, query({ view: 'all', kind: 'CARD' }));
-      check('K9', '자료 종류 거르기 — 매출만 1줄(항목 없음) · 카드는 0줄 · 칩 수는 거르기 전 그대로',
+      const sOnly = await listClassifyOp(c, ORG_A, query({ kind: 'S' }));
+      const card = await listClassifyOp(c, ORG_A, query({ kind: 'CARD' }));
+      check('K9', '출처 거르기 — 매출만 1줄(항목 없음) · 카드는 0줄 · 칩 수는 거르기 전 그대로',
         sOnly.ok && sOnly.data.rows.map((r) => r.id).join() === 'vcls-s1' && sOnly.data.rows[0].itemCode === null &&
         card.ok && card.data.rows.length === 0 && sOnly.data.counts.kinds.all === 4);
-      const per = await listClassifyOp(c, ORG_A, query({ view: 'all', from: '2026-08-01', to: '2026-09-10' }));
-      check('K10', '기간 직접 지정 — 8.01 ~ 9.10 (끝 날 포함): 8.28 · 9.10 · 9.01',
+      const per = await listClassifyOp(c, ORG_A, query({ from: '2026-08-01', to: '2026-09-10' }));
+      check('K10', '기간(세무사 전달 서류가 쓴다) — 8.01 ~ 9.10 (끝 날 포함): 8.28 · 9.10 · 9.01',
         per.ok && per.data.rows.map((r) => r.id).join() === 'vcls-p3,vcls-p1,vcls-p8',
         per.ok ? per.data.rows.map((r) => r.id) : per);
 
       // ── 파일로 들어옴 ──
-      const byFile = await listClassifyOp(c, ORG_A, query({ view: 'all', fileId: 'vcls-fp' }));
+      const byFile = await listClassifyOp(c, ORG_A, query({ fileId: 'vcls-fp' }));
       check('K11', '★ 파일로 들어오면 그 파일 줄 전부(다른 달 8월 줄 포함 · 기간 거르기 없음) · 파일 띠 이름',
         byFile.ok && byFile.data.rows.length === 4 && byFile.data.rows.every((r) => r.fileId === 'vcls-fp') &&
         byFile.data.file?.fileName === 'vcls-fp.xls' && byFile.data.counts.kinds.all === 4,
         byFile.ok ? { rows: byFile.data.rows.map((r) => r.id), file: byFile.data.file } : byFile);
-      const otherFile = await listClassifyOp(c, ORG_A, query({ view: 'all', fileId: 'vcls-fb' }));
+      const otherFile = await listClassifyOp(c, ORG_A, query({ fileId: 'vcls-fb' }));
       check('K12', '남의 단체 파일 · 없는 파일은 404', !otherFile.ok && otherFile.status === 404, otherFile);
 
-      // ── 엑셀 ──
-      const ex = await exportClassifyOp(c, ORG_A, query({ view: 'all' }));
+      // ── 엑셀 — 목록과 같은 칸의 시트 하나(2026-11-08) ──
+      const ex = await exportClassifyOp(c, ORG_A, query());
       const sheet = ex.ok ? XLSX.read(ex.data.bytes, { type: 'array' }) : null;
       const aoa = sheet ? XLSX.utils.sheet_to_json(sheet.Sheets[sheet.SheetNames[0]], { header: 1 }) : [];
-      // 1-4 설계 7 — 시트는 자료 종류마다(계산서 · 카드 · 현금). 첫 시트가 계산서, 카드 · 현금 줄은 아직 없다(K23 에서 본다)
-      check('K13', '★ 엑셀 — 파일 이름 · 첫 시트 = 계산서(자료 종류 이름) · 줄 = 화면 거르기 결과 · 항목 이름(수도광열비) · 매출은 「매출」',
-        ex.ok && ex.data.fileName === '항목지정_2026-09.xlsx' && sheet.SheetNames.length === 3 && aoa.length === 1 + 4 &&
-        aoa[0].at(-1) === '항목' && aoa.some((r) => r.at(-1) === '수도광열비') && aoa.some((r) => r[0] === '매출' && r.at(-1) === '매출'),
-        { name: ex.ok ? ex.data.fileName : ex, sheets: sheet?.SheetNames, rows: aoa.length });
+      check('K13', '★ 엑셀 — 파일 이름 · 시트 「항목 지정」 하나 · 칸 = 목록(날짜 · 출처 · 사용처 · 내용 · 금액 · 계정과목) · 줄 = 검색조건 결과 · 항목 이름(수도광열비) · 매출은 「—」',
+        ex.ok && ex.data.fileName === '항목지정_2026-09.xlsx' && JSON.stringify(sheet.SheetNames) === JSON.stringify(['항목 지정']) && aoa.length === 1 + 4 &&
+        aoa[0].join() === '날짜,출처,사용처,내용,금액,계정과목' &&
+        aoa.some((r) => r.at(-1) === '수도광열비') && aoa.some((r) => r[1] === '매출 계산서' && r.at(-1) === '—'),
+        { name: ex.ok ? ex.data.fileName : ex, sheets: sheet?.SheetNames, head: aoa[0], rows: aoa.length });
 
       // ── 사업자 유형을 바꾼 회사 — 이름은 두 파티션에서, 골라 두기는 그 회사 목록에 있는 것만 ──
       await confirmClassifyOp(c, ORG_A, [{ kind: 'INVOICE', id: 'vcls-p8', itemCode: 'NONBIZ_TAXPRO' }], ACTOR); // 법인 전용 항목(211 부터 접대비는 개인에도 있다)
@@ -157,7 +161,7 @@ async function main() {
       await applyCompanyScope(c, OPERATOR);
       await c.query(`UPDATE public.tb_s050_invoices SET item_code = NULL, classified_at = NULL WHERE id = 'vcls-p3'`);
       await applyCompanyScope(c, tenant(ORG_A));
-      const indiv = await listClassifyOp(c, ORG_A, query({ view: 'all', fileId: 'vcls-fp' }));
+      const indiv = await listClassifyOp(c, ORG_A, query({ fileId: 'vcls-fp' }));
       const p3b = indiv.ok ? indiv.data.rows.find((r) => r.id === 'vcls-p3') : null;
       check('K14', '★ 개인으로 바꾼 뒤 — 선택 항목은 개인 목록 18개(세무사 판단 없음 · 접대비 있음, 211) · 세무사 판단 이름은 그대로 보임 · 법인 전용 항목은 골라 두지 않음',
         indiv.ok && !indiv.data.codes.items.some((i) => i.code === 'NONBIZ_TAXPRO') && indiv.data.codes.items.some((i) => i.code === 'ENTERTAIN') &&
@@ -177,7 +181,7 @@ async function main() {
 
       // ── 회사 B ──
       await applyCompanyScope(c, tenant(ORG_B));
-      const bList = await listClassifyOp(c, ORG_B, query({ view: 'all' }));
+      const bList = await listClassifyOp(c, ORG_B, query());
       const bConfirm = await confirmClassifyOp(c, ORG_B, [{ kind: 'INVOICE', id: 'vcls-p3', itemCode: 'RENT' }], ACTOR);
       check('K16', '★ 회사 B — A 의 줄이 안 보이고(자기 1줄만), A 의 줄 확정은 404',
         bList.ok && bList.data.rows.map((r) => r.id).join() === 'vcls-b1' && !bConfirm.ok && bConfirm.status === 404,
@@ -185,12 +189,12 @@ async function main() {
 
       // ── 운영사 세션도 자기 단체만 ──
       await applyCompanyScope(c, OPERATOR);
-      const op = await listClassifyOp(c, ORG_A, query({ view: 'all' }));
+      const op = await listClassifyOp(c, ORG_A, query());
       check('K17', '운영사 세션 — 넘긴 단체(A)의 줄만, B 의 줄은 섞이지 않는다', op.ok && op.data.rows.every((r) => r.id !== 'vcls-b1'));
 
       // ── 카드 사용 내역 · 현금 경비(1-4) — 지어낸 줄을 운영사 세션으로 넣는다 ──
       await applyCompanyScope(c, tenant(ORG_A));
-      const before = await listClassifyOp(c, ORG_A, query());
+      const before = await listClassifyOp(c, ORG_A, query(LEFT));
       await applyCompanyScope(c, OPERATOR);
       await c.query(`INSERT INTO public.tb_s050_fin_accounts (id, org_id, kind, card_co_code, number, alias)
         VALUES ('vcc-card', $1, 'C', 'KB', '4821', '법인카드 1')`, [ORG_A]);
@@ -217,7 +221,7 @@ async function main() {
 
       await applyCompanyScope(c, tenant(ORG_A));
       const l4 = await listClassifyOp(c, ORG_A, query());
-      const kindsOf = (rows) => rows.map((r) => `${r.kind}:${r.id}`).filter((k) => k.includes('vcc-')).sort().join();
+      const kindsOf = (rows) => rows.filter((r) => r.direction === 'P').map((r) => `${r.kind}:${r.id}`).filter((k) => k.includes('vcc-')).sort().join();
       check('K18', '★ 미지정 셈 — 카드 3줄 · 현금 매입 빈 2줄이 남은 줄에, 카드 3 · 현금 매입 3이 전체에 더해진다(현금 매출 빠짐)',
         before.ok && l4.ok && l4.data.counts.left === before.data.counts.left + 5 && l4.data.counts.total === before.data.counts.total + 6 &&
         kindsOf(l4.data.rows) === 'CARD:vcc-c1,CARD:vcc-c2,CARD:vcc-c3,CASH:vcc-x1,CASH:vcc-x2,CASH:vcc-x3',
@@ -243,38 +247,65 @@ async function main() {
         !cashSale.ok && cashSale.status === 400 && !wrongKind.ok && wrongKind.status === 404 && x3.item_code === null,
         { cashSale, wrongKind, x3 });
 
-      const all2 = await listClassifyOp(c, ORG_A, query({ view: 'all' }));
-      const onlyCard = await listClassifyOp(c, ORG_A, query({ view: 'all', kind: 'CARD' }));
-      const onlyCash = await listClassifyOp(c, ORG_A, query({ view: 'all', kind: 'CASH' }));
+      const all2 = await listClassifyOp(c, ORG_A, query());
+      const onlyCard = await listClassifyOp(c, ORG_A, query({ kind: 'CARD' }));
+      const onlyCash = await listClassifyOp(c, ORG_A, query({ kind: 'CASH' }));
       check('K22', '자료 종류 칩 — 카드 3 · 현금 4(매출 포함) · 전체 11, 카드 · 현금 거르기는 그 줄만 · 칩 이름은 자료 종류 코드',
-        all2.ok && JSON.stringify(all2.data.counts.kinds) === JSON.stringify({ all: 11, P: 3, S: 1, CARD: 3, CASH: 4, PPIYONG: 0, BANK: 0 }) &&
+        all2.ok && JSON.stringify(all2.data.counts.kinds) === JSON.stringify({ all: 11, P: 3, S: 1, CARD: 3, CASH: 4, PCARD: 0, BANK: 0 }) &&
         onlyCard.ok && onlyCard.data.rows.length === 3 && onlyCard.data.rows.every((x) => x.kind === 'CARD') &&
         onlyCash.ok && onlyCash.data.rows.length === 4 && onlyCash.data.rows.every((x) => x.kind === 'CASH') &&
         ['CARD', 'CASH'].every((k) => all2.data.codes.kinds.some((x) => x.code === k && x.name)),
         all2.ok ? all2.data.counts.kinds : all2);
 
-      const ex2 = await exportClassifyOp(c, ORG_A, query({ view: 'all' }));
-      const wb2 = ex2.ok ? XLSX.read(ex2.data.bytes, { type: 'array' }) : null;
-      const exCard = await exportClassifyOp(c, ORG_A, query({ view: 'all', kind: 'CARD' }));
+      const exCard = await exportClassifyOp(c, ORG_A, query({ kind: 'CARD' }));
       const wb3 = exCard.ok ? XLSX.read(exCard.data.bytes, { type: 'array' }) : null;
-      const kindName = (k) => (all2.ok ? all2.data.codes.kinds.find((x) => x.code === k)?.name : null);
-      const cardAoa = wb2 ? XLSX.utils.sheet_to_json(wb2.Sheets[kindName('CARD')], { header: 1 }) : [];
-      check('K23', '★ 엑셀 — 「전체」는 계산서 · 카드 · 현금 시트 셋(자료 종류 이름), 카드만 거르면 카드 시트 하나 · 카드번호는 끝 4자리만',
-        wb2 && JSON.stringify(wb2.SheetNames) === JSON.stringify([kindName('INVOICE'), kindName('CARD'), kindName('CASH')]) &&
-        cardAoa.length === 1 + 3 && cardAoa.some((row) => row[1] === '법인카드 1 · 끝 4821') &&
-        wb3 && JSON.stringify(wb3.SheetNames) === JSON.stringify([kindName('CARD')]),
-        { all: wb2?.SheetNames, card: wb3?.SheetNames, cardRows: cardAoa.length });
+      const cardAoa = wb3 ? XLSX.utils.sheet_to_json(wb3.Sheets['항목 지정'], { header: 1 }) : [];
+      check('K23', '★ 엑셀 — 출처 카드만 걸면 카드 3줄만 · 출처 칸은 별칭 / 별칭 없으면 「… · 끝 0001」(카드번호는 끝 4자리만)',
+        wb3 && JSON.stringify(wb3.SheetNames) === JSON.stringify(['항목 지정']) && cardAoa.length === 1 + 3 &&
+        cardAoa.some((row) => row[1] === '법인카드 1') && cardAoa.some((row) => String(row[1]).endsWith('끝 0001')),
+        { sheets: wb3?.SheetNames, cardRows: cardAoa.map((r) => r[1]) });
 
-      // 1-4 보완 — 현금 시트의 결제방법 · 증빙 칸 이름은 코드 분류 이름(글자로 박지 않는다)
-      const catName = async (cat) => (await c.query(`SELECT name FROM public.tb_s080_code_masters WHERE category = $1`, [cat])).rows[0]?.name;
-      const [payName, proofName] = [await catName('TAX_PAY_METHOD'), await catName('TAX_PROOF')];
-      const cashHead = wb2 ? XLSX.utils.sheet_to_json(wb2.Sheets[kindName('CASH')], { header: 1 })[0] : [];
-      check('K25', '★ 엑셀 현금 시트 — 결제방법 · 증빙 칸 이름 = 코드 분류 TAX_PAY_METHOD · TAX_PROOF 이름',
-        !!payName && !!proofName && cashHead?.[5] === payName && cashHead?.[6] === proofName,
-        { payName, proofName, cashHead });
+      // ── 카드 「내용」(222) — [확정] 때 항목과 함께 저장 · 다시 확정하면 덮음 · 엑셀 「내용」 칸 ──
+      const n1 = await confirmClassifyOp(c, ORG_A, [{ kind: 'CARD', id: 'vcc-c2', itemCode: 'MEAL', note: '회의 다과' }], ACTOR);
+      const l6 = await listClassifyOp(c, ORG_A, query({ kind: 'CARD' }));
+      const c2 = l6.ok ? l6.data.rows.find((x) => x.id === 'vcc-c2') : null;
+      const ex4 = await exportClassifyOp(c, ORG_A, query({ kind: 'CARD' }));
+      const aoa4 = ex4.ok ? XLSX.utils.sheet_to_json(XLSX.read(ex4.data.bytes, { type: 'array' }).Sheets['항목 지정'], { header: 1 }) : [];
+      const n2 = await confirmClassifyOp(c, ORG_A, [{ kind: 'CARD', id: 'vcc-c2', itemCode: 'TEL', note: null }], ACTOR);
+      const c2b = (await c.query(`SELECT item_code, note FROM public.tb_s050_card_txns WHERE id = 'vcc-c2'`)).rows[0];
+      check('K25', '★ 카드 「내용」 — 확정 때 저장 · 목록 · 엑셀 「내용」 칸에 보이고 · 다시 확정하면 덮는다(빈 글 → null)',
+        n1.ok && c2?.note === '회의 다과' && c2.itemCode === 'MEAL' && aoa4.some((r) => r[3] === '회의 다과') &&
+        n2.ok && c2b.item_code === 'TEL' && c2b.note === null,
+        { c2, c2b, excel: aoa4.map((r) => r[3]) });
+
+      // ── 구분 거르기(2026-11-08) — 미지정 = 항목이 빈 매입 줄, 지정 = 항목이 있는 매입 줄, 매출 줄은 「전체」에만 ──
+      const sL = await listClassifyOp(c, ORG_A, query({ status: 'L' }));
+      const sD = await listClassifyOp(c, ORG_A, query({ status: 'D' }));
+      const sAll = await listClassifyOp(c, ORG_A, query());
+      check('K26', '★ 구분 — 미지정은 항목 빈 매입 줄만 · 지정은 항목 있는 매입 줄만 · 둘 + 매출 줄 = 전체 · 미지정 수 = 서버 셈(left)',
+        sL.ok && sD.ok && sAll.ok &&
+        sL.data.rows.every((x) => x.direction === 'P' && x.itemCode === null) && sD.data.rows.every((x) => x.direction === 'P' && x.itemCode !== null) &&
+        sL.data.rows.length + sD.data.rows.length + sAll.data.rows.filter((x) => x.direction === 'S').length === sAll.data.rows.length &&
+        sL.data.rows.length === sAll.data.counts.left && sAll.data.rows.some((x) => x.id === 'vcc-s1') && !sL.data.rows.some((x) => x.id === 'vcc-s1'),
+        sAll.ok ? { L: sL.data.rows.length, D: sD.data.rows.length, all: sAll.data.rows.length, left: sAll.data.counts.left } : sAll);
+      check('K27', '검색조건 선택지 — 구분 미지정 · 지정 / 출처 매입 · 매출 · 카드 · 현금경비(개인카드 · 은행은 사용 안 함이라 없음)',
+        sAll.ok && sAll.data.codes.statuses.map((x) => x.code).join() === 'L,D' && sAll.data.codes.sources.map((x) => x.code).join() === 'P,S,CARD,CASH',
+        sAll.ok ? { statuses: sAll.data.codes.statuses, sources: sAll.data.codes.sources } : sAll);
+
+      // ── 계정과목 거르기(2026-11-08 추가) — 그 계정과목으로 확정된 줄만, 목록 · 엑셀이 같다 ──
+      const want = sAll.ok ? sAll.data.rows.filter((x) => x.itemCode === 'TEL').map((x) => x.id).sort().join() : '';
+      const byItem = await listClassifyOp(c, ORG_A, query({ item: 'TEL' }));
+      const byItemL = await listClassifyOp(c, ORG_A, query({ item: 'TEL', status: 'L' }));
+      const exItem = await exportClassifyOp(c, ORG_A, query({ item: 'TEL' }));
+      const aoaItem = exItem.ok ? XLSX.utils.sheet_to_json(XLSX.read(exItem.data.bytes, { type: 'array' }).Sheets['항목 지정'], { header: 1 }) : [];
+      check('K28', '★ 계정과목 — 고르면 그 계정과목(통신비)으로 확정된 줄만 · 미지정과 함께 걸면 0줄 · 엑셀도 같은 줄',
+        byItem.ok && want !== '' && byItem.data.rows.map((x) => x.id).sort().join() === want &&
+        byItemL.ok && byItemL.data.rows.length === 0 &&
+        aoaItem.length === 1 + byItem.data.rows.length && aoaItem.slice(1).every((r) => r.at(-1) === '통신비'),
+        { want, got: byItem.ok ? byItem.data.rows.map((x) => x.id) : byItem, excel: aoaItem.length - 1 });
 
       await applyCompanyScope(c, tenant(ORG_B));
-      const bList2 = await listClassifyOp(c, ORG_B, query({ view: 'all' }));
+      const bList2 = await listClassifyOp(c, ORG_B, query());
       const bCard = await confirmClassifyOp(c, ORG_B, [{ kind: 'CARD', id: 'vcc-c2', itemCode: 'RENT' }], ACTOR);
       check('K24', '★ 회사 B — A 의 카드 · 현금 줄이 안 보이고, A 의 카드 줄 확정은 404',
         bList2.ok && !bList2.data.rows.some((x) => x.id.startsWith('vcc-')) && bList2.data.counts.kinds.CARD === 0 &&

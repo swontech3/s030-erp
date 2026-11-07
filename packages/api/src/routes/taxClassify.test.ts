@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { ErpSession, ScopeRole } from '@swonbiz/shared';
 import type { ClassifyQuery, TaxClassifyResponse, TaxClassifyRow } from '@swonbiz/shared/domain/tax-classify';
 import { buildXlsx } from '../lib/xlsxExport.ts';
-import { cardExportSheet, cashExportSheet, invoiceExportSheet, registerTaxClassifyRoutes, type TaxClassifyDeps } from './taxClassify.ts';
+import { cardExportSheet, cashExportSheet, classifyListSheet, invoiceExportSheet, registerTaxClassifyRoutes, type TaxClassifyDeps } from './taxClassify.ts';
 
 const session = (role: ScopeRole): ErpSession => ({
   erpSid: 'sid-hash',
@@ -21,15 +21,15 @@ const session = (role: ScopeRole): ErpSession => ({
   lastActiveAt: null,
 });
 
-const Q: ClassifyQuery = { month: '2026-09', view: 'left', kind: 'all', from: null, to: null, fileId: null };
+const Q: ClassifyQuery = { month: '2026-09', status: 'all', kind: 'all', from: null, to: null, fileId: null, item: null };
 const LIST: TaxClassifyResponse = {
   query: Q,
   bizType: 'C',
   bizTypeName: '법인',
-  counts: { left: 0, total: 0, kinds: { all: 0, P: 0, S: 0, CARD: 0, CASH: 0, PPIYONG: 0, BANK: 0 } },
+  counts: { left: 0, total: 0, kinds: { all: 0, P: 0, S: 0, CARD: 0, CASH: 0, PCARD: 0, BANK: 0 } },
   rows: [],
   file: null,
-  codes: { items: [], itemNames: [], invDirs: [], kinds: [] },
+  codes: { items: [], itemNames: [], invDirs: [], kinds: [], statuses: [], sources: [] },
 };
 const NOT_FOUND = { ok: false as const, status: 404 as const, error: 'not_found', message: '없는 계산서입니다' };
 
@@ -68,10 +68,10 @@ describe('GET /tax/classify', () => {
   it('주소를 해석해 세션 단체로 읽는다', async () => {
     const { deps, calls } = fakeDeps();
     const a = await build('tenant', deps);
-    const res = await a.inject({ method: 'GET', url: '/tax/classify?month=2026-09&view=all&kind=P' });
+    const res = await a.inject({ method: 'GET', url: '/tax/classify?month=2026-09&status=L&kind=P&item=RENT' });
     expect(res.statusCode).toBe(200);
     expect(res.headers['cache-control']).toBe('no-store');
-    expect(calls).toEqual([['list', 9001, { ...Q, view: 'all', kind: 'P' }]]);
+    expect(calls).toEqual([['list', 9001, { ...Q, status: 'L', kind: 'P', item: 'RENT' }]]);
   });
 
   it('주소가 틀리면 400 + errors, 읽지 않는다', async () => {
@@ -100,7 +100,7 @@ describe('POST /tax/classify/confirm', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['cache-control']).toBe('no-store');
     expect(res.json()).toEqual({ confirmed: 1 });
-    expect(calls).toEqual([['confirm', 1, [{ kind: 'CARD', id: 'i1', itemCode: 'RENT' }]]]);
+    expect(calls).toEqual([['confirm', 1, [{ kind: 'CARD', id: 'i1', itemCode: 'RENT', note: null }]]]); // 카드 줄은 내용(222)을 늘 싣는다
   });
 
   it('목록에 없는 항목 · 빈 줄은 400, 확정하지 않는다', async () => {
@@ -139,11 +139,11 @@ describe('GET /tax/classify/export', () => {
   it('엑셀 파일로 보낸다 — 거르기는 화면과 같은 주소', async () => {
     const { deps, calls } = fakeDeps();
     const a = await build('tenant', deps);
-    const res = await a.inject({ method: 'GET', url: '/tax/classify/export?month=2026-09&view=all&kind=S' });
+    const res = await a.inject({ method: 'GET', url: '/tax/classify/export?month=2026-09&status=D&kind=S' });
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     expect(res.headers['content-disposition']).toContain(`filename*=UTF-8''${encodeURIComponent('거래분류_2026-09.xlsx')}`);
-    expect(calls).toEqual([['export', 9001, { ...Q, view: 'all', kind: 'S' }]]);
+    expect(calls).toEqual([['export', 9001, { ...Q, status: 'D', kind: 'S' }]]);
   });
 
   it('주소가 틀리면 400 · 남의 파일은 404', async () => {
@@ -158,7 +158,7 @@ describe('GET /tax/classify/export', () => {
 
 describe('invoiceExportSheet — 계산서 시트(표준 양식 칸 + 항목)', () => {
   const row = (over: Partial<TaxClassifyRow>): TaxClassifyRow => ({
-    kind: 'INVOICE', description: null, cardLast4: null, cardAlias: null, vatDeduct: null, payMethod: null, proof: null,
+    kind: 'INVOICE', description: null, note: null, cardLast4: null, cardAlias: null, vatDeduct: null, payMethod: null, proof: null,
     id: 'i', direction: 'P', writeDate: '2026-09-05', approvalNo: 'A-1', vendorId: 'v', vendorName: '(주)강남빌딩',
     bizNo: '1208133459', supplyAmount: 1500000, taxAmount: 150000, totalAmount: 1650000, invClass: 'TAX', fileId: 'f',
     itemCode: 'RENT', suggestedItemCode: null, ...over,
@@ -177,7 +177,7 @@ describe('invoiceExportSheet — 계산서 시트(표준 양식 칸 + 항목)', 
     const wb = XLSX.read(bytes, { type: 'array' });
     expect(wb.SheetNames).toEqual(['매입·매출 계산서']);
     expect(XLSX.utils.sheet_to_json(wb.Sheets['매입·매출 계산서']!, { header: 1 })).toEqual([
-      ['구분', '작성일', '승인번호', '거래처명', '사업자번호', '공급가액', '세액', '종류', '항목'],
+      ['구분', '작성일', '승인번호', '거래처명', '사업자번호', '공급가액', '세액', '종류', '계정과목'],
       ['매입', '2026-09-05', 'A-1', '(주)강남빌딩', '120-81-33459', 1500000, 150000, '세금계산서', '사무실 월세'],
       ['매입', '2026-09-05', 'A-1', '(주)강남빌딩', '120-81-33459', 1500000, 150000, '세금계산서', '분류 필요'],
       ['매출', '2026-09-05', 'A-1', '(주)강남빌딩', '120-81-33459', 1500000, 150000, '세금계산서', '매출'],
@@ -188,7 +188,7 @@ describe('invoiceExportSheet — 계산서 시트(표준 양식 칸 + 항목)', 
 describe('cardExportSheet — 카드 사용 내역 시트(1-4)', () => {
   const base: TaxClassifyRow = {
     kind: 'CARD', id: 'c', direction: 'P', writeDate: '2026-09-03', approvalNo: null, vendorId: 'v', vendorName: '지어낸 가게',
-    description: null, bizNo: '2208162517', supplyAmount: 10000, taxAmount: 1000, totalAmount: 11000, invClass: null,
+    description: null, note: '회의 다과', bizNo: '2208162517', supplyAmount: 10000, taxAmount: 1000, totalAmount: 11000, invClass: null,
     cardLast4: '4821', cardAlias: '법인카드 1', vatDeduct: 'Y', payMethod: null, proof: null, fileId: 'f', itemCode: 'MEAL', suggestedItemCode: null,
   };
   const names = {
@@ -197,17 +197,17 @@ describe('cardExportSheet — 카드 사용 내역 시트(1-4)', () => {
     deducts: [{ code: 'Y', name: '공제' }, { code: 'N', name: '불공제' }],
   };
 
-  it('칸 — 사용일 · 카드(별칭 · 끝 4자리만) · 가맹점명 · 사업자번호 · 공급가액 · 세액 · 합계 · 공제 여부 · 항목', () => {
+  it('칸 — 사용일 · 카드(별칭 · 끝 4자리만) · 가맹점명 · 내용(222) · 사업자번호 · 공급가액 · 세액 · 합계 · 공제 여부 · 항목', () => {
     const bytes = buildXlsx([cardExportSheet([
       base,
-      { ...base, id: 'd', cardAlias: null, bizNo: null, totalAmount: -5000, supplyAmount: -5000, taxAmount: 0, vatDeduct: null, itemCode: null },
+      { ...base, id: 'd', cardAlias: null, note: null, bizNo: null, totalAmount: -5000, supplyAmount: -5000, taxAmount: 0, vatDeduct: null, itemCode: null },
     ], names)]);
     const wb = XLSX.read(bytes, { type: 'array' });
     expect(wb.SheetNames).toEqual(['카드 사용 내역']);
     expect(XLSX.utils.sheet_to_json(wb.Sheets['카드 사용 내역']!, { header: 1, defval: '' })).toEqual([
-      ['사용일', '카드', '가맹점명', '사업자번호', '공급가액', '세액', '합계', '공제 여부', '항목'],
-      ['2026-09-03', '법인카드 1 · 끝 4821', '지어낸 가게', '220-81-62517', 10000, 1000, 11000, '공제', '식대·회의비'],
-      ['2026-09-03', '끝 4821', '지어낸 가게', '', -5000, 0, -5000, '', '분류 필요'],
+      ['사용일', '카드', '가맹점명', '내용', '사업자번호', '공급가액', '세액', '합계', '공제 여부', '계정과목'],
+      ['2026-09-03', '법인카드 1 · 끝 4821', '지어낸 가게', '회의 다과', '220-81-62517', 10000, 1000, 11000, '공제', '식대·회의비'],
+      ['2026-09-03', '끝 4821', '지어낸 가게', '', '', -5000, 0, -5000, '', '분류 필요'],
     ]);
   });
 });
@@ -215,7 +215,7 @@ describe('cardExportSheet — 카드 사용 내역 시트(1-4)', () => {
 describe('cashExportSheet — 현금 경비 시트(1-4)', () => {
   const base: TaxClassifyRow = {
     kind: 'CASH', id: 'x', direction: 'P', writeDate: '2026-09-05', approvalNo: null, vendorId: null, vendorName: '지어낸 식당',
-    description: '점심', bizNo: null, supplyAmount: null, taxAmount: null, totalAmount: 5000, invClass: null,
+    description: '점심', note: null, bizNo: null, supplyAmount: null, taxAmount: null, totalAmount: 5000, invClass: null,
     cardLast4: null, cardAlias: null, vatDeduct: null, payMethod: 'CASH', proof: 'RECEIPT', fileId: 'f', itemCode: null, suggestedItemCode: null,
   };
   const names = {
@@ -236,7 +236,7 @@ describe('cashExportSheet — 현금 경비 시트(1-4)', () => {
     ], names)]);
     const wb = XLSX.read(bytes, { type: 'array' });
     expect(XLSX.utils.sheet_to_json(wb.Sheets['현금 경비']!, { header: 1, defval: '' })).toEqual([
-      ['날짜', '품명', '거래처', '구분', '금액', '결제방법', '증빙', '항목'],
+      ['날짜', '품명', '거래처', '구분', '금액', '결제방법', '증빙', '계정과목'],
       ['2026-09-05', '점심', '지어낸 식당', '매입', 5000, '현금', '영수증', '식대·회의비'],
       ['2026-09-05', '점심', '지어낸 식당', '매입', 5000, '현금', '영수증', '분류 필요'],
       ['2026-09-05', '점심', '', '매출', 30000, '현금', '', '매출'],
@@ -247,6 +247,36 @@ describe('cashExportSheet — 현금 경비 시트(1-4)', () => {
     const bytes = buildXlsx([cashExportSheet([base], { ...names, payMethodHeader: '지어낸 결제', proofHeader: '지어낸 증빙' })]);
     const wb = XLSX.read(bytes, { type: 'array' });
     expect(XLSX.utils.sheet_to_json(wb.Sheets['현금 경비']!, { header: 1 })[0]).toEqual(
-      ['날짜', '품명', '거래처', '구분', '금액', '지어낸 결제', '지어낸 증빙', '항목']);
+      ['날짜', '품명', '거래처', '구분', '금액', '지어낸 결제', '지어낸 증빙', '계정과목']);
+  });
+});
+
+describe('classifyListSheet — 항목 지정 [엑셀 내려받기](2026-11-08 — 목록과 같은 칸)', () => {
+  const base: TaxClassifyRow = {
+    kind: 'CARD', id: 'c', direction: 'P', writeDate: '2026-09-03', approvalNo: null, vendorId: 'v', vendorName: '지어낸 가게',
+    description: null, note: '회의 다과', bizNo: null, supplyAmount: 10000, taxAmount: 1000, totalAmount: 11000, invClass: null,
+    cardLast4: '4821', cardAlias: '법인카드 1', vatDeduct: 'Y', payMethod: null, proof: null, fileId: 'f', itemCode: 'MEAL', suggestedItemCode: null,
+  };
+  const names = {
+    invDirs: [{ code: 'P', name: '매입' }, { code: 'S', name: '매출' }],
+    kinds: [{ code: 'CARD', name: '카드 사용 내역' }, { code: 'CASH', name: '현금 경비' }],
+    itemNames: [{ code: 'MEAL', name: '식대·회의비' }],
+    leftName: '미지정',
+  };
+
+  it('칸 — 날짜 · 출처 · 사용처 · 내용 · 금액 · 계정과목 / 시트 이름 「항목 지정」', () => {
+    const bytes = buildXlsx([classifyListSheet([
+      base,
+      { ...base, id: 'x', kind: 'CASH', vendorName: '', description: '복사 용지', note: null, totalAmount: 5000, itemCode: null },
+      { ...base, id: 's', kind: 'INVOICE', direction: 'S', vendorName: '지어낸 손님', note: null, totalAmount: 330000, itemCode: null },
+    ], names)]);
+    const wb = XLSX.read(bytes, { type: 'array' });
+    expect(wb.SheetNames).toEqual(['항목 지정']);
+    expect(XLSX.utils.sheet_to_json(wb.Sheets['항목 지정']!, { header: 1, defval: '' })).toEqual([
+      ['날짜', '출처', '사용처', '내용', '금액', '계정과목'],
+      ['2026-09-03', '법인카드 1', '지어낸 가게', '회의 다과', 11000, '식대·회의비'],
+      ['2026-09-03', '현금 경비', '—', '복사 용지', 5000, '미지정'],
+      ['2026-09-03', '매출 계산서', '지어낸 손님', '—', 330000, '—'],
+    ]);
   });
 });

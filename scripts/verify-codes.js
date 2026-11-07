@@ -45,8 +45,9 @@ const asOperator = (fn) => withCompanyScope({ role: 'operator', companyId: null 
  * ★ 2026-11-01 159 → 166 — 세무 은행(212 · 213) 쓰임 5줄 + 고정 코드 2줄.
  * ★ 2026-11-01 166 → 174 — 세무 국세 · 지방세 · 4대보험 · 대출(214 · 215) 쓰임 5줄 + 고정 코드 3줄.
  * ★ 2026-11-07 174 → 176 — 세무 세무사 전달 서류(218 TAX_HANDOFF_TP) 쓰임 1줄 + 고정 코드 1줄.
+ * ★ 2026-11-08 176 → 178 — 세무 항목 지정 검색조건(222 TAX_CLS_STATUS · TAX_CLS_SOURCE) 고정 코드 2줄(담는 칸이 없어 쓰임은 없다).
  */
-const EXPECTED_ITEMS = 176;
+const EXPECTED_ITEMS = 178;
 let pass = 0;
 let fail = 0;
 const failures = [];

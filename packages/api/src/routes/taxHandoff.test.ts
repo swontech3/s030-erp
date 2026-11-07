@@ -41,7 +41,7 @@ const session = (role: ScopeRole): ErpSession => ({
 
 const row = (over: Partial<TaxClassifyRow>): TaxClassifyRow => ({
   kind: 'INVOICE', id: 'r', direction: 'P', writeDate: '2026-07-01', approvalNo: 'A1', vendorId: null, vendorName: '지어낸 거래처',
-  description: null, bizNo: '9900000011', supplyAmount: 1000, taxAmount: 100, totalAmount: 1100, invClass: 'TAX', cardLast4: null,
+  description: null, note: null, bizNo: '9900000011', supplyAmount: 1000, taxAmount: 100, totalAmount: 1100, invClass: 'TAX', cardLast4: null,
   cardAlias: null, vatDeduct: null, payMethod: null, proof: null, fileId: 'f', itemCode: null, suggestedItemCode: null, ...over,
 });
 const pay = (id: string): TaxPaymentRow => ({
@@ -99,10 +99,10 @@ describe('buildHandoffSheets — 시트 아홉', () => {
 
   it('매입 · 매출 · 카드 · 현금 · 국세 · 지방세 · 대출은 지금 시트 함수의 칸 그대로', () => {
     const s = Object.fromEntries(buildHandoffSheets(SRC).map((x) => [x.key, x.sheet.columns.map((c) => c.header).join()]));
-    expect(s.P).toBe('구분,작성일,승인번호,거래처명,사업자번호,공급가액,세액,종류,항목');
+    expect(s.P).toBe('구분,작성일,승인번호,거래처명,사업자번호,공급가액,세액,종류,계정과목');
     expect(s.S).toBe(s.P);
-    expect(s.CARD).toBe('사용일,카드,가맹점명,사업자번호,공급가액,세액,합계,공제 여부,항목');
-    expect(s.CASH).toBe('날짜,품명,거래처,구분,금액,결제방법,증빙,항목');
+    expect(s.CARD).toBe('사용일,카드,가맹점명,내용,사업자번호,공급가액,세액,합계,공제 여부,계정과목');
+    expect(s.CASH).toBe('날짜,품명,거래처,구분,금액,결제방법,증빙,계정과목');
     expect(s.NTAX).toBe('납부일,세목,비용 여부,금액,가산금,수납관서,전자납부번호');
     expect(s.LTAX).toBe('납부일,세목,비용 여부,금액,귀속 연월,납부기관,납부방법,납세번호');
     expect(s.LOAN).toBe('거래일,대출,구분,거래종류,원금,이자,수수료,잔액');

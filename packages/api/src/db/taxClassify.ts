@@ -55,7 +55,7 @@ const filterSql = (alias: string, col: string) => `${alias}.org_id = $1
 const filterParams = (orgId: number, f: ClassifyFilter) => [orgId, f.range?.[0] ?? null, f.range?.[1] ?? null, f.fileId];
 
 const NONE = {
-  approvalNo: null, vendorId: null, description: null, bizNo: null, supplyAmount: null, taxAmount: null, invClass: null,
+  approvalNo: null, vendorId: null, description: null, note: null, bizNo: null, supplyAmount: null, taxAmount: null, invClass: null,
   cardLast4: null, cardAlias: null, vatDeduct: null, payMethod: null, proof: null, suggestedItemCode: null,
 } as const;
 
@@ -134,6 +134,7 @@ interface CardRow {
   tax_amount: string;
   total_amount: string;
   vat_deduct: string | null;
+  note: string | null;
   file_id: string;
   item_code: string | null;
 }
@@ -147,7 +148,7 @@ export async function listClassifyCards(client: ScopedClient, orgId: number, f: 
             (SELECT a.alias FROM public.tb_s050_fin_accounts a
               WHERE a.org_id = c.org_id AND a.kind = 'C' AND a.number = c.card_last4
               ORDER BY a.sort_order, a.created_at LIMIT 1) AS card_alias,
-            c.supply_amount, c.tax_amount, c.total_amount, c.vat_deduct, c.file_id, c.item_code
+            c.supply_amount, c.tax_amount, c.total_amount, c.vat_deduct, c.note, c.file_id, c.item_code
        FROM public.tb_s050_card_txns c
        LEFT JOIN public.tb_s050_vendors v ON v.org_id = c.org_id AND v.id = c.vendor_id
       WHERE ${filterSql('c', 'use_date')}
@@ -169,6 +170,7 @@ export async function listClassifyCards(client: ScopedClient, orgId: number, f: 
     cardLast4: r.card_last4,
     cardAlias: r.card_alias,
     vatDeduct: r.vat_deduct,
+    note: r.note,
     fileId: r.file_id,
     itemCode: r.item_code,
   }));
@@ -311,14 +313,28 @@ export async function lockClassifyRows(
   return rows;
 }
 
-/** 항목 확정 — 다시 확정하면 덮는다. 고친 줄 수. */
+/**
+ * 항목 확정 — 다시 확정하면 덮는다. 고친 줄 수.
+ * ★ 카드 줄은 「내용」(222 `note`)도 함께 덮는다(빈 글은 null — `parseClassifyConfirm` 이 걷었다).
+ */
 export async function setClassifyItems(
   client: ScopedClient,
   orgId: number,
   kind: ClassifyRowKind,
-  rows: readonly { id: string; itemCode: string }[],
+  rows: readonly { id: string; itemCode: string; note?: string | null }[],
   actor: string,
 ): Promise<number> {
+  if (kind === 'CARD') {
+    const c = await q(
+      client,
+      `UPDATE public.tb_s050_card_txns t
+          SET item_code = w.item_code, note = w.note, classified_at = CURRENT_TIMESTAMP, classified_by = $5
+         FROM unnest($2::text[], $3::text[], $4::text[]) AS w(id, item_code, note)
+        WHERE t.org_id = $1 AND t.id = w.id`,
+      [orgId, rows.map((x) => x.id), rows.map((x) => x.itemCode), rows.map((x) => x.note ?? null), actor],
+    );
+    return c.rowCount ?? 0;
+  }
   const r = await q(
     client,
     `UPDATE public.${TABLE_OF[kind]} t
