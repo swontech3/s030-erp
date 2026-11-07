@@ -25,6 +25,8 @@ export const EDIT_GRANT_USE_TP = '000';
 export const ORG_SELF_GRANT = 'ORG_SELF';
 /** 자기 회사 직원 정보를 고치는 권한 — 직원 받기에서 직원이 ERP 에 없을 때 본문 `orgId` 를 대상으로 본다(삐용 통합 시험 C1). */
 export const MEMBER_SELF_GRANT = 'MEMBER_SELF';
+/** 운영사로 받는 권한 — 받기 셋에서 단체관리의 수정 키가 있을 때만 운영사로 본다(`bbiyong/receiveCaller.ts`, 2026-11-08). */
+export const OPERATOR_GRANT = 'OPERATOR';
 
 export interface EditGrant {
   screen: string;
