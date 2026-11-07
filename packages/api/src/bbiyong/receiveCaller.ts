@@ -3,7 +3,7 @@
  * 입주사 직원 받기가 같은 규칙을 쓴다.
  *
  *   · 실어 온 삐용 토큰(`Authorization: Bearer`)으로 삐용 「내 메뉴」(`my-menus`)를 부른다.
- *     공통 코드 `BBIYONG_EDIT_GRANT` 의 `OPERATOR` 줄 이름(`화면코드:키`, 예 `S021100010:F002` — 단체관리의 수정 키)이
+ *     공통 코드 `BBIYONG_EDIT_GRANT` 의 `OPERATOR` 줄 설명(`화면코드:키`, 예 `S021100010:F002` — 단체관리의 수정 키)이
  *     내 메뉴에 **화면과 키 둘 다** 있으면 **운영사** — 받는다(좁힘 2026-11-08, 삐용팀 요청).
  *     단체관리가 「보기」뿐이면 · 키 없는 옛 문자열 모양이면 · 코드 줄이 없거나 모양이 틀리면 운영사로 보지 않는다
  *     (안전한 쪽) — 다음 규칙으로 넘어간다. 회사 조회(org-lookup)는 이 규칙을 쓰지 않는다(단체관리만 있으면 된다)
@@ -24,7 +24,7 @@ import { hasEditGrant, parseEditGrant } from '../legal/companyEditGrant.ts';
 export interface ReceiveCallerDeps {
   myMenus(accessToken: string): Promise<MyMenusOutcome>;
   myOrg(accessToken: string): Promise<MyOrgOutcome>;
-  /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `OPERATOR` 줄 이름(`화면코드:키`). 없으면 null(→ 아무도 운영사가 아니다). */
+  /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `OPERATOR` 줄 설명(`화면코드:키`). 없으면 null(→ 아무도 운영사가 아니다). */
   operatorGrantName(): Promise<string | null>;
 }
 

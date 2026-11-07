@@ -86,7 +86,7 @@ export type ReceiveOutcome =
 
 /** 부르는 쪽 확인(`ReceiveCallerDeps` — 삐용 내 메뉴 · 지금 계정의 단체) + 쓰기. */
 export interface ReceiveDeps extends ReceiveCallerDeps {
-  /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `ORG_SELF` 줄 이름(`화면코드:키`). 없으면 null. */
+  /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `ORG_SELF` 줄 설명(`화면코드:키`). 없으면 null. */
   orgGrantName(): Promise<string | null>;
   /**
    * 운영사 스코프 트랜잭션 하나에서: 입주사면 `tenant`, 법무 줄이 없으면 `not_found`, 바꿨으면 `applied`.

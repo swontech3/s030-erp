@@ -11,7 +11,7 @@ import { BbiyongUnavailableError, type MyMenusOutcome, type MyOrgOutcome } from 
 const OPERATOR: MyMenusOutcome = { kind: 'ok', screens: ['S021100010'], keys: { S021100010: ['F002'] } };
 /** 단체관리가 「보기」뿐 — 운영사가 아니다. */
 const VIEW_ONLY: MyMenusOutcome = { kind: 'ok', screens: ['S021100010'], keys: { S021100010: ['F001'] } };
-/** 공통 코드 BBIYONG_EDIT_GRANT / OPERATOR 줄 이름(대역). */
+/** 공통 코드 BBIYONG_EDIT_GRANT / OPERATOR 줄 설명(대역). */
 const OPERATOR_GRANT = 'S021100010:F002';
 const COMPANY: MyMenusOutcome = { kind: 'ok', screens: ['S021000000'] };
 

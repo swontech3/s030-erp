@@ -88,9 +88,9 @@ export interface MemberReceiveDeps extends ReceiveCallerDeps {
    * 직원이 없으면 `'not_found'`.
    */
   orgOfMember(memberId: number): Promise<{ orgId: number | null; representative: boolean } | 'not_found'>;
-  /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `MEMBER_SELF` 줄 이름(`화면코드:키`). 없으면 null. */
+  /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `MEMBER_SELF` 줄 설명(`화면코드:키`). 없으면 null. */
   memberGrantName(): Promise<string | null>;
-  /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `ORG_SELF` 줄 이름(`화면코드:키`). 없으면 null. */
+  /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `ORG_SELF` 줄 설명(`화면코드:키`). 없으면 null. */
   orgGrantName(): Promise<string | null>;
   /**
    * 운영사 스코프 트랜잭션 하나에서: 회원번호의 직원이 없으면 `not_found`, 이메일이 같은 회사 다른 활성
