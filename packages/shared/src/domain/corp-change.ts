@@ -74,8 +74,9 @@ export const STOCK_MEMBER_TYPE = 'R';
 
 /**
  * 변경 구분별로 쓸 수 있는 회사유형 — 공통코드 `LAW_CNG_MT` / `000`(결정 2026-11-07).
- * 코드값 = 변경 구분(`LAW_CNG_TP` 의 코드값), 이름 = 쓸 수 있는 회사유형 코드를 쉼표로(예 `R` · `A` · `R,A`).
- * 고칠 때는 코드 관리(s030100030)에서 이름을 고친다(한 업무는 한 화면).
+ * 코드값 = 변경 구분(`LAW_CNG_TP` 의 코드값), 이름 = 사람이 읽는 구분 이름(`LAW_CNG_TP` 의 이름과 같게),
+ * **설명** = 쓸 수 있는 회사유형 코드를 쉼표로(예 `R` · `A` · `R,A`) — 코드 모양 고침(결정 2026-11-07).
+ * 고칠 때는 코드 관리(s030100030)에서 그 줄의 「설명」을 고친다(한 업무는 한 화면).
  */
 export const CORP_CHANGE_MEMBER_RULE_CATEGORY = 'LAW_CNG_MT';
 export const CORP_CHANGE_MEMBER_RULE_USE_TP = '000';
@@ -83,21 +84,23 @@ export const CORP_CHANGE_MEMBER_RULE_USE_TP = '000';
 /** 변경 구분 → 쓸 수 있는 회사유형 코드들. 줄이 없는 구분은 키가 없다. */
 export type ChangeTypeRules = Readonly<Record<string, readonly string[]>>;
 
-/** 코드 줄(`LAW_CNG_MT`) → 규칙. 이름을 쉼표로 나누고 앞뒤 공백 · 빈 칸은 버린다. */
-export function parseChangeTypeRules(rows: readonly { code: string; name: string }[]): ChangeTypeRules {
+/** 코드 줄(`LAW_CNG_MT`) → 규칙. 설명을 쉼표로 나누고 앞뒤 공백 · 빈 칸은 버린다.
+ * 설명이 비면 줄이 없는 구분과 같다 — 주식회사(R)만(결정 2026-11-07). */
+export function parseChangeTypeRules(rows: readonly { code: string; description: string | null }[]): ChangeTypeRules {
   const rules: Record<string, readonly string[]> = {};
   for (const r of rows) {
-    rules[r.code] = r.name
+    const types = (r.description ?? '')
       .split(',')
       .map((s) => s.trim())
       .filter((s) => s !== '');
+    if (types.length > 0) rules[r.code] = types;
   }
   return rules;
 }
 
 /**
  * 이 회사유형의 건이 고를 수 있는 구분인가(결정 2026-11-01 → 2026-11-07 공통 코드로).
- *   · 규칙은 공통코드 `LAW_CNG_MT`(`parseChangeTypeRules`) — 구분의 이름에 회사유형 코드가 있으면 고를 수 있다
+ *   · 규칙은 공통코드 `LAW_CNG_MT`(`parseChangeTypeRules`) — 구분의 설명에 회사유형 코드가 있으면 고를 수 있다
  *   · 줄이 없는 구분은 주식회사(`R`)만 · 회사유형이 비었거나 R · A 가 아닌 회사(C · S · P · Z 등)는 주식회사로 본다
      (예전 동작 유지, 결정 2026-11-07)
  * ★ 화면(새 건 대화상자 선택지)과 서버(첫 저장 · 저장 · 작성완료 거절)가 이 함수 하나를 쓴다.

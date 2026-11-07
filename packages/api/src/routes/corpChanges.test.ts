@@ -1672,7 +1672,7 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
   const INS_CHANGE = /INSERT INTO public\.tb_s080_corp_changes/;
   const HQ_PAYLOAD = { newHqAddress: { zipCode: '13500', address: '경기 성남시 1' }, resolutionDate: '2026-10-01', relocationDate: '2026-10-02' };
   // 구분별 회사유형 규칙(공통 코드 LAW_CNG_MT, 결정 2026-11-07) — 일회용의 시작 값
-  const RULE = (code: string, name: string) => ({ category: 'LAW_CNG_MT', code, name });
+  const RULE = (code: string, rule: string) => ({ category: 'LAW_CNG_MT', code, name: code + ' 이름', description: rule });
   const START_RULES = [RULE('NAME', 'R'), RULE('PURPOSE', 'R'), RULE('OFFICER', 'R'), RULE('CEO_ADDR', 'R'), RULE('HQ', 'R'), RULE('HQ_OUT', 'A')];
   const CODES = (more: object[] = [], rules = START_RULES) => ({ match: /FROM public.tb_s080_codes_line/, rows: [...rules, ...more] });
 
@@ -1781,7 +1781,7 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
     expect((await press('E', 'C', 'R')).statusCode).toBe(200);
   });
 
-  it('규칙 이름을 「R,A」로 바꾸면 유한회사도 고를 수 있다 · 줄이 없는 구분은 주식회사만(결정 2026-11-07)', async () => {
+  it('규칙 설명을 「R,A」로 바꾸면 유한회사도 고를 수 있다 · 이름은 보지 않는다 · 줄이 없는 구분은 주식회사만(결정 2026-11-07)', async () => {
     const save = async (changeType: string, memberType: string, rules: object[]) => {
       const db = fakeDb([LEGAL_ORG(memberType), CODES([], rules as never)]);
       const a = await build(session('operator', 1), db.deps);
@@ -1793,6 +1793,11 @@ describe('본점이전 구분 · 회사 형태(결정 2026-11-01)', () => {
     expect(await save('HQ', 'A', START_RULES)).toBe(400);
     expect(await save('HQ', 'A', [RULE('HQ', 'R,A'), RULE('HQ_OUT', 'A')])).toBe(201);
     expect(await save('HQ', 'R', [RULE('HQ', 'R,A'), RULE('HQ_OUT', 'A')])).toBe(201);
+    // 규칙은 설명 칸에서만 읽는다 — 이름이 「R,A」여도 설명이 A 면 주식회사는 못 고른다
+    expect(await save('HQ', 'R', [{ category: 'LAW_CNG_MT', code: 'HQ', name: 'R,A', description: 'A' }])).toBe(400);
+    // 설명이 비면 줄이 없는 구분과 같다 — 주식회사만
+    expect(await save('HQ_OUT', 'A', [RULE('HQ_OUT', '')])).toBe(400);
+    expect(await save('HQ', 'R', [{ category: 'LAW_CNG_MT', code: 'HQ', name: '동일관할', description: null }])).toBe(201);
     // 줄이 하나도 없으면 — 타관할은 아무도 못 고르고, 그 밖은 주식회사만
     expect(await save('HQ_OUT', 'A', [])).toBe(400);
     expect(await save('HQ', 'R', [])).toBe(201);

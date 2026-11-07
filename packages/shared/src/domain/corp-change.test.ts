@@ -109,16 +109,16 @@ describe('★ 타관할로의 본점이전(HQ_OUT) · 회사 형태(결정 2026-
   });
   // 시작 값(일회용 2026-11-07-change-type-member-rule) — NAME · PURPOSE · OFFICER · CEO_ADDR · HQ = R / HQ_OUT = A
   const rules = parseChangeTypeRules([
-    { code: 'NAME', name: 'R' },
-    { code: 'PURPOSE', name: 'R' },
-    { code: 'OFFICER', name: 'R' },
-    { code: 'CEO_ADDR', name: 'R' },
-    { code: 'HQ', name: 'R' },
-    { code: 'HQ_OUT', name: 'A' },
+    { code: 'NAME', description: 'R' },
+    { code: 'PURPOSE', description: 'R' },
+    { code: 'OFFICER', description: 'R' },
+    { code: 'CEO_ADDR', description: 'R' },
+    { code: 'HQ', description: 'R' },
+    { code: 'HQ_OUT', description: 'A' },
   ]);
   const allowedTypes = (memberType: string | null, r = rules) => CORP_CHANGE_TYPES.filter((t) => changeTypeAllowedFor(t, memberType, r));
-  it('규칙 읽기 — 쉼표로 나누고 공백 · 빈 칸은 버린다', () => {
-    expect(parseChangeTypeRules([{ code: 'HQ', name: ' R , A ,' }, { code: 'NAME', name: '' }])).toEqual({ HQ: ['R', 'A'], NAME: [] });
+  it('규칙 읽기(설명 칸) — 쉼표로 나누고 공백 · 빈 칸은 버린다', () => {
+    expect(parseChangeTypeRules([{ code: 'HQ', description: ' R , A ,' }, { code: 'NAME', description: '' }, { code: 'PURPOSE', description: null }])).toEqual({ HQ: ['R', 'A'] });
     expect(CORP_CHANGE_MEMBER_RULE_CATEGORY).toBe('LAW_CNG_MT');
   });
   it('유한회사 → 타관할만 · 주식회사 → 지금 5가지 · 비었으면 주식회사로 본다', () => {
@@ -127,14 +127,23 @@ describe('★ 타관할로의 본점이전(HQ_OUT) · 회사 형태(결정 2026-
     expect(allowedTypes(null)).toEqual(allowedTypes('R'));
     expect(allowedTypes('')).toEqual(allowedTypes('R'));
   });
+  it('설명이 비면(빈 글 · 공백 · 쉼표만 · null) 줄이 없는 구분과 같다 — 주식회사(R)만', () => {
+    for (const description of ['', '  ', ' , ', null]) {
+      const r = parseChangeTypeRules([{ code: 'HQ_OUT', description }, { code: 'NAME', description: 'A' }]);
+      expect(changeTypeAllowedFor('HQ_OUT', 'R', r)).toBe(true);
+      expect(changeTypeAllowedFor('HQ_OUT', null, r)).toBe(true);
+      expect(changeTypeAllowedFor('HQ_OUT', 'A', r)).toBe(false);
+      expect(changeTypeAllowedFor('NAME', 'A', r)).toBe(true);
+    }
+  });
   it('회사유형이 R · A 가 아니면(C · S · P · Z 등) 주식회사로 보고 거른다 — 예전 동작 유지', () => {
     for (const t of ['C', 'S', 'P', 'Z', 'X', ' ']) expect(allowedTypes(t)).toEqual(allowedTypes('R'));
-    const both = parseChangeTypeRules([{ code: 'NAME', name: 'A' }]);
+    const both = parseChangeTypeRules([{ code: 'NAME', description: 'A' }]);
     expect(changeTypeAllowedFor('NAME', 'C', both)).toBe(false);
     expect(changeTypeMemberTypeError('HQ_OUT', 'C', rules)).not.toBeNull();
   });
   it('이름을 「R,A」로 바꾸면 둘 다 고를 수 있다', () => {
-    const both = parseChangeTypeRules([{ code: 'NAME', name: 'R,A' }, { code: 'HQ_OUT', name: 'A' }]);
+    const both = parseChangeTypeRules([{ code: 'NAME', description: 'R,A' }, { code: 'HQ_OUT', description: 'A' }]);
     expect(changeTypeAllowedFor('NAME', 'A', both)).toBe(true);
     expect(changeTypeAllowedFor('NAME', 'R', both)).toBe(true);
     expect(changeTypeAllowedFor('NAME', null, both)).toBe(true);

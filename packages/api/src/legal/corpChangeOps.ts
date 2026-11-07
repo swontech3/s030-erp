@@ -75,6 +75,7 @@ import {
   getCorpChange,
   insertCorpChange,
   insertOfficer,
+  listChangeTypeRuleRows,
   listOfficers,
   readCompanySource,
   tenantOrgCode,
@@ -243,7 +244,7 @@ async function checkCompanyWrite(
 /** 구분별 회사유형 규칙(공통 코드 `LAW_CNG_MT`, 결정 2026-11-07) — 대화상자 · 첫 저장 · 저장 · 작성완료가 이것 하나를 읽는다. */
 async function readChangeTypeRules(client: ScopedClient): Promise<ChangeTypeRules> {
   return parseChangeTypeRules(
-    await listCodes(client, [{ category: CORP_CHANGE_MEMBER_RULE_CATEGORY, useTp: CORP_CHANGE_MEMBER_RULE_USE_TP }]),
+    await listChangeTypeRuleRows(client, CORP_CHANGE_MEMBER_RULE_CATEGORY, CORP_CHANGE_MEMBER_RULE_USE_TP),
   );
 }
 
