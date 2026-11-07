@@ -103,7 +103,8 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     memberName: '홍길동',
     orgName: '주식회사 비앤케이넷',
     scope: 'tenant',
-    screens: ['s030000050', 's030600010'],
+    // ★ s030200090 내 청구서(앱 1단계 7-나 · 2026-11-08) — 입주사 전용 보기 화면. 운영사 계정에는 넣지 않는다.
+    screens: ['s030000050', 's030200090', 's030600010'],
     orgCode: 'Z97',
   },
   {

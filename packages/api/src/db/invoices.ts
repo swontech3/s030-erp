@@ -172,6 +172,31 @@ export async function listContractInvoices(
   return rows;
 }
 
+/**
+ * 한 회사의 청구서 — 청구 달 `from` ~ `to`(`YYYY-MM`, 둘 다 포함). 내 청구서(s030200090)가 쓴다.
+ *
+ * ★ 입주사 세션의 RLS 가 이미 자기 회사로 좁힌다. `company_id` 조건은 **겹쳐 거는 것**이다 —
+ *   운영사 스코프로 잘못 불려도 남의 회사 줄이 섞이지 않는다.
+ * ★ 취소 장도 돌려준다 — 거르기는 화면 규칙(shared `my-invoices`)이 한다.
+ */
+export async function listCompanyInvoicesInRange(
+  client: ScopedClient,
+  companyId: string,
+  from: string,
+  to: string,
+): Promise<InvoiceRow[]> {
+  const { rows } = await q<InvoiceRow>(
+    client,
+    `SELECT ${INVOICE_COLUMNS}
+       FROM public.tb_s080_invoices
+      WHERE company_id = $1
+        AND year_month BETWEEN $2 AND $3
+      ORDER BY year_month, due_date, invoice_id`,
+    [companyId, from, to],
+  );
+  return rows;
+}
+
 export interface InvoiceLineRow {
   invoice_line_id: string;
   seq: number;

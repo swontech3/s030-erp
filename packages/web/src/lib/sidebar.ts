@@ -35,6 +35,7 @@ const SIDEBAR_ICONS: Record<ScreenId, IconName | null> = {
   s030200040: null, // 계약 폼 — 상세에서 들어간다
   s030200070: 'receipt',
   s030200080: 'message-square-text',
+  s030200090: 'receipt', // 내 청구서(입주사) — 운영사 청구와 같은 영수증. 둘을 함께 받는 계정은 없다
   s030500010: null, // 랜딩 — 공개 화면
   s030500060: null, // 회의실 현황판 — 공개 화면(키오스크)
   s030500070: null, // 문의상담 목록 — 공개 화면

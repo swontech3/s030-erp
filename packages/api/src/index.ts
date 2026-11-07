@@ -19,6 +19,7 @@ import { registerContractRoutes } from './routes/contracts.ts';
 import { registerBillingRoutes } from './routes/billing.ts';
 import { registerLookupRoutes } from './routes/lookups.ts';
 import { registerBookingRoutes } from './routes/booking.ts';
+import { registerMyInvoicesRoutes } from './routes/myInvoices.ts';
 import { registerKioskRoutes } from './routes/kiosk.ts';
 import { registerInquiryRoutes } from './routes/inquiry.ts';
 import { registerInquiryAdminRoutes } from './routes/inquiryAdmin.ts';
@@ -113,6 +114,8 @@ registerAuthRoutes(app);
 registerAclRoutes(app);
 registerContractRoutes(app);
 registerBillingRoutes(app);
+// ★ 내 청구서(s030200090 · 앱 1단계 7-나). **입주사 전용 · 보기만** — 쓰기는 위 청구 라우트(운영사)뿐이다.
+registerMyInvoicesRoutes(app);
 registerLookupRoutes(app);
 // ★ 회의실 예약(s030600010). 조회는 입주사도 하고, 종료 처리만 운영사다.
 registerBookingRoutes(app);
