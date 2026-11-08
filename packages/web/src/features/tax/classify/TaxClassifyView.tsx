@@ -65,12 +65,14 @@ interface Props {
   month: string;
   /** 자료 올리기 [보기]로 들어온 파일. */
   fileId: string | null;
+  /** 처음 구분 — 주소 `?status=`(부가세 조회 비고 [항목지정]은 미지정 L, 11-08 ⑦). 없으면 전체. */
+  initialStatus?: ClassifyStatus;
 }
 
-export function TaxClassifyView({ month, fileId }: Props) {
+export function TaxClassifyView({ month, fileId, initialStatus = 'all' }: Props) {
   const router = useRouter();
   const pathname = usePathname();
-  const [status, setStatus] = useState<ClassifyStatus>('all');
+  const [status, setStatus] = useState<ClassifyStatus>(initialStatus);
   const [kind, setKind] = useState<ClassifyKind>('all');
   /** 계정과목 — 빈 글이면 전체. */
   const [item, setItem] = useState('');

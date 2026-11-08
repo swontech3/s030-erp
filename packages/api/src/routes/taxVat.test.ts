@@ -1,5 +1,5 @@
 /**
- * `/tax/vat` — 주소 해석(400) · 세션 단체 · 엑셀 응답 · 엑셀 칸(1-8 결정 11).
+ * `/tax/vat` — 주소 해석(400) · 세션 단체 · 엑셀 응답 · 엑셀 칸(1-8 결정 11 · 11-08 ⑦ 「부가세 요약」).
  *
  * ★ DB 에 붙지 않는다. 계산은 shared `tax-vat.test.ts`, 실제 DB 는 `scripts/verify-tax-vat.js` 가 잰다.
  */
@@ -7,9 +7,9 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import * as XLSX from 'xlsx';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ErpSession, ScopeRole } from '@swonbiz/shared';
-import type { TaxVatResponse, VatLedgerRow } from '@swonbiz/shared/domain/tax-vat';
+import type { TaxVatResponse, VatAmounts, VatLedgerRow } from '@swonbiz/shared/domain/tax-vat';
 import { buildXlsx } from '../lib/xlsxExport.ts';
-import { registerTaxVatRoutes, vatLedgerSheet, type TaxVatDeps } from './taxVat.ts';
+import { registerTaxVatRoutes, vatLedgerSheet, vatSummarySheet, type TaxVatDeps } from './taxVat.ts';
 
 const session = (role: ScopeRole): ErpSession => ({
   erpSid: 'sid-hash',
@@ -120,6 +120,29 @@ describe('vatLedgerSheet — 매출 · 매입 시트(결정 11)', () => {
       ['작성일', '거래처', '사업자번호', '공급가액', '세액', '자료', '공제 여부'],
       ['2026-08-01', '가게', null, 300, 30, '카드', '불공제'],
       ['2026-08-02', '갑상사', '1234567890', 200, 20, '계산서', null],
+    ]);
+  });
+});
+
+describe('vatSummarySheet — 「부가세 요약」 시트(11-08 ⑦)', () => {
+  const a: VatAmounts = {
+    salesSupply: 1000, salesTax: 100, salesTotal: 1100,
+    purchaseSupply: 200, purchaseTax: 20, purchaseTotal: 220,
+    cardSupply: 50, cardTax: 5, cardTotal: 55,
+    payable: 75,
+  };
+  it('화면 표와 같은 칸 · 달마다 한 줄 + 합계 줄 · 아직 오지 않은 달은 모든 칸 빈칸', () => {
+    const sheet = vatSummarySheet(
+      [{ month: '2026-10', amounts: a }, { month: '2026-11', amounts: null }],
+      a,
+    );
+    expect(sheet.name).toBe('부가세 요약');
+    expect(aoa(sheet)).toEqual([
+      ['월', '매출액 공급가액', '매출액 부가세액', '매출액 합계', '매입액 공급가액', '매입액 부가세액', '매입액 합계',
+        '카드 경비 공급가액', '카드 경비 부가세액', '카드 경비 합계', '납부세액'],
+      ['2026-10', 1000, 100, 1100, 200, 20, 220, 50, 5, 55, 75],
+      ['2026-11', null, null, null, null, null, null, null, null, null, null],
+      ['합계', 1000, 100, 1100, 200, 20, 220, 50, 5, 55, 75],
     ]);
   });
 });

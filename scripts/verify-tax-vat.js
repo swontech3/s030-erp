@@ -5,8 +5,9 @@
  *
  * ★★ 계산 규칙 하나하나는 shared `tax-vat.test.ts` 가 잰다. 여기는 그 위의 읽기다:
  *    신고 기간(법인 분기 · 개인 반기, 설정의 사업자 유형) · 세는 범위 · 매출세액 · 매입세액 · 카드 공제(Y) · 현금 매출 ·
- *    공제가 안 될 수 있는 매입(코드 TAX_NODEDUCT_ITEM, 217) · 미지정 건 · 기간 고르기 · 맞지 않는 기간 400 · 설정 없음 ·
- *    엑셀(매출 · 매입 시트) · 회사별 막기.
+ *    미지정 건 · 달마다 표(합계 칸 · 아직 오지 않은 달 빈칸) · 기간 고르기 · 맞지 않는 기간 400 · 설정 없음 ·
+ *    엑셀(부가세 요약 · 매출 · 매입 시트) · 회사별 막기.
+ * ★ 11-08 ⑦ — 「공제가 안 될 수 있는 매입」 계산을 지워 V3 을 뺐다. 달마다 표 V14 · V15 를 더하고 V8 · V9 를 「부가세 요약」 시트에 맞췄다.
  * ★★ API 의 풀(`db/pool.ts`)로 접속한다 — erp_app. 라우트가 쓰는 처리(`routes/taxVat.ts` 의 …Op)를 그대로 부른다.
  * ★ 시험 줄은 지어낸 값으로 **한 트랜잭션 안에서 넣고 ROLLBACK 한다.** DB 에 남는 것이 없다(마지막 Z1 이 센다).
  *   시험 단체는 verify-201 · 203 과 같은 대역(990001 · 990002).
@@ -93,12 +94,20 @@ async function main() {
       check('V2', '★ 매출세액 130,000(계산서 세액 합, 6월 줄 빠짐) · 매입세액 25,000 · 카드 공제(Y) 3,000 · 낼 세금 102,000',
         v && v.sales.tax === 130000 && v.sales.supply === 1300000 && v.purchase.tax === 25000 && v.card.tax === 3000 && v.payable === 102000,
         v ? { sales: v.sales, purchase: v.purchase, card: v.card, payable: v.payable } : r);
-      check('V3', '★ 공제가 안 될 수 있는 매입 — 코드 표(217) 순서 접대비 2,000(공제 카드만) · 차량유지비 20,000 · 최대 22,000',
-        v && JSON.stringify(v.nodeduct.lines.map((l) => [l.itemCode, l.label, l.tax])) ===
-          JSON.stringify([['ENTERTAIN', '접대비', 2000], ['VEHICLE', '차량유지비', 20000]]) && v.nodeduct.total === 22000,
-        v ? v.nodeduct : r);
       check('V4', '현금 매출 55,000(세액 계산 없음) · 미지정 건 3(계산서 · 카드 · 현금 매입)',
         v && v.cashSales === 55000 && v.unassignedCount === 3, v ? { cash: v.cashSales, left: v.unassignedCount } : r);
+      const amt = (a) => (a === null ? null : [a.salesSupply, a.salesTax, a.salesTotal, a.purchaseSupply, a.purchaseTax, a.purchaseTotal,
+        a.cardSupply, a.cardTax, a.cardTotal, a.payable].join());
+      check('V14', '★ 달마다 표(⑦) — 7 · 8 · 9월 숫자 · 합계 칸 = 공급가액 + 부가세액 · 합계 줄 납부세액 102,000 · 미지정이 있는 가장 이른 달 7월',
+        v && v.months.map((m) => `${m.month}:${amt(m.amounts)}`).join('|') ===
+          ['2026-07:1000000,100000,1100000,0,0,0,30000,3000,33000,97000', '2026-08:0,0,0,250000,25000,275000,0,0,0,-25000',
+            '2026-09:300000,30000,330000,0,0,0,0,0,0,30000'].join('|') &&
+          amt(v.total) === '1300000,130000,1430000,250000,25000,275000,30000,3000,33000,102000' && v.unassignedFirstMonth === '2026-07',
+        v ? { months: v.months.map((m) => `${m.month}:${amt(m.amounts)}`), total: amt(v.total), first: v.unassignedFirstMonth } : r);
+      const q4 = await vatOp(c, ORG_A, query({ month: THIS_MONTH, periodId: '2026-Q4' }), THIS_MONTH);
+      check('V15', '★ 아직 오지 않은 달(⑦) — 4분기 · 이번 달 11월이면 10 · 11월은 숫자(0), 12월은 빈칸(null)',
+        q4.ok && q4.data.vat?.months.map((m) => `${m.month}:${m.amounts === null ? 'null' : m.amounts.payable}`).join() ===
+          '2026-10:0,2026-11:0,2026-12:null', q4.ok ? q4.data.vat?.months : q4);
       const db = (await c.query(`SELECT sum(tax_amount)::int t FROM public.tb_s050_invoices
         WHERE org_id = $1 AND direction = 'S' AND write_date >= '2026-07-01' AND write_date < '2026-10-01'`, [ORG_A])).rows[0];
       check('V5', '매출세액이 DB 합과 같다', v && v.sales.tax === db.t, { db: db.t });
@@ -119,11 +128,12 @@ async function main() {
       };
       const x = await exportVatOp(c, ORG_A, query());
       const sh = x.ok ? read(x.data.bytes) : [];
-      check('V8', '★ 엑셀 — 부가세_2026년3분기.xlsx · 시트 매출(제목 + 2) · 매입(제목 + 계산서 2 + 카드 4) · 칸 일곱',
-        x.ok && x.data.fileName === '부가세_2026년3분기.xlsx' && sh.map(([nm, r]) => `${nm}:${r.length}`).join() === '매출:3,매입:7' &&
-        sh[1][1][0].join() === '작성일,거래처,사업자번호,공급가액,세액,자료,공제 여부',
-        x.ok ? { name: x.data.fileName, sheets: sh.map(([nm, r]) => `${nm}:${r.length}`), head: sh[1]?.[1]?.[0] } : x);
-      const cardRow = sh[1]?.[1]?.find((row) => row[5] === '카드' && row[4] === 500);
+      check('V8', '★ 엑셀 — 부가세_2026년3분기.xlsx · 맨 앞 부가세 요약(제목 + 달 3 + 합계, ⑦) · 매출(제목 + 2) · 매입(제목 + 계산서 2 + 카드 4) · 명세 칸 일곱',
+        x.ok && x.data.fileName === '부가세_2026년3분기.xlsx' && sh.map(([nm, r]) => `${nm}:${r.length}`).join() === '부가세 요약:5,매출:3,매입:7' &&
+        sh[0][1][4].join() === '합계,1300000,130000,1430000,250000,25000,275000,30000,3000,33000,102000' &&
+        sh[2][1][0].join() === '작성일,거래처,사업자번호,공급가액,세액,자료,공제 여부',
+        x.ok ? { name: x.data.fileName, sheets: sh.map(([nm, r]) => `${nm}:${r.length}`), total: sh[0]?.[1]?.[4], head: sh[2]?.[1]?.[0] } : x);
+      const cardRow = sh[2]?.[1]?.find((row) => row[5] === '카드' && row[4] === 500);
       check('V9', '엑셀 매입 카드 줄 — 자료 「카드」 · 공제 여부는 코드 이름(불공제)', cardRow?.[6] === '불공제', cardRow ?? null);
 
       // ── 개인 ──

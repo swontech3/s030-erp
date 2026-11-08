@@ -6,15 +6,14 @@
  *   세는 범위  기간 첫날 ~ (기간 끝 · 작업할 달 중 이른 달)의 끝 — 시안 「7~9월까지 쌓인 값」
  *   매출세액   매출 계산서 세액 합(결정 10) · 매입세액 매입 계산서 세액 합(항목과 무관)
  *   카드       홈택스 공제(Y) 줄 세액 합(결정 3)
- *   현금 매출  세액을 세지 않고 금액만 — 화면은 「부가세 포함 여부 세무사 확인」 안내(결정 7)
- *   공제가 안 될 수 있는 매입  매입 계산서 · 공제(Y) 카드 중 항목이 코드 TAX_NODEDUCT_ITEM 이름(= 출금 항목 코드값)인 줄의 세액(결정 4)
- *   달마다 표  기간의 달마다 매출 · 매입(계산서) 공급가액 · 부가세, 카드 공제(Y) 줄 공급가액 · 부가세, 낼 부가세 + 합계(11-06 대표 수정)
+ *   현금 매출  세액을 세지 않고 금액만(결정 7 — 11-08 ⑦ 부터 화면에 안내 없음)
+ *   달마다 표  기간의 달마다 매출 · 매입(계산서) · 카드 공제(Y) 줄의 공급가액 · 부가세액 · 합계, 납부세액 + 합계 줄(11-06 · 11-08 ⑦)
+ *              센 범위 끝 달(기간 끝 · 작업할 달 중 이른 달)보다 뒤 달 = 아직 오지 않은 달 → 숫자 없음(null, 화면 · 엑셀 빈칸)
+ * ★ 11-08 ⑦ — 「공제가 안 될 수 있는 매입」(결정 4) 계산을 지웠다. 코드 표 TAX_NODEDUCT_ITEM(217) · DB 는 그대로.
  *   선택지     올해 포함 최근 3년(작업할 달이 더 앞이면 그 해부터)에서 이번 달까지 시작한 기간(11-06)
  * ★ 계산서 없는 매출은 입금 항목 · 은행 분류가 아직 없어 세지 않는다.
  */
-import { parseMonth, taxYearOptions, type TaxCodeName, type TaxFieldError } from './tax-uploads.ts';
-
-export const TAX_NODEDUCT_ITEM_CATEGORY = 'TAX_NODEDUCT_ITEM';
+import { parseMonth, taxYearOptions, type TaxFieldError } from './tax-uploads.ts';
 
 /* ── 신고 기간 ───────────────────────────────────────────────────────────── */
 
@@ -176,27 +175,31 @@ export interface VatSources {
 
 export interface VatOptions {
   range: [string, string];
-  /** 표의 달 — 신고 기간의 달 전부(`vatPeriodMonths`). 센 범위 밖 달은 0. */
+  /** 표의 달 — 신고 기간의 달 전부(`vatPeriodMonths`). 센 범위 끝 달보다 뒤 달은 숫자 없음(null). */
   months: readonly string[];
-  /** 그 회사 출금 항목 — 이름. */
-  items: readonly TaxCodeName[];
-  /** 코드 TAX_NODEDUCT_ITEM 의 이름(= 출금 항목 코드값), 코드 표 순서. */
-  nodeductItems: readonly string[];
 }
 
-/** 표 한 줄 — 금액은 원. 카드는 홈택스 공제(Y) 줄만. 낼 부가세 = 매출 부가세 − 매입 부가세 − 카드 부가세. */
+/**
+ * 표 한 줄 — 금액은 원. 매출 = 매출 계산서, 매입 = 매입 계산서, 카드는 홈택스 공제(Y) 줄만.
+ * 합계 = 공급가액 + 부가세액. 납부세액 = 매출 부가세액 − 매입 부가세액 − 카드 부가세액.
+ */
 export interface VatAmounts {
   salesSupply: number;
   salesTax: number;
+  salesTotal: number;
   purchaseSupply: number;
   purchaseTax: number;
+  purchaseTotal: number;
   cardSupply: number;
   cardTax: number;
+  cardTotal: number;
   payable: number;
 }
 
-export interface VatMonthRow extends VatAmounts {
+export interface VatMonthRow {
   month: string;
+  /** 아직 오지 않은 달(센 범위 끝 달보다 뒤)은 null — 모든 칸 빈칸. 지났거나 그 달이면 숫자(없으면 0). */
+  amounts: VatAmounts | null;
 }
 
 export interface VatResult {
@@ -206,12 +209,20 @@ export interface VatResult {
   cashSales: number;
   /** 낼 세금 예상 = 매출세액 − 매입세액 − 카드. */
   payable: number;
-  nodeduct: { lines: { itemCode: string; label: string; tax: number }[]; total: number };
   unassignedCount: number;
+  /** 미지정 줄이 있는 가장 이른 달 `YYYY-MM` — 없으면 null(비고 [항목지정]이 이 달로 연다, 11-08 ⑦). */
+  unassignedFirstMonth: string | null;
   /** 달마다 표(11-06). */
   months: VatMonthRow[];
-  /** 합계 줄 — 낼 부가세가 그 기간 예상액(= payable). */
+  /** 합계 줄 — 숫자가 있는 달의 합, 납부세액이 그 기간 예상액(= payable). */
   total: VatAmounts;
+}
+
+/** 범위 끝 달 `YYYY-MM` — [첫날, 끝 다음 날)의 끝 다음 날 전날이 든 달. */
+function lastMonthOf(range: [string, string]): string {
+  const end = new Date(`${range[1]}T00:00:00Z`);
+  end.setUTCDate(0);
+  return `${end.getUTCFullYear()}-${String(end.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 const inRange = (range: [string, string]) => (r: { date: string }) => r.date >= range[0] && r.date < range[1];
@@ -229,14 +240,6 @@ export function buildVat(src: VatSources, o: VatOptions): VatResult {
   const purchase = { supply: sum(purchaseInv, (r) => r.supply), tax: sum(purchaseInv, (r) => r.tax) };
   const card = { tax: sum(deductCards, (r) => r.tax) };
 
-  const byItem = new Map<string, number>();
-  for (const r of [...purchaseInv, ...deductCards]) {
-    if (r.itemCode !== null && o.nodeductItems.includes(r.itemCode)) byItem.set(r.itemCode, (byItem.get(r.itemCode) ?? 0) + r.tax);
-  }
-  const lines = o.nodeductItems
-    .filter((code) => byItem.has(code))
-    .map((code) => ({ itemCode: code, label: o.items.find((i) => i.code === code)?.name ?? code, tax: byItem.get(code)! }));
-
   const cashPurchases = src.cashPurchases.filter(ok);
   const amountsOf = (inv: readonly VatSources['invoices'][number][], cds: readonly VatSources['cards'][number][]): VatAmounts => {
     const s = inv.filter((r) => r.direction === 'S');
@@ -244,24 +247,36 @@ export function buildVat(src: VatSources, o: VatOptions): VatResult {
     const salesTax = sum(s, (r) => r.tax);
     const purchaseTax = sum(p, (r) => r.tax);
     const cardTax = sum(cds, (r) => r.tax);
+    const salesSupply = sum(s, (r) => r.supply);
+    const purchaseSupply = sum(p, (r) => r.supply);
+    const cardSupply = sum(cds, (r) => r.supply);
     return {
-      salesSupply: sum(s, (r) => r.supply), salesTax, purchaseSupply: sum(p, (r) => r.supply), purchaseTax,
-      cardSupply: sum(cds, (r) => r.supply), cardTax, payable: salesTax - purchaseTax - cardTax,
+      salesSupply, salesTax, salesTotal: salesSupply + salesTax,
+      purchaseSupply, purchaseTax, purchaseTotal: purchaseSupply + purchaseTax,
+      cardSupply, cardTax, cardTotal: cardSupply + cardTax,
+      payable: salesTax - purchaseTax - cardTax,
     };
   };
   const ofMonth = (m: string) => (r: { date: string }) => r.date.slice(0, 7) === m;
+  const lastMonth = lastMonthOf(o.range);
+  const unassigned = [
+    ...purchaseInv.filter((r) => r.itemCode === null),
+    ...cards.filter((r) => r.itemCode === null),
+    ...cashPurchases.filter((r) => r.itemCode === null),
+  ];
+  const firstLeft = unassigned.reduce<string | null>((a, r) => (a === null || r.date < a ? r.date : a), null);
   return {
     sales,
     purchase,
     card,
     cashSales: sum(src.cashSales.filter(ok), (r) => r.amount),
     payable: sales.tax - purchase.tax - card.tax,
-    nodeduct: { lines, total: sum(lines, (l) => l.tax) },
-    unassignedCount:
-      purchaseInv.filter((r) => r.itemCode === null).length +
-      cards.filter((r) => r.itemCode === null).length +
-      cashPurchases.filter((r) => r.itemCode === null).length,
-    months: o.months.map((m) => ({ month: m, ...amountsOf(invoices.filter(ofMonth(m)), deductCards.filter(ofMonth(m))) })),
+    unassignedCount: unassigned.length,
+    unassignedFirstMonth: firstLeft === null ? null : firstLeft.slice(0, 7),
+    months: o.months.map((m) => ({
+      month: m,
+      amounts: m > lastMonth ? null : amountsOf(invoices.filter(ofMonth(m)), deductCards.filter(ofMonth(m))),
+    })),
     total: amountsOf(invoices.filter((r) => o.months.includes(r.date.slice(0, 7))), deductCards.filter((r) => o.months.includes(r.date.slice(0, 7)))),
   };
 }

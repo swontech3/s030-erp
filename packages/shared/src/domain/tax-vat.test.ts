@@ -108,14 +108,15 @@ const card = (date: string, supply: number, tax: number, vatDeduct: string | nul
 });
 const EMPTY: VatSources = { invoices: [], cards: [], cashSales: [], cashPurchases: [] };
 const RANGE: [string, string] = ['2026-07-01', '2026-10-01'];
-const ITEMS = [
-  { code: 'MEAL', name: '식대·회의비' },
-  { code: 'ENTERTAIN', name: '접대비' },
-  { code: 'VEHICLE', name: '차량유지비' },
-];
-const NODEDUCT = ['ENTERTAIN', 'NONBIZ_TAXPRO', 'VEHICLE'];
 const MONTHS = ['2026-07', '2026-08', '2026-09'];
-const o = { range: RANGE, months: MONTHS, items: ITEMS, nodeductItems: NODEDUCT };
+const o = { range: RANGE, months: MONTHS };
+/** 표 한 줄 — 합계 칸은 공급가액 + 부가세액. */
+const amt = (salesSupply: number, salesTax: number, purchaseSupply: number, purchaseTax: number, cardSupply: number, cardTax: number) => ({
+  salesSupply, salesTax, salesTotal: salesSupply + salesTax,
+  purchaseSupply, purchaseTax, purchaseTotal: purchaseSupply + purchaseTax,
+  cardSupply, cardTax, cardTotal: cardSupply + cardTax,
+  payable: salesTax - purchaseTax - cardTax,
+});
 
 describe('buildVat — 낼 세금 예상', () => {
   it('매출세액 = 매출 계산서 세액 합(결정 10) · 매입세액 = 매입 계산서 세액 합 · 범위 밖은 뺀다', () => {
@@ -169,11 +170,14 @@ describe('buildVat — 낼 세금 예상', () => {
       o,
     );
     expect(r.unassignedCount).toBe(3);
+    // 미지정이 있는 가장 이른 달(11-08 ⑦ — 비고 [항목지정]이 이 달로 연다)
+    expect(r.unassignedFirstMonth).toBe('2026-07');
+    expect(buildVat(EMPTY, o).unassignedFirstMonth).toBeNull();
   });
 });
 
 describe('buildVat — 달마다 표(11-06)', () => {
-  it('기간의 달마다 한 줄 — 매출 · 매입(계산서) 공급가액 · 부가세, 카드는 공제(Y) 줄 공급가액 · 부가세, 낼 부가세', () => {
+  it('기간의 달마다 한 줄 — 매출 · 매입(계산서) · 카드 공제(Y) 줄의 공급가액 · 부가세액 · 합계, 납부세액', () => {
     const r = buildVat(
       {
         ...EMPTY,
@@ -183,46 +187,23 @@ describe('buildVat — 달마다 표(11-06)', () => {
       o,
     );
     expect(r.months).toEqual([
-      { month: '2026-07', salesSupply: 1000000, salesTax: 100000, purchaseSupply: 200000, purchaseTax: 20000, cardSupply: 10000, cardTax: 1000, payable: 79000 },
-      { month: '2026-08', salesSupply: 0, salesTax: 0, purchaseSupply: 0, purchaseTax: 0, cardSupply: 0, cardTax: 0, payable: 0 },
-      { month: '2026-09', salesSupply: 30000, salesTax: 3000, purchaseSupply: 0, purchaseTax: 0, cardSupply: 0, cardTax: 0, payable: 3000 },
+      { month: '2026-07', amounts: amt(1000000, 100000, 200000, 20000, 10000, 1000) },
+      { month: '2026-08', amounts: amt(0, 0, 0, 0, 0, 0) },
+      { month: '2026-09', amounts: amt(30000, 3000, 0, 0, 0, 0) },
     ]);
+    expect(r.months[0]!.amounts).toMatchObject({ salesTotal: 1100000, purchaseTotal: 220000, cardTotal: 11000, payable: 79000 });
   });
 
-  it('합계 줄 = 달 줄의 합, 합계의 낼 부가세 = 그 기간 예상액 · 센 범위 밖 달은 0', () => {
+  it('합계 줄 = 숫자가 있는 달 줄의 합, 합계의 납부세액 = 그 기간 예상액 · 센 범위 끝 달보다 뒤 달(아직 오지 않은 달)은 null', () => {
     const r = buildVat(
       { ...EMPTY, invoices: [inv('S', '2026-07-03', 100, 10), inv('S', '2026-09-03', 500, 50)], cards: [card('2026-08-02', 40, 4, 'Y')] },
       { ...o, range: ['2026-07-01', '2026-09-01'] },
     );
-    expect(r.months.map((m) => m.payable)).toEqual([10, -4, 0]);
-    expect(r.total).toEqual({ salesSupply: 100, salesTax: 10, purchaseSupply: 0, purchaseTax: 0, cardSupply: 40, cardTax: 4, payable: 6 });
+    expect(r.months.map((m) => m.amounts?.payable ?? null)).toEqual([10, -4, null]);
+    expect(r.months[2]!.amounts).toBeNull();
+    expect(r.total).toEqual(amt(100, 10, 0, 0, 40, 4));
+    expect(r.total.payable).toBe(6);
     expect(r.total.payable).toBe(r.payable);
-  });
-});
-
-describe('buildVat — 공제가 안 될 수 있는 매입(결정 4)', () => {
-  it('매입 계산서 · 공제(Y) 카드 중 코드 표 항목인 줄의 세액을 항목별로(코드 표 순서) · 합계', () => {
-    const r = buildVat(
-      {
-        ...EMPTY,
-        invoices: [inv('P', '2026-08-01', 100000, 10000, 'VEHICLE'), inv('P', '2026-08-02', 1, 5, 'MEAL')],
-        cards: [
-          card('2026-07-02', 40000, 4000, 'Y', 'ENTERTAIN'),
-          card('2026-07-03', 20000, 2000, 'Y', 'ENTERTAIN'),
-          card('2026-07-04', 9000, 900, 'N', 'ENTERTAIN'),
-        ],
-      },
-      o,
-    );
-    expect(r.nodeduct.lines).toEqual([
-      { itemCode: 'ENTERTAIN', label: '접대비', tax: 6000 },
-      { itemCode: 'VEHICLE', label: '차량유지비', tax: 10000 },
-    ]);
-    expect(r.nodeduct.total).toBe(16000);
-  });
-
-  it('없으면 빈 목록 · 0', () => {
-    expect(buildVat(EMPTY, o).nodeduct).toEqual({ lines: [], total: 0 });
   });
 });
 
