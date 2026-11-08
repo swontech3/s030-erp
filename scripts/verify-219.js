@@ -4,6 +4,7 @@
  *   tb_s050_handoff_logs.ck_s050_handoff_logs_recipients — cardinality(recipients) BETWEEN 1 AND 4
  *
  * 사용: node scripts/verify-219.js .env packages/api/.env
+ * ★ 2026-11-08 ⑧ — 224 뒤에는 보낸 이력 표가 없어 네 항목 모두 「건너뜀」(verify-224 H2 가 받는 사람 1~4 를 잰다).
  * 적용 전 시험: node scripts/verify-219.js .env packages/api/.env --dry-run supabase/migrations/219_tax_handoff_to4.sql
  *   postgres 한 접속 · 한 트랜잭션 안에서 파일을 돌리고(파일의 BEGIN; · COMMIT; 줄은 걷음) 검증한 뒤 **늘 ROLLBACK** 한다.
  *
@@ -32,9 +33,16 @@ const ORG_A = 990001;
 
 const results = [];
 const check = (id, what, cond, note = '') => results.push({ 항목: id, 내용: what, 결과: cond ? '통과' : '실패', 비고: note });
+const skip = (id, what, note) => results.push({ 항목: id, 내용: what, 결과: '건너뜀', 비고: note });
 
 async function checks(pc) {
   const q = (s, p) => pc.query(s, p).then((r) => r.rows);
+  // ★ 2026-11-08 ⑧ — 224 가 보낸 이력 표를 최종 발송(tb_s050_handoff_last, 받는 사람 1~4 CHECK 그대로)으로 바꿨으면 건너뛴다(verify-224 가 잰다)
+  const replaced = (await q(`SELECT to_regclass('public.${H}') o, to_regclass('public.tb_s050_handoff_last') n`))[0];
+  if (replaced.o === null && replaced.n !== null) {
+    for (const id of ['K1', 'K2', 'K3', 'K4']) skip(id, `${H} — 받는 사람 1~4`, '224 로 표가 최종 발송으로 바뀜 — verify-224 H2 가 잰다');
+    return;
+  }
   const def = (await q(`SELECT pg_get_constraintdef(oid) d FROM pg_constraint WHERE conrelid = to_regclass('public.${H}') AND conname = $1`, [CK]))[0]?.d ?? '';
   // pg 는 BETWEEN 을 「>= 1 AND <= 4」 꼴로 풀어 보여 준다
   check('K1', `${CK} — 받는 사람 1~4`, def.includes('>= 1') && def.includes('<= 4'), def || '없음');
@@ -85,8 +93,9 @@ const bodyOf = (file) => fs.readFileSync(file, 'utf8').replace(/^BEGIN;[ \t]*$/m
   await pc.end();
 
   console.table(results);
-  const failed = results.filter((r) => r.결과 !== '통과').length;
-  console.log(failed === 0 ? `✔ 전부 통과 (${results.length}건)` : `✘ 실패 ${failed}건`);
+  const failed = results.filter((r) => r.결과 === '실패').length;
+  const skipped = results.filter((r) => r.결과 === '건너뜀').length;
+  console.log(failed === 0 ? `✔ 전부 통과 (${results.length - skipped}건${skipped ? ` · 건너뜀 ${skipped}` : ''})` : `✘ 실패 ${failed}건`);
   process.exit(failed === 0 ? 0 : 1);
 })().catch((e) => {
   console.error('✘ 실행 실패:', e.message);

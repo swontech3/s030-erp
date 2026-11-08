@@ -6,7 +6,7 @@
  * ★★ 주소 · 본문 · 보내기 흐름 하나하나는 shared `tax-handoff.test.ts` · api `taxHandoff.test.ts` 가 잰다. 여기는 그 위의 읽기다:
  *    시트 아홉 이름 · 순서 · 줄 수가 **각 화면과 같은지**(항목 지정 「이번 달 자료 전체」 · 세금 · 4대보험 · 대출 — 같은 기간),
  *    은행 · 이체 줄(세는 범위 · 별칭 또는 끝 4자리 · 전체 번호 안 나감) · 미지정 건 수(부가세 조회와 같음) · 엑셀 ·
- *    ★ 다른 회사 줄이 안 들어가는지(운영사 세션도) · 보낸 이력 회사별 막기 · 보내기(가짜 메일 — 성공 · 실패 둘 다 이력에).
+ *    ★ 다른 회사 줄이 안 들어가는지(운영사 세션도) · 최종 발송 회사별 막기 · 보내기(가짜 메일 — 성공만 최종 발송을 덮어쓰고 실패는 남기지 않음, 11-08 ⑧ 224).
  * ★★ API 의 풀(`db/pool.ts`)로 접속한다 — erp_app. 라우트가 쓰는 처리(`routes/taxHandoff.ts` 의 handoffOp · sendHandoff)를 그대로 부른다.
  * ★ 시험 줄은 지어낸 값으로 **한 트랜잭션 안에서 넣고 ROLLBACK 한다.** DB 에 남는 것이 없다(마지막 Z1 이 센다).
  *   시험 단체는 verify-201 · 203 과 같은 대역(990001 · 990002). ★ 메일은 실제로 보내지 않는다(가짜 Mailer).
@@ -16,7 +16,7 @@
 import * as XLSX from 'xlsx';
 import { pool, closePool } from '../packages/api/src/db/pool.ts';
 import { applyCompanyScope } from '../packages/api/src/db/withCompanyScope.ts';
-import { insertHandoffLog } from '../packages/api/src/db/taxHandoff.ts';
+import { upsertHandoffLast } from '../packages/api/src/db/taxHandoff.ts';
 import { buildXlsx } from '../packages/api/src/lib/xlsxExport.ts';
 import { handoffOp, sendHandoff } from '../packages/api/src/routes/taxHandoff.ts';
 import { listClassifyOp } from '../packages/api/src/routes/taxClassify.ts';
@@ -170,8 +170,11 @@ async function main() {
       const flat = JSON.stringify(d?.sheets ?? []);
       check('T7', '★ 계좌 전체 번호가 시트에 나가지 않는다', d && !flat.includes(ACCT_A) && !flat.includes(ACCT_A2), '');
       const v = await vatOp(c, ORG_A, { month: MONTH, periodId: null }, THIS_MONTH);
-      check('T8', '미지정 건 수 — 부가세 조회와 같다(계산서 1 · 카드 2 · 현금 1 = 4)',
-        d && v.ok && d.unassignedCount === v.data.vat.unassignedCount && d.unassignedCount === 4, { handoff: d?.unassignedCount, vat: v.ok ? v.data.vat.unassignedCount : v });
+      check('T8', '미지정 건 수 · 가장 이른 달 — 부가세 조회와 같다(계산서 1 · 카드 2 · 현금 1 = 4 · 2026-07) · 처음엔 미발송 · 내용 처음 값',
+        d && v.ok && d.unassignedCount === v.data.vat.unassignedCount && d.unassignedCount === 4 &&
+        d.unassignedFirstMonth === v.data.vat.unassignedFirstMonth && d.unassignedFirstMonth === '2026-07' && d.last === null &&
+        d.mailText === `안녕하세요. ${d.companyName ? `${d.companyName} ` : ''}2026년 3분기 부가세 신고 자료입니다.`,
+        { handoff: d?.unassignedCount, first: d?.unassignedFirstMonth, vat: v.ok ? v.data.vat.unassignedCount : v, last: d?.last, text: d?.mailText });
       check('T9', '★ 다른 회사 줄이 안 들어간다 — B 의 거래처 · 상대 · 금액 · 계좌가 A 시트에 없다',
         d && !flat.includes('B회사') && !flat.includes('5555') && !flat.includes(ACCT_B) && !flat.includes('VHO-vho-nb'), '');
 
@@ -189,7 +192,7 @@ async function main() {
         op.ok && op.data.response.sheets.map((s) => s.rows.length).join() === d?.sheets.map((s) => s.rows.length).join() &&
         !opFlat.includes('B회사') && !opFlat.includes(ACCT_B), op.ok ? op.data.response.sheets.map((s) => s.rows.length) : op);
 
-      // ── 보내기(가짜 메일) · 이력 ──
+      // ── 보내기(가짜 메일) · 최종 발송 ──
       await applyCompanyScope(c, tenant(ORG_A));
       const mails = [];
       const parts = {
@@ -197,53 +200,60 @@ async function main() {
           const b = await handoffOp(c, ORG_A, q, OPTS);
           if (!b.ok) return b;
           const x = b.data.response;
-          return { ok: true, data: { recipients: x.recipients, companyName: '지어낸 회사', period: x.period, rangeLabel: x.rangeLabel,
-            periodFrom: b.data.periodFrom, periodTo: b.data.periodTo, fileName: x.fileName, bytes: buildXlsx(b.data.sheets),
-            sheets: x.sheets.map((s) => ({ name: s.name, count: s.rows.length })), rowCount: x.sheets.reduce((n, s) => n + s.rows.length, 0),
-            unassignedCount: x.unassignedCount } };
+          return { ok: true, data: { recipients: x.recipients, period: x.period, fileName: x.fileName, bytes: buildXlsx(b.data.sheets) } };
         },
-        senderName: async () => '지어낸 보낸이',
-        saveLog: async (s, l) => insertHandoffLog(c, s.s020OrgId, l),
+        people: async () => ({ sender: { name: '지어낸 보낸이', email: 'staff@example.com' }, rep: { name: '지어낸 대표', email: 'rep@example.com' } }),
+        saveLast: async (s, k, l) => upsertHandoffLast(c, s.s020OrgId, k, l),
       };
-      const body = { month: MONTH, tp: 'T', periodId: '2026-Q3', to: ['tax@example.com'] };
+      const body = { month: MONTH, tp: 'T', periodId: '2026-Q3', to: ['tax@example.com'], subject: '지어낸 제목', text: '지어낸 내용' };
       const okMail = { ready: true, send: async (m) => void mails.push(m) };
       const badMail = { ready: true, send: async () => { throw new Error('지어낸 메일 서버 오류'); } };
       const s1 = await sendHandoff(session(ORG_A), body, okMail, parts);
-      const s2 = await sendHandoff(session(ORG_A), body, badMail, parts);
+      const s2 = await sendHandoff(session(ORG_A), { ...body, to: ['ceo@example.com'] }, badMail, parts);
       const s3 = await sendHandoff(session(ORG_A), { ...body, to: ['someone@else.com'] }, okMail, parts);
-      check('T12', '★ 보내기 — 성공(첨부 아홉 시트 · 줄 수 합 15) · 실패(사유) 둘 다 이력에 · 세무 설정에 없는 메일은 400 · 메일은 한 번만',
-        s1.ok && s1.data.ok && s1.data.log.rowCount === 15 && s1.data.log.periodFrom === '2026-07-01' && s1.data.log.periodTo === '2026-09-30' &&
-        s1.data.log.sentBy === '7' && s1.data.log.sentByName === '지어낸 보낸이' &&
-        s2.ok && !s2.data.ok && s2.data.log.failReason === '지어낸 메일 서버 오류' &&
-        !s3.ok && s3.status === 400 && mails.length === 1 && mails[0].attachments[0].filename === '세무자료_부가세_2026년3분기.xlsx',
-        { s1: s1.ok ? s1.data.log : s1, s2: s2.ok ? s2.data.ok : s2, s3: s3.ok ? 'ok' : s3.status, mails: mails.length });
+      const xl = mails[0] ? XLSX.read(mails[0].attachments[0].content, { type: 'array' }) : null;
+      check('T12', '★ 보내기 — 성공(제목 · 내용 그대로 · 첨부 아홉 시트 · 참조 대표자 · 답장 발송인) · 실패는 사유만 · 세무 설정에 없는 메일은 400 · 메일은 한 번만',
+        s1.ok && s1.data.ok && s1.data.last.sentBy === '7' && s1.data.last.sentByName === '지어낸 보낸이' && s1.data.last.cc === 'rep@example.com' &&
+        s2.ok && !s2.data.ok && s2.data.message === '메일을 보내지 못했습니다 — 지어낸 메일 서버 오류' &&
+        !s3.ok && s3.status === 400 && mails.length === 1 && mails[0].subject === '지어낸 제목' && mails[0].text === '지어낸 내용' &&
+        mails[0].cc === 'rep@example.com' && mails[0].replyTo === 'staff@example.com' && mails[0].fromName === '지어낸 보낸이' &&
+        mails[0].attachments[0].filename === '세무자료_부가세_2026년3분기.xlsx' && xl?.SheetNames.length === 9,
+        { s1: s1.ok ? s1.data : s1, s2: s2.ok ? s2.data : s2, s3: s3.ok ? 'ok' : s3.status, mails: mails.length });
       const again = await handoffOp(c, ORG_A, Q, OPTS);
-      // ★ 한 트랜잭션 안이라 보낸 때(CURRENT_TIMESTAMP = 트랜잭션 시작)가 같다 — 순서는 보지 않고 두 줄만 본다(최신이 위는 질의의 ORDER BY)
-      check('T13', '보낸 이력 — 성공 줄 · 실패 줄 둘',
-        again.ok && again.data.response.logs.map((l) => l.ok).sort().join() === 'false,true', again.ok ? again.data.response.logs.map((l) => l.ok) : again);
+      const l = again.ok ? again.data.response.last : null;
+      check('T13', '★ 최종 발송 — 성공 한 줄(받는 사람 · 참조 · 파일 이름) · 실패는 덮어쓰지 않았다',
+        l && l.recipients.join() === 'tax@example.com' && l.cc === 'rep@example.com' && l.fileName === '세무자료_부가세_2026년3분기.xlsx' &&
+        /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(l.sentAt), l ?? again);
+      const s4 = await sendHandoff(session(ORG_A), { ...body, to: ['ceo@example.com', 'tax@example.com'] }, okMail, parts);
+      const n4 = (await c.query(`SELECT count(*)::int n FROM public.tb_s050_handoff_last WHERE org_id = $1`, [ORG_A])).rows[0].n;
+      const q2 = await handoffOp(c, ORG_A, { ...Q, periodId: '2026-Q2' }, OPTS);
+      check('T14', '★ 다시 보내면 같은 줄을 덮어쓴다(한 줄 · 받는 사람 둘) · 다른 신고 기간(2분기)은 미발송',
+        s4.ok && s4.data.ok && n4 === 1 && s4.data.last.recipients.join() === 'ceo@example.com,tax@example.com' && q2.ok && q2.data.response.last === null,
+        { n4, last: s4.ok ? s4.data : s4, q2: q2.ok ? q2.data.response.last : q2 });
 
-      // ── 이력 회사별 막기 ──
+      // ── 최종 발송 회사별 막기 ──
       await applyCompanyScope(c, tenant(ORG_B));
-      await insertHandoffLog(c, ORG_B, { tp: 'T', periodFrom: '2026-07-01', periodTo: '2026-09-30', recipients: ['b-tax@example.com'],
-        fileName: 'B회사.xlsx', rowCount: 1, ok: true, failReason: null, sentBy: '8', sentByName: null });
+      await upsertHandoffLast(c, ORG_B, { tp: 'T', periodId: '2026-Q3' }, { recipients: ['b-tax@example.com'], cc: null,
+        fileName: 'B회사.xlsx', sentBy: '8', sentByName: null });
       const b = await handoffOp(c, ORG_B, Q, OPTS);
-      check('T14', '★ 회사 B — 자기 이력 하나만 · A 의 이력 없음 · 자기 줄만(매출 1 · 은행 1 · 국세 1)',
-        b.ok && b.data.response.logs.map((l) => l.fileName).join() === 'B회사.xlsx' &&
-        b.data.response.sheets.map((s) => s.rows.length).join() === '0,1,0,1,0,0,1,0,0', b.ok ? { logs: b.data.response.logs.length, rows: b.data.response.sheets.map((s) => s.rows.length) } : b);
       let denied = null;
       await c.query('SAVEPOINT x');
       try {
-        await insertHandoffLog(c, ORG_A, { tp: 'T', periodFrom: '2026-07-01', periodTo: '2026-09-30', recipients: ['x@example.com'],
-          fileName: 'x.xlsx', rowCount: 0, ok: true, failReason: null, sentBy: '8', sentByName: null });
+        await upsertHandoffLast(c, ORG_A, { tp: 'T', periodId: '2026-Q3' }, { recipients: ['x@example.com'], cc: null,
+          fileName: 'x.xlsx', sentBy: '8', sentByName: null });
       } catch (e) {
         denied = e.code;
       }
       await c.query('ROLLBACK TO SAVEPOINT x');
-      check('T15', '★ 회사 B 세션으로 A 의 이력은 넣지 못한다(RLS 42501)', denied === '42501', String(denied));
+      check('T15', '★ 회사 B — 자기 최종 발송만(B회사.xlsx) · 자기 줄만(매출 1 · 은행 1 · 국세 1) · B 세션으로 A 의 줄은 넣지도 덮지도 못한다(42501)',
+        b.ok && b.data.response.last?.fileName === 'B회사.xlsx' && denied === '42501' &&
+        b.data.response.sheets.map((s) => s.rows.length).join() === '0,1,0,1,0,0,1,0,0',
+        b.ok ? { last: b.data.response.last?.fileName, denied, rows: b.data.response.sheets.map((s) => s.rows.length) } : b);
       await applyCompanyScope(c, OPERATOR);
       const opA = await handoffOp(c, ORG_A, Q, OPTS);
-      check('T16', '★ 운영사 세션도 자기 단체 이력만 — A 둘(B 의 이력 없음)',
-        opA.ok && opA.data.response.logs.length === 2 && opA.data.response.logs.every((l) => l.fileName !== 'B회사.xlsx'), opA.ok ? opA.data.response.logs.length : opA);
+      check('T16', '★ 운영사 세션도 자기 단체 최종 발송만 — A 의 줄(B 의 줄 아님)',
+        opA.ok && opA.data.response.last?.fileName === '세무자료_부가세_2026년3분기.xlsx' && opA.data.response.last?.recipients.length === 2,
+        opA.ok ? opA.data.response.last : opA);
     } finally {
       await c.query('ROLLBACK');
     }
@@ -254,7 +264,7 @@ async function main() {
       await applyCompanyScope(c, OPERATOR);
       const cnt = async (t) => (await c.query(`SELECT count(*)::int n FROM public.${t} WHERE org_id = ANY($1)`, [[ORG_A, ORG_B]])).rows[0].n;
       const tables = ['tb_s050_upload_files', 'tb_s050_invoices', 'tb_s050_card_txns', 'tb_s050_cash_txns', 'tb_s050_bank_txns',
-        'tb_s050_tax_payments', 'tb_s050_loan_txns', 'tb_s050_settings', 'tb_s050_fin_accounts', 'tb_s050_vendors', 'tb_s050_handoff_logs'];
+        'tb_s050_tax_payments', 'tb_s050_loan_txns', 'tb_s050_settings', 'tb_s050_fin_accounts', 'tb_s050_vendors', 'tb_s050_handoff_last'];
       const n = [];
       for (const t of tables) n.push(await cnt(t));
       check('Z1', '롤백 후 시험 줄 0 (운영사 스코프로 센다)', n.every((x) => x === 0), tables.map((t, i) => `${t.slice(8)} ${n[i]}`).join(' · '));

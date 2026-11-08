@@ -13,6 +13,7 @@
  *
  * ★ 시험 행은 트랜잭션 안에서 넣고 ROLLBACK 한다. 남는 것이 없다. 시험 값은 모두 지어낸 값이다.
  * ★ 코드값 · 이름 · 순서는 대표가 정한 것 그대로 여기 적어 둔다 — 코드 관리에서 고치면 실패로 나온다.
+ * ★ 2026-11-08 ⑧ — 224 가 보낸 이력 표를 지우고 최종 발송 표로 바꿨다. 224 뒤에는 ① 코드만 재고 ② 표 · 행 검사는 「건너뜀」(verify-224 가 잰다).
  *
  * 종료코드: 0 = 전부 통과 / 1 = 실패 있음 / 2 = 실행 실패
  */
@@ -70,7 +71,18 @@ async function codes(q) {
     fmt(lines.map((l) => [l.code, l.name])));
 }
 
+/** 224 가 보낸 이력 표를 최종 발송(tb_s050_handoff_last)으로 바꿨으면 표 · 행 검사는 건너뛴다 — verify-224 가 잰다(2026-11-08 ⑧). */
+const REPLACED_224 = '224 로 보낸 이력 표가 최종 발송(tb_s050_handoff_last)으로 바뀜 — verify-224 가 잰다';
+const ROW_IDS = [['H1', '이력 넣기'], ['H2', 'CHECK'], ['H6', '자기 단체 이력만'], ['H7', '남의 단체 넣기 막힘'], ['H8', '고치기 · 지우기 권한 없음'],
+  ['H9', '단체 ID 없는 세션 0건'], ['Z1', '롤백 후 시험 줄 0']];
+
 async function structure(q) {
+  const replaced = (await q(`SELECT to_regclass('public.${H}') o, to_regclass('public.tb_s050_handoff_last') n`))[0];
+  if (replaced.o === null && replaced.n !== null) {
+    for (const id of ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7']) skip(id, `${H} — 표 검사`, REPLACED_224);
+    for (const [id, what] of ROW_IDS) skip(id, what, REPLACED_224);
+    return false;
+  }
   const cols = await q(`SELECT column_name, data_type, is_nullable FROM information_schema.columns
     WHERE table_schema='public' AND table_name=$1`, [H]);
   const got = Object.fromEntries(cols.map((c) => [c.column_name, [c.data_type, c.is_nullable]]));

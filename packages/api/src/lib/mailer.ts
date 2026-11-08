@@ -22,6 +22,12 @@ export interface MailMessage {
   subject: string;
   text: string;
   attachments: readonly { filename: string; content: Uint8Array }[];
+  /** 보내는 이름 — 실제 보내는 주소는 SMTP_FROM 그대로(11-08 ⑧). 없으면 주소만. */
+  fromName?: string | null;
+  /** 참조(CC) 한 사람 — 없으면 싣지 않는다. */
+  cc?: string | null;
+  /** 답장 주소(Reply-To) — 없으면 싣지 않는다. */
+  replyTo?: string | null;
 }
 
 export interface Mailer {
@@ -73,8 +79,10 @@ export function createMailer(config: SmtpConfig | null, makeTransport: (opts: Re
     ready: true,
     send: async (m) => {
       await transport.sendMail({
-        from: config.from,
+        from: m.fromName ? { name: m.fromName, address: config.from } : config.from,
         to: m.to.join(', '),
+        ...(m.cc ? { cc: m.cc } : {}),
+        ...(m.replyTo ? { replyTo: m.replyTo } : {}),
         subject: m.subject,
         text: m.text,
         attachments: m.attachments.map((a) => ({ filename: a.filename, content: Buffer.from(a.content) })),

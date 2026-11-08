@@ -47,6 +47,18 @@ describe('createMailer', () => {
     const att = (sent[0]!.attachments as { filename: string; content: Buffer }[])[0]!;
     expect(att.filename).toBe('세무자료.xlsx');
     expect([...att.content]).toEqual([1, 2]);
+    expect(sent[0]).not.toHaveProperty('cc');
+    expect(sent[0]).not.toHaveProperty('replyTo');
+  });
+
+  it('★ 보내는 이름 · 참조 · 답장 주소(11-08 ⑧) — 실제 보내는 주소는 SMTP_FROM 그대로', async () => {
+    const sent: Record<string, unknown>[] = [];
+    const m = createMailer(smtpConfigOf(FULL), () => ({ sendMail: async (msg) => void sent.push(msg) }));
+    await m.send({
+      to: ['a@x.com'], subject: '제목', text: '본문', attachments: [],
+      fromName: '김사원', cc: 'ceo@x.com', replyTo: 'staff@x.com',
+    });
+    expect(sent[0]).toMatchObject({ from: { name: '김사원', address: 'erp@example.com' }, to: 'a@x.com', cc: 'ceo@x.com', replyTo: 'staff@x.com' });
   });
 
   it('587 · 인증 없음 — secure false · auth 없음', () => {

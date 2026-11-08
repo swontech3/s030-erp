@@ -173,6 +173,9 @@
   color: var(--text-muted); font-family: inherit; font-size: 15px; cursor: pointer; white-space: nowrap;
 }
 .tabOn { border-bottom-color: var(--color-primary); color: var(--text-heading); font-weight: 700; }
+/* 탭 줄을 가로 스크롤 없이 한 줄에 — 간격 · 글자 크기만 줄인다(2026-11-08 ⑧ 세무사 전달 서류 시트 아홉) */
+.tabsFit { gap: 14px; padding: 0 16px; overflow-x: visible; flex-wrap: nowrap; flex: 0 0 auto; }
+.tabsFit .tab { font-size: 13px; padding: 10px 0 10px; }
 
 /* ── 표 — 글자 왼쪽 · 숫자 오른쪽 ── */
 .tblWrap { overflow: hidden; border-radius: var(--radius-lg); }

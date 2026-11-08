@@ -1,13 +1,12 @@
 /**
- * 세무 세무사 전달 서류(s050500010) DB — 은행 줄 읽기 · 보낸 이력 읽기 · 넣기(1-9, 2026-11-07).
+ * 세무 세무사 전달 서류(s050500010) DB — 은행 줄 읽기 · 최종 발송 읽기 · 덮어쓰기(1-9 2026-11-07 · 11-08 ⑧ 224).
  *
  * ★★★ 모든 질의가 `org_id = $1`(세션 단체 ID)을 직접 건다 — 운영사 세션도 RLS 가 모든 단체를 보여 주기 때문이다(203 머리말).
  * ★ 은행 줄의 계좌는 별칭 또는 끝 4자리만 내보낸다 — 전체 번호는 화면 · 엑셀로 나가지 않는다(계좌 글자는 라우트가 만든다).
  *   별칭은 세무 설정 계좌(은행 · 같은 번호)에서 찾는다 — 「사용 안 함」 계좌도 이름은 그대로 보인다(세무 설정 안내).
- * ★ 보낸 이력은 넣기 · 읽기만(218 — erp_app 에 고치기 · 지우기 권한이 없다).
+ * ★ 최종 발송은 단체 · 종류 · 신고 기간마다 한 줄 — 성공할 때만 덮어쓴다(224 — erp_app 은 덮어쓰는 칸만 UPDATE · 지우기 없음).
  */
-import { randomUUID } from 'node:crypto';
-import type { HandoffLogView } from '@swonbiz/shared/domain/tax-handoff';
+import type { HandoffLastView } from '@swonbiz/shared/domain/tax-handoff';
 import type { ScopedClient } from './withCompanyScope.ts';
 
 interface Rows<T> {
@@ -73,36 +72,44 @@ export async function listHandoffBankRows(client: ScopedClient, orgId: number, r
   }));
 }
 
-/* ── 보낸 이력 ───────────────────────────────────────────────────────────── */
+/* ── 최종 발송(224) ─────────────────────────────────────────────────────── */
 
-export type NewHandoffLog = Omit<HandoffLogView, 'id' | 'sentAt'>;
-
-const LOG_COLS = `id, to_char(sent_at, 'YYYY-MM-DD HH24:MI') AS sent_at, handoff_tp, to_char(period_from, 'YYYY-MM-DD') AS period_from,
-  to_char(period_to, 'YYYY-MM-DD') AS period_to, recipients, file_name, row_count, ok, fail_reason, sent_by, sent_by_name`;
-
-interface LogRow {
-  id: string; sent_at: string; handoff_tp: string; period_from: string; period_to: string; recipients: string[]; file_name: string;
-  row_count: number; ok: boolean; fail_reason: string | null; sent_by: string; sent_by_name: string | null;
+export interface HandoffLastKey {
+  tp: string;
+  periodId: string;
 }
-const logView = (r: LogRow): HandoffLogView => ({
-  id: r.id, sentAt: r.sent_at, tp: r.handoff_tp, periodFrom: r.period_from, periodTo: r.period_to, recipients: r.recipients,
-  fileName: r.file_name, rowCount: r.row_count, ok: r.ok, failReason: r.fail_reason, sentBy: r.sent_by, sentByName: r.sent_by_name,
+export type NewHandoffLast = Omit<HandoffLastView, 'sentAt'>;
+
+const LAST_COLS = `to_char(sent_at, 'YYYY-MM-DD HH24:MI') AS sent_at, recipients, cc, file_name, sent_by, sent_by_name`;
+
+interface LastRow {
+  sent_at: string; recipients: string[]; cc: string | null; file_name: string; sent_by: string; sent_by_name: string | null;
+}
+const lastView = (r: LastRow): HandoffLastView => ({
+  sentAt: r.sent_at, recipients: r.recipients, cc: r.cc, fileName: r.file_name, sentBy: r.sent_by, sentByName: r.sent_by_name,
 });
 
-/** 그 단체의 보낸 이력 — 최신이 위. */
-export async function listHandoffLogs(client: ScopedClient, orgId: number): Promise<HandoffLogView[]> {
-  const { rows } = await q<LogRow>(client, `SELECT ${LOG_COLS} FROM public.tb_s050_handoff_logs WHERE org_id = $1 ORDER BY sent_at DESC, id`, [orgId]);
-  return rows.map(logView);
+/** 그 단체 · 종류 · 신고 기간의 최종 발송 — 없으면 null(미발송). */
+export async function getHandoffLast(client: ScopedClient, orgId: number, k: HandoffLastKey): Promise<HandoffLastView | null> {
+  const { rows } = await q<LastRow>(
+    client,
+    `SELECT ${LAST_COLS} FROM public.tb_s050_handoff_last WHERE org_id = $1 AND handoff_tp = $2 AND period_id = $3`,
+    [orgId, k.tp, k.periodId],
+  );
+  return rows[0] ? lastView(rows[0]) : null;
 }
 
-export async function insertHandoffLog(client: ScopedClient, orgId: number, l: NewHandoffLog): Promise<HandoffLogView> {
-  const { rows } = await q<LogRow>(
+/** 성공한 발송으로 덮어쓴다 — 없으면 넣고, 있으면 그 줄을 바꾼다(224 — erp_app 은 덮어쓰는 칸만 UPDATE). */
+export async function upsertHandoffLast(client: ScopedClient, orgId: number, k: HandoffLastKey, l: NewHandoffLast): Promise<HandoffLastView> {
+  const { rows } = await q<LastRow>(
     client,
-    `INSERT INTO public.tb_s050_handoff_logs
-       (id, org_id, handoff_tp, period_from, period_to, recipients, file_name, row_count, ok, fail_reason, sent_by, sent_by_name)
-     VALUES ($1, $2, $3, $4::date, $5::date, $6, $7, $8, $9, $10, $11, $12)
-     RETURNING ${LOG_COLS}`,
-    [randomUUID(), orgId, l.tp, l.periodFrom, l.periodTo, l.recipients, l.fileName, l.rowCount, l.ok, l.failReason, l.sentBy, l.sentByName],
+    `INSERT INTO public.tb_s050_handoff_last (org_id, handoff_tp, period_id, sent_at, recipients, cc, file_name, sent_by, sent_by_name)
+     VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6, $7, $8)
+     ON CONFLICT (org_id, handoff_tp, period_id) DO UPDATE SET
+       sent_at = EXCLUDED.sent_at, recipients = EXCLUDED.recipients, cc = EXCLUDED.cc, file_name = EXCLUDED.file_name,
+       sent_by = EXCLUDED.sent_by, sent_by_name = EXCLUDED.sent_by_name
+     RETURNING ${LAST_COLS}`,
+    [orgId, k.tp, k.periodId, l.recipients, l.cc, l.fileName, l.sentBy, l.sentByName],
   );
-  return logView(rows[0]!);
+  return lastView(rows[0]!);
 }

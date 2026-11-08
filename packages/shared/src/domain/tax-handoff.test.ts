@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   HANDOFF_SHEETS,
   handoffFileName,
-  handoffLogPeriodLabel,
-  handoffMailBody,
+  handoffMailText,
   handoffPeriodLabel,
   handoffRangeDates,
   handoffSearch,
@@ -49,7 +48,7 @@ describe('주소 — 종류 · 신고 기간', () => {
   });
 });
 
-describe('파일 이름 · 기간 글자 · 메일 제목', () => {
+describe('파일 이름 · 기간 글자 · 메일 제목 · 내용', () => {
   it('파일 이름 — 세무자료_부가세_2026년3분기.xlsx · 개인은 2기', () => {
     expect(handoffFileName(Q3)).toBe('세무자료_부가세_2026년3분기.xlsx');
     expect(handoffFileName(H2)).toBe('세무자료_부가세_2026년2기.xlsx');
@@ -66,9 +65,10 @@ describe('파일 이름 · 기간 글자 · 메일 제목', () => {
     expect(handoffSubject('  ', Q3)).toBe('2026년 3분기 부가세 신고 자료');
   });
 
-  it('이력의 기간 — 첫 달 ~ 끝 달, 한 달이면 그 달', () => {
-    expect(handoffLogPeriodLabel('2026-07-01', '2026-09-30')).toBe('2026-07 ~ 2026-09');
-    expect(handoffLogPeriodLabel('2026-07-01', '2026-07-31')).toBe('2026-07');
+  it('★ 내용 처음 값 — 안녕하세요. 회사명 {기간} 부가세 신고 자료입니다. · 회사명이 없으면 빼고(11-08 ⑧)', () => {
+    expect(handoffMailText('(주)브릿지랩', Q3)).toBe('안녕하세요. (주)브릿지랩 2026년 3분기 부가세 신고 자료입니다.');
+    expect(handoffMailText('개인상회', H2)).toBe('안녕하세요. 개인상회 2026년 2기 부가세 신고 자료입니다.');
+    expect(handoffMailText(null, Q3)).toBe('안녕하세요. 2026년 3분기 부가세 신고 자료입니다.');
   });
 });
 
@@ -80,38 +80,36 @@ describe('세는 날짜 — [첫날, 끝 다음 날) → 첫날 · 끝날(항목
   });
 });
 
-describe('메일 본문 — 시안 S05-10 미리보기 꼴', () => {
-  const sheets = HANDOFF_SHEETS.map((s, i) => ({ name: s.name, count: i === 0 ? 3 : 0 }));
-
-  it('인사 · 첨부(시트 아홉과 줄 수) · 남은 일', () => {
-    expect(handoffMailBody({ companyName: '(주)브릿지랩', period: Q3, rangeLabel: '7~9월', fileName: '세무자료_부가세_2026년3분기.xlsx', sheets, unassignedCount: 5 }))
-      .toBe([
-        '안녕하세요, (주)브릿지랩입니다. 2026년 3분기(7~9월) 부가세 신고 자료를 보내 드립니다.',
-        '첨부: 세무자료_부가세_2026년3분기.xlsx — 매입 3줄 · 매출 0줄 · 카드 0줄 · 은행거래내역 0줄 · 이체내역 0줄 · 현금 0줄 · 국세 0줄 · 지방세 0줄 · 대출 0줄',
-        '아직 남은 일: 미지정 5줄',
-      ].join('\n'));
-  });
-
-  it('남은 일이 없으면 「남은 일 없음」 · 회사명이 없으면 「안녕하세요.」', () => {
-    const body = handoffMailBody({ companyName: null, period: Q3, rangeLabel: '7~8월', fileName: 'f.xlsx', sheets, unassignedCount: 0 });
-    expect(body.split('\n')[0]).toBe('안녕하세요. 2026년 3분기(7~8월) 부가세 신고 자료를 보내 드립니다.');
-    expect(body.split('\n')[2]).toBe('남은 일 없음');
-  });
-});
-
 describe('보내기 본문', () => {
-  const base = { month: '2026-09', tp: 'T', period: '2026-Q3', to: ['tax@example.com'] };
+  const base = { month: '2026-09', tp: 'T', period: '2026-Q3', to: ['tax@example.com'], subject: ' 제목 ', text: '첫 줄\n둘째 줄 ' };
 
-  it('받는 사람 1~3명 · 겹치면 하나로', () => {
-    expect(parseHandoffSend(base)).toEqual({ ok: true, value: { month: '2026-09', tp: 'T', periodId: '2026-Q3', to: ['tax@example.com'] } });
+  it('받는 사람 · 제목 · 내용(앞뒤 빈칸만 걷음 · 여러 줄 그대로) · 겹친 받는 사람은 하나로', () => {
+    expect(parseHandoffSend(base)).toEqual({
+      ok: true, value: { month: '2026-09', tp: 'T', periodId: '2026-Q3', to: ['tax@example.com'], subject: '제목', text: '첫 줄\n둘째 줄' },
+    });
     const r = parseHandoffSend({ ...base, to: ['a@x.com', 'a@x.com', 'b@x.com'] });
     expect(r.ok && r.value.to).toEqual(['a@x.com', 'b@x.com']);
   });
 
-  it('★ 받는 사람 0명 — 「세무 설정에서 세무사 메일을 먼저 넣으세요」', () => {
+  it('★ 받는 사람 0명 — 「받는 사람을 한 명 이상 선택하세요」', () => {
     const r = parseHandoffSend({ ...base, to: [] });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.errors[0]).toEqual({ field: 'to', message: '받는 사람을 한 명 이상 고르세요' });
+    if (!r.ok) expect(r.errors[0]).toEqual({ field: 'to', message: '받는 사람을 한 명 이상 선택하세요' });
+  });
+
+  it('★ 제목 · 내용 — 비었으면 거절 · 제목 200자 · 내용 5,000자까지', () => {
+    const errs = (x: Record<string, unknown>) => {
+      const r = parseHandoffSend({ ...base, ...x });
+      return r.ok ? [] : r.errors.map((e) => `${e.field}:${e.message}`);
+    };
+    expect(errs({ subject: '  ', text: undefined })).toEqual(['subject:제목을 넣으세요', 'text:내용을 넣으세요']);
+    expect(errs({ subject: 'a'.repeat(200), text: 'b'.repeat(5000) })).toEqual([]);
+    expect(errs({ subject: 'a'.repeat(201), text: 'b'.repeat(5001) })).toEqual(['subject:제목은 200자까지입니다', 'text:내용은 5,000자까지입니다']);
+  });
+
+  it('★ 참조는 받지 않는다 — 본문에 cc 를 실어도 결과에 없다(서버가 정한다)', () => {
+    const r = parseHandoffSend({ ...base, cc: 'other@x.com' });
+    expect(r.ok && 'cc' in r.value).toBe(false);
   });
 
   it('★ 받는 사람 4명까지 — 4명 통과(2026-11-07 대표 결정)', () => {

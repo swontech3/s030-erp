@@ -1,13 +1,13 @@
 /**
- * `/tax/handoff` — 주소 해석(400) · 세션 단체 · 시트 아홉 · 은행 시트 칸 · 보내기 흐름(1-9).
+ * `/tax/handoff` — 주소 해석(400) · 세션 단체 · 시트 아홉 · 은행 시트 칸 · 보내기 흐름(1-9) · 참조 · 최종 발송(11-08 ⑧).
  *
- * ★ DB 에 붙지 않고 메일도 보내지 않는다 — 메일은 가짜 `Mailer`, 준비 · 이력은 가짜 `HandoffSendParts`.
+ * ★ DB 에 붙지 않고 메일도 보내지 않는다 — 메일은 가짜 `Mailer`, 준비 · 사람 · 최종 발송은 가짜 `HandoffSendParts`.
  *   실제 DB 는 `scripts/verify-tax-handoff.js` 가 잰다.
  */
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ErpSession, ScopeRole } from '@swonbiz/shared';
-import { HANDOFF_SHEETS, type HandoffLogView, type TaxHandoffResponse } from '@swonbiz/shared/domain/tax-handoff';
+import { HANDOFF_SHEETS, type HandoffLastView, type TaxHandoffResponse } from '@swonbiz/shared/domain/tax-handoff';
 import type { TaxClassifyRow } from '@swonbiz/shared/domain/tax-classify';
 import type { LoanTxnRow, TaxPaymentRow } from '@swonbiz/shared/domain/tax-payments';
 import { vatPeriodById } from '@swonbiz/shared/domain/tax-vat';
@@ -16,14 +16,17 @@ import type { Mailer, MailMessage } from '../lib/mailer.ts';
 import {
   bankAccountLabel,
   buildHandoffSheets,
+  handoffCc,
   registerTaxHandoffRoutes,
   sendHandoff,
   sheetView,
   type HandoffBankRow,
+  type HandoffLastKey,
+  type HandoffPeople,
   type HandoffPrepared,
   type HandoffSendParts,
   type HandoffSources,
-  type NewHandoffLog,
+  type NewHandoffLast,
   type TaxHandoffDeps,
 } from './taxHandoff.ts';
 
@@ -142,22 +145,19 @@ describe('buildHandoffSheets — 시트 아홉', () => {
 const Q3 = vatPeriodById('C', '2026-Q3')!;
 const PREPARED: HandoffPrepared = {
   recipients: [{ name: '김세무', email: 'tax@example.com' }, { name: null, email: 'ceo@example.com' }],
-  companyName: '(주)브릿지랩',
   period: Q3,
-  rangeLabel: '7~9월',
-  periodFrom: '2026-07-01',
-  periodTo: '2026-09-30',
   fileName: '세무자료_부가세_2026년3분기.xlsx',
   bytes: new Uint8Array([9]),
-  sheets: HANDOFF_SHEETS.map((s) => ({ name: s.name, count: 1 })),
-  rowCount: 9,
-  unassignedCount: 2,
 };
-const BODY = { month: '2026-09', tp: 'T' as const, periodId: '2026-Q3', to: ['tax@example.com'] };
+const BODY = {
+  month: '2026-09', tp: 'T' as const, periodId: '2026-Q3', to: ['tax@example.com'],
+  subject: '[고친 회사] 2026년 3분기 부가세 신고 자료', text: '안녕하세요.\n고친 내용입니다.',
+};
+const STAFF: HandoffPeople = { sender: { name: '김사원', email: 'staff@x.com' }, rep: { name: '최대표', email: 'ceo@x.com' } };
 
-function fakes(over: { mailer?: Partial<Mailer>; prepared?: Awaited<ReturnType<HandoffSendParts['prepare']>> } = {}) {
+function fakes(over: { mailer?: Partial<Mailer>; prepared?: Awaited<ReturnType<HandoffSendParts['prepare']>>; people?: HandoffPeople } = {}) {
   const mails: MailMessage[] = [];
-  const logs: NewHandoffLog[] = [];
+  const saved: [HandoffLastKey, NewHandoffLast][] = [];
   const mailer: Mailer = {
     ready: true,
     send: async (m) => {
@@ -167,42 +167,57 @@ function fakes(over: { mailer?: Partial<Mailer>; prepared?: Awaited<ReturnType<H
   };
   const parts: HandoffSendParts = {
     prepare: async () => over.prepared ?? { ok: true, data: PREPARED },
-    senderName: async () => '홍길동',
-    saveLog: async (_s, l) => {
-      logs.push(l);
-      return { id: 'log1', sentAt: '2026-11-07 10:00', ...l } as HandoffLogView;
+    people: async () => over.people ?? { sender: { name: '홍길동', email: null }, rep: null },
+    saveLast: async (_s, k, l) => {
+      saved.push([k, l]);
+      return { sentAt: '2026-11-08 10:00', ...l };
     },
   };
-  return { mails, logs, mailer, parts };
+  return { mails, saved, mailer, parts };
 }
 
+describe('handoffCc — 참조(서버가 정한다)', () => {
+  it('★ 발송인이 대표자가 아니면 대표자 · 대표자면 없음(메일로 견줌, 큰 글자 무시)', () => {
+    expect(handoffCc(STAFF)).toEqual({ name: '최대표', email: 'ceo@x.com' });
+    expect(handoffCc({ ...STAFF, sender: { name: '최대표', email: 'CEO@x.com' } })).toBeNull();
+  });
+
+  it('대표자를 모르거나 대표자 메일이 없으면 없음 · 발송인 메일을 모르면 대표자를 참조', () => {
+    expect(handoffCc({ ...STAFF, rep: null })).toBeNull();
+    expect(handoffCc({ ...STAFF, rep: { name: '최대표', email: null } })).toBeNull();
+    expect(handoffCc({ ...STAFF, sender: { name: '김사원', email: null } })).toEqual({ name: '최대표', email: 'ceo@x.com' });
+  });
+});
+
 describe('sendHandoff', () => {
-  it('★ 성공 — 제목 · 본문 · 엑셀 첨부로 보내고 이력에 성공 · 보낸 사람(번호 + 이름)을 남긴다', async () => {
+  it('★ 성공 — 화면이 보낸 제목 · 내용 · 엑셀 첨부로 보내고 최종 발송을 덮어쓴다(단체 · 종류 · 기간 · 보낸 사람 번호 + 이름)', async () => {
     const f = fakes();
     const r = await sendHandoff(session('tenant'), BODY, f.mailer, f.parts);
-    expect(r.ok && r.data.ok).toBe(true);
+    expect(r).toEqual({ ok: true, data: { ok: true, last: { sentAt: '2026-11-08 10:00', ...f.saved[0]![1] } } });
     expect(f.mails).toHaveLength(1);
-    expect(f.mails[0]).toMatchObject({ to: ['tax@example.com'], subject: '[(주)브릿지랩] 2026년 3분기 부가세 신고 자료' });
-    expect(f.mails[0]!.text).toContain('아직 남은 일: 미지정 2줄');
+    expect(f.mails[0]).toMatchObject({ to: ['tax@example.com'], subject: BODY.subject, text: BODY.text, fromName: '홍길동', replyTo: null, cc: null });
     expect(f.mails[0]!.attachments).toEqual([{ filename: '세무자료_부가세_2026년3분기.xlsx', content: new Uint8Array([9]) }]);
-    expect(f.logs).toEqual([{
-      tp: 'T', periodFrom: '2026-07-01', periodTo: '2026-09-30', recipients: ['tax@example.com'], fileName: '세무자료_부가세_2026년3분기.xlsx',
-      rowCount: 9, ok: true, failReason: null, sentBy: '7', sentByName: '홍길동',
-    }]);
+    expect(f.saved).toEqual([[
+      { tp: 'T', periodId: '2026-Q3' },
+      { recipients: ['tax@example.com'], cc: null, fileName: '세무자료_부가세_2026년3분기.xlsx', sentBy: '7', sentByName: '홍길동' },
+    ]]);
   });
 
-  it('★ 메일 서버 실패 — 실패와 사유를 이력에 남기고 결과는 ok false', async () => {
+  it('★ 발송인이 대표자가 아니면 대표자를 참조 · 보내는 이름 · 답장 주소는 발송인 — 최종 발송에도 참조', async () => {
+    const f = fakes({ people: STAFF });
+    await sendHandoff(session('tenant'), BODY, f.mailer, f.parts);
+    expect(f.mails[0]).toMatchObject({ fromName: '김사원', replyTo: 'staff@x.com', cc: 'ceo@x.com' });
+    expect(f.saved[0]![1]).toMatchObject({ cc: 'ceo@x.com', sentByName: '김사원' });
+  });
+
+  it('★ 메일 서버 실패 — 저장하지 않고 결과는 ok false · 사유(500자까지)', async () => {
     const f = fakes({ mailer: { send: async () => { throw new Error('Invalid login: 535 Authentication failed'); } } });
     const r = await sendHandoff(session('tenant'), BODY, f.mailer, f.parts);
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.data).toMatchObject({ ok: false, message: '메일을 보내지 못했습니다 — Invalid login: 535 Authentication failed' });
-    expect(f.logs[0]).toMatchObject({ ok: false, failReason: 'Invalid login: 535 Authentication failed' });
-  });
-
-  it('실패 사유는 500자까지', async () => {
-    const f = fakes({ mailer: { send: async () => { throw new Error('x'.repeat(900)); } } });
-    await sendHandoff(session('tenant'), BODY, f.mailer, f.parts);
-    expect(f.logs[0]!.failReason).toHaveLength(500);
+    expect(r).toEqual({ ok: true, data: { ok: false, message: '메일을 보내지 못했습니다 — Invalid login: 535 Authentication failed' } });
+    expect(f.saved).toHaveLength(0);
+    const long = fakes({ mailer: { send: async () => { throw new Error('x'.repeat(900)); } } });
+    const r2 = await sendHandoff(session('tenant'), BODY, long.mailer, long.parts);
+    expect(r2.ok && !r2.data.ok && r2.data.message).toBe(`메일을 보내지 못했습니다 — ${'x'.repeat(500)}`);
   });
 
   it('★ 설정이 없으면 503 「메일 발송 설정이 아직 없습니다 — 엑셀을 내려받아 보내 주세요」· 보내지도 남기지도 않는다', async () => {
@@ -210,7 +225,7 @@ describe('sendHandoff', () => {
     const r = await sendHandoff(session('tenant'), BODY, f.mailer, f.parts);
     expect(r).toEqual({ ok: false, status: 503, error: 'mail_not_ready', message: '메일 발송 설정이 아직 없습니다 — 엑셀을 내려받아 보내 주세요' });
     expect(f.mails).toHaveLength(0);
-    expect(f.logs).toHaveLength(0);
+    expect(f.saved).toHaveLength(0);
   });
 
   it('★ 세무 설정에 없는 메일은 400 — 아무 주소로나 보내지 않는다', async () => {
@@ -218,7 +233,7 @@ describe('sendHandoff', () => {
     const r = await sendHandoff(session('tenant'), { ...BODY, to: ['tax@example.com', 'someone@else.com'] }, f.mailer, f.parts);
     expect(r).toMatchObject({ ok: false, status: 400, error: 'not_recipient' });
     expect(f.mails).toHaveLength(0);
-    expect(f.logs).toHaveLength(0);
+    expect(f.saved).toHaveLength(0);
   });
 
   it('세무 설정에 세무사 메일이 없으면 400 「세무 설정에서 세무사 메일을 먼저 넣으세요」', async () => {
@@ -258,7 +273,7 @@ async function build(role: ScopeRole, over: Partial<TaxHandoffDeps> = {}) {
     },
     send: async (s, b) => {
       calls.push(['send', s.s020OrgId, b]);
-      return { ok: true, data: { ok: true, message: null, log: {} as HandoffLogView } };
+      return { ok: true, data: { ok: true, last: {} as HandoffLastView } };
     },
     ...over,
   };
@@ -301,11 +316,22 @@ describe('GET /tax/handoff/export', () => {
 });
 
 describe('POST /tax/handoff/send', () => {
-  it('본문을 읽어 보낸다', async () => {
+  it('본문을 읽어 보낸다 — 제목 · 내용을 받고 ★ 화면이 보낸 참조는 버린다', async () => {
     const { a, calls } = await build('tenant');
-    const res = await a.inject({ method: 'POST', url: '/tax/handoff/send', payload: { month: '2026-09', tp: 'T', period: '2026-Q3', to: ['tax@example.com'] } });
+    const res = await a.inject({
+      method: 'POST', url: '/tax/handoff/send',
+      payload: { month: '2026-09', tp: 'T', period: '2026-Q3', to: ['tax@example.com'], subject: BODY.subject, text: BODY.text, cc: 'x@evil.com' },
+    });
     expect(res.statusCode).toBe(200);
     expect(calls).toEqual([['send', 9001, BODY]]);
+  });
+
+  it('제목 · 내용이 비면 400 — 보내지 않는다', async () => {
+    const { a, calls } = await build('tenant');
+    const res = await a.inject({ method: 'POST', url: '/tax/handoff/send', payload: { month: '2026-09', tp: 'T', period: '2026-Q3', to: ['a@x.com'], subject: ' ', text: '' } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errors.map((e: { field: string }) => e.field)).toEqual(['subject', 'text']);
+    expect(calls).toEqual([]);
   });
 
   it('받는 사람 0명 · 원천세는 400 — 보내지 않는다', async () => {
@@ -320,7 +346,7 @@ describe('POST /tax/handoff/send', () => {
     const { a } = await build('tenant', {
       send: async () => ({ ok: false, status: 503, error: 'mail_not_ready', message: '메일 발송 설정이 아직 없습니다 — 엑셀을 내려받아 보내 주세요' }),
     });
-    const res = await a.inject({ method: 'POST', url: '/tax/handoff/send', payload: { month: '2026-09', tp: 'T', period: '2026-Q3', to: ['a@x.com'] } });
+    const res = await a.inject({ method: 'POST', url: '/tax/handoff/send', payload: { month: '2026-09', tp: 'T', period: '2026-Q3', to: ['a@x.com'], subject: '제목', text: '내용' } });
     expect(res.statusCode).toBe(503);
     expect(res.json()).toEqual({ error: 'mail_not_ready', message: '메일 발송 설정이 아직 없습니다 — 엑셀을 내려받아 보내 주세요' });
   });

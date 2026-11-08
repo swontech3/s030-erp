@@ -194,8 +194,8 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
   { category: 'BANK', useTp: '000', table: 'tb_s050_loan_txns', column: 'bank_code', label: '세무 대출 거래' },
   { category: 'TAX_LOAN_TP', useTp: '000', table: 'tb_s050_loan_txns', column: 'txn_tp', label: '세무 대출 거래' },
 
-  // --- 세무 세무사 전달 서류 (s050500010) — 2026-11-07 추가. 218_tax_handoff.sql ---
-  { category: 'TAX_HANDOFF_TP', useTp: '000', table: 'tb_s050_handoff_logs', column: 'handoff_tp', label: '세무 세무사 전달 이력' },
+  // --- 세무 세무사 전달 서류 (s050500010) — 2026-11-07 추가. 218_tax_handoff.sql · 2026-11-08 224 로 표가 최종 발송(tb_s050_handoff_last)으로 바뀜 ---
+  { category: 'TAX_HANDOFF_TP', useTp: '000', table: 'tb_s050_handoff_last', column: 'handoff_tp', label: '세무 세무사 전달 최종 발송' },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */
@@ -422,12 +422,12 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     source: 'packages/shared/src/domain/tax-pay-social-loan.ts (PayExcluded · SocialExcluded · LoanExcluded)',
     label: '세무 납부 · 4대보험 · 대출 뺀 줄 종류',
   },
-  /** 세무사 전달 종류 — 218 CHECK(보낸 이력)가 T · M 에 기대고, 화면 · API 가 T 만 동작시킨다(M 은 준비 중). 2026-11-07 추가. */
+  /** 세무사 전달 종류 — 224 CHECK(최종 발송, 218 보낸 이력을 바꿈)가 T · M 에 기대고, 화면 · API 가 T 만 동작시킨다(M 은 준비 중). 2026-11-07 추가. */
   {
     category: 'TAX_HANDOFF_TP',
     useTp: '000',
     codes: ['T', 'M'],
-    source: 'packages/shared/src/domain/tax-handoff.ts (HANDOFF_TP_VAT · HANDOFF_TP_WH) · 218 (ck_s050_handoff_logs_tp)',
+    source: 'packages/shared/src/domain/tax-handoff.ts (HANDOFF_TP_VAT · HANDOFF_TP_WH) · 224 (ck_s050_handoff_last_tp)',
     label: '세무 세무사 전달 종류',
   },
   /** 항목 지정 검색조건 「구분」 — 서버가 L(미지정) · D(지정)로 거른다(`filterClassifyRows`). 담는 칸은 없다. 2026-11-08 추가(222). */

@@ -1,9 +1,11 @@
 /**
  * 세무 세무사 전달 서류(s050500010, 세무 S05) — 1-9 (2026-11-07 대표 지시 「답변 · 변경」).
  *
- *   GET  /tax/handoff?month&tp&period           신고 기간 · 시트 아홉 미리보기 · 미지정 건 수 · 받는 사람 · 제목 · 메일 설정 · 보낸 이력
+ *   GET  /tax/handoff?month&tp&period           신고 기간 · 시트 아홉 미리보기 · 미지정 건 수 · 받는 사람 · 제목 · 내용 · 메일 설정 ·
+ *                                               발송인 · 참조 · 최종 발송(고른 종류 · 신고 기간)
  *   GET  /tax/handoff/export?month&tp&period    시트 아홉 엑셀(ERP 공통 부품 `lib/xlsxExport.ts`) — 메일 설정과 상관없이 늘 된다
- *   POST /tax/handoff/send   { month, tp, period, to[] }   서버가 엑셀을 만들어 첨부해 보낸다(nodemailer) · 결과를 이력에 남긴다
+ *   POST /tax/handoff/send   { month, tp, period, to[], subject, text }   서버가 엑셀을 만들어 첨부해 보낸다(nodemailer) ·
+ *                                               성공하면 최종 발송을 덮어쓴다(224). 실패는 저장하지 않고 사유만 돌려준다(11-08 ⑧)
  *
  * ★★★ 운영사 세션도 **자기 단체만** — 읽는 처리마다 `org_id = 세션 단체 ID` 를 직접 건다. 역할로 403 을 내지 않는다.
  * ★ 종류는 T 부가세 납부만 — M 원천세 납부는 주소 해석에서 400 「준비 중」(shared `tax-handoff.ts`).
@@ -11,7 +13,9 @@
  * ★ 시트는 지금 화면의 처리 · 시트 함수를 그대로 부른다 — 매입 · 매출 · 카드 · 현금은 항목 지정 「이번 달 자료 전체」(기간 직접 지정),
  *   국세 · 지방세 · 대출은 세금 · 4대보험 · 대출 화면(기간 직접 지정). 은행거래내역 · 이체내역 시트만 새로(화면이 아직 없다).
  * ★ 받는 사람은 세무 설정의 세무사 메일 가운데서만 — 다른 주소는 400(아무 주소로나 보내지 않는다).
- * ★ 메일 보내기는 트랜잭션 밖에서 한다 — 준비(읽기 · 엑셀) 한 번, 보내기, 이력 넣기 한 번. 실패도 사유와 함께 남긴다.
+ * ★ 참조는 서버가 정한다 — 발송인이 대표자가 아니면 대표자(화면이 보낸 참조는 받지 않는다). 보내는 주소는 SMTP_FROM,
+ *   보내는 이름은 로그인 사람 이름, 답장 주소(Reply-To)는 로그인 사람 메일(`handoffPeople` — 삐용에서 얻지 못한 칸은 빼고 보낸다).
+ * ★ 메일 보내기는 트랜잭션 밖에서 한다 — 준비(읽기 · 엑셀) 한 번, 보내기, 최종 발송 덮어쓰기 한 번(성공할 때만).
  */
 import type { FastifyInstance } from 'fastify';
 import type { ErpSession } from '@swonbiz/shared';
@@ -22,12 +26,13 @@ import {
   HANDOFF_TP_VAT,
   TAX_HANDOFF_TP_CATEGORY,
   handoffFileName,
-  handoffMailBody,
+  handoffMailText,
   handoffRangeDates,
   handoffSubject,
   parseHandoffQuery,
   parseHandoffSend,
-  type HandoffLogView,
+  type HandoffLastView,
+  type HandoffPerson,
   type HandoffQuery,
   type HandoffSend,
   type HandoffSheetKey,
@@ -42,7 +47,7 @@ import { vatRange, type VatPeriod } from '@swonbiz/shared/domain/tax-vat';
 import { requireSession } from '../session/hook.ts';
 import type { ScopedClient } from '../db/withCompanyScope.ts';
 import { listCategoryNames } from '../db/taxClassify.ts';
-import { insertHandoffLog, listHandoffBankRows, listHandoffLogs, type HandoffBankRow, type NewHandoffLog } from '../db/taxHandoff.ts';
+import { getHandoffLast, listHandoffBankRows, upsertHandoffLast, type HandoffBankRow, type HandoffLastKey, type NewHandoffLast } from '../db/taxHandoff.ts';
 import { bbiyongAuth } from '../bbiyong/index.ts';
 import { env } from '../env.ts';
 import { buildXlsx, sendXlsx, type XlsxSheet } from '../lib/xlsxExport.ts';
@@ -53,7 +58,7 @@ import { fillCompanyName, readTaxSettingsOp } from './taxSettings.ts';
 import { vatOp } from './taxVat.ts';
 import { loadCodeNames, runOp, type TaxOp } from './taxUploads.ts';
 
-export type { HandoffBankRow, NewHandoffLog };
+export type { HandoffBankRow, HandoffLastKey, NewHandoffLast };
 
 type HandoffFail = { ok: false; status: 400 | 404 | 409 | 503; error: string; message: string };
 type HandoffOp<T> = { ok: true; data: T } | HandoffFail;
@@ -63,6 +68,7 @@ const NO_RECIPIENT: HandoffFail = { ok: false, status: 400, error: 'no_recipient
 const NOT_RECIPIENT: HandoffFail = { ok: false, status: 400, error: 'not_recipient', message: '세무 설정에 없는 메일입니다' };
 const NOT_READY: HandoffFail = { ok: false, status: 503, error: 'mail_not_ready', message: MAIL_NOT_READY };
 const FAIL_REASON_MAX = 500;
+const NO_PERSON: HandoffPerson = { name: null, email: null };
 
 /* ── 시트 ────────────────────────────────────────────────────────────────── */
 
@@ -169,8 +175,6 @@ interface Built {
   response: TaxHandoffResponse;
   /** 엑셀 시트 — 사업자 유형이 없으면 빈 목록. */
   sheets: XlsxSheet<any>[];
-  periodFrom: string | null;
-  periodTo: string | null;
 }
 
 /** `thisMonth` 은 이번 달 — 신고 기간 선택지 끝(부가세 조회와 같다). 검증 스크립트가 날짜를 고정하려고 넘긴다. */
@@ -184,7 +188,6 @@ export async function handoffOp(
   if (!vat.ok) return vat;
   const settings = await readTaxSettingsOp(client, orgId);
   const tpNames = (await loadCodeNames(client, [TAX_HANDOFF_TP_CATEGORY])).get(TAX_HANDOFF_TP_CATEGORY) ?? [];
-  const logs = await listHandoffLogs(client, orgId);
   const { period } = vat.data;
   const base: TaxHandoffResponse = {
     query: { ...q, periodId: vat.data.query.periodId },
@@ -194,14 +197,18 @@ export async function handoffOp(
     rangeLabel: vat.data.rangeLabel,
     sheets: [],
     unassignedCount: vat.data.vat?.unassignedCount ?? 0,
+    unassignedFirstMonth: vat.data.vat?.unassignedFirstMonth ?? null,
     recipients: settings.settings.taxEmails,
     companyName: settings.company.name,
     subject: null,
+    mailText: null,
     fileName: null,
     mailReady: opts.mailReady,
-    logs,
+    sender: NO_PERSON,
+    cc: null,
+    last: null,
   };
-  if (!period) return { ok: true, data: { response: base, sheets: [], periodFrom: null, periodTo: null } };
+  if (!period) return { ok: true, data: { response: base, sheets: [] } };
 
   const range = vatRange(period, q.month);
   const { from, to } = handoffRangeDates(range);
@@ -244,11 +251,11 @@ export async function handoffOp(
         ...base,
         sheets: built.map((b) => sheetView(b.key, b.sheet)),
         subject: handoffSubject(base.companyName, period),
+        mailText: handoffMailText(base.companyName, period),
         fileName: handoffFileName(period),
+        last: await getHandoffLast(client, orgId, { tp: q.tp, periodId: period.id }),
       },
       sheets: built.map((b) => b.sheet),
-      periodFrom: from,
-      periodTo: to,
     },
   };
 }
@@ -263,36 +270,74 @@ async function withSessionName(session: ErpSession, r: TaxHandoffResponse): Prom
     name = null;
   }
   const companyName = fillCompanyName({ source: 'none', name: r.companyName, bizNumber: null, corpNumber: null }, name).name;
-  return { ...r, companyName, subject: r.period ? handoffSubject(companyName, r.period) : null };
+  return {
+    ...r,
+    companyName,
+    subject: r.period ? handoffSubject(companyName, r.period) : null,
+    mailText: r.period ? handoffMailText(companyName, r.period) : null,
+  };
 }
+
+/* ── 발송인 · 참조 ───────────────────────────────────────────────────────── */
+
+/** 발송인(로그인 사람) · 대표자 — 삐용에서 얻은 것. 얻지 못한 칸은 null. */
+export interface HandoffPeople {
+  sender: HandoffPerson;
+  /** 대표자 — 삐용에서 얻지 못하면 null. */
+  rep: HandoffPerson | null;
+}
+
+/**
+ * 참조 — 발송인이 대표자가 아니면 대표자(대표자 메일이 있을 때만). 발송인이 대표자면 참조 없음.
+ * ★ 같은 사람인지는 메일로 본다. 발송인 메일을 모르면 대표자가 아닌 것으로 본다.
+ */
+export function handoffCc(p: HandoffPeople): HandoffPerson | null {
+  const repMail = p.rep?.email?.trim().toLowerCase();
+  if (!p.rep || !repMail) return null;
+  const me = p.sender.email?.trim().toLowerCase();
+  return me === repMail ? null : p.rep;
+}
+
+/**
+ * 삐용에서 사람을 읽는다(11-08 ⑧). ★ 실패는 빈 채로 — 메일은 그 부분 없이 보낸다.
+ *   발송인 이름   `getProfile(memberId).memberName` — 있다
+ *   발송인 메일   삐용 회원 표시정보(`BbiyongProfile`)에 메일 칸이 없다 → null(답장 주소 없이 보낸다)
+ *   대표자        삐용 단체 조회(`getOrg`)에 대표자 메일이 없고 실연동은 규격 대기(unsupported) → null(참조 없이 보낸다)
+ */
+async function handoffPeople(session: ErpSession): Promise<HandoffPeople> {
+  let name: string | null = null;
+  try {
+    name = (await bbiyongAuth.getProfile(session.s020MemberId))?.memberName || null;
+  } catch {
+    name = null;
+  }
+  return { sender: { name, email: null }, rep: null };
+}
+
+const withPeople = (r: TaxHandoffResponse, p: HandoffPeople): TaxHandoffResponse => ({ ...r, sender: p.sender, cc: handoffCc(p) });
 
 /* ── 보내기 ──────────────────────────────────────────────────────────────── */
 
 export interface HandoffPrepared {
   recipients: TaxEmail[];
-  companyName: string | null;
   period: VatPeriod;
-  rangeLabel: string;
-  periodFrom: string;
-  periodTo: string;
   fileName: string;
   bytes: Uint8Array;
-  sheets: { name: string; count: number }[];
-  rowCount: number;
-  unassignedCount: number;
 }
 
-/** 바꿔 끼울 수 있는 부분 — 시험이 DB 없이 흐름을 본다. */
+/** 바꿔 끼울 수 있는 부분 — 시험이 DB · 삐용 없이 흐름을 본다. */
 export interface HandoffSendParts {
   prepare(session: ErpSession, q: HandoffQuery): Promise<HandoffOp<HandoffPrepared>>;
-  /** 보낸 사람 이름 — 삐용에서 읽는다, 못 읽으면 null. */
-  senderName(session: ErpSession): Promise<string | null>;
-  saveLog(session: ErpSession, log: NewHandoffLog): Promise<HandoffLogView>;
+  /** 발송인 · 대표자 — 삐용에서 읽는다, 못 읽은 칸은 null. */
+  people(session: ErpSession): Promise<HandoffPeople>;
+  /** 성공한 발송으로 최종 발송을 덮어쓴다. */
+  saveLast(session: ErpSession, key: HandoffLastKey, last: NewHandoffLast): Promise<HandoffLastView>;
 }
 
 /**
- * 보내기 — 설정 없음 503 → 준비(읽기 · 엑셀) → 받는 사람 확인(세무 설정 메일만) → 보내기 → 이력(성공 / 실패 사유).
- * ★ 메일 서버 실패는 HTTP 실패가 아니다 — 이력을 남겼으므로 결과(ok false · 사유)로 돌려준다.
+ * 보내기 — 설정 없음 503 → 준비(읽기 · 엑셀) → 받는 사람 확인(세무 설정 메일만) → 보내기 → 성공이면 최종 발송 덮어쓰기.
+ * ★ 메일 서버 실패는 HTTP 실패가 아니다 — 저장하지 않고 결과(ok false · 사유)로 돌려준다(팝업이 오류를 보인다).
+ * ★ 제목 · 내용은 화면이 보낸 것(팝업에서 고친 것), 참조는 서버가 정한다(`handoffCc`).
  */
 export async function sendHandoff(session: ErpSession, body: HandoffSend, mailer: Mailer, parts: HandoffSendParts): Promise<HandoffOp<TaxHandoffSendResult>> {
   if (!mailer.ready) return NOT_READY;
@@ -303,26 +348,26 @@ export async function sendHandoff(session: ErpSession, body: HandoffSend, mailer
   const allowed = new Set(d.recipients.map((r) => r.email));
   if (!body.to.every((e) => allowed.has(e))) return NOT_RECIPIENT;
 
-  let failReason: string | null = null;
+  const people = await parts.people(session);
+  const cc = handoffCc(people);
   try {
     await mailer.send({
       to: body.to,
-      subject: handoffSubject(d.companyName, d.period),
-      text: handoffMailBody({
-        companyName: d.companyName, period: d.period, rangeLabel: d.rangeLabel, fileName: d.fileName, sheets: d.sheets,
-        unassignedCount: d.unassignedCount,
-      }),
+      subject: body.subject,
+      text: body.text,
       attachments: [{ filename: d.fileName, content: d.bytes }],
+      fromName: people.sender.name,
+      replyTo: people.sender.email,
+      cc: cc?.email ?? null,
     });
   } catch (err) {
     const msg = err instanceof Error && err.message.trim() !== '' ? err.message.trim() : '알 수 없는 오류';
-    failReason = msg.slice(0, FAIL_REASON_MAX);
+    return { ok: true, data: { ok: false, message: `메일을 보내지 못했습니다 — ${msg.slice(0, FAIL_REASON_MAX)}` } };
   }
-  const log = await parts.saveLog(session, {
-    tp: body.tp, periodFrom: d.periodFrom, periodTo: d.periodTo, recipients: body.to, fileName: d.fileName, rowCount: d.rowCount,
-    ok: failReason === null, failReason, sentBy: String(session.s020MemberId), sentByName: await parts.senderName(session),
+  const last = await parts.saveLast(session, { tp: body.tp, periodId: d.period.id }, {
+    recipients: body.to, cc: cc?.email ?? null, fileName: d.fileName, sentBy: String(session.s020MemberId), sentByName: people.sender.name,
   });
-  return { ok: true, data: { ok: failReason === null, message: failReason === null ? null : `메일을 보내지 못했습니다 — ${failReason}`, log } };
+  return { ok: true, data: { ok: true, last } };
 }
 
 /* ── 라우트 ──────────────────────────────────────────────────────────────── */
@@ -343,28 +388,13 @@ const sendParts: HandoffSendParts = {
   prepare: async (session, q) => {
     const b = await buildOf(session, q);
     if (!b.ok) return b;
-    const { response: r, sheets, periodFrom, periodTo } = b.data;
-    if (!r.period || !r.fileName || !periodFrom || !periodTo) return NO_BIZ_TYPE;
-    const named = await withSessionName(session, r);
-    return {
-      ok: true,
-      data: {
-        recipients: r.recipients, companyName: named.companyName, period: r.period, rangeLabel: r.rangeLabel ?? '',
-        periodFrom, periodTo, fileName: r.fileName, bytes: buildXlsx(sheets),
-        sheets: r.sheets.map((s) => ({ name: s.name, count: s.rows.length })),
-        rowCount: r.sheets.reduce((n, s) => n + s.rows.length, 0), unassignedCount: r.unassignedCount,
-      },
-    };
+    const { response: r, sheets } = b.data;
+    if (!r.period || !r.fileName) return NO_BIZ_TYPE;
+    return { ok: true, data: { recipients: r.recipients, period: r.period, fileName: r.fileName, bytes: buildXlsx(sheets) } };
   },
-  senderName: async (session) => {
-    try {
-      return (await bbiyongAuth.getProfile(session.s020MemberId))?.memberName || null;
-    } catch {
-      return null;
-    }
-  },
-  saveLog: async (session, log) => {
-    const r = await runOp(session, async (c) => ({ ok: true as const, data: await insertHandoffLog(c, session.s020OrgId, log) }));
+  people: handoffPeople,
+  saveLast: async (session, key, last) => {
+    const r = await runOp(session, async (c) => ({ ok: true as const, data: await upsertHandoffLast(c, session.s020OrgId, key, last) }));
     if (!r.ok) throw new Error(r.message);
     return r.data;
   },
@@ -373,7 +403,8 @@ const sendParts: HandoffSendParts = {
 const defaultDeps: TaxHandoffDeps = {
   get: async (session, q) => {
     const b = await buildOf(session, q);
-    return b.ok ? { ok: true, data: await withSessionName(session, b.data.response) } : b;
+    if (!b.ok) return b;
+    return { ok: true, data: withPeople(await withSessionName(session, b.data.response), await handoffPeople(session)) };
   },
   exportFile: async (session, q) => {
     const b = await buildOf(session, q);
