@@ -8,7 +8,7 @@
  *   - 목록 ↔ 상세는 한 장씩. 상세를 열 때 방문 기록을 남긴다 — 폰 [뒤로] = 목록으로
  */
 import { describe, expect, it } from 'vitest';
-import { detailHistory, initialStatus, inquiryAdminLayout, resetStatus } from './inquiry-admin-layout';
+import { detailHistory, initialStatus, inquiryAdminLayout, resetStatus, retentionDeleteHint } from './inquiry-admin-layout';
 
 const APP = inquiryAdminLayout(true);
 const PC = inquiryAdminLayout(false);
@@ -65,5 +65,14 @@ describe('detailHistory — 고른 문의가 바뀔 때 주소를 어떻게 적�
     ['7', '8'],
   ])('PC(%p → %p) → 지금처럼 기록을 쌓지 않는다', (prev, next) => {
     expect(detailHistory(PC, prev, next)).toBe('replace');
+  });
+});
+
+describe('retentionDeleteHint — 「보관 기간 지남」 안내의 지우는 곳(9-나)', () => {
+  it('PC(삭제 단추 보임) — 지금 문구 그대로', () => {
+    expect(retentionDeleteHint(PC.deleteButton)).toBe('[글 삭제]로 개인정보를 지워 주세요.');
+  });
+  it('앱 안(삭제 단추 감춤) — PC 화면에서 지우라고 알린다', () => {
+    expect(retentionDeleteHint(APP.deleteButton)).toBe('PC 화면에서 [글 삭제]로 개인정보를 지워 주세요.');
   });
 });

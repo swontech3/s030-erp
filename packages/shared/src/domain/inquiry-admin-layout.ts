@@ -55,3 +55,11 @@ export function detailHistory(
 ): 'push' | 'replace' {
   return layout.detailHistory === 'push' && prev === null && next !== null ? 'push' : 'replace';
 }
+
+/**
+ * 「보관 기간 지남」 안내의 지우는 곳 — 앱 1단계 9-나 (대표 지시 2026-11-08)
+ * ★ 앱 안에서는 [글 삭제] 단추를 감추므로(`deleteButton`) 「PC 화면에서」를 앞에 붙인다. PC 는 지금 문구 그대로다.
+ */
+export function retentionDeleteHint(deleteButtonShown: boolean): string {
+  return `${deleteButtonShown ? '' : 'PC 화면에서 '}[글 삭제]로 개인정보를 지워 주세요.`;
+}

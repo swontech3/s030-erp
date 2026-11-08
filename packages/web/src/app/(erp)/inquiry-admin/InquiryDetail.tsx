@@ -28,6 +28,7 @@ import {
   operatorReplyBlock,
   type MessageKind,
 } from '@swonbiz/shared/domain/inquiry';
+import { retentionDeleteHint } from '@swonbiz/shared/domain/inquiry-admin-layout';
 import { Icon } from '@/components/ds';
 import {
   codeName,
@@ -132,8 +133,9 @@ export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit,
             <Icon name="info" size={16} />
             <span>
               등록일부터 {inquiry.retentionMonths}개월이 지났습니다(보유 기간 「등록일로부터{' '}
-              {inquiry.retentionMonths}개월 보관 후 파기」). <b>자동으로 삭제되지 않습니다</b> — 상담이 끝난 글이면
-              [글 삭제]로 개인정보를 지워 주세요. 고객 화면에는 이 안내가 보이지 않습니다.
+              {inquiry.retentionMonths}개월 보관 후 파기」). <b>자동으로 삭제되지 않습니다</b> — 상담이 끝난 글이면{' '}
+              {/* 앱 안은 [글 삭제] 를 감춘다 → 「PC 화면에서」 (앱 1단계 9-나) */}
+              {retentionDeleteHint(showDelete)} 고객 화면에는 이 안내가 보이지 않습니다.
             </span>
           </div>
         ) : null}
