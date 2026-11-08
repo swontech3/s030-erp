@@ -8,10 +8,11 @@
  *   ② 4대보험 회사 · 직원 부담은 나누지 않는다 — 화면에 안내 한 줄만(직원 급여 단계에서)
  *   ③ 「처음 보는 세목」은 이 화면에서 빼고 「비용 / 비용 아님」만(코드 TAX_TAX_NOEXP 이름과 견준다, `isExpenseTaxItem`)
  *   ④ 엑셀 이름 국세납부_ · 지방세납부_ · 4대보험_ · 대출_ + YYYY-MM(직접 지정이면 YYYY-MM~YYYY-MM). 4대보험은 보험 종류별 합계 시트를 더한다
+ *      (2026-11-08 세 화면 [엑셀 내려받기]를 없애며 파일 이름 함수를 지웠다 — 시트는 세무사 전달 서류가 쓴다)
  *   ⑤ 대출 요약은 대출(은행 · 끝 4자리)별 실행 원금 · 상환 원금 · 이자 · 수수료 합계만 — 잔액은 거래 목록에서
  *   ⑥ 4대보험은 고지 연월로 거른다
  * ★ 자료 올리기 [보기]는 `?month=&file=` 로 온다 — 탭은 서버가 파일의 자료 종류로 정한다(`tabOfFileKind`).
- * ★ 주소 검사 · 기간 · 파일 이름 · 합계는 여기 한 곳 — 화면 목록 · 엑셀 · 검증이 같은 것을 쓴다.
+ * ★ 주소 검사 · 기간 · 합계는 여기 한 곳 — 화면 목록 · 검증이 같은 것을 쓴다.
  * ★ 2026-11-08 대표 수정 ⑥: 탭을 없애고 메뉴 셋으로 나눴다 — 세금 납부(s050300040 · /tax/payments) · 4대보험(s050300050 · /tax/social) ·
  *   대출내역(s050300060 · /tax/loans). 서버 계산 · 엑셀 시트 함수는 그대로 — 주소 tab 에 「세금 전체」(PAY = 국세 + 지방세)를 더하고,
  *   4대보험에 보험 거르기(ins — 건강보험은 장기요양 포함)를 더했다. 기간 직접 지정은 화면에서 없앴다(from · to 는 세무사 전달 서류가 쓴다).
@@ -27,15 +28,6 @@ export type PaymentTab = (typeof PAYMENT_TABS)[number];
 export const PAYMENT_TAB_LABELS: Readonly<Record<PaymentTab, string>> = {
   NTAX: '국세',
   LTAX: '지방세',
-  SOCIAL: '4대보험',
-  LOAN: '대출',
-};
-
-/** 엑셀 파일 이름 앞 글자(결정 ④). */
-const FILE_PREFIX: Readonly<Record<PaymentView, string>> = {
-  PAY: '세금납부',
-  NTAX: '국세납부',
-  LTAX: '지방세납부',
   SOCIAL: '4대보험',
   LOAN: '대출',
 };
@@ -154,14 +146,7 @@ export function paymentsRange(q: PaymentsQuery): [string, string] | null {
   return [`${q.month}-01`, nextMonthFirst(q.month)];
 }
 
-/** 엑셀 파일 이름(결정 ④) — 「국세납부_2026-09.xlsx」, 기간 직접 지정이면 「국세납부_2026-07~2026-09.xlsx」. */
-export function paymentsExportFileName(q: PaymentsQuery): string {
-  const prefix = FILE_PREFIX[q.tab];
-  if (!q.fileId && q.from && q.to) return `${prefix}_${q.from.slice(0, 7)}~${q.to.slice(0, 7)}.xlsx`;
-  return `${prefix}_${q.month}.xlsx`;
-}
-
-/** 주소 글자 — 화면 목록 · 엑셀이 같은 거르기를 쓴다. 파일이면 파일만(탭 · 기간은 싣지 않는다). */
+/** 주소 글자 — 화면 목록이 쓰는 거르기. 파일이면 파일만(탭 · 기간은 싣지 않는다). */
 export function paymentsSearch(q: PaymentsQuery): string {
   const p = new URLSearchParams({ month: q.month });
   if (q.fileId) p.set('file', q.fileId);

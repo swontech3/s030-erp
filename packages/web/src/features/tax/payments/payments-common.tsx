@@ -3,8 +3,8 @@
 /**
  * 세금 납부 · 4대보험 · 대출내역(2026-11-08 대표 수정 ⑥ — 한 화면의 탭을 메뉴 셋으로 나눔) 공통 — 불러오기 · 파일 띠 · 빈 줄.
  *
- * ★ 세 화면은 같은 API(`/api/tax/payments`, tab = PAY · NTAX · LTAX / SOCIAL / LOAN)를 쓴다. 서버 계산 · 엑셀 시트 함수는 그대로.
- * ★ 짜임은 거래처 · 항목 지정과 같다 — 검색조건 카드 / 버튼 줄(오른쪽 [엑셀 내려받기]) / 목록 카드(목록만 스크롤 · 머리 고정).
+ * ★ 세 화면은 같은 API(`/api/tax/payments`, tab = PAY · NTAX · LTAX / SOCIAL / LOAN)를 쓴다. 서버 계산 · 엑셀 시트 함수(세무사 전달 서류가 씀)는 그대로.
+ * ★ 짜임은 거래처 · 항목 지정과 같다 — 검색조건 카드 / 목록 카드(목록만 스크롤 · 머리 고정). [엑셀 내려받기]는 2026-11-08 없앴다.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';

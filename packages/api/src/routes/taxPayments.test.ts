@@ -1,5 +1,5 @@
 /**
- * `/tax/payments` — 주소 해석(400) · 404 · 세션 단체를 그대로 넘기는지 · 엑셀 응답 · 엑셀 칸(1-7).
+ * `/tax/payments` — 주소 해석(400) · 404 · 세션 단체를 그대로 넘기는지 · 엑셀 칸(1-7 — 시트 함수는 세무사 전달 서류가 쓴다).
  *
  * ★ DB 에 붙지 않는다. 단체 가르기 · 파일 거르기 · 합계는 `scripts/verify-tax-payments.js` 가 실제 DB 에서 잰다.
  */
@@ -18,7 +18,6 @@ import { buildXlsx } from '../lib/xlsxExport.ts';
 import {
   loanExportSheet,
   payExportSheet,
-  paymentsSheets,
   registerTaxPaymentsRoutes,
   socialExportSheet,
   socialTotalsSheet,
@@ -51,10 +50,6 @@ function fakeDeps(over: Partial<TaxPaymentsDeps> = {}) {
   const calls: unknown[][] = [];
   const deps: TaxPaymentsDeps = {
     list: async (s, q) => { calls.push(['list', s.s020OrgId, q]); return { ok: true, data: LIST }; },
-    exportFile: async (s, q) => {
-      calls.push(['export', s.s020OrgId, q]);
-      return { ok: true, data: { fileName: '국세납부_2026-09.xlsx', bytes: buildXlsx([{ name: 's', columns: [], rows: [] }]) } };
-    },
     ...over,
   };
   return { deps, calls };
@@ -110,26 +105,6 @@ describe('GET /tax/payments', () => {
     const res = await a.inject({ method: 'GET', url: '/tax/payments?month=2026-09&file=x' });
     expect(res.statusCode).toBe(404);
     expect(res.json()).toEqual({ error: 'not_found', message: '없는 파일입니다' });
-  });
-});
-
-describe('GET /tax/payments/export', () => {
-  it('엑셀 파일로 보낸다 — 거르기는 화면과 같은 주소', async () => {
-    const { deps, calls } = fakeDeps();
-    const a = await build('tenant', deps);
-    const res = await a.inject({ method: 'GET', url: '/tax/payments/export?month=2026-09&tab=NTAX' });
-    expect(res.statusCode).toBe(200);
-    expect(res.headers['content-type']).toContain('spreadsheetml');
-    expect(res.headers['content-disposition']).toContain(encodeURIComponent('국세납부_2026-09.xlsx'));
-    expect(calls).toEqual([['export', 9001, Q]]);
-  });
-
-  it('주소가 틀리면 400 · 남의 파일은 404', async () => {
-    const { deps, calls } = fakeDeps({ exportFile: async () => NOT_FOUND });
-    const a = await build('tenant', deps);
-    expect((await a.inject({ method: 'GET', url: '/tax/payments/export?month=2026-9' })).statusCode).toBe(400);
-    expect(calls).toEqual([]);
-    expect((await a.inject({ method: 'GET', url: '/tax/payments/export?month=2026-09&file=x' })).statusCode).toBe(404);
   });
 });
 
@@ -202,20 +177,5 @@ describe('loanExportSheet — 대출 시트', () => {
       ['거래일', '대출', '구분', '거래종류', '원금', '이자', '수수료', '잔액'],
       ['2026-09-25', '우리은행 · 끝 5678', '상환', '이자납입', 0, 120000, 0, 50000000],
     ]);
-  });
-});
-
-describe('paymentsSheets — [엑셀 내려받기] 시트(⑥ 2026-11-08)', () => {
-  const data = (over: Partial<TaxPaymentsResponse>): TaxPaymentsResponse => ({ ...LIST, ...over });
-  const L = { ...PAY, id: 'l1', kind: 'LTAX' as const, penalty: null };
-  it('세금 전체(PAY) — 국세 · 지방세 두 시트로 나눠 담는다', () => {
-    const sheets = paymentsSheets(data({ query: { ...Q, tab: 'PAY' }, pays: [PAY, L] }));
-    expect(sheets.map((x) => x.name)).toEqual(['국세', '지방세']);
-    expect(sheets.map((x) => x.rows.length)).toEqual([1, 1]);
-  });
-  it('국세만 · 지방세만이면 그 시트 하나, 4대보험은 사람별 + 보험 종류별 합계, 대출은 하나(지금 그대로)', () => {
-    expect(paymentsSheets(data({ query: { ...Q, tab: 'LTAX' }, pays: [L] })).map((x) => x.name)).toEqual(['지방세']);
-    expect(paymentsSheets(data({ query: { ...Q, tab: 'SOCIAL' } })).map((x) => x.name)).toEqual(['4대보험', '보험 종류별 합계']);
-    expect(paymentsSheets(data({ query: { ...Q, tab: 'LOAN' } })).map((x) => x.name)).toEqual(['대출']);
   });
 });

@@ -4,20 +4,18 @@
  * 대출내역(s050300060) 본문 — 2026-11-08 대표 수정 ⑥ 으로 「세금 · 4대보험 · 대출」의 대출 탭을 한 메뉴로 나눴다. 읽기만.
  *
  *   ① 검색조건 — 년월(세무 공통 연도 · 월)
- *   ② 버튼 줄 — 오른쪽 [엑셀 내려받기](대출 시트 — 지금 그대로)
- *   ③ 목록 위 대출(은행 · 끝 4자리)별 요약(작게 — 실행 원금 · 상환 원금 · 이자 · 수수료, 잔액 없음 — 1-7 결정 ⑤) ·
+ *   ② 목록 위 대출(은행 · 끝 4자리)별 요약(작게 — 실행 원금 · 상환 원금 · 이자 · 수수료, 잔액 없음 — 1-7 결정 ⑤) ·
  *      거래 목록(거래일 · 대출 · 구분 · 거래종류 · 원금 · 이자 · 수수료 · 잔액)
+ * ★ [엑셀 내려받기]를 없앴다(2026-11-08) — 짜임은 검색조건 / 목록 둘.
  * ★ 기간 직접 지정 · 설명 글을 없앴다. ★ 대출번호는 끝 4자리만(서버가 그것만 준다). 이름(은행 · 구분)은 API 의 코드 이름.
  */
-import { useState } from 'react';
 import { loanSummary } from '@swonbiz/shared/domain/tax-payments';
-import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
 import t from '../common/tax.module.css';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { TaxMonthBar } from '../common/TaxMonthBar';
 import { won } from '../uploads/tax-uploads-model';
 import { DASH, EmptyRow, FileNote, codeName, shortDate, usePayments } from './payments-common';
-import { exportHref, type PaymentsQuery } from './tax-payments-model';
+import type { PaymentsQuery } from './tax-payments-model';
 
 interface Props {
   month: string;
@@ -26,7 +24,6 @@ interface Props {
 }
 
 export function TaxLoansView({ month, fileId }: Props) {
-  const [failed, setFailed] = useState<string | null>(null);
   const query: PaymentsQuery = { month, tab: 'LOAN', from: null, to: null, fileId };
   const { data, loadError } = usePayments(query, '대출내역을 불러오지 못했습니다');
 
@@ -55,13 +52,6 @@ export function TaxLoansView({ month, fileId }: Props) {
         <TaxMonthBar month={month} note={<FileNote file={data.file} month={month} />} />
       </div>
 
-      {/* ② 버튼 */}
-      <div className={`${t.tbar} ${t.tbarOut}`}>
-        <span className={t.sp} />
-        <ExcelDownloadButton href={exportHref(query)} className={`${t.btn} ${t.btnSm}`} onError={setFailed} />
-      </div>
-      {failed ? <TaxFormErrorBanner kind="failed" message={failed} /> : null}
-
       {/* 대출별 요약 — 작게 */}
       {summary.length ? (
         <div className={`${t.card} ${t.secLow}`}>
@@ -76,7 +66,7 @@ export function TaxLoansView({ month, fileId }: Props) {
         </div>
       ) : null}
 
-      {/* ③ 거래 목록 */}
+      {/* ② 거래 목록 */}
       <div className={`${t.card} ${t.listCard}`}>
         <div className={t.listScroll}>
           <table className={`${t.tbl} ${t.tblSticky}`}>

@@ -10,7 +10,6 @@ import {
   loanSummary,
   parsePaymentsQuery,
   payTotals,
-  paymentsExportFileName,
   paymentsRange,
   paymentsSearch,
   tabOfFileKind,
@@ -84,20 +83,6 @@ describe('paymentsRange — 날짜 범위 [첫날, 끝 다음 날)', () => {
   });
 });
 
-describe('paymentsExportFileName — 엑셀 이름(결정 ④)', () => {
-  it('탭마다 이름 · 작업할 달', () => {
-    expect(paymentsExportFileName(Q)).toBe('국세납부_2026-09.xlsx');
-    expect(paymentsExportFileName({ ...Q, tab: 'LTAX' })).toBe('지방세납부_2026-09.xlsx');
-    expect(paymentsExportFileName({ ...Q, tab: 'SOCIAL' })).toBe('4대보험_2026-09.xlsx');
-    expect(paymentsExportFileName({ ...Q, tab: 'LOAN' })).toBe('대출_2026-09.xlsx');
-  });
-
-  it('기간 직접 지정이면 _YYYY-MM~YYYY-MM, 파일이면 작업할 달', () => {
-    expect(paymentsExportFileName({ ...Q, tab: 'LOAN', from: '2026-07-01', to: '2026-09-30' })).toBe('대출_2026-07~2026-09.xlsx');
-    expect(paymentsExportFileName({ ...Q, fileId: 'f1' })).toBe('국세납부_2026-09.xlsx');
-  });
-});
-
 describe('paymentsSearch — 화면 목록 · 엑셀이 같은 주소', () => {
   it('달 · 탭, 기간이 있으면 기간', () => {
     expect(paymentsSearch(Q)).toBe('?month=2026-09&tab=NTAX');
@@ -148,10 +133,9 @@ describe('loanSummary — 대출(은행 · 끝 4자리)별 요약(결정 ⑤ · 
 });
 
 describe('⑥ 메뉴 셋(2026-11-08) — 세금 납부 · 4대보험 · 대출내역', () => {
-  it('세금 전체(PAY) — 국세 · 지방세를 한 목록으로. 주소 tab=PAY, 엑셀 이름 「세금납부_」', () => {
+  it('세금 전체(PAY) — 국세 · 지방세를 한 목록으로. 주소 tab=PAY', () => {
     expect(parsePaymentsQuery({ month: '2026-09', tab: 'PAY' })).toEqual({ ok: true, value: { ...Q, tab: 'PAY' } });
     expect(paymentsRange({ ...Q, tab: 'PAY' })).toEqual(['2026-09-01', '2026-10-01']);
-    expect(paymentsExportFileName({ ...Q, tab: 'PAY' })).toBe('세금납부_2026-09.xlsx');
     expect(paymentsSearch({ ...Q, tab: 'PAY' })).toBe('?month=2026-09&tab=PAY');
   });
 

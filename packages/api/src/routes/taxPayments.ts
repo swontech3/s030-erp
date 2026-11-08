@@ -2,13 +2,14 @@
  * 세무 세금 · 4대보험 · 대출(s050300040, 세무 S05) — 1-7 (2026-11-02). 읽기만.
  *
  *   GET /tax/payments?month&tab&from&to&file          지금 탭의 줄 · 탭마다 줄 수 · 파일 띠 · 코드 이름
- *   GET /tax/payments/export?…(목록과 같은 주소)       지금 탭 거르기 결과를 엑셀로(ERP 공통 부품 `lib/xlsxExport.ts`)
  *
  * ★★★ 운영사 세션도 **자기 단체만** — `org_id = 세션 단체 ID` 를 직접 건다(`db/taxPayments.ts`). 역할로 403 을 내지 않는다.
  * ★ 남의 단체 · 없는 파일 · 이 화면 자료가 아닌 파일은 404(셋을 가르지 않는다).
  * ★ 자료 올리기 [보기]로 오면(`file`) 탭은 파일의 자료 종류로 정한다(`tabOfFileKind`).
  * ★ 2026-11-08 대표 수정 ⑥ — 메뉴 셋(세금 납부 · 4대보험 · 대출내역)이 이 API 하나를 함께 쓴다. tab=PAY 는 국세 + 지방세 한 목록
- *   (줄마다 kind), ins 는 4대보험 보험 거르기(건강보험은 장기요양 포함 — shared `filterSocialIns`). 시트 함수는 그대로.
+ *   (줄마다 kind), ins 는 4대보험 보험 거르기(건강보험은 장기요양 포함 — shared `filterSocialIns`).
+ * ★ 2026-11-08 — 세 화면의 [엑셀 내려받기]를 없애 `/tax/payments/export` 를 지웠다. 시트 함수(국세 · 지방세 · 4대보험 · 대출)는
+ *   그대로 둔다 — 국세 · 지방세 · 대출은 세무사 전달 서류(`taxHandoff.ts`)가 쓴다.
  * ★ 국세 · 지방세 비용 여부는 저장하지 않는다 — 코드 「비용이 아닌 세목」(TAX_TAX_NOEXP) 이름과 견준다(`isExpenseTaxItem`).
  *   「처음 보는 세목」은 이 화면에서 보이지 않는다(1-7 결정 ③).
  */
@@ -29,7 +30,6 @@ import {
   TAX_PAY_SRC_CATEGORY,
   filterSocialIns,
   parsePaymentsQuery,
-  paymentsExportFileName,
   paymentsRange,
   tabOfFileKind,
   type LoanTxnRow,
@@ -43,7 +43,7 @@ import type { TaxCodeName } from '@swonbiz/shared/domain/tax-uploads';
 import { requireSession } from '../session/hook.ts';
 import type { ScopedClient } from '../db/withCompanyScope.ts';
 import { countPayments, findPaymentFile, listLoanTxns, listPayments, listSocialIns } from '../db/taxPayments.ts';
-import { buildXlsx, sendXlsx, type XlsxSheet } from '../lib/xlsxExport.ts';
+import type { XlsxSheet } from '../lib/xlsxExport.ts';
 import { loadCodeNames, runOp, type TaxOp } from './taxUploads.ts';
 
 const FILE_NOT_FOUND = { ok: false as const, status: 404 as const, error: 'not_found', message: '없는 파일입니다' };
@@ -201,42 +201,15 @@ export function loanExportSheet(
   };
 }
 
-/**
- * 엑셀 시트 — 걸린 조건 결과(화면과 같은 줄). 세금 전체는 국세 · 지방세 두 시트(지금 시트 칸 그대로, 2026-11-08),
- * 4대보험은 사람별 + 보험 종류별 합계 두 시트, 대출은 하나.
- */
-export function paymentsSheets(data: TaxPaymentsResponse): XlsxSheet<any>[] {
-  const { query: q, codes } = data;
-  if (q.tab === PAY_ALL) {
-    return (['NTAX', 'LTAX'] as const).map((k) => payExportSheet(k, data.pays.filter((r) => r.kind === k)));
-  }
-  if (q.tab === 'NTAX' || q.tab === 'LTAX') return [payExportSheet(q.tab, data.pays)];
-  if (q.tab === 'SOCIAL') return [socialExportSheet(data.social, codes.socialIns), socialTotalsSheet(data.social, codes.socialIns)];
-  return [loanExportSheet(data.loans, codes.banks, codes.loanTps)];
-}
-
-/** 엑셀 — 지금 걸린 조건 결과. */
-export async function exportPaymentsOp(
-  client: ScopedClient,
-  orgId: number,
-  query: PaymentsQuery,
-): Promise<TaxOp<{ fileName: string; bytes: Uint8Array }>> {
-  const r = await listPaymentsOp(client, orgId, query);
-  if (!r.ok) return r;
-  return { ok: true, data: { fileName: paymentsExportFileName(r.data.query), bytes: buildXlsx(paymentsSheets(r.data)) } };
-}
-
 /* ── 라우트 ──────────────────────────────────────────────────────────────── */
 
 /** 바꿔 끼울 수 있는 바깥 — 시험이 DB 없이 주소 · 400 · 404 를 본다. */
 export interface TaxPaymentsDeps {
   list(session: ErpSession, query: PaymentsQuery): Promise<TaxOp<TaxPaymentsResponse>>;
-  exportFile(session: ErpSession, query: PaymentsQuery): Promise<TaxOp<{ fileName: string; bytes: Uint8Array }>>;
 }
 
 const defaultDeps: TaxPaymentsDeps = {
   list: (session, query) => runOp(session, (c) => listPaymentsOp(c, session.s020OrgId, query)),
-  exportFile: (session, query) => runOp(session, (c) => exportPaymentsOp(c, session.s020OrgId, query)),
 };
 
 const invalid = (errors: { field: string; message: string }[]) => ({ error: 'invalid_request', message: errors[0]!.message, errors });
@@ -250,15 +223,5 @@ export function registerTaxPaymentsRoutes(app: FastifyInstance, deps: TaxPayment
     const r = await deps.list(session, parsed.value);
     if (!r.ok) return reply.code(r.status).send({ error: r.error, message: r.message });
     return reply.send(r.data);
-  });
-
-  app.get<{ Querystring: Record<string, unknown> }>('/tax/payments/export', async (req, reply) => {
-    const session = requireSession(req);
-    reply.header('Cache-Control', 'no-store');
-    const parsed = parsePaymentsQuery(req.query);
-    if (!parsed.ok) return reply.code(400).send(invalid(parsed.errors));
-    const r = await deps.exportFile(session, parsed.value);
-    if (!r.ok) return reply.code(r.status).send({ error: r.error, message: r.message });
-    return sendXlsx(reply, r.data.fileName, r.data.bytes);
   });
 }

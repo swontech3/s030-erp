@@ -1,21 +1,21 @@
 /**
- * 세무 세금 납부 · 4대보험 · 대출내역(s050300040 · 050 · 060 — 2026-11-08 메뉴 셋으로 나눔, P17~P19) 검증 — **앱이 실제 DB 에서** 하는 일만 잰다(1-7, 2026-11-02).
+ * 세무 세금 납부 · 4대보험 · 대출내역(s050300040 · 050 · 060 — 2026-11-08 메뉴 셋으로 나눔, P17 · P18) 검증 — **앱이 실제 DB 에서** 하는 일만 잰다(1-7, 2026-11-02).
  *
  * 사용: npm run verify:tax-payments   (= npx tsx scripts/verify-tax-payments.js)
  *
  * ★★ 표 구조 · 권한 · CHECK 는 `scripts/verify-214.js` 가 잰다. 여기는 그 위의 읽기다:
  *    탭마다 줄 · 줄 수 · 날짜 최신순 · 비용 여부(코드 이름) · 기간 직접 지정 · 4대보험 고지 연월 거르기 · 대출 요약 ·
- *    파일 거르기(탭을 파일 종류로) · 이 화면 자료가 아닌 파일 404 · 회사별 막기 · 합계가 DB 와 같은지 · 엑셀.
+ *    파일 거르기(탭을 파일 종류로) · 이 화면 자료가 아닌 파일 404 · 회사별 막기 · 합계가 DB 와 같은지.
+ *    (엑셀 P12~P14 · P19 는 2026-11-08 세 화면 [엑셀 내려받기]를 없애며 뺐다 — 시트는 verify-tax-handoff 가 잰다)
  * ★★ API 의 풀(`db/pool.ts`)로 접속한다 — erp_app. 라우트가 쓰는 처리(`routes/taxPayments.ts` 의 …Op)를 그대로 부른다.
  * ★ 시험 줄은 지어낸 값으로 **한 트랜잭션 안에서 넣고 ROLLBACK 한다.** DB 에 남는 것이 없다(마지막 Z1 이 센다).
  *   시험 단체는 verify-201 · 203 과 같은 대역(990001 · 990002).
  *
  * 종료코드: 0 = 전부 통과 / 1 = 실패 있음 / 2 = 실행 실패
  */
-import * as XLSX from 'xlsx';
 import { pool, closePool } from '../packages/api/src/db/pool.ts';
 import { applyCompanyScope } from '../packages/api/src/db/withCompanyScope.ts';
-import { exportPaymentsOp, listPaymentsOp } from '../packages/api/src/routes/taxPayments.ts';
+import { listPaymentsOp } from '../packages/api/src/routes/taxPayments.ts';
 import { loanSummary, payTotals } from '../packages/shared/src/domain/tax-payments.ts';
 
 const ORG_A = 990001;
@@ -134,12 +134,6 @@ async function main() {
       check('P18', '★ 4대보험 보험 거르기 — 건강보험은 장기요양까지(셋) · 국민연금은 9월 고지 없음(0줄)',
         hi.ok && ids(hi.data.social) === 'vpay-s1,vpay-s3,vpay-s2' && np.ok && np.data.social.length === 0,
         { hi: hi.ok ? ids(hi.data.social) : hi, np: np.ok ? np.data.social.length : np });
-      const xp = await exportPaymentsOp(c, ORG_A, query({ tab: 'PAY' }));
-      const xpw = xp.ok ? XLSX.read(xp.data.bytes, { type: 'array' }) : null;
-      const rowsOf = (nm) => (xpw ? XLSX.utils.sheet_to_json(xpw.Sheets[nm], { header: 1 }).length : -1);
-      check('P19', '엑셀 세금 전체 — 이름 세금납부_2026-09.xlsx · 시트 국세(제목 + 2) · 지방세(제목 + 1)',
-        xp.ok && xp.data.fileName === '세금납부_2026-09.xlsx' && JSON.stringify(xpw.SheetNames) === JSON.stringify(['국세', '지방세']) &&
-        rowsOf('국세') === 3 && rowsOf('지방세') === 2, xp.ok ? { name: xp.data.fileName, sheets: xpw.SheetNames } : xp);
 
       // ── 파일로 들어오기 ──
       const f = await listPaymentsOp(c, ORG_A, query({ tab: 'NTAX', fileId: 'vpay-fo' }));
@@ -151,27 +145,6 @@ async function main() {
       const fx = await listPaymentsOp(c, ORG_A, query({ fileId: 'vpay-none' }));
       check('P11', '이 화면 자료가 아닌 파일(계산서) · 남의 단체 파일 · 없는 파일은 404',
         !fi.ok && fi.status === 404 && !fb.ok && fb.status === 404 && !fx.ok && fx.status === 404, { fi, fb, fx });
-
-      // ── 엑셀 ──
-      const read = (bytes) => {
-        const wb = XLSX.read(bytes, { type: 'array' });
-        return wb.SheetNames.map((nm) => [nm, XLSX.utils.sheet_to_json(wb.Sheets[nm], { header: 1, defval: null })]);
-      };
-      const xn = await exportPaymentsOp(c, ORG_A, query());
-      const sn = xn.ok ? read(xn.data.bytes) : [];
-      check('P12', '엑셀 국세 — 이름 국세납부_2026-09.xlsx · 시트 「국세」 하나 · 화면과 같은 줄 수(제목 + 2)',
-        xn.ok && xn.data.fileName === '국세납부_2026-09.xlsx' && sn.length === 1 && sn[0][0] === '국세' && sn[0][1].length === 3,
-        xn.ok ? { name: xn.data.fileName, sheets: sn.map(([nm, r]) => `${nm}:${r.length}`) } : xn);
-      const xs = await exportPaymentsOp(c, ORG_A, query({ tab: 'SOCIAL', from: '2026-08-01', to: '2026-09-30' }));
-      const ss = xs.ok ? read(xs.data.bytes) : [];
-      const totalRow = ss[1]?.[1]?.at(-1);
-      check('P13', '★ 엑셀 4대보험 — 이름 4대보험_2026-08~2026-09.xlsx · 사람별 + 「보험 종류별 합계」 시트 · 합계 줄 = 4명 · 298,000',
-        xs.ok && xs.data.fileName === '4대보험_2026-08~2026-09.xlsx' && ss.length === 2 && ss[0][1].length === 5 &&
-        ss[1][0] === '보험 종류별 합계' && totalRow?.[0] === '합계' && totalRow[1] === 4 && totalRow[2] === 298000,
-        xs.ok ? { name: xs.data.fileName, sheets: ss.map(([nm, r]) => `${nm}:${r.length}`), totalRow } : xs);
-      const xo = await exportPaymentsOp(c, ORG_A, query({ fileId: 'vpay-fo' }));
-      check('P14', '엑셀 파일로 — 대출_2026-09.xlsx · 그 파일 세 줄', xo.ok && xo.data.fileName === '대출_2026-09.xlsx' &&
-        read(xo.data.bytes)[0][1].length === 4, xo.ok ? xo.data.fileName : xo);
 
       // ── 회사별 막기 ──
       await applyCompanyScope(c, tenant(ORG_B));

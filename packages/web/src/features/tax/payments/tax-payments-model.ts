@@ -1,5 +1,5 @@
 /**
- * 세금 납부 · 4대보험 · 대출내역(s050300040 · 050 · 060, 2026-11-08 메뉴 셋으로 나눔) 화면 모델 — 불러오기 · 엑셀 주소. 세 화면이 같은 API.
+ * 세금 납부 · 4대보험 · 대출내역(s050300040 · 050 · 060, 2026-11-08 메뉴 셋으로 나눔) 화면 모델 — 불러오기. 세 화면이 같은 API.
  *
  * ★ 브라우저는 Fastify 에 직접 붙지 않는다 — `/api/tax/payments/**`(Next 중계)를 부른다.
  * ★ 주소 검사(달 · 탭 · 보험 · 파일 · 단체)는 **서버가 한다**(shared `tax-payments.ts`). 화면은 결과만 그린다.
@@ -36,5 +36,3 @@ export async function loadPayments(q: PaymentsQuery): Promise<TaxPaymentsRespons
   }
   return body as unknown as TaxPaymentsResponse;
 }
-
-export const exportHref = (q: PaymentsQuery) => `/api/tax/payments/export${paymentsSearch(q)}`;

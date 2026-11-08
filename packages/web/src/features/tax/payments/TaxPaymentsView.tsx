@@ -4,22 +4,21 @@
  * 세금 납부(s050300040) 본문 — 2026-11-08 대표 수정 ⑥ 으로 「세금 · 4대보험 · 대출」의 국세 · 지방세 탭을 한 메뉴로 나눴다. 읽기만.
  *
  *   ① 검색조건 — 년월(세무 공통) · 「세금 전체 / 국세 / 지방세」(코드 TAX_PAY_SRC, 223 — 「세금 전체」는 첫 줄이고 코드가 아니다)
- *   ② 버튼 줄 — 오른쪽 [엑셀 내려받기](걸린 조건 결과 — 세금 전체면 국세 · 지방세 두 시트)
- *   ③ 목록 — 국세 · 지방세를 한 목록에: 납부일 · 구분 · 세목 · 비용 여부(배지) · 금액 · 가산금(국세) · 귀속 · 납부방법(지방세) ·
+ *   ② 목록 — 국세 · 지방세를 한 목록에: 납부일 · 구분 · 세목 · 비용 여부(배지) · 금액 · 가산금(국세) · 귀속 · 납부방법(지방세) ·
  *      기관(국세 수납관서 · 지방세 납부기관) · 납부번호(국세 전자납부번호 · 지방세 납세번호). 그 세금에 없는 칸은 「—」. 맨 아래 합계 줄
+ * ★ [엑셀 내려받기]를 없앴다(2026-11-08) — 짜임은 검색조건 / 목록 둘.
  * ★ 기간 직접 지정 · 설명 글 · 「오늘 …」 · 「지금 걸린 거르기 결과만 내려받습니다」를 없앴다.
  * ★ 「처음 보는 세목」은 보이지 않는다(1-7 결정 ③). 이름(구분)은 API 가 준 코드 이름으로만 그린다.
  * ★ 파일로 들어오면 기간 거르기 없이 그 파일 줄만 — 서버가 구분을 파일 종류(국세 / 지방세)로 정한다.
  */
 import { useState } from 'react';
 import { PAY_ALL, payTotals, type PaymentView } from '@swonbiz/shared/domain/tax-payments';
-import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
 import t from '../common/tax.module.css';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { TaxMonthBar } from '../common/TaxMonthBar';
 import { won } from '../uploads/tax-uploads-model';
 import { DASH, EmptyRow, FileNote, codeName, shortDate, usePayments } from './payments-common';
-import { exportHref, type PaymentsQuery } from './tax-payments-model';
+import type { PaymentsQuery } from './tax-payments-model';
 
 interface Props {
   month: string;
@@ -29,7 +28,6 @@ interface Props {
 
 export function TaxPaymentsView({ month, fileId }: Props) {
   const [src, setSrc] = useState<PaymentView>(PAY_ALL);
-  const [failed, setFailed] = useState<string | null>(null);
   const query: PaymentsQuery = { month, tab: src, from: null, to: null, fileId };
   const { data, loadError } = usePayments(query, '세금 납부를 불러오지 못했습니다');
 
@@ -76,14 +74,7 @@ export function TaxPaymentsView({ month, fileId }: Props) {
         </TaxMonthBar>
       </div>
 
-      {/* ② 버튼 */}
-      <div className={`${t.tbar} ${t.tbarOut}`}>
-        <span className={t.sp} />
-        <ExcelDownloadButton href={exportHref({ ...query, tab: shown })} className={`${t.btn} ${t.btnSm}`} onError={setFailed} />
-      </div>
-      {failed ? <TaxFormErrorBanner kind="failed" message={failed} /> : null}
-
-      {/* ③ 목록 */}
+      {/* ② 목록 */}
       <div className={`${t.card} ${t.listCard}`}>
         <div className={t.listScroll}>
           <table className={`${t.tbl} ${t.tblSticky}`}>

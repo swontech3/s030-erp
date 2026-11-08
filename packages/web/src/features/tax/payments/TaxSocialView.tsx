@@ -5,21 +5,20 @@
  *
  *   ① 검색조건 — 고지 연월(세무 공통 연도 · 월) · 「보험 전체 / 국민연금 / 건강보험 / 고용보험 / 산재보험」
  *      (기존 코드 TAX_SOCIAL_INS 이름. 장기요양은 따로 두지 않고 건강보험에 들어간다 — 서버 `filterSocialIns`)
- *   ② 버튼 줄 — 오른쪽 [엑셀 내려받기](사람별 + 보험 종류별 합계 두 시트 — 지금 그대로)
- *   ③ 목록 위 보험 종류별 합계(작게) · 사람별 목록(고지 연월 · 보험 종류 · 가입자 · 보수월액 · 금액)
+ *   ② 목록 위 보험 종류별 합계(작게) · 사람별 목록(고지 연월 · 보험 종류 · 가입자 · 보수월액 · 금액)
+ * ★ [엑셀 내려받기]를 없앴다(2026-11-08) — 짜임은 검색조건 / 목록 둘.
  * ★ 「회사 · 직원 부담은 직원 급여에서 나눕니다」 · 기간 직접 지정 · 설명 글을 없앴다.
- * ★ 가입자 번호(끝 4자리)는 화면 · 엑셀에 보이지 않는다(API 는 준다 — 직원 급여에서 씀).
+ * ★ 가입자 번호(끝 4자리)는 화면에 보이지 않는다(API 는 준다 — 직원 급여에서 씀).
  */
 import { useState } from 'react';
 import { socialTotals } from '@swonbiz/shared/domain/tax-pay-social-loan';
 import { SOCIAL_INS_FILTERS } from '@swonbiz/shared/domain/tax-payments';
-import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
 import t from '../common/tax.module.css';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { TaxMonthBar } from '../common/TaxMonthBar';
 import { won } from '../uploads/tax-uploads-model';
 import { DASH, EmptyRow, FileNote, codeName, usePayments } from './payments-common';
-import { exportHref, type PaymentsQuery } from './tax-payments-model';
+import type { PaymentsQuery } from './tax-payments-model';
 
 interface Props {
   month: string;
@@ -29,7 +28,6 @@ interface Props {
 
 export function TaxSocialView({ month, fileId }: Props) {
   const [ins, setIns] = useState('');
-  const [failed, setFailed] = useState<string | null>(null);
   const query: PaymentsQuery = { month, tab: 'SOCIAL', from: null, to: null, fileId, ...(ins ? { ins } : {}) };
   const { data, loadError } = usePayments(query, '4대보험을 불러오지 못했습니다');
 
@@ -75,13 +73,6 @@ export function TaxSocialView({ month, fileId }: Props) {
         </TaxMonthBar>
       </div>
 
-      {/* ② 버튼 */}
-      <div className={`${t.tbar} ${t.tbarOut}`}>
-        <span className={t.sp} />
-        <ExcelDownloadButton href={exportHref(query)} className={`${t.btn} ${t.btnSm}`} onError={setFailed} />
-      </div>
-      {failed ? <TaxFormErrorBanner kind="failed" message={failed} /> : null}
-
       {/* 보험 종류별 합계 — 작게 */}
       {totals.length ? (
         <div className={`${t.card} ${t.secLow}`}>
@@ -98,7 +89,7 @@ export function TaxSocialView({ month, fileId }: Props) {
         </div>
       ) : null}
 
-      {/* ③ 사람별 목록 */}
+      {/* ② 사람별 목록 */}
       <div className={`${t.card} ${t.listCard}`}>
         <div className={t.listScroll}>
           <table className={`${t.tbl} ${t.tblSticky}`}>
