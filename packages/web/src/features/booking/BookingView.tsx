@@ -1024,6 +1024,8 @@ function BookingBlock({
   );
 }
 
+/** @screen s030600010p2 예약 취소 확인 · 060 공간운영 */
+
 /**
  * 예약 취소 확인 — 480px(시안 `03-booking-form.md` §5).
  *
