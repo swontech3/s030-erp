@@ -16,6 +16,16 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig({
   test: {
+    /**
+     * 시험 하나의 제한 시간 — 기본 5초 → 30초(삐용팀 지적, 2026-11-08).
+     *
+     * ★ 증상: 한꺼번에 돌리면 **파일마다 첫 시험**이 「Test timed out in 5000ms」로 실패한다.
+     * ★ 원인: DB · 순서 · 연결 풀이 아니다(DB 는 일부러 못 붙는 주소). 파일의 첫 시험 안에서 Fastify 앱과
+     *   라우트 모듈을 처음 불러오는 비용(한가할 때 0.5~0.7초)이 CPU 가 바쁘면 5초를 넘는다 — 둘째 시험부터는 수 ms.
+     *   이 PC 에서 api 시험을 여섯 벌 동시에 돌려 재현했다(26건 모두 첫 시험 · 같은 메시지).
+     * ★ 시험 내용은 그대로 두고 기다리는 시간만 늘린다. 진짜로 멈춘 시험은 30초에 실패한다.
+     */
+    testTimeout: 30_000,
     env: {
       ERP_DATABASE_URL: 'postgres://vitest:vitest@127.0.0.1:1/vitest-should-not-connect',
       // 32바이트 base64 — 값 자체는 의미 없고 길이 검사만 통과하면 된다.

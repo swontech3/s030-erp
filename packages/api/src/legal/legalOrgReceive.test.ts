@@ -7,7 +7,8 @@ import { BbiyongUnavailableError, type MyMenusOutcome, type MyOrgOutcome } from 
 import type { LegalOrgFromBbiyong } from '../db/corpChanges.ts';
 import { bearerOf, parseReceiveBody, receiveLegalOrg, type ReceiveDeps } from './legalOrgReceive.ts';
 
-const OK_MENUS: MyMenusOutcome = { kind: 'ok', screens: ['S021000000', 'S021100010'] };
+/** 운영사 — 단체관리와 그 수정 키(대역 코드 줄 OPERATOR = S021100010:F002, 2026-11-08). */
+const OK_MENUS: MyMenusOutcome = { kind: 'ok', screens: ['S021000000', 'S021100010'], keys: { S021100010: ['F002'] } };
 /** 운영사가 아닌 토큰 — 단체관리 없음. */
 const COMPANY_MENUS: MyMenusOutcome = { kind: 'ok', screens: ['S021000000'] };
 /** 회사 계정 — 단체관리 없음 · 「내 단체 정보」 수정 키 있음(대역 코드 줄 ORG_SELF = S021100021:F002). */
@@ -29,6 +30,7 @@ function deps(
     },
     myOrg: async () => org,
     orgGrantName: async () => grantName,
+    operatorGrantName: async () => 'S021100010:F002',
     apply: async (orgId, fields) => {
       applied.push({ orgId, fields });
       return result;

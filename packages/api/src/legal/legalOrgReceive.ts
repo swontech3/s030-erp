@@ -2,7 +2,7 @@
  * 법무 비입주사 회사 정보 「받기」(삐용 → 법무, 2026-10-23) — 삐용이 회사 정보를 고쳤을 때 부른다.
  * 「보내기」(`legalOrgSync.ts`)의 짝이다. 삐용 팀에 넘기는 규격은 `doc/연동규격_법무_회사정보_받기.md`.
  *
- *   · 부르는 쪽 확인: **실어 온 삐용 토큰**이 운영사(내 메뉴에 단체관리 `S021100010`)이거나, 지금 계정의
+ *   · 부르는 쪽 확인: **실어 온 삐용 토큰**이 운영사(내 메뉴에 단체관리 `S021100010` 과 그 수정 키 `F002` — 공통 코드 `BBIYONG_EDIT_GRANT`/`OPERATOR`, 2026-11-08)이거나, 지금 계정의
  *     단체가 본문 `orgId` 와 같을 때만 받는다. 그 밖은 403(`bbiyong/receiveCaller.ts`)
  *   · 회사 찾기: **단체 ID** 로 찾는다. 함께 온 단체코드는 비교하지 않는다(결정 2026-10-23)
  *   · 법무 회사 정보 줄이 없으면 아무것도 안 하고 **성공**으로 답한다(삐용이 장애로 보지 않게)
@@ -17,7 +17,7 @@ import { checkReceiveCaller, type CallerRefused, type ReceiveCallerDeps } from '
 import { hasEditGrant, parseEditGrant } from './companyEditGrant.ts';
 
 // ★ 부르는 쪽 확인은 입주사 회사 · 직원 받기와 같은 함수다(`bbiyong/receiveCaller.ts`).
-export { bearerOf, RECEIVE_REQUIRED_MENU } from '../bbiyong/receiveCaller.ts';
+export { bearerOf } from '../bbiyong/receiveCaller.ts';
 
 /** 받는 본문의 칸 → [법무 칸, 이름, 최대 길이(null = 제한 없음), 숫자 칸 종류]. */
 const RECEIVE_FIELDS: Readonly<
@@ -86,7 +86,7 @@ export type ReceiveOutcome =
 
 /** 부르는 쪽 확인(`ReceiveCallerDeps` — 삐용 내 메뉴 · 지금 계정의 단체) + 쓰기. */
 export interface ReceiveDeps extends ReceiveCallerDeps {
-  /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `ORG_SELF` 줄 이름(`화면코드:키`). 없으면 null. */
+  /** 공통 코드 `BBIYONG_EDIT_GRANT` 의 `ORG_SELF` 줄 설명(`화면코드:키`). 없으면 null. */
   orgGrantName(): Promise<string | null>;
   /**
    * 운영사 스코프 트랜잭션 하나에서: 입주사면 `tenant`, 법무 줄이 없으면 `not_found`, 바꿨으면 `applied`.

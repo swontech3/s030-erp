@@ -4,15 +4,18 @@
 import { describe, expect, it } from 'vitest';
 import { MOCK_ACCOUNTS, MOCK_SCREEN_LOGIN_MESSAGE, MockBbiyongAuth } from './MockBbiyongAuth.ts';
 import { INVALID_CREDENTIALS_MESSAGE } from './types.ts';
+import { checkReceiveCaller } from './receiveCaller.ts';
 
 // ★ 비밀번호 로그인(signIn)은 없다(규격서 Q6) — mock 토큰 = mock-access.{회원번호}.{시각}
 const mockAccess = (email: string) =>
   `mock-access.${MOCK_ACCOUNTS.find((a) => a.email === email)!.memberId}.${Date.now()}`;
 
 describe('MockBbiyongAuth.myMenus', () => {
-  it('★ 운영사 계정 토큰이면 단체관리(S021100010)가 있다 · 회사 계정은 없다', async () => {
+  it('★ 운영사 계정 토큰이면 단체관리(S021100010)와 그 수정 키 F002 가 있다 · 회사 계정은 없다', async () => {
     const auth = new MockBbiyongAuth();
-    expect(await auth.myMenus(mockAccess('operator@s-wontech.co.kr'))).toEqual({ kind: 'ok', screens: ['S021100010'] });
+    for (const email of ['admin@s-wontech.co.kr', 'operator@s-wontech.co.kr']) {
+      expect(await auth.myMenus(mockAccess(email))).toEqual({ kind: 'ok', screens: ['S021100010'], keys: { S021100010: ['F002'] } });
+    }
     // 회사 계정(화면 확인용, 2026-10-25)은 「내 단체 정보」와 수정 키만 — 단체관리는 없다.
     expect(await auth.myMenus(mockAccess('nontenant@test.com'))).toEqual({
       kind: 'ok',
@@ -25,6 +28,21 @@ describe('MockBbiyongAuth.myMenus', () => {
     const auth = new MockBbiyongAuth();
     expect(await auth.myMenus('eyJ.real')).toEqual({ kind: 'rejected' });
     expect(await auth.myMenus('mock-access.9999.1')).toEqual({ kind: 'rejected' });
+  });
+});
+
+describe('모의 모드 받기(2026-11-08) — 운영사 계정은 지금처럼 운영사로 통과한다', () => {
+  it('★★ 운영사 계정 토큰 → 받음 · 회사 계정 토큰 + 남의 회사 → 403', async () => {
+    const auth = new MockBbiyongAuth();
+    const deps = {
+      myMenus: (t: string) => auth.myMenus(t),
+      myOrg: (t: string) => auth.myOrg(t),
+      operatorGrantName: async () => 'S021100010:F002',
+    };
+    for (const email of ['admin@s-wontech.co.kr', 'operator@s-wontech.co.kr']) {
+      expect(await checkReceiveCaller(`Bearer ${mockAccess(email)}`, deps, async () => null, '시험')).toBeNull();
+    }
+    expect((await checkReceiveCaller(`Bearer ${mockAccess('tenant@test.com')}`, deps, async () => 324, '시험'))?.status).toBe(403);
   });
 });
 

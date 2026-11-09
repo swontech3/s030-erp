@@ -28,9 +28,9 @@
  *    「무상 n개월 제공 — … 정산 시 반환한다」가 자동으로 찍혀 나간다
  *    (`contract-memo.ts` 의 `freeLabel`). 그 줄이 곧 이 환수의 약정이다.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CONTRACT_OFFICE } from '@swonbiz/shared';
+import { DEPOSIT_ACCOUNT_MISSING, depositAccountOf, type DepositAccount } from '@swonbiz/shared/domain/deposit-account';
 import { settlementDirection } from '@swonbiz/shared/domain/settlement-view';
 import { usageChargeBreakdown, usedPeriodLabel } from '@swonbiz/shared/domain/usage-period';
 import { Icon } from '@/components/ds';
@@ -53,6 +53,23 @@ const wonText = (n: number) => `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleStrin
 
 export function SettlementDocument({ s, onClose }: { s: Settlement; onClose: () => void }) {
   const printed = useRef(false);
+  /**
+   * 입금 계좌 — 공통 코드 `DEPOSIT_ACCT`(설명 칸, 코드 관리에서 고친다). 계약서와 같은 값이다(2026-11-08).
+   * `undefined` = 읽는 중 · `null` = 설정되지 않음(또는 읽기 실패). 읽는 중에는 [인쇄] 를 막는다.
+   */
+  const [depositAccount, setDepositAccount] = useState<DepositAccount | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/codes')
+      .then(async (res) => (res.ok ? ((await res.json()) as { codes: { category: string; code: string; description?: string | null }[] }).codes : []))
+      .catch(() => [])
+      .then((codes) => {
+        if (alive) setDepositAccount(depositAccountOf(codes));
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -107,7 +124,7 @@ export function SettlementDocument({ s, onClose }: { s: Settlement; onClose: () 
         <div data-print-hide="1" className={docStyles.head}>
           <strong className={styles.docHeadTitle}>중도해지 정산서</strong>
           <div className={docStyles.headRight}>
-            <button type="button" className={`${docStyles.btn} ${docStyles.btnGhost}`} onClick={doPrint}>
+            <button type="button" className={`${docStyles.btn} ${docStyles.btnGhost}`} onClick={doPrint} disabled={depositAccount === undefined}>
               <Icon name="file-text" size={16} />
               인쇄
             </button>
@@ -172,7 +189,17 @@ export function SettlementDocument({ s, onClose }: { s: Settlement; onClose: () 
             <div className={docStyles.table} data-doc-table="1">
               {dir.kind === 'charge' ? (
                 // ★ 추가로 받을 금액이면 **우리 입금 계좌** — 계약서에 찍힌 그 계좌다.
-                <Row th="입금 계좌" td={`${CONTRACT_OFFICE.BANK}  (${CONTRACT_OFFICE.ACCOUNT_HOLDER})`} wide />
+                <Row
+                  th="입금 계좌"
+                  td={
+                    depositAccount === undefined
+                      ? ''
+                      : depositAccount
+                        ? `${depositAccount.account}  (예금주 ${depositAccount.holder})`
+                        : DEPOSIT_ACCOUNT_MISSING
+                  }
+                  wide
+                />
               ) : s.refund ? (
                 <Row th="환불 계좌" td={`${s.refund.bank} ${s.refund.account}  (예금주 ${s.refund.holder})`} wide />
               ) : (

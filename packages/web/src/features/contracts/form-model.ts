@@ -138,6 +138,8 @@ export interface CodeOption {
   category: string;
   code: string;
   name: string;
+  /** 설명 — 값을 설명 칸에 두는 코드(입금 계좌 `DEPOSIT_ACCT`)만 읽는다. */
+  description?: string | null;
 }
 
 /**
