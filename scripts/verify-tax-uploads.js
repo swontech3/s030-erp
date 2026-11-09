@@ -283,12 +283,13 @@ async function bankChecks(c) {
     xpv.data.skipReasons.map((x) => x.code).join() === 'badAmount,badDate,noAmount,xferNotDone,otherAccount,noToAccount',
     xpv.ok ? { toInsert: xpv.data.toInsert, statuses: xpv.data.sample.map((s) => s.status), warnings: xpv.data.warnings } : xpv);
   const xup = await up('xf1.xlsx', xf1, X('v-bank-wr'));
-  const att = (await c.query(`SELECT to_char(t.txn_at, 'HH24:MI:SS') at, t.xfer_bank_src, t.xfer_account_last4, t.xfer_holder_src, t.xfer_to_memo_src, t.xfer_from_memo_src, f.file_name
+  const att = (await c.query(`SELECT to_char(t.txn_at, 'HH24:MI:SS') at, t.xfer_bank_src, t.xfer_account_last4, t.xfer_holder_src, t.xfer_to_memo_src, t.xfer_from_memo_src, t.xfer_account_no, f.file_name
     FROM public.tb_s050_bank_txns t JOIN public.tb_s050_upload_files f ON f.id = t.xfer_file_id WHERE t.org_id = $1`, [ORG_A])).rows;
-  check('B9', '★ 이체 올리기 — 10:00:00 출금 줄 하나에 받는 은행 · 끝 4자리 · 받는분 · 메모 둘을 덧붙인다 · 새 줄은 넣지 않는다 · 파일 덧붙인 수 1',
+  check('B9', '★ 이체 올리기 — 10:00:00 출금 줄 하나에 받는 은행 · 끝 4자리 + 전체 번호(225) · 받는분 · 메모 둘을 덧붙인다 · 새 줄은 넣지 않는다 · 파일 덧붙인 수 1 · 응답에 전체 번호 없음',
     xup.ok && xup.data.insertedCount === 1 && xup.data.file.bankFileTp === 'XFER' && xup.data.file.insertedCount === 1 &&
     att.length === 1 && att[0].at === '10:00:00' && att[0].xfer_bank_src === '지어낸은행' && att[0].xfer_account_last4 === '4444' &&
     att[0].xfer_holder_src === '지어낸 받는분' && att[0].xfer_to_memo_src === '지어낸 받는표시' && att[0].xfer_from_memo_src === '지어낸 보낸표시' &&
+    att[0].xfer_account_no === '111222233334444' && !JSON.stringify(xup).includes('33334444') &&
     (await c.query(`SELECT count(*)::int n FROM public.tb_s050_bank_txns WHERE org_id = $1`, [ORG_A])).rows[0].n === 8,
     { up: xup.ok ? xup.data.insertedCount : xup, att });
 

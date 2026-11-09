@@ -2,7 +2,8 @@
  * 세무 세무사 전달 서류(s050500010) DB — 은행 줄 읽기 · 최종 발송 읽기 · 덮어쓰기(1-9 2026-11-07 · 11-08 ⑧ 224).
  *
  * ★★★ 모든 질의가 `org_id = $1`(세션 단체 ID)을 직접 건다 — 운영사 세션도 RLS 가 모든 단체를 보여 주기 때문이다(203 머리말).
- * ★ 은행 줄의 계좌는 별칭 또는 끝 4자리만 내보낸다 — 전체 번호는 화면 · 엑셀로 나가지 않는다(계좌 글자는 라우트가 만든다).
+ * ★ 은행거래내역 시트의 계좌는 별칭 또는 끝 4자리만 내보낸다(계좌 글자는 라우트가 만든다).
+ *   ★ 이체내역 시트만 보낸 계좌번호 · 받는 계좌번호 전체를 내보낸다(225 — 2026-11-08 대표 결정).
  *   별칭은 세무 설정 계좌(은행 · 같은 번호)에서 찾는다 — 「사용 안 함」 계좌도 이름은 그대로 보인다(세무 설정 안내).
  * ★ 최종 발송은 단체 · 종류 · 신고 기간마다 한 줄 — 성공할 때만 덮어쓴다(224 — erp_app 은 덮어쓰는 칸만 UPDATE · 지우기 없음).
  */
@@ -22,6 +23,8 @@ export interface HandoffBankRow {
   txnAt: string;
   /** 우리 계좌번호(숫자만) — 라우트가 별칭 또는 끝 4자리로 바꿔 내보낸다. */
   accountNo: string;
+  /** 우리 계좌 은행 코드(코드 BANK) — 이체내역 「보낸 은행」. */
+  bankCode: string;
   alias: string | null;
   description: string | null;
   counterparty: string | null;
@@ -29,22 +32,22 @@ export interface HandoffBankRow {
   inAmount: number;
   outAmount: number;
   balance: number;
-  /** 덧붙인 이체 내역 — 없으면 null. 받는 계좌는 끝 4자리만(212). */
-  xfer: { bank: string; last4: string; holder: string; toMemo: string | null; fromMemo: string | null } | null;
+  /** 덧붙인 이체 내역 — 없으면 null. 받는 계좌 전체 번호(225)는 다시 올리기 전 줄이면 null(끝 4자리만). */
+  xfer: { bank: string; last4: string; accountNo: string | null; holder: string; toMemo: string | null; fromMemo: string | null } | null;
 }
 
 /** 세는 범위 [첫날, 끝 다음 날)의 은행 거래 줄 — 거래일시 순. */
 export async function listHandoffBankRows(client: ScopedClient, orgId: number, range: readonly [string, string]): Promise<HandoffBankRow[]> {
   const { rows } = await q<{
-    txn_at: string; account_no: string; alias: string | null; description_src: string | null; counterparty_src: string | null;
+    txn_at: string; account_no: string; bank_code: string; alias: string | null; description_src: string | null; counterparty_src: string | null;
     memo_src: string | null; in_amount: string; out_amount: string; balance: string; xfer_file_id: string | null;
     xfer_bank_src: string | null; xfer_account_last4: string | null; xfer_holder_src: string | null;
-    xfer_to_memo_src: string | null; xfer_from_memo_src: string | null;
+    xfer_to_memo_src: string | null; xfer_from_memo_src: string | null; xfer_account_no: string | null;
   }>(
     client,
-    `SELECT to_char(b.txn_at, 'YYYY-MM-DD HH24:MI:SS') AS txn_at, b.account_no, a.alias, b.description_src, b.counterparty_src,
+    `SELECT to_char(b.txn_at, 'YYYY-MM-DD HH24:MI:SS') AS txn_at, b.account_no, b.bank_code, a.alias, b.description_src, b.counterparty_src,
             b.memo_src, b.in_amount, b.out_amount, b.balance, b.xfer_file_id, b.xfer_bank_src, b.xfer_account_last4,
-            b.xfer_holder_src, b.xfer_to_memo_src, b.xfer_from_memo_src
+            b.xfer_holder_src, b.xfer_to_memo_src, b.xfer_from_memo_src, b.xfer_account_no
        FROM public.tb_s050_bank_txns b
        LEFT JOIN LATERAL (
          SELECT f.alias FROM public.tb_s050_fin_accounts f
@@ -59,6 +62,7 @@ export async function listHandoffBankRows(client: ScopedClient, orgId: number, r
   return rows.map((r) => ({
     txnAt: r.txn_at,
     accountNo: r.account_no,
+    bankCode: r.bank_code,
     alias: r.alias,
     description: r.description_src,
     counterparty: r.counterparty_src,
@@ -67,7 +71,7 @@ export async function listHandoffBankRows(client: ScopedClient, orgId: number, r
     outAmount: Number(r.out_amount),
     balance: Number(r.balance),
     xfer: r.xfer_file_id
-      ? { bank: r.xfer_bank_src!, last4: r.xfer_account_last4!, holder: r.xfer_holder_src!, toMemo: r.xfer_to_memo_src, fromMemo: r.xfer_from_memo_src }
+      ? { bank: r.xfer_bank_src!, last4: r.xfer_account_last4!, accountNo: r.xfer_account_no, holder: r.xfer_holder_src!, toMemo: r.xfer_to_memo_src, fromMemo: r.xfer_from_memo_src }
       : null,
   }));
 }

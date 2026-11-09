@@ -193,7 +193,7 @@ describe('convertBankTxnSheet — 은행 거래내역 → 표준 양식', () => 
 /* ── 이체 내역 ───────────────────────────────────────────────────────────── */
 
 describe('convertBankXferSheet — 우리 이체 결과 → 이체 줄', () => {
-  it('★ 받는 계좌는 끝 4자리만 남긴다 · 받는 은행 · 받는분 · 메모 둘 · 합계 줄 뺌', () => {
+  it('★ 받는 계좌는 끝 4자리 + 전체 번호(숫자만, 225) · 받는 은행 · 받는분 · 메모 둘 · 합계 줄 뺌', () => {
     const r = convertBankXferSheet(xfSheet([
       xfLine(1, '2026.09.10 10:00:00', 5000, { to: '111-2222-33334444' }),
       xfLine(2, '2026.09.10 11:00:00', 7000, { toMemo: '', fromMemo: '' }),
@@ -202,15 +202,14 @@ describe('convertBankXferSheet — 우리 이체 결과 → 이체 줄', () => {
     if (!r.ok) throw new Error(r.error.message);
     expect(r.totalRows).toBe(2);
     expect(r.rows[0]).toEqual({
-      xferAt: '2026-09-10 10:00:00', amount: 5000, toBank: '시험은행', toAccountLast4: '4444', holder: '시험받는분',
-      toMemo: '받는표시', fromMemo: '보낸표시',
+      xferAt: '2026-09-10 10:00:00', amount: 5000, toBank: '시험은행', toAccountLast4: '4444', toAccountNo: '111222233334444',
+      holder: '시험받는분', toMemo: '받는표시', fromMemo: '보낸표시',
     });
-    expect(JSON.stringify(r.rows)).not.toContain('33334444');
     expect(r.rows[1]!.toMemo).toBeNull();
     expect(r.rows[1]!.fromMemo).toBeNull();
   });
 
-  it('뺀 줄 — 처리완료 아님 · 고른 계좌가 아닌 줄 · 날짜 · 금액 · 받는 은행/계좌/받는분 빔', () => {
+  it('뺀 줄 — 처리완료 아님 · 고른 계좌가 아닌 줄 · 날짜 · 금액 · 받는 은행/계좌/받는분 빔 · 받는 계좌 30자리 넘음(225 칸)', () => {
     const r = convertBankXferSheet(xfSheet([
       xfLine(1, '2026.09.10 10:00:00', 5000, { done: '처리중' }),
       xfLine(2, '2026.09.10 10:00:00', 5000, { from: '9999-999-999999' }),
@@ -222,10 +221,12 @@ describe('convertBankXferSheet — 우리 이체 결과 → 이체 줄', () => {
       xfLine(8, '2026.09.10 10:00:00', 5000, { to: '12-3' }),
       xfLine(9, '2026.09.10 10:00:00', 5000, { holder: '' }),
       xfLine(10, '2026.09.10 10:00:00', 5000),
+      xfLine(11, '2026.09.10 10:00:00', 5000, { to: '1'.repeat(31) }),
+      xfLine(12, '2026.09.10 10:00:00', 5000, { to: '1'.repeat(30) }),
     ]), XF_MAP, W_ACCT);
     if (!r.ok) throw new Error(r.error.message);
-    expect(r.rows).toHaveLength(1);
-    expect(r.excluded).toEqual({ badDate: 1, badAmount: 2, noAmount: 1, xferNotDone: 1, otherAccount: 1, noToAccount: 3 });
+    expect(r.rows.map((x) => x.toAccountNo)).toEqual(['99988877766', '1'.repeat(30)]);
+    expect(r.excluded).toEqual({ badDate: 1, badAmount: 2, noAmount: 1, xferNotDone: 1, otherAccount: 1, noToAccount: 4 });
   });
 });
 
@@ -233,7 +234,7 @@ describe('convertBankXferSheet — 우리 이체 결과 → 이체 줄', () => {
 
 describe('matchTransfers — 이체 줄 ↔ 출금 줄(같은 계좌 · 이체금액 = 출금액 · ±60초 · 가장 가까운 줄)', () => {
   const x = (at: string, amount: number): BankXferStdRow => ({
-    xferAt: at, amount, toBank: '시험은행', toAccountLast4: '4444', holder: '가', toMemo: null, fromMemo: null,
+    xferAt: at, amount, toBank: '시험은행', toAccountLast4: '4444', toAccountNo: '1234444', holder: '가', toMemo: null, fromMemo: null,
   });
   const out = (id: string, at: string, amount: number, attachedFile: string | null = null) => ({ id, txnAt: at, outAmount: amount, attachedFile });
 

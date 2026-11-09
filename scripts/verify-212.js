@@ -12,6 +12,7 @@
  *
  * ★ 구조 · 권한은 postgres 로 읽는다(카탈로그). RLS · 고치기는 erp_app 으로 잰다 — 앱과 같은 길(verify-208 과 같은 이유).
  * ★ 시험 행은 트랜잭션 안에서 넣고 ROLLBACK 한다. 남는 것이 없다.
+ * ★ 2026-11-08 — 225 가 받는 계좌 전체 번호 칸(xfer_account_no)을 더했다. 칸 · CHECK · 칸 권한 목록에 넣었다(뜻은 verify-225 가 잰다).
  *
  * 종료코드: 0 = 전부 통과 / 1 = 실패 있음 / 2 = 실행 실패
  */
@@ -57,10 +58,12 @@ const BANK_COLS = {
   xfer_file_id: ['text', 'YES'], xfer_bank_src: ['character varying', 'YES'], xfer_account_last4: ['character', 'YES'],
   xfer_holder_src: ['character varying', 'YES'], xfer_to_memo_src: ['character varying', 'YES'],
   xfer_from_memo_src: ['character varying', 'YES'],
+  xfer_account_no: ['character varying', 'YES'], // 225 — 받는 계좌번호 전체(2026-11-08 대표 결정)
   created_at: ['timestamp without time zone', 'NO'],
 };
 /** 이체를 덧붙일 때 고치는 칸 — erp_app 이 고칠 수 있는 칸은 이것뿐. */
-const XFER_COLS = ['xfer_file_id', 'xfer_bank_src', 'xfer_account_last4', 'xfer_holder_src', 'xfer_to_memo_src', 'xfer_from_memo_src'];
+const XFER_COLS = ['xfer_file_id', 'xfer_bank_src', 'xfer_account_last4', 'xfer_holder_src', 'xfer_to_memo_src', 'xfer_from_memo_src',
+  'xfer_account_no']; // 225 — 같은 원칙(칸 단위 UPDATE)
 
 async function structure(q) {
   let n = 1;
@@ -93,7 +96,8 @@ async function structure(q) {
 
   const cks = (await q(`SELECT conname FROM pg_constraint WHERE contype='c' AND conrelid = to_regclass('public.${B}')`)).map((r) => r.conname);
   const wantCk = ['ck_s050_bank_txns_account_no', 'ck_s050_bank_txns_in_amount', 'ck_s050_bank_txns_out_amount',
-    'ck_s050_bank_txns_one_side', 'ck_s050_bank_txns_xfer_last4', 'ck_s050_bank_txns_xfer_all', 'ck_s050_bank_txns_xfer_out'];
+    'ck_s050_bank_txns_one_side', 'ck_s050_bank_txns_xfer_last4', 'ck_s050_bank_txns_xfer_all', 'ck_s050_bank_txns_xfer_out',
+    'ck_s050_bank_txns_xfer_account_no']; // 225
   check(`S${n++}`, `CHECK ${wantCk.length}개 이름 그대로`, wantCk.every((c) => cks.includes(c)) && cks.length === wantCk.length, cks.sort().join(','));
 
   const idx = (await q(`SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename=$1`, [B])).map((r) => r.indexname);

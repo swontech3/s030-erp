@@ -702,8 +702,8 @@ export interface TaxUploadsResponse {
 /** 납부 미리보기 한 줄 — 납부 줄 + 비용인지(코드 「비용이 아닌 세목」으로 정함, 1-6). */
 export type PayPreviewRow = PayStdRow & { expense: boolean };
 
-/** 이체 미리보기 한 줄 — 이체 줄 + 짝 상태(찾음 · 못 찾음 · 정할 수 없음 · 이미 덧붙임). */
-export type BankXferPreviewRow = BankXferStdRow & { status: XferMatchStatus };
+/** 이체 미리보기 한 줄 — 이체 줄 + 짝 상태(찾음 · 못 찾음 · 정할 수 없음 · 이미 덧붙임). ★ 받는 계좌 전체 번호는 빼고 끝 4자리만(225). */
+export type BankXferPreviewRow = Omit<BankXferStdRow, 'toAccountNo'> & { status: XferMatchStatus };
 
 /**
  * 자료 종류마다 다른 부분 — 계산서는 매입/매출 · 계산서 줄, 카드 · 현금은 매입/매출 없이 그 줄,

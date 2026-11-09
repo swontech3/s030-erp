@@ -55,7 +55,7 @@ const loan: LoanTxnRow = {
   id: 'l1', bankCode: '020', loanLast4: '5678', txnDate: '2026-07-20', txnTp: 'R', txnType: '이자납입', principal: 0, interest: 3000, fee: 0, balance: 100,
 };
 const bank = (over: Partial<HandoffBankRow>): HandoffBankRow => ({
-  txnAt: '2026-07-05 10:20:30', accountNo: '1002123456789', alias: null, description: '적요', counterparty: '상대', memo: null,
+  txnAt: '2026-07-05 10:20:30', accountNo: '1002123456789', bankCode: '004', alias: null, description: '적요', counterparty: '상대', memo: null,
   inAmount: 0, outAmount: 7000, balance: 50000, xfer: null, ...over,
 });
 
@@ -81,13 +81,17 @@ const SRC: HandoffSources = {
     bank({ alias: '운영 통장', inAmount: 9000, outAmount: 0 }),
     bank({
       txnAt: '2026-07-06 09:00:00', outAmount: 3000,
-      xfer: { bank: '국민', last4: '1111', holder: '받는분', toMemo: '받는 통장 글', fromMemo: '보낸 통장 글' },
+      xfer: { bank: '국민', last4: '1111', accountNo: '99988871111', holder: '받는분', toMemo: '받는 통장 글', fromMemo: '보낸 통장 글' },
+    }),
+    bank({
+      txnAt: '2026-07-07 09:00:00', alias: '운영 통장', outAmount: 2000,
+      xfer: { bank: '신한', last4: '2222', accountNo: null, holder: '옛 줄', toMemo: null, fromMemo: null },
     }),
   ],
   ntax: [pay('n1')],
   ltax: [pay('t1'), pay('t2')],
   loans: [loan],
-  banks: [{ code: '020', name: '우리은행' }],
+  banks: [{ code: '004', name: '국민은행' }, { code: '020', name: '우리은행' }],
   loanTps: [{ code: 'R', name: '상환' }],
 };
 
@@ -96,7 +100,7 @@ describe('buildHandoffSheets — 시트 아홉', () => {
     const sheets = buildHandoffSheets(SRC);
     expect(sheets.map((s) => s.key)).toEqual(HANDOFF_SHEETS.map((s) => s.key));
     expect(sheets.map((s) => `${s.sheet.name}:${s.sheet.rows.length}`)).toEqual([
-      '매입:2', '매출:1', '카드:1', '은행거래내역:2', '이체내역:1', '현금:1', '국세:1', '지방세:2', '대출:1',
+      '매입:2', '매출:1', '카드:1', '은행거래내역:3', '이체내역:2', '현금:1', '국세:1', '지방세:2', '대출:1',
     ]);
   });
 
@@ -111,19 +115,25 @@ describe('buildHandoffSheets — 시트 아홉', () => {
     expect(s.LOAN).toBe('거래일,대출,구분,거래종류,원금,이자,수수료,잔액');
   });
 
-  it('★ 은행거래내역 — 거래일시 · 계좌 · 적요 · 상대 · 입금 · 출금 · 잔액 · 메모, 계좌는 별칭 또는 끝 4자리', () => {
+  it('★ 은행거래내역 — 거래일시 · 계좌 · 적요 · 상대 · 입금 · 출금 · 잔액 · 메모, 계좌는 별칭 또는 끝 4자리(전체 번호 안 나감)', () => {
     const v = sheetView('BANK', buildHandoffSheets(SRC)[3]!.sheet);
     expect(v.columns).toEqual(['거래일시', '계좌', '적요', '상대', '입금', '출금', '잔액', '메모']);
     expect(v.rows).toEqual([
       ['2026-07-05 10:20:30', '운영 통장', '적요', '상대', 9000, 0, 50000, null],
       ['2026-07-06 09:00:00', '끝 6789', '적요', '상대', 0, 3000, 50000, null],
+      ['2026-07-07 09:00:00', '운영 통장', '적요', '상대', 0, 2000, 50000, null],
     ]);
+    expect(JSON.stringify(v.rows)).not.toContain('1002123456789');
+    expect(JSON.stringify(v.rows)).not.toContain('99988871111');
   });
 
-  it('★ 이체내역 — 이체 칸이 붙은 출금 줄만 · 받는 계좌는 끝 4자리 · 통장표시 두 칸(받는분 · 보내는분)', () => {
+  it('★ 이체내역(225) — 이체 칸이 붙은 출금 줄만 · 보낸 은행 · 보낸 계좌번호(전체) · 보낸이(별칭, 없으면 —) · 받는 계좌번호(전체, 없으면 …끝 4자리) · 통장표시 보내는분 → 받는분', () => {
     const v = sheetView('XFER', buildHandoffSheets(SRC)[4]!.sheet);
-    expect(v.columns).toEqual(['거래일시', '계좌', '받는 은행', '받는 계좌 끝 4자리', '받는분', '금액', '받는분 통장표시', '보내는분 통장표시']);
-    expect(v.rows).toEqual([['2026-07-06 09:00:00', '끝 6789', '국민', '1111', '받는분', 3000, '받는 통장 글', '보낸 통장 글']]);
+    expect(v.columns).toEqual(['거래일시', '보낸 은행', '보낸 계좌번호', '보낸이', '받는 은행', '받는 계좌번호', '받는분', '금액', '보내는분 통장표시', '받는분 통장표시']);
+    expect(v.rows).toEqual([
+      ['2026-07-06 09:00:00', '국민은행', '1002123456789', '—', '국민', '99988871111', '받는분', 3000, '보낸 통장 글', '받는 통장 글'],
+      ['2026-07-07 09:00:00', '국민은행', '1002123456789', '운영 통장', '신한', '…2222', '옛 줄', 2000, null, null],
+    ]);
   });
 
   it('계좌 글자 — 별칭이 있으면 별칭, 없으면 「끝 1234」(★ 전체 번호를 내보내지 않는다)', () => {

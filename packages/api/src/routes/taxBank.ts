@@ -154,7 +154,8 @@ export async function previewBankOp(
     data: {
       kind: TAX_KIND_BANK, bankFileTp: 'XFER', direction: null, fileName, sameFile: sameFileOf(d.sameFile),
       totalRows: d.converted.totalRows, byMonth: countByUseMonth(d.match.pairs.map((x) => ({ useDate: dayOf(x.xfer.xferAt) }))),
-      sample: d.converted.rows.slice(0, PREVIEW_SAMPLE_ROWS).map((r, i) => ({ ...r, status: d.match.statuses[i]! })),
+      // ★ 받는 계좌 전체 번호(225)는 미리보기 응답에 싣지 않는다 — 화면은 끝 4자리만
+      sample: d.converted.rows.slice(0, PREVIEW_SAMPLE_ROWS).map(({ toAccountNo: _full, ...r }, i) => ({ ...r, status: d.match.statuses[i]! })),
       toInsert: d.match.pairs.length, alreadyUploaded: d.match.alreadyAttached.length, alreadyWhere: d.alreadyWhere,
       excluded: d.converted.excluded, skipReasons: await skipReasonsFor(client, d.converted.excluded),
       warnings: [...d.converted.warnings, ...xferWarnings(d.match)],

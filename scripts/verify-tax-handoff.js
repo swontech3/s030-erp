@@ -31,6 +31,8 @@ const THIS_MONTH = '2026-11';
 const ACCT_A = '1002123456789'; // 별칭 있음
 const ACCT_A2 = '110987654321'; // 별칭 없음 → 끝 4321
 const ACCT_B = '9990001112223';
+/** 이체 받는 계좌 전체 번호(225) — 끝 4자리 1111. */
+const TO_ACCT = '35601234561111';
 const results = [];
 const check = (id, what, cond, note = '') =>
   results.push({ 항목: id, 내용: what, 결과: cond ? '통과' : '실패', 비고: typeof note === 'string' ? note : JSON.stringify(note) });
@@ -112,7 +114,7 @@ async function main() {
       await txn('vho-t0', ORG_A, 'vho-ft', ACCT_A, '2026-10-01 00:00:00', 0, 1); // 4분기 — 빠진다
       await txn('vho-tb', ORG_B, 'vho-bt', ACCT_B, '2026-08-05 13:00:00', 0, 5555);
       await c.query(`UPDATE public.tb_s050_bank_txns SET xfer_file_id = 'vho-fw', xfer_bank_src = '지어낸은행', xfer_account_last4 = '1111',
-          xfer_holder_src = '지어낸 받는분', xfer_to_memo_src = '받는 글', xfer_from_memo_src = '보낸 글' WHERE id = 'vho-t2'`);
+          xfer_holder_src = '지어낸 받는분', xfer_to_memo_src = '받는 글', xfer_from_memo_src = '보낸 글', xfer_account_no = $1 WHERE id = 'vho-t2'`, [TO_ACCT]);
 
       const pay = (id, org, fileId, kind, date) =>
         c.query(`INSERT INTO public.tb_s050_tax_payments (id, org_id, file_id, kind, pay_date, tax_item_src, pay_no, amount,
@@ -163,12 +165,17 @@ async function main() {
         bank && xfer && bank.rows.length === dbBank.n && xfer.rows.length === dbBank.x && dbBank.n === 3 && dbBank.x === 1 &&
         bank.rows.map((x) => x[0]).join() === '2026-07-01 00:00:00,2026-08-05 13:00:00,2026-09-30 23:59:59',
         { bank: bank?.rows.length, xfer: xfer?.rows.length, db: dbBank });
-      check('T6', '★ 계좌 — 별칭 「지어낸 운영 통장」 · 별칭 없으면 「끝 4321」 · 이체 줄 칸(받는 은행 · 끝 4자리 · 받는분 · 금액 · 통장표시 둘)',
+      const bankName = (await c.query(`SELECT name FROM public.tb_s080_codes_line WHERE build_id = '1' AND category = 'BANK' AND code = '004' LIMIT 1`)).rows[0]?.name ?? '004';
+      check('T6', '★ 계좌 — 은행거래내역은 별칭 「지어낸 운영 통장」 · 별칭 없으면 「끝 4321」 · 이체내역(225) 칸 순서 — 보낸 은행(코드 이름) · 보낸 계좌번호 · 보낸이(별칭 없으면 —) · 받는 은행 · 받는 계좌번호(전체) · 받는분 · 금액 · 보내는분 → 받는분 통장표시',
         bank && xfer && bank.rows.map((x) => x[1]).join() === '지어낸 운영 통장,끝 4321,지어낸 운영 통장' &&
-        JSON.stringify(xfer.rows[0]) === JSON.stringify(['2026-08-05 13:00:00', '끝 4321', '지어낸은행', '1111', '지어낸 받는분', 3000, '받는 글', '보낸 글']),
+        JSON.stringify(xfer.columns) === JSON.stringify(['거래일시', '보낸 은행', '보낸 계좌번호', '보낸이', '받는 은행', '받는 계좌번호', '받는분', '금액', '보내는분 통장표시', '받는분 통장표시']) &&
+        JSON.stringify(xfer.rows[0]) === JSON.stringify(['2026-08-05 13:00:00', bankName, ACCT_A2, '—', '지어낸은행', TO_ACCT, '지어낸 받는분', 3000, '보낸 글', '받는 글']),
         { bank: bank?.rows.map((x) => x[1]), xfer: xfer?.rows[0] });
+      // ★ 225 — 전체 번호는 이체내역 시트에만. 다른 시트(은행거래내역 등)에는 우리 계좌 · 받는 계좌 전체 번호가 나가지 않는다
       const flat = JSON.stringify(d?.sheets ?? []);
-      check('T7', '★ 계좌 전체 번호가 시트에 나가지 않는다', d && !flat.includes(ACCT_A) && !flat.includes(ACCT_A2), '');
+      const others = JSON.stringify((d?.sheets ?? []).filter((x) => x.key !== 'XFER'));
+      check('T7', '★ 계좌 전체 번호는 이체내역 시트에만 — 다른 시트에는 우리 계좌 · 받는 계좌 전체 번호가 없다',
+        d && !others.includes(ACCT_A) && !others.includes(ACCT_A2) && !others.includes(TO_ACCT), '');
       const v = await vatOp(c, ORG_A, { month: MONTH, periodId: null }, THIS_MONTH);
       check('T8', '미지정 건 수 · 가장 이른 달 — 부가세 조회와 같다(계산서 1 · 카드 2 · 현금 1 = 4 · 2026-07) · 처음엔 미발송 · 내용 처음 값',
         d && v.ok && d.unassignedCount === v.data.vat.unassignedCount && d.unassignedCount === 4 &&

@@ -40,6 +40,8 @@ export const XFER_MATCH_SECONDS = 60;
 const TEXT_MAX = 200;
 const XFER_BANK_MAX = 50;
 const XFER_TEXT_MAX = 100;
+/** 받는 계좌번호 전체 자리 수 끝 — 225 칸 varchar(30). 넘으면 「받는 계좌 없음」으로 뺀다. */
+const XFER_ACCOUNT_MAX = 30;
 
 /* ── 대응표 ──────────────────────────────────────────────────────────────── */
 
@@ -119,8 +121,10 @@ export interface BankXferStdRow {
   xferAt: string;
   amount: number;
   toBank: string;
-  /** 받는 계좌번호 끝 4자리(숫자). ★ 전체 번호는 없다. */
+  /** 받는 계좌번호 끝 4자리(숫자) — 다른 화면 · 미리보기는 이것만 쓴다. */
   toAccountLast4: string;
+  /** 받는 계좌번호 전체(숫자만, 4~30자리) — 저장 · 세무사 전달 「이체내역」 시트만 쓴다(225, 2026-11-08 대표 결정). ★ 화면 응답으로 내보내지 않는다. */
+  toAccountNo: string;
   holder: string;
   toMemo: string | null;
   fromMemo: string | null;
@@ -274,12 +278,13 @@ export function convertBankXferSheet(
     const toBank = bankText(cell(row, c.toBank), XFER_BANK_MAX);
     const toDigits = digitsOnly(textOf(cell(row, c.toAccount)));
     const holder = bankText(cell(row, c.holder), XFER_TEXT_MAX);
-    if (toBank === null || toDigits.length < 4 || holder === null) { excluded.noToAccount++; continue; }
+    if (toBank === null || toDigits.length < 4 || toDigits.length > XFER_ACCOUNT_MAX || holder === null) { excluded.noToAccount++; continue; }
     rows.push({
       xferAt,
       amount,
       toBank,
       toAccountLast4: toDigits.slice(-4),
+      toAccountNo: toDigits,
       holder,
       toMemo: bankText(cell(row, c.toMemo), XFER_TEXT_MAX),
       fromMemo: bankText(cell(row, c.fromMemo), XFER_TEXT_MAX),

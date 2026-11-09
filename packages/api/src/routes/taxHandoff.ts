@@ -95,19 +95,31 @@ export function bankTxnSheet(rows: readonly HandoffBankRow[]): XlsxSheet<Handoff
   };
 }
 
-/** 이체내역 — 이체 칸이 붙은 출금 줄. 거래일시 · 계좌 · 받는 은행 · 받는 계좌 끝 4자리 · 받는분 · 금액 · 통장표시 두 칸(대표 결정 11-07). */
-export function bankXferSheet(rows: readonly HandoffBankRow[]): XlsxSheet<HandoffBankRow> {
+/** 받는 계좌번호 — 전체 번호(225), 없으면(225 전에 덧붙인 줄 · 다시 올리기 전) 「…1234」. */
+export function xferToAccountLabel(x: { last4: string; accountNo: string | null }): string {
+  return x.accountNo ?? `…${x.last4}`;
+}
+
+/**
+ * 이체내역 — 이체 칸이 붙은 출금 줄(2026-11-08 대표 결정 · 225). 칸 순서:
+ *   거래일시 · 보낸 은행(코드 BANK 이름) · 보낸 계좌번호(우리 계좌 전체) · 보낸이(세무 설정 계좌 별칭, 없으면 「—」) ·
+ *   받는 은행 · 받는 계좌번호(전체, 없으면 「…1234」) · 받는분 · 금액 · 보내는분 통장표시 · 받는분 통장표시
+ * ★ 이 시트만 계좌 전체 번호를 내보낸다 — 은행거래내역 시트 · 다른 화면은 별칭 또는 끝 4자리 그대로.
+ */
+export function bankXferSheet(rows: readonly HandoffBankRow[], banks: readonly TaxCodeName[]): XlsxSheet<HandoffBankRow> {
   return {
     name: '이체내역',
     columns: [
       { header: '거래일시', value: (r) => r.txnAt },
-      { header: '계좌', value: (r) => bankAccountLabel(r.alias, r.accountNo) },
+      { header: '보낸 은행', value: (r) => banks.find((b) => b.code === r.bankCode)?.name ?? r.bankCode },
+      { header: '보낸 계좌번호', value: (r) => r.accountNo },
+      { header: '보낸이', value: (r) => (r.alias && r.alias.trim() !== '' ? r.alias.trim() : '—') },
       { header: '받는 은행', value: (r) => r.xfer?.bank ?? null },
-      { header: '받는 계좌 끝 4자리', value: (r) => r.xfer?.last4 ?? null },
+      { header: '받는 계좌번호', value: (r) => (r.xfer ? xferToAccountLabel(r.xfer) : null) },
       { header: '받는분', value: (r) => r.xfer?.holder ?? null },
       { header: '금액', value: (r) => r.outAmount },
-      { header: '받는분 통장표시', value: (r) => r.xfer?.toMemo ?? null },
       { header: '보내는분 통장표시', value: (r) => r.xfer?.fromMemo ?? null },
+      { header: '받는분 통장표시', value: (r) => r.xfer?.toMemo ?? null },
     ],
     rows: rows.filter((r) => r.xfer !== null),
   };
@@ -147,7 +159,7 @@ export function buildHandoffSheets(src: HandoffSources): { key: HandoffSheetKey;
     named('S', invoiceExportSheet(inv(TAX_INV_DIR_SALES), { ...invNames, kindName: SHEET_NAME.S })),
     named('CARD', cardExportSheet(src.classify.filter((r) => r.kind === 'CARD'), { kindName: SHEET_NAME.CARD, itemNames: n.itemNames, deducts: n.deducts })),
     named('BANK', bankTxnSheet(src.bank)),
-    named('XFER', bankXferSheet(src.bank)),
+    named('XFER', bankXferSheet(src.bank, src.banks)),
     named('CASH', cashExportSheet(src.classify.filter((r) => r.kind === 'CASH'), {
       kindName: SHEET_NAME.CASH, itemNames: n.itemNames, invDirs: n.invDirs, payMethods: n.payMethods, proofs: n.proofs,
       payMethodHeader: n.payMethodHeader, proofHeader: n.proofHeader,

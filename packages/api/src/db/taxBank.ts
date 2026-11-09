@@ -3,7 +3,8 @@
  *
  * ★★★ 모든 회사 자료 질의가 `org_id = $1`(세션 단체 ID)을 직접 건다 — 운영사 세션도 RLS 가 모든 단체를 보여 주기 때문이다(203 머리말).
  *     계좌도 그 단체 · 은행(B) · 「사용 안 함」이 아닌 것만 고를 수 있다(`readBankAccount`).
- * ★★ 받는 계좌번호는 끝 4자리만 다룬다 — 이 파일에 전체 번호가 들어올 길이 없다(shared `convertBankXferSheet` 가 이미 걸렀다).
+ * ★★ 받는 계좌번호는 끝 4자리(xfer_account_last4)와 전체 번호(xfer_account_no, 225 — 2026-11-08 대표 결정)를 함께 저장 · 비운다.
+ *    전체 번호는 세무사 전달 「이체내역」 시트만 읽는다(db/taxHandoff.ts). 다른 화면 응답은 끝 4자리만.
  * ★ 중복 막기는 「개수 맞추기」 — 열쇠(shared `bankTxnDedupKey`)마다 DB 줄이 든 파일 이름(먼저 올린 줄부터)만 읽는다.
  * ★ 이체 덧붙이기는 이체 칸 여섯만 고친다(212 권한). 이미 덧붙은 줄은 덮지 않는다(`xfer_file_id IS NULL`).
  * ★ 금액은 bigint 라 pg 가 글자로 준다 — 원 단위 정수라 Number 로 바꿔도 잃지 않는다.
@@ -192,13 +193,13 @@ export async function attachXfers(
     client,
     `UPDATE public.tb_s050_bank_txns AS t
         SET xfer_file_id = $3, xfer_bank_src = u.to_bank, xfer_account_last4 = u.last4, xfer_holder_src = u.holder,
-            xfer_to_memo_src = u.to_memo, xfer_from_memo_src = u.from_memo
-       FROM unnest($4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::text[])
-            AS u(id, to_bank, last4, holder, to_memo, from_memo)
+            xfer_to_memo_src = u.to_memo, xfer_from_memo_src = u.from_memo, xfer_account_no = u.account_no
+       FROM unnest($4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::text[], $10::text[])
+            AS u(id, to_bank, last4, holder, to_memo, from_memo, account_no)
       WHERE t.org_id = $1 AND t.account_no = $2 AND t.id = u.id AND t.out_amount > 0 AND t.xfer_file_id IS NULL`,
     [
       orgId, accountNo, xferFileId,
-      pairs.map((p) => p.txnId), col('toBank'), col('toAccountLast4'), col('holder'), col('toMemo'), col('fromMemo'),
+      pairs.map((p) => p.txnId), col('toBank'), col('toAccountLast4'), col('holder'), col('toMemo'), col('fromMemo'), col('toAccountNo'),
     ],
   );
   return r.rowCount ?? 0;
@@ -221,7 +222,7 @@ export async function clearXfers(client: ScopedClient, orgId: number, xferFileId
     client,
     `UPDATE public.tb_s050_bank_txns
         SET xfer_file_id = NULL, xfer_bank_src = NULL, xfer_account_last4 = NULL, xfer_holder_src = NULL,
-            xfer_to_memo_src = NULL, xfer_from_memo_src = NULL
+            xfer_to_memo_src = NULL, xfer_from_memo_src = NULL, xfer_account_no = NULL
       WHERE org_id = $1 AND xfer_file_id = ANY($2::text[])`,
     [orgId, xferFileIds],
   );
