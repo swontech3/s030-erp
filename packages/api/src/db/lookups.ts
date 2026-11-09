@@ -69,6 +69,8 @@ export interface CodeRow {
   category: string;
   code: string;
   name: string;
+  /** 설명 — 값을 설명 칸에 두는 코드(입금 계좌 `DEPOSIT_ACCT`)가 읽는다. */
+  description: string | null;
   sort_order: number;
 }
 
@@ -97,7 +99,7 @@ export interface CodeSpec {
 export async function listCodes(client: ScopedClient, specs: readonly CodeSpec[]): Promise<CodeRow[]> {
   const { rows } = await q<CodeRow>(
     client,
-    `SELECT l.category, l.code, l.name, l.sort_order
+    `SELECT l.category, l.code, l.name, l.description, l.sort_order
        FROM public.tb_s080_codes_line l
        JOIN unnest($1::text[], $2::text[]) AS w(category, use_tp)
          ON w.category = l.category AND w.use_tp = l.use_tp

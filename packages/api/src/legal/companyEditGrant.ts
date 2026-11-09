@@ -4,8 +4,9 @@
  *   · 운영사 — 늘 연다(삐용을 묻지 않는다)
  *   · 회사 사용자 — 삐용 「내 메뉴」(`my-menus`)에서 「내 단체 정보」 화면에 수정 키가 있을 때만
  *
- * 화면코드 · 키는 공통 코드 `BBIYONG_EDIT_GRANT`(파티션 000)의 `ORG_SELF` 줄 이름(`화면코드:키`,
- * 예 `S021100021:F002`)에서 읽는다 — 바꿀 때는 코드 관리(s030100030)에서 이름을 고친다.
+ * 화면코드 · 키는 공통 코드 `BBIYONG_EDIT_GRANT`(파티션 000)의 `ORG_SELF` 줄 **설명**(`화면코드:키`,
+ * 예 `S021100021:F002`)에서 읽는다 — 이름 칸은 사람이 읽는 이름이다(2026-11-08, `LAW_CNG_MT` 와 같은 모양).
+ * 바꿀 때는 코드 관리(s030100030)에서 그 줄의 「설명」을 고친다. 설명이 비면 그 규칙은 없는 것(아무에게도 열지 않는다).
  * 「그 회사」는 세션의 단체다 — 건은 RLS(037)가 자기 단체 것만 보여 주고, 새 건의 남의 단체는
  * `parseCreateBody` 가 403 이다.
  *
@@ -25,6 +26,8 @@ export const EDIT_GRANT_USE_TP = '000';
 export const ORG_SELF_GRANT = 'ORG_SELF';
 /** 자기 회사 직원 정보를 고치는 권한 — 직원 받기에서 직원이 ERP 에 없을 때 본문 `orgId` 를 대상으로 본다(삐용 통합 시험 C1). */
 export const MEMBER_SELF_GRANT = 'MEMBER_SELF';
+/** 운영사로 받는 권한 — 받기 셋에서 단체관리의 수정 키가 있을 때만 운영사로 본다(`bbiyong/receiveCaller.ts`, 2026-11-08). */
+export const OPERATOR_GRANT = 'OPERATOR';
 
 export interface EditGrant {
   screen: string;
@@ -32,17 +35,17 @@ export interface EditGrant {
 }
 
 /**
- * 받기(삐용 → ERP — 세션이 없다)에서 `BBIYONG_EDIT_GRANT` 줄 이름. 운영사 스코프로 읽는다. 없으면 null.
+ * 받기(삐용 → ERP — 세션이 없다)에서 `BBIYONG_EDIT_GRANT` 줄 **설명**(`화면코드:키`). 운영사 스코프로 읽는다. 없으면 null.
  * 받기 셋이 같은 판정(`parseEditGrant` · `hasEditGrant`)을 쓴다(삐용 통합 시험 C3, 2026-10-25).
  */
 export async function receiveGrantName(code: string): Promise<string | null> {
   const rows = await withCompanyScope({ role: 'operator', companyId: null }, (client) =>
     listCodes(client, [{ category: EDIT_GRANT_CATEGORY, useTp: EDIT_GRANT_USE_TP }]),
   );
-  return rows.find((r) => r.code === code)?.name ?? null;
+  return rows.find((r) => r.code === code)?.description ?? null;
 }
 
-/** 코드 줄 이름 `화면코드:키` → 둘. 모양이 틀리면 null(아무에게도 열지 않는다). */
+/** 코드 줄 설명 `화면코드:키` → 둘. 모양이 틀리면 null(아무에게도 열지 않는다). */
 export function parseEditGrant(name: string | null | undefined): EditGrant | null {
   const m = /^\s*([A-Za-z0-9]+)\s*:\s*([A-Za-z0-9]+)\s*$/.exec(name ?? '');
   return m ? { screen: m[1]!, key: m[2]! } : null;
@@ -54,7 +57,7 @@ export function hasEditGrant(menus: MyMenusOutcome, grant: EditGrant): boolean {
 }
 
 export interface CompanyEditorDeps {
-  /** `ORG_SELF` 줄의 이름. 없으면 null. */
+  /** `ORG_SELF` 줄의 설명(`화면코드:키`). 없으면 null. */
   grantName(session: ErpSession): Promise<string | null>;
   /** 이 세션의 삐용 토큰으로 내 메뉴. */
   myMenus(session: ErpSession): Promise<MyMenusOutcome>;
@@ -65,7 +68,7 @@ const defaultDeps: CompanyEditorDeps = {
     const rows = await withCompanyScope(scopeOfSession(session), (client) =>
       listCodes(client, [{ category: EDIT_GRANT_CATEGORY, useTp: EDIT_GRANT_USE_TP }]),
     );
-    return rows.find((r) => r.code === ORG_SELF_GRANT)?.name ?? null;
+    return rows.find((r) => r.code === ORG_SELF_GRANT)?.description ?? null;
   },
   myMenus: (session) => callBbiyong(session.erpSid, (token) => bbiyongAuth.myMenus(token)),
 };

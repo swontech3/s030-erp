@@ -13,10 +13,24 @@ export const metadata = {
   description: '에스원비즈 공유오피스 운영 시스템',
 };
 
+/**
+ * ★ 2026-11-08 — 다른 화면(삐용) 안에 떴는지를 **첫 페인트 전에** `<html data-embedded>` 로 적는다.
+ *   서버는 iframe 인지 모른다. 마운트 뒤에 알면 메뉴 틀 · 로그인 입력칸이 한 번 그려졌다가 사라진다
+ *   (삐용 요청 2026-11-08 「로그인 화면 깜박임」). 이 표시를 보고 CSS 가 처음부터 감춘다
+ *   — AppShell.module.css · login.module.css.
+ * ★ 판정은 shared `isEmbedded` 와 같다(self !== top, 접근이 막히면 안에 뜬 것).
+ * ★ 표시만 한다 — 토큰 주고받기 · 허용 주소 판정은 그대로 embedBridge 한 곳이다.
+ */
+const EMBED_MARK_SCRIPT =
+  "try{if(window.self!==window.top)document.documentElement.setAttribute('data-embedded','1')}" +
+  "catch(e){document.documentElement.setAttribute('data-embedded','1')}";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
+    // ★ suppressHydrationWarning — 위 스크립트가 React 보다 먼저 data-embedded 를 붙인다(html 한 칸만)
+    <html lang="ko" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: EMBED_MARK_SCRIPT }} />
         {/*
           자체 호스팅 웹폰트 프리로드.
 

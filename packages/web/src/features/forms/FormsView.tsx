@@ -388,6 +388,7 @@ export function FormsView({ initialId }: { initialId: string | null }) {
   );
 }
 
+/** @screen s030100020p1 양식 삭제 · 010 기준설정 */
 function DeleteDialog({
   template,
   onClose,

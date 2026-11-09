@@ -60,6 +60,7 @@ import {
   CONTRACT_PREMISES,
 } from '@swonbiz/shared';
 import { calcSubleaseMonthlyPayment } from '@swonbiz/shared/domain/contract-amounts';
+import { DEPOSIT_ACCOUNT_MISSING, depositAccountOf, type DepositAccount } from '@swonbiz/shared/domain/deposit-account';
 import {
   companyAddressLabel,
   dayOfMonthLabel,
@@ -152,6 +153,8 @@ export function ContractDocumentModal({ company, terms, items, spaces, codes, on
     codes.find((c) => c.category === 'MEMBER_TYPE' && c.code === company.memberType)?.name ?? '';
   const paymentMethodName =
     codes.find((c) => c.category === 'PAYMENT_METHOD' && c.code === terms.paymentMethod)?.name ?? '';
+  /** 입금 계좌 — 공통 코드 `DEPOSIT_ACCT` 의 설명 칸(코드 관리에서 고친다). 없으면 null. */
+  const depositAccount = depositAccountOf(codes);
 
   // ★ 값이 채워진 줄만 센다. 빈 줄(호실 미선택)이 「외 N건」을 부풀리면 안 된다.
   const filled = items.filter((r) => r.spaceId !== '');
@@ -300,6 +303,7 @@ export function ContractDocumentModal({ company, terms, items, spaces, codes, on
               vatNote={vatSuffix(filled.map((r) => r.vatYn))}
               firstPayment={firstPayment}
               memo={memo}
+              depositAccount={depositAccount}
             />
           ) : (
             <SubleaseDocument
@@ -356,6 +360,7 @@ function UsageDocument(props: {
   vatNote: string;
   firstPayment: number | null;
   memo: string;
+  depositAccount: DepositAccount | null;
 }) {
   const { company, terms } = props;
 
@@ -490,8 +495,14 @@ function UsageDocument(props: {
           <span data-td="1" className={styles.td}>{CONTRACT_OFFICE.EMAIL}</span>
           <Th>은행(계좌번호)</Th>
           <span data-td="1" className={`${styles.td} ${styles.tdLast}`}>
-            {CONTRACT_OFFICE.BANK}
-            <span data-note="1" className={styles.note}>{CONTRACT_OFFICE.ACCOUNT_HOLDER}</span>
+            {props.depositAccount ? (
+              <>
+                {props.depositAccount.account}
+                <span data-note="1" className={styles.note}>예금주 {props.depositAccount.holder}</span>
+              </>
+            ) : (
+              DEPOSIT_ACCOUNT_MISSING
+            )}
           </span>
         </div>
       </div>

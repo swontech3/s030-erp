@@ -707,3 +707,14 @@
 .inApp .main {
   padding: 16px;
 }
+
+/*
+ * ★ 2026-11-08 — 다른 화면(삐용) 안에 떴으면 메뉴 틀(사이드바 · 접기 · 상단 띠)을 **처음부터** 감춘다.
+ *   `<html data-embedded>` 는 루트 레이아웃 스크립트가 첫 페인트 전에 붙인다. 마운트 뒤의 `embedded`
+ *   상태만으로는 한 번 그렸다가 사라졌다(삐용 요청 「삐용 안 ERP 메뉴 틀이 잠깐 보였다 사라짐」).
+ */
+:global(html[data-embedded]) .aside,
+:global(html[data-embedded]) .toggle,
+:global(html[data-embedded]) .header {
+  display: none;
+}
