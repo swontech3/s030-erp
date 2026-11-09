@@ -107,12 +107,19 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  /**
+   * ★ 2026-11-08 — 삐용 안에 떴을 때 입력칸을 보일 차례인가(삐용 요청 「로그인 화면 깜박임」).
+   *   안에 떴으면 처음에는 CSS 가 입력칸을 감추고 「잠시만요」만 보인다(`<html data-embedded>` — 루트 레이아웃).
+   *   토큰이 안 오거나 로그인에 실패하면 `startInnerLogin` 이 이것을 켠다. 혼자 열렸으면 쓰이지 않는다.
+   */
+  const [showForm, setShowForm] = useState(false);
+
   /*
    * ★ 2026-10-22 — 삐용 안에 떠 있으면 「준비됨」을 알리고, 바깥(허용 주소)이 보낸 토큰을
    *   **이 화면이 쓰는 그 로그인 자리**(/api/auth/login)로 넘긴다. 새 로그인 길이 아니다.
    *   혼자 열렸으면 아무것도 하지 않는다.
    */
-  useEffect(() => startInnerLogin(), []);
+  useEffect(() => startInnerLogin(() => setShowForm(true)), []);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -171,6 +178,12 @@ export default function LoginPage() {
   }
 
   return (
+    <div className={showForm ? styles.embedReveal : undefined}>
+    {/* ★ 삐용 안에 떴을 때만 보인다(login.module.css) — 혼자 열렸으면 감춰져 있다 */}
+    <div className={styles.embedWait} role="status" aria-live="polite">
+      잠시만요
+    </div>
+    <div className={styles.embedForm}>
     <AuthShell>
         <div style={{ width: 380, margin: 'auto 0' }}>
           <h1
@@ -516,5 +529,7 @@ export default function LoginPage() {
         </div>
 
     </AuthShell>
+    </div>
+    </div>
   );
 }

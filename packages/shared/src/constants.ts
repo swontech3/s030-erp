@@ -256,14 +256,13 @@ export const CONTRACT_PREMISES = {
  *
  * ★ 센터명·담당자는 **설정 → 지점 설정**에서 와야 하는데 그 화면도 API 도 없다.
  *   `CONTRACT_DEFAULTS.DEFAULT_CENTER` / `DEFAULT_MANAGER` 를 쓴다(CONT-14).
- *   나머지 넷은 명세에 값이 적혀 있어 그대로 둔다.
+ *   전화 · Fax · 이메일은 명세에 값이 적혀 있어 그대로 둔다. 입금 계좌는 공통 코드로 옮겼다(2026-11-08, 아래).
  */
 export const CONTRACT_OFFICE = {
   TEL: "070-4355-2312",
   FAX: "070-4015-3344",
   EMAIL: "swonbiz@s-onetech.com",
-  BANK: "우리은행 1005-002-433395",
-  ACCOUNT_HOLDER: "예금주 ㈜에스원테크",
+  // 입금 계좌(은행 · 계좌번호 · 예금주)는 공통 코드 `DEPOSIT_ACCT` 로 옮겼다(2026-11-08) — `domain/deposit-account.ts`.
 } as const;
 
 // =============================================================================
