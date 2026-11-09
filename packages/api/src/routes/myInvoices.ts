@@ -10,20 +10,32 @@
  *
  * ★ 보기 전용이다. 쓰는 주소가 없다 — 청구 · 수납 처리는 운영사 `/billing` 한 곳(`routes/billing.ts`).
  * ★ 회사 연결이 없는 입주사(삐용 단체만 있고 ERP 입주사 연결이 없다)는 빈 목록이다 — 예외가 아니라 0건
- *   (ORG_ARCHITECTURE.md §1-2). DB 를 부르지 않는다.
+ *   (ORG_ARCHITECTURE.md §1-2). 청구서는 부르지 않는다(입금 계좌만 읽는다).
  * ★ 판정(미납 · 합계 · 달별 묶음 · 미납 띠)은 화면이 shared `domain/my-invoices` 로 한다. 이 파일은 배선만.
  * ★ 응답에는 화면에 필요한 여섯 칸만 싣는다 — 회사 · 계약 · 건물 번호는 내보내지 않는다.
+ * ★ 입금 계좌 `depositAccount` 도 함께 싣는다(2026-11-09 · master 171b82e 가 상수를 공통 코드로 옮김).
+ *   서버가 공통 코드 `DEPOSIT_ACCT` 를 읽는다 — 정산서(`/codes` → shared `depositAccountOf`)와 같은 코드 · 같은 읽는 법.
+ *   `/codes` 는 운영사 전용이라 입주사 화면은 이 응답으로 받는다. 설정되지 않았으면 `null`.
  */
 import type { FastifyInstance } from 'fastify';
 import type { ErpSession } from '@swonbiz/shared';
 import { requireSession } from '../session/hook.ts';
 import { scopeOfSession, withCompanyScope } from '../db/withCompanyScope.ts';
 import { listCompanyInvoicesInRange, type InvoiceRow } from '../db/invoices.ts';
+import { listCodes } from '../db/lookups.ts';
+import {
+  DEPOSIT_ACCOUNT_CATEGORY,
+  DEPOSIT_ACCOUNT_USE_TP,
+  depositAccountOf,
+  type DepositAccount,
+} from '@swonbiz/shared/domain/deposit-account';
 
 /** 바꿔 끼울 수 있는 바깥 — 시험이 DB 없이 권한 · 기간 · 응답 모양을 본다. */
 export interface MyInvoicesDeps {
   /** 세션의 회사(`companyId` 가 있을 때만 부른다) 청구서 — 청구 달 `from` ~ `to`. */
   listMyInvoices(session: ErpSession, from: string, to: string): Promise<InvoiceRow[]>;
+  /** 입금 계좌(공통 코드 `DEPOSIT_ACCT`) — 줄이 없거나 설명이 비면 `null`. */
+  depositAccount(session: ErpSession): Promise<DepositAccount | null>;
 }
 
 const defaultDeps: MyInvoicesDeps = {
@@ -31,6 +43,10 @@ const defaultDeps: MyInvoicesDeps = {
     withCompanyScope(scopeOfSession(session), (client) =>
       listCompanyInvoicesInRange(client, session.companyId as string, from, to),
     ),
+  depositAccount: (session) =>
+    withCompanyScope(scopeOfSession(session), (client) =>
+      listCodes(client, [{ category: DEPOSIT_ACCOUNT_CATEGORY, useTp: DEPOSIT_ACCOUNT_USE_TP }]),
+    ).then(depositAccountOf),
 };
 
 /** 한 번에 받을 수 있는 가장 긴 기간(달 수, 양 끝 포함). 화면은 13개월(지난 12 + 이번 달)을 부른다. */
@@ -61,10 +77,12 @@ export function registerMyInvoicesRoutes(app: FastifyInstance, deps: MyInvoicesD
       });
     }
 
-    if (session.companyId === null) return reply.send({ invoices: [] });
+    const depositAccount = await deps.depositAccount(session);
+    if (session.companyId === null) return reply.send({ invoices: [], depositAccount });
 
     const rows = await deps.listMyInvoices(session, req.query.from as string, req.query.to as string);
     return reply.send({
+      depositAccount,
       invoices: rows.map((row) => ({
         invoiceId: row.invoice_id,
         yearMonth: row.year_month,

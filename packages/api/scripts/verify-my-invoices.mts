@@ -9,12 +9,20 @@
  *   2. 입주사 A 스코프로 **다른 회사 B 의 번호**를 넣어 불러도 0줄 (RLS 가 막는다 — SQL 조건만으로는 아니다)
  *   3. 회사 연결 없는 입주사(companyId null) 스코프 → 0줄
  *   4. 날짜 기간이 양 끝을 포함한다 — 한 달짜리 기간으로 부른 수 = 그 달 줄 수
+ *   5. 입금 계좌(공통 코드 DEPOSIT_ACCT, 2026-11-09) — 입주사 스코프(회사 있음 · 없음)로도 읽히고
+ *      운영사 스코프로 읽은 값(정산서가 보는 값)과 같다 · 설정되어 있다
  *
  * 사용: node_modules/.bin/tsx packages/api/scripts/verify-my-invoices.mts   (erp_app 접속 · 읽기 전용)
  */
 import { pool, closePool } from '../src/db/pool.ts';
 import { withCompanyScope } from '../src/db/withCompanyScope.ts';
 import { listCompanyInvoicesInRange } from '../src/db/invoices.ts';
+import { listCodes } from '../src/db/lookups.ts';
+import {
+  DEPOSIT_ACCOUNT_CATEGORY,
+  DEPOSIT_ACCOUNT_USE_TP,
+  depositAccountOf,
+} from '@swonbiz/shared/domain/deposit-account';
 
 const WIDE = ['1900-01', '2999-12'] as const;
 
@@ -74,6 +82,19 @@ if (withRows.length >= 1) {
   );
   check(none.length === 0, `회사 연결 없는 입주사 스코프 → 0장 — ${none.length}장`);
 }
+
+// 5. 입금 계좌 — 라우트(`routes/myInvoices.ts` defaultDeps)와 같은 읽는 법
+const DEPOSIT_SPEC = [{ category: DEPOSIT_ACCOUNT_CATEGORY, useTp: DEPOSIT_ACCOUNT_USE_TP }];
+const readAccount = (scope: { role: 'operator' | 'tenant'; companyId: string | null }) =>
+  withCompanyScope(scope, (c) => listCodes(c, DEPOSIT_SPEC)).then(depositAccountOf);
+const opAccount = await readAccount({ role: 'operator', companyId: null });
+check(opAccount !== null, `입금 계좌가 설정되어 있다(운영사 스코프) — ${opAccount ? `${opAccount.account} · ${opAccount.holder}` : '없음'}`);
+for (const co of linked) {
+  const mine = await readAccount({ role: 'tenant', companyId: co.company_id });
+  check(JSON.stringify(mine) === JSON.stringify(opAccount), `${co.org_id} — 입주사 스코프로 읽은 입금 계좌 = 운영사 스코프 값`);
+}
+const noneAccount = await readAccount({ role: 'tenant', companyId: null });
+check(JSON.stringify(noneAccount) === JSON.stringify(opAccount), '회사 연결 없는 입주사 스코프로 읽은 입금 계좌 = 운영사 스코프 값');
 
 console.log(fails.length === 0 ? '전체 통과' : `실패 ${fails.length}건`);
 await closePool();

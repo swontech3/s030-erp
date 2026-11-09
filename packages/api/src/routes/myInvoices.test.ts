@@ -34,13 +34,24 @@ const ROW: InvoiceRow = {
   status: 'P',
 };
 
-function fakeDeps(rows: InvoiceRow[] = [ROW]): MyInvoicesDeps & { calls: unknown[] } {
+const ACCOUNT = { account: '우리은행 1005-002-433395', holder: '㈜에스원테크' };
+
+function fakeDeps(
+  rows: InvoiceRow[] = [ROW],
+  account: { account: string; holder: string } | null = ACCOUNT,
+): MyInvoicesDeps & { calls: unknown[]; accountCalls: unknown[] } {
   const calls: unknown[] = [];
+  const accountCalls: unknown[] = [];
   return {
     calls,
+    accountCalls,
     listMyInvoices: async (s, from, to) => {
       calls.push({ companyId: s.companyId, role: s.role, from, to });
       return rows;
+    },
+    depositAccount: async (s) => {
+      accountCalls.push({ companyId: s.companyId, role: s.role });
+      return account;
     },
   };
 }
@@ -69,14 +80,15 @@ describe('GET /my/invoices — 권한', () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().message).toContain('/billing');
     expect(deps.calls).toEqual([]);
+    expect(deps.accountCalls).toEqual([]);
   });
 
-  it('회사 연결이 없는 입주사는 빈 목록 — DB 를 부르지 않는다', async () => {
+  it('회사 연결이 없는 입주사는 빈 목록 — 청구서는 부르지 않는다(입금 계좌만 싣는다)', async () => {
     const deps = fakeDeps();
     const a = await build(session('tenant', null), deps);
     const res = await a.inject({ method: 'GET', url: '/my/invoices?from=2025-11&to=2026-11' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ invoices: [] });
+    expect(res.json()).toEqual({ invoices: [], depositAccount: ACCOUNT });
     expect(deps.calls).toEqual([]);
   });
 });
@@ -114,6 +126,7 @@ describe('GET /my/invoices — 입주사', () => {
     expect(res.statusCode).toBe(200);
     expect(deps.calls).toEqual([{ companyId: 'c-421', role: 'tenant', from: '2025-11', to: '2026-11' }]);
     expect(res.json()).toEqual({
+      depositAccount: ACCOUNT,
       invoices: [
         {
           invoiceId: 'inv-1',
@@ -132,5 +145,30 @@ describe('GET /my/invoices — 입주사', () => {
     const res = await a.inject({ method: 'GET', url: '/my/invoices?from=2025-11&to=2026-11' });
     const keys = Object.keys(res.json().invoices[0]).sort();
     expect(keys).toEqual(['dueDate', 'invoiceId', 'paidAmount', 'status', 'totalAmount', 'yearMonth']);
+  });
+});
+
+describe('GET /my/invoices — 입금 계좌 (공통 코드 DEPOSIT_ACCT · master 171b82e 와 같은 값)', () => {
+  it('서버가 읽은 계좌(은행·번호 · 예금주)를 함께 싣는다 — 자기 세션으로 읽는다', async () => {
+    const deps = fakeDeps();
+    const a = await build(session('tenant', 'c-421'), deps);
+    const res = await a.inject({ method: 'GET', url: '/my/invoices?from=2025-11&to=2026-11' });
+    expect(res.json().depositAccount).toEqual(ACCOUNT);
+    expect(deps.accountCalls).toEqual([{ companyId: 'c-421', role: 'tenant' }]);
+  });
+
+  it('계좌가 설정되지 않았으면 depositAccount = null (화면이 「입금 계좌가 설정되지 않았습니다」)', async () => {
+    const a = await build(session('tenant', 'c-421'), fakeDeps([ROW], null));
+    const res = await a.inject({ method: 'GET', url: '/my/invoices?from=2025-11&to=2026-11' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().depositAccount).toBeNull();
+    expect(res.json().invoices).toHaveLength(1);
+  });
+
+  it('기간이 틀리면(400) 계좌도 읽지 않는다', async () => {
+    const deps = fakeDeps();
+    const a = await build(session('tenant', 'c-421'), deps);
+    await a.inject({ method: 'GET', url: '/my/invoices?from=2026-11&to=2025-11' });
+    expect(deps.accountCalls).toEqual([]);
   });
 });
