@@ -132,6 +132,15 @@ export const BBIYONG = {
   ORG_PATCH_PATH: "/rest/v1/s021100010/erp-patch-org",
 
   /**
+   * 단체 목록(조회) — `GET ?orgName=&memberName=&limit=&curPage=`(연동규격 사본 2-1). 공용 회사 조회 팝업이 쓴다.
+   * ★ 등록 · 수정과 같이 **「단체관리」(S021100010) 화면 권한**이 있는 운영사 직원 토큰이어야 한다(2-2) — 없으면
+   *   HTTP 200 본문 `status: 403` · `error: ["AUTHZ_DENY"]`.
+   * ★ 응답(2026-11-01 개발계 실측): `data` 는 행 배열(쪽 감싸개 없음) · 행마다 `totCnt`(전체 수) ·
+   *   행 칸 `orgId` · `orgCode` · `orgName` · `orgTp` · `memberName` · `telNo` · `email` · `memberCnt` · …
+   */
+  ORG_LIST_PATH: "/rest/v1/s021100010/org-list",
+
+  /**
    * 직원정보 — 구성원 신규(`I`) · 수정(`U`) · 삭제(`D`) 를 **한 엔드포인트**로 받는다
    * (삐용 규격 2026-10-05). 가르는 것은 본문의 `regTp` 다.
    *
@@ -247,14 +256,13 @@ export const CONTRACT_PREMISES = {
  *
  * ★ 센터명·담당자는 **설정 → 지점 설정**에서 와야 하는데 그 화면도 API 도 없다.
  *   `CONTRACT_DEFAULTS.DEFAULT_CENTER` / `DEFAULT_MANAGER` 를 쓴다(CONT-14).
- *   나머지 넷은 명세에 값이 적혀 있어 그대로 둔다.
+ *   전화 · Fax · 이메일은 명세에 값이 적혀 있어 그대로 둔다. 입금 계좌는 공통 코드로 옮겼다(2026-11-08, 아래).
  */
 export const CONTRACT_OFFICE = {
   TEL: "070-4355-2312",
   FAX: "070-4015-3344",
   EMAIL: "swonbiz@s-onetech.com",
-  BANK: "우리은행 1005-002-433395",
-  ACCOUNT_HOLDER: "예금주 ㈜에스원테크",
+  // 입금 계좌(은행 · 계좌번호 · 예금주)는 공통 코드 `DEPOSIT_ACCT` 로 옮겼다(2026-11-08) — `domain/deposit-account.ts`.
 } as const;
 
 // =============================================================================

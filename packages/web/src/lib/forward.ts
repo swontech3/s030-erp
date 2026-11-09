@@ -135,16 +135,27 @@ export async function forwardGetJson(path: string): Promise<NextResponse> {
     );
   }
 
-  if (!res.ok && res.status >= 500) {
+  // ★ 503 이면서 Fastify 가 이유(`error` · `message`)를 실어 보냈으면 그 문구를 넘긴다(2026-11-01) —
+  //   「아직 연결되지 않았습니다」 · 「인증 서버에 연결할 수 없습니다」를 「서버 오류」로 덮지 않는다.
+  //   그 밖의 5xx 는 지금처럼 덮는다(pg 문구 등이 새지 않게 — Fastify 가 이미 덮지만 한 번 더). 4xx 는 그대로 넘긴다.
+  if (!res.ok && res.status >= 500 && !(res.status === 503 && hasReason(res.body))) {
     return NextResponse.json({ message: '서버 오류가 났습니다. 잠시 후 다시 시도해 주세요' }, { status: res.status });
   }
   return passThrough(res.body, res.status);
+}
+
+/** 본문에 기계용 `error` 와 사람용 `message` 가 둘 다 글자로 있는가. */
+function hasReason(body: unknown): boolean {
+  const b = body as { error?: unknown; message?: unknown } | null | undefined;
+  return typeof b?.error === 'string' && typeof b?.message === 'string' && b.message.trim() !== '';
 }
 
 export async function forwardJson(
   request: Request,
   path: string,
   method: 'POST' | 'PATCH' | 'PUT',
+  /** 상한 — 기본은 `callApi` 의 5초. 바깥(AI)을 부르는 주소만 넘긴다 */
+  timeoutMs?: number,
 ): Promise<NextResponse> {
   const blocked = rejectCrossSite(request, { requireJson: true });
   if (blocked) return blocked;
@@ -163,7 +174,7 @@ export async function forwardJson(
 
   let res;
   try {
-    res = await callApi<{ message?: string }>(path, { method, body, erpSid: sid });
+    res = await callApi<{ message?: string }>(path, { method, body, erpSid: sid, timeoutMs });
   } catch (err) {
     // Fastify 에 못 붙은 것은 입력 오류가 아니다 — 사용자 잘못으로 돌리지 않는다.
     console.error(`[forward] ${method} ${path} 실패:`, (err as Error).message);

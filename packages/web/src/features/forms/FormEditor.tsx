@@ -449,6 +449,7 @@ export function FormEditor({ id }: { id: string | null }) {
         </div>
       </div>
 
+      {/** @screen s030100021p1 나가기 확인 · 010 기준설정 */}
       {leaving ? (
         <ModalShell
           title="저장하지 않고 나갈까요?"

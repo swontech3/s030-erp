@@ -57,6 +57,7 @@ import {
   OFFICER_CHANGE_KIND_LABEL,
   REGISTRATION_DEADLINE_DAYS,
   canPrintCorpChange,
+  hqOutTaxHint,
   isRrnShape,
   purposeLines,
   registrationDeadline,
@@ -65,6 +66,7 @@ import {
   type CorpChangeStatus,
   type OfficerChangeKind,
 } from '@swonbiz/shared/domain/corp-change';
+import { corpChangeDocName } from '@swonbiz/shared/domain/corp-change-print';
 import { STALE_STATUS_MESSAGE } from '@swonbiz/shared/domain/corp-change-transition';
 import {
   corpChangeDateLine,
@@ -87,6 +89,9 @@ import { CorpChangeConfirmDialog, type CorpChangeConfirmKind } from './CorpChang
 import { CorpChangePrintDialog } from './CorpChangePrintDialog';
 import { CorpChangePrintHistory } from './CorpChangePrintHistory';
 import { BizPurposePickerDialog } from './BizPurposePickerDialog';
+import { ArticlesFileField } from './ArticlesFileField';
+import { CorpChangeArticlesSection, type ArticleOverrides } from './CorpChangeArticlesSection';
+import { ARTICLES_APPLIED_LOCK_MESSAGE, readArticleOverrides } from '@swonbiz/shared/domain/legal-articles';
 import { appendPurposeLines } from '@swonbiz/shared/domain/biz-purpose';
 import styles from './corp-change-detail.module.css';
 
@@ -97,6 +102,11 @@ interface Props {
   saved: CorpChangeDetailResponse | null;
   /** 「입주사 화면에서 입력」 링크를 보여 줄까 — 그 화면(s030200030)을 받은 사람에게만. */
   canOpenTenantScreen: boolean;
+  /**
+   * 새 건 대화상자에서 고른 회사유형(임시 모드만, 결정 2026-11-07 — `presetMemberTypeFor` 가 거른 값).
+   * 회사 정보의 회사유형 칸에 넣는다 — 저장된 값과 달라 첫 [저장] 에 회사 정보로 실려 법무 회사 정보에 저장된다.
+   */
+  presetMemberType?: string | null;
 }
 
 export type Address = { zipCode: string; address: string; addressDetail: string };
@@ -135,6 +145,11 @@ function toForm(fields: readonly CorpChangeFieldDef[], payload: Record<string, u
     out[f.name] = f.type === 'address' ? toAddress(v) : typeof v === 'string' ? v : '';
   }
   return out;
+}
+
+/** 「변경된 정관 조항」에서 사람이 고친 문구를 싣는다(2026-11-08) — 없으면 칸을 싣지 않는다. */
+function withArticles(wire: Record<string, unknown>, overrides: ArticleOverrides): Record<string, unknown> {
+  return Object.keys(overrides).length > 0 ? { ...wire, articlesItems: overrides } : wire;
 }
 
 /** 보낼 모양 — 빈 칸은 null. 서버가 같은 규칙으로 다시 읽는다(`parsePayload`). */
@@ -260,7 +275,7 @@ interface OfficerDraft {
   rrnMasked: string | null;
 }
 
-export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScreen }: Props) {
+export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScreen, presetMemberType }: Props) {
   const router = useRouter();
   /**
    * ★ 저장된 건은 **상태로** 든다 — 상태 전이가 돌려준 새 상세, 409 뒤에 다시 읽은 상세로 바꿔
@@ -298,7 +313,12 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
    *    [저장] 전체를 거절한다).
    */
   const [company, setCompany] = useState<CorpChangeCompanyInfo>(draft.company);
-  const [companyInput, setCompanyInput] = useState<CompanyForm>(() => companyForm(draft.company));
+  // 새 건 대화상자에서 고른 회사유형(임시 모드만) — 입력값에만 넣는다. 저장본(companySaved)은 그대로라 첫 [저장] 에 실린다.
+  const [companyInput, setCompanyInput] = useState<CompanyForm>(() =>
+    initialSaved === null && presetMemberType
+      ? { ...companyForm(draft.company), memberType: presetMemberType }
+      : companyForm(draft.company),
+  );
   const [companySaved, setCompanySaved] = useState(() => JSON.stringify(companyForm(draft.company)));
   const companyEditable = draft.canEditCompany && editable && !company.isTenant;
   const companyDirty = companyEditable && JSON.stringify(companyInput) !== companySaved;
@@ -314,9 +334,25 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
   const initialForm = useMemo(() => toForm(def.fields, savedPayload), [def.fields, savedPayload]);
 
   const [form, setForm] = useState<FormPayload>(initialForm);
-  const [savedWire, setSavedWire] = useState<string>(() => JSON.stringify(toWire(def.fields, toForm(def.fields, savedPayload))));
+  /** 「변경된 정관 조항」에서 사람이 고친 문구(2026-11-08) — [저장] 에 payload `articlesItems` 로 실린다. */
+  const [articleOverrides, setArticleOverrides] = useState<ArticleOverrides>(() => readArticleOverrides(savedPayload));
+  /**
+   * 타관할 본점이전 세금 안내(결정 2026-11-06) — 지금 본점(회사 정보: 입주사 = ERP 값, 비입주사 = 입력 중인 값)이
+   * 대도시 밖이고 새 본점이 대도시일 때만. 그 밖에는 문구 없음(`hqOutTaxHint`).
+   */
+  const hqOutNote =
+    draft.changeType === 'HQ_OUT'
+      ? hqOutTaxHint(
+          company.isTenant ? company.head.address : companyInput.head.address,
+          (form.newHqAddress as Address | undefined)?.address,
+        ) ?? undefined
+      : undefined;
+  // ★ 정관 변경 건 안내(「변경된 정관은 따로 준비하세요」 · 완료 건 다시 출력)는 서버가 [서류 출력] 응답에 싣는다(2026-11-08).
+  const [savedWire, setSavedWire] = useState<string>(() =>
+    JSON.stringify(withArticles(toWire(def.fields, toForm(def.fields, savedPayload)), readArticleOverrides(savedPayload))),
+  );
   /** 저장 안 한 입력 — 변경 내용 또는 회사 정보를 사람이 고쳤다. [저장] · 상태 버튼 막기가 이것을 본다. */
-  const dirty = JSON.stringify(toWire(def.fields, form)) !== savedWire || companyDirty;
+  const dirty = JSON.stringify(withArticles(toWire(def.fields, form), articleOverrides)) !== savedWire || companyDirty;
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   /**
@@ -373,7 +409,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
   const persist = async (): Promise<{ id: string; detail: CorpChangeDetailResponse | null } | null> => {
     setSaveError(null);
     setFieldErrors({});
-    const wire = toWire(def.fields, form);
+    const wire = withArticles(toWire(def.fields, form), articleOverrides);
     // 비입주사 회사 정보 — 고쳤거나 기본값이 있을 때만 싣는다(안 실으면 서버가 건드리지 않는다).
     const companyWire = sendCompany ? companyBody(companyInput) : undefined;
 
@@ -555,7 +591,8 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
   function applyDetail(d: CorpChangeDetailResponse) {
     setSaved(d);
     setForm(toForm(def.fields, d.payload));
-    setSavedWire(JSON.stringify(toWire(def.fields, toForm(def.fields, d.payload))));
+    setArticleOverrides(readArticleOverrides(d.payload));
+    setSavedWire(JSON.stringify(withArticles(toWire(def.fields, toForm(def.fields, d.payload)), readArticleOverrides(d.payload))));
     setOfficers(d.officers.map((o) => ({ ...o, rrn: '' })));
     setCompany(d.company);
     setCompanyInput(companyForm(d.company));
@@ -759,8 +796,16 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
               </span>
             </div>
           ) : null}
+          {/* 정관이 바뀐(최종본에 반영된) 완료 건 — 완료 취소 · 취소를 막는다(결정 2026-11-08). 버튼은 서버가 뺐다 */}
+          {saved?.status === 'C' && saved.articles?.applied ? (
+            <div className={`${styles.banner} ${styles.bannerInfo}`} role="status">
+              <Icon name="lock" size={16} />
+              <span>{ARTICLES_APPLIED_LOCK_MESSAGE}</span>
+            </div>
+          ) : null}
 
           <CompanySection
+            orgId={draft.orgId}
             company={company}
             form={companyInput}
             editable={companyEditable}
@@ -807,6 +852,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
                   value={form[f.name] ?? (f.type === 'address' ? EMPTY_ADDRESS : '')}
                   disabled={!editable || busy}
                   error={errorFor(f.name)}
+                  note={f.name === 'newHqAddress' && draft.changeType === 'HQ_OUT' ? hqOutNote : undefined}
                   onChange={(v) => setForm((prev) => ({ ...prev, [f.name]: v }))}
                   onError={notify}
                   onNotice={notify}
@@ -814,6 +860,27 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
               ))}
             </div>
           </section>
+
+          {/* 「변경된 정관 조항」(2026-11-08) — 정관이 바뀌는 구분 · 우리 시스템으로 설립한 회사만. 저장된 건에서만 */}
+          {saved?.articles ? (
+            <CorpChangeArticlesSection
+              view={saved.articles}
+              editable={editable && !busy}
+              ctx={{
+                changeType: draft.changeType,
+                payload: toWire(def.fields, form),
+                company: {
+                  name: company.isTenant ? company.legalName : blankToNull(companyInput.legalName),
+                  memberType: company.isTenant ? company.memberType : blankToNull(companyInput.memberType),
+                  headAddress: company.isTenant ? company.head.address : blankToNull(companyInput.head.address),
+                },
+                namePosition: company.namePosition,
+              }}
+              overrides={articleOverrides}
+              errorFor={(role) => errorFor(`articlesItems.${role}`)}
+              onChange={setArticleOverrides}
+            />
+          ) : null}
 
           {def.usesOfficers ? (
             <OfficersSection
@@ -968,8 +1035,17 @@ function PayloadField({
   if (def.type === 'address') {
     return (
       <div className={`${styles.field} ${styles.spanAll}`}>
-        {label}
-        {note ? <span className={styles.hint}>{note}</span> : null}
+        {/* 조건부 안내(note)는 이름표 바로 옆에 괄호로 — 「신규 본점주소* (…)」(결정 2026-11-07).
+            칸 정의의 고정 hint 는 그대로 이름표 아래다. */}
+        {note ? (
+          <span className={styles.label}>
+            {def.label} {def.required ? <span className={styles.req}>*</span> : null}{' '}
+            <span className={styles.labelNote}>({note})</span>
+          </span>
+        ) : (
+          label
+        )}
+        {!note && def.hint ? <span className={styles.hint}>{def.hint}</span> : null}
         <AddressInput value={value as Address} disabled={disabled} onChange={onChange} onError={onError} />
         {serverError}
       </div>
@@ -1173,7 +1249,14 @@ function payloadColumns(fields: readonly CorpChangeFieldDef[]): number {
  * ★ 저장은 머리의 [저장] 하나다(결정 2026-10-10) — 이 부품은 입력만 하고, 값은 부모가 든다.
  * ★ 삐용 기본값으로 채운 칸(`defaultedFields`)은 고치기 전까지 「저장 전」 딱지를 붙인다.
  */
+/**
+ * 「서류에 쓰이는 상호」 — 회사명에 회사 형태 표기가 없으면 회사유형 낱말을 붙인 것(`corpChangeDocName`). 서류 출력과 같다.
+ * ★ 서류는 작성완료 때의 회사 정보로 나간다 — 작성완료 뒤에 고친 값은 다시 작성완료해야 서류에 든다.
+ */
+const DOC_NAME_LABEL = '서류에 쓰이는 상호';
+
 function CompanySection({
+  orgId,
   company,
   form,
   editable,
@@ -1184,6 +1267,8 @@ function CompanySection({
   onChange,
   onError,
 }: {
+  /** 단체 — 「정관 파일」 칸이 쓴다(결정 2026-11-07). */
+  orgId: number;
   company: CorpChangeCompanyInfo;
   form: CompanyForm;
   /** 비입주사이고 건을 고칠 수 있다(임시 모드 · 서류작성중). */
@@ -1215,6 +1300,8 @@ function CompanySection({
       ['대표자 자택 주소', addressLine(company.ceo) || null, true],
     ];
     const missing = rows.some(([, v]) => v === null || v === '');
+    // 서류에 쓰이는 상호 — 출력과 같은 함수(결정 2026-11-06). 회사명이 비면 위 「회사명」이 이미 빈칸을 알린다
+    rows.push([DOC_NAME_LABEL, corpChangeDocName(company.legalName, company.memberType, company.namePosition) || null, true]);
     return (
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
@@ -1242,6 +1329,8 @@ function CompanySection({
               {label === '대표자 자택 주소' && errorFor('ceo') ? <span className={styles.fieldError}>{errorFor('ceo')}</span> : null}
             </div>
           ))}
+          {/* 정관 파일 — 입주사도 법무 쪽에서 관리(운영사만 올린다, 결정 2026-11-07) */}
+          <ArticlesFileField orgId={orgId} onError={onError} />
         </div>
       </section>
     );
@@ -1256,6 +1345,8 @@ function CompanySection({
     const e = errorFor(key);
     return e ? <span className={styles.fieldError}>{e}</span> : null;
   };
+
+  const docName = corpChangeDocName(form.legalName, form.memberType, company.namePosition);
 
   const preTag = (key: CompanyDefaultField) => (defaulted(key) ? <span className={styles.preTag}>저장 전</span> : null);
 
@@ -1327,6 +1418,13 @@ function CompanySection({
           <AddressInput value={form.ceo} disabled={disabled} compact onChange={(ceo) => set({ ceo })} onError={onError} />
           {fieldError('ceo') ?? fieldError('ceoAddress') ?? fieldError('ceoZipCode') ?? fieldError('ceoAddressDetail')}
         </div>
+        {/* 서류에 쓰이는 상호 — 읽기만. 입력 중인 상호 · 회사유형으로 출력과 같은 함수를 부른다(결정 2026-11-06) */}
+        <div className={`${styles.field} ${styles.span2}`}>
+          <span className={styles.label}>{DOC_NAME_LABEL}</span>
+          <span className={`${styles.readValue}${docName ? '' : ` ${styles.readEmpty}`}`}>{docName || '—'}</span>
+        </div>
+        {/* 정관 파일 — 건의 [저장] 과 따로, 고르는 즉시 올라간다(결정 2026-11-07) */}
+        <ArticlesFileField orgId={orgId} onError={onError} />
       </div>
     </section>
   );
@@ -1621,7 +1719,7 @@ function OfficersSection({
                 inputMode="numeric"
                 autoComplete="off"
                 placeholder={draft.rrnMasked ? `${draft.rrnMasked} — 바꿀 때만 입력` : '숫자 13자리'}
-                onChange={(e) => setDraft({ ...draft, rrn: e.target.value })}
+                onChange={(e) => setDraft({ ...draft, rrn: maskInput(e.currentTarget, 'rrn') })}
               />
               {rrnBad ? (
                 <span className={styles.fieldError}>주민등록번호는 숫자 13자리로 입력하세요</span>

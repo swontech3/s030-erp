@@ -7,7 +7,8 @@ import type { MyMenusOutcome, MyOrgOutcome } from '../bbiyong/types.ts';
 import type { MemberFromBbiyong } from '../db/companies.ts';
 import { parseMemberReceiveBody, receiveMember, type MemberReceiveDeps } from './memberReceive.ts';
 
-const OK_MENUS: MyMenusOutcome = { kind: 'ok', screens: ['S021100010'] };
+/** 운영사 — 단체관리와 그 수정 키(대역 코드 줄 OPERATOR = S021100010:F002, 2026-11-08). */
+const OK_MENUS: MyMenusOutcome = { kind: 'ok', screens: ['S021100010'], keys: { S021100010: ['F002'] } };
 /** 회사 계정 — 단체관리 없음 · 대역 코드 줄(MEMBER_SELF = S021100031:F003)의 화면 · 키 있음. */
 const KEYED: MyMenusOutcome = { kind: 'ok', screens: ['S021100031'], keys: { S021100031: ['F003'] } };
 
@@ -42,6 +43,7 @@ function deps(
     },
     memberGrantName: async () => grantName,
     orgGrantName: async () => orgGrantName,
+    operatorGrantName: async () => 'S021100010:F002',
     apply: async (memberId, fields) => {
       applied.push({ memberId, fields });
       return result;

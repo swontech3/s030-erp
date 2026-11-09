@@ -183,6 +183,7 @@ export function RefundAccountFields({
   );
 }
 
+/** @screen s030200070p5 정산 처리 확인 · 020 입주사관리 */
 export function SettleDialog({ s, onClose, onDone }: { s: Settlement; onClose: () => void; onDone: (m: string) => void }) {
   const dir = settlementDirection(s.netAmount);
   const [processedOn, setProcessedOn] = useState(localTodayIso());

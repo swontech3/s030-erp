@@ -2,7 +2,7 @@
  * 기동 배너 — 잘못된 계통에 붙은 것을 **기동 로그에서 즉시** 알아채는 것이 전부다.
  *
  * ★ 2026-09-30: 판별 근거가 **포트에서 `BBIYONG_SYSTEM` 으로** 바뀌었다. 개발계
- *   `192.168.0.22:8082` · 가동계 `192.168.0.14:8082` — 포트가 같아서 포트로는 갈 수 없다.
+ *   `192.168.0.22:8082` · 가동계 `192.168.0.14:8080` — 포트가 같아서 포트로는 갈 수 없다.
  *   그래서 이 시험은 **같은 주소에 계통만 다르게 넣어** 배너가 주소를 보지 않는다는
  *   것을 고정한다.
  */
@@ -20,7 +20,7 @@ describe('bbiyongBanner', () => {
   });
 
   it('★ 가동계는 눈에 띄게 경고한다', () => {
-    const out = bbiyongBanner({ mock: false, baseUrl: 'https://192.168.0.14:8082', system: 'prod' });
+    const out = bbiyongBanner({ mock: false, baseUrl: 'https://192.168.0.14:8080', system: 'prod' });
     expect(out.length).toBeGreaterThan(3); // 한 줄로 흘려보내지 않는다
     expect(text(out)).toContain('가동계');
     expect(text(out)).toContain('★★');
@@ -58,7 +58,7 @@ describe('bbiyongBanner', () => {
     expect(dev).toContain('http://192.168.0.22:8082');
     expect(dev).toContain('개발계');
 
-    const prod = text(bbiyongBanner({ mock: true, baseUrl: 'https://192.168.0.14:8082', system: 'prod' }));
+    const prod = text(bbiyongBanner({ mock: true, baseUrl: 'https://192.168.0.14:8080', system: 'prod' }));
     expect(prod).toContain('가동계');
   });
 

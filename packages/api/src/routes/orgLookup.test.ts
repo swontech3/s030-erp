@@ -119,6 +119,19 @@ describe('GET /org-lookup — 규격 없음', () => {
   });
 });
 
+describe('GET /org-lookup — 삐용 권한 · 연결 실패(2026-11-01)', () => {
+  it('★ 삐용 단체관리 권한이 없으면(forbidden) 403 + 그 문구 · 목록도 단건도', async () => {
+    const no = { kind: 'forbidden' as const, message: '삐용 단체관리 권한이 필요합니다' };
+    const deps = fakeDeps({ listOrgs: async () => no, getOrg: async () => no });
+    const a = await build(session('operator', 1), deps);
+    for (const url of ['/org-lookup', '/org-lookup/one?orgId=9001']) {
+      const res = await a.inject({ method: 'GET', url });
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toEqual({ error: 'bbiyong_forbidden', message: '삐용 단체관리 권한이 필요합니다' });
+    }
+  });
+});
+
 describe('GET /org-lookup/one — 단건', () => {
   it('단체 ID 로 찾고 딱지를 붙인다', async () => {
     const a = await build(session('operator', 1), fakeDeps());

@@ -36,9 +36,10 @@ async function build(tenant = false, rowCount = 1) {
   const db = fakeClient(tenant, rowCount);
   const deps: ReceiveDeps = {
     myMenus: async (token) =>
-      token === 'good' ? { kind: 'ok', screens: ['S021100010'] } : { kind: 'rejected' },
+      token === 'good' ? { kind: 'ok', screens: ['S021100010'], keys: { S021100010: ['F002'] } } : { kind: 'rejected' },
     myOrg: async () => ({ kind: 'rejected' }),
     orgGrantName: async () => null,
+    operatorGrantName: async () => 'S021100010:F002',
     apply: async (orgId, fields) => {
       if (await isTenantOrg(db.client, orgId)) return 'tenant';
       return (await patchLegalOrgFromBbiyong(db.client, { orgId, fields, actor: 'bbiyong' })) > 0 ? 'applied' : 'not_found';

@@ -571,6 +571,7 @@ export function DocFormSettingsView() {
         </section>
       </div>
 
+      {/** @screen s040900010p1 등기 설정 줄 삭제 · 090 설정 · 법무 서비스(s04) */}
       {confirmDelete && item && group ? (
         <ModalShell
           title={`${tabName} 줄 삭제`}

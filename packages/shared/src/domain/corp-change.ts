@@ -39,6 +39,8 @@
  */
 import type { ScopeRole } from '../session.ts';
 import { parseDay } from './day.ts';
+import { metroSurchargeOf } from './incorporation-tax.ts';
+import { sidoOf } from './korea-sido.ts';
 
 // =============================================================================
 // 코드 어휘
@@ -51,13 +53,122 @@ export const CORP_CHANGE_STATUS_CATEGORY = 'LAW_PROG_ST';
 export const CORP_CHANGE_CODE_USE_TP = '000';
 
 /**
- * 변경 구분 5종. **이 목록에 없으면 거절한다.**
+ * 변경 구분 6종(2026-11-01 타관할로의 본점이전 `HQ_OUT` 더함). **이 목록에 없으면 거절한다.**
  *
  * ★ 개발 DB 코드표에는 `CEO_CHG`(대표이사변경)도 있다 — **구현 없음, 나중.** 레거시에도
  *   입력 칸 정의가 없었다(결정 2026-10-09). 넣을 때 여기와 `CHANGE_TYPE_DEFS` 에 함께 넣는다.
  */
-export const CORP_CHANGE_TYPES = ['NAME', 'HQ', 'PURPOSE', 'OFFICER', 'CEO_ADDR'] as const;
+export const CORP_CHANGE_TYPES = ['NAME', 'HQ', 'HQ_OUT', 'PURPOSE', 'OFFICER', 'CEO_ADDR'] as const;
 export type CorpChangeType = (typeof CORP_CHANGE_TYPES)[number];
+
+// =============================================================================
+// 회사 형태별 구분 — 본점이전 (결정 2026-11-01)
+// =============================================================================
+
+/**
+ * 유한회사 회사유형 코드(`MEMBER_TYPE` — 입주사 000 · 비입주사 002 모두 `A`).
+ */
+export const LTD_MEMBER_TYPE = 'A';
+/** 주식회사 회사유형 코드 — 회사유형이 비었거나 R · A 가 아닌 회사는 이것으로 본다 · 규칙 줄이 없는 구분은 이것만 고른다(결정 2026-11-07). */
+export const STOCK_MEMBER_TYPE = 'R';
+
+/**
+ * 변경 구분별로 쓸 수 있는 회사유형 — 공통코드 `LAW_CNG_MT` / `000`(결정 2026-11-07).
+ * 코드값 = 변경 구분(`LAW_CNG_TP` 의 코드값), 이름 = 사람이 읽는 구분 이름(`LAW_CNG_TP` 의 이름과 같게),
+ * **설명** = 쓸 수 있는 회사유형 코드를 쉼표로(예 `R` · `A` · `R,A`) — 코드 모양 고침(결정 2026-11-07).
+ * 고칠 때는 코드 관리(s030100030)에서 그 줄의 「설명」을 고친다(한 업무는 한 화면).
+ */
+export const CORP_CHANGE_MEMBER_RULE_CATEGORY = 'LAW_CNG_MT';
+export const CORP_CHANGE_MEMBER_RULE_USE_TP = '000';
+
+/** 변경 구분 → 쓸 수 있는 회사유형 코드들. 줄이 없는 구분은 키가 없다. */
+export type ChangeTypeRules = Readonly<Record<string, readonly string[]>>;
+
+/** 코드 줄(`LAW_CNG_MT`) → 규칙. 설명을 쉼표로 나누고 앞뒤 공백 · 빈 칸은 버린다.
+ * 설명이 비면 줄이 없는 구분과 같다 — 주식회사(R)만(결정 2026-11-07). */
+export function parseChangeTypeRules(rows: readonly { code: string; description: string | null }[]): ChangeTypeRules {
+  const rules: Record<string, readonly string[]> = {};
+  for (const r of rows) {
+    const types = (r.description ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s !== '');
+    if (types.length > 0) rules[r.code] = types;
+  }
+  return rules;
+}
+
+/**
+ * 이 회사유형의 건이 고를 수 있는 구분인가(결정 2026-11-01 → 2026-11-07 공통 코드로).
+ *   · 규칙은 공통코드 `LAW_CNG_MT`(`parseChangeTypeRules`) — 구분의 설명에 회사유형 코드가 있으면 고를 수 있다
+ *   · 줄이 없는 구분은 주식회사(`R`)만 · 회사유형이 비었거나 R · A 가 아닌 회사(C · S · P · Z 등)는 주식회사로 본다
+     (예전 동작 유지, 결정 2026-11-07)
+ * ★ 화면(새 건 대화상자 선택지)과 서버(첫 저장 · 저장 · 작성완료 거절)가 이 함수 하나를 쓴다.
+ */
+export function changeTypeAllowedFor(
+  changeType: string,
+  memberType: string | null | undefined,
+  rules: ChangeTypeRules,
+): boolean {
+  const allowed = rules[changeType] ?? [STOCK_MEMBER_TYPE];
+  const type = memberType === STOCK_MEMBER_TYPE || memberType === LTD_MEMBER_TYPE ? memberType : STOCK_MEMBER_TYPE;
+  return allowed.includes(type);
+}
+
+/** 구분이 회사유형과 맞지 않을 때의 문구. 맞으면 null. 오류 자리는 `changeType`. */
+export function changeTypeMemberTypeError(
+  changeType: string,
+  memberType: string | null | undefined,
+  rules: ChangeTypeRules,
+): string | null {
+  if (changeTypeAllowedFor(changeType, memberType, rules)) return null;
+  return '이 회사유형은 고를 수 없는 변경 구분입니다 — 회사 정보의 회사유형을 확인하세요';
+}
+
+/**
+ * 타관할 본점이전 세금 안내 — 대도시 밖 → 대도시로 옮길 때만 「신규 본점주소*」 이름표 바로 옆에 괄호로
+ * 보인다(`hqOutTaxHint`, 결정 2026-11-07).
+ */
+export const HQ_OUT_TAX_HINT = '인구과밀지역 대도시 신설 전입으로 중과세금 확인을 하세요.';
+
+/**
+ * 타관할 본점이전 세금 안내(결정 2026-11-06) — 지금 본점(회사 정보)이 대도시 밖이고 새 본점이 대도시면
+ * `HQ_OUT_TAX_HINT`, 그 밖에는 null. 대도시 판단은 법인설립과 같은 `metroSurchargeOf`(본점이 서울이면
+ * 중과)다 — 기준을 한 곳에 둔다. 지금 본점 주소가 비면 판단할 수 없으므로 null.
+ */
+export function hqOutTaxHint(
+  currentHqAddress: string | null | undefined,
+  newHqAddress: string | null | undefined,
+): string | null {
+  if (!(currentHqAddress ?? '').trim()) return null;
+  if (metroSurchargeOf(null, currentHqAddress)) return null;
+  return metroSurchargeOf(null, newHqAddress) ? HQ_OUT_TAX_HINT : null;
+}
+
+/** 정관 변경 건 안내 — [서류 출력] 화면 위쪽 한 줄(`articlesChangeNotice`, 결정 2026-11-07). 종이에는 나가지 않는다. */
+export const ARTICLES_CHANGE_NOTICE = '정관 변경 건입니다 — 변경된 정관은 따로 준비하세요';
+
+/**
+ * 정관 변경 건 안내(결정 2026-11-07) — **정관 최종본이 없는 회사**(다른 곳 설립, 2026-11-08 1단계 밖)의 정관 변경 건.
+ * 어느 구분이 정관을 바꾸는지는 공통 코드 `LAW_CNG_AR`(`legal-articles.ts`, 2026-11-08 — 소스에 박지 않는다)의 역할이다:
+ *   · 역할이 없으면(임원 · 대표자 주소) null
+ *   · 본점 · 공고 밖의 역할(상호 · 목적)이 있으면 늘 `ARTICLES_CHANGE_NOTICE`
+ *   · 본점 · 공고만이면 지금 본점과 새 본점의 시·도가 다를 때만
+ * 시·도는 세금 안내와 같은 `sidoOf`(정관 제3조 「본점은 ○○에 둔다」가 시·도 단위다).
+ * 두 주소 중 하나라도 비면 비교할 수 없으므로 null.
+ */
+export function articlesChangeNotice(
+  roles: readonly string[],
+  currentHqAddress: string | null | undefined,
+  newHqAddress: string | null | undefined,
+): string | null {
+  if (roles.length === 0) return null;
+  if (roles.some((r) => r !== 'HQ' && r !== 'NOTICE')) return ARTICLES_CHANGE_NOTICE;
+  const from = sidoOf(currentHqAddress);
+  const to = sidoOf(newHqAddress);
+  if (!from || !to) return null;
+  return from !== to ? ARTICLES_CHANGE_NOTICE : null;
+}
 
 /**
  * 진행 상태 4종 — 서류작성중(P) → 작성완료(E) → 완료(C), 그리고 취소(X).
@@ -167,6 +278,18 @@ export const CHANGE_TYPE_DEFS: Readonly<Record<CorpChangeType, CorpChangeTypeDef
       { name: 'relocationDate', label: '이전일', type: 'date', required: true },
     ],
   },
+  // 타관할로의 본점이전(결정 2026-11-01 1) — 칸은 동일관할(HQ)과 같다. 유한회사 건만(`changeTypeAllowedFor`)
+  HQ_OUT: {
+    usesOfficers: false,
+    officerEffectiveDateRequired: false,
+    requiresCeoHome: false,
+    fields: [
+      // 세금 안내는 조건부라 칸 정의에 두지 않는다 — 화면이 `hqOutTaxHint` 로 붙인다(결정 2026-11-06)
+      { name: 'newHqAddress', label: '신규 본점주소', type: 'address', required: true },
+      { name: 'resolutionDate', label: '결의일', type: 'date', required: true },
+      { name: 'relocationDate', label: '이전일', type: 'date', required: true },
+    ],
+  },
   PURPOSE: {
     usesOfficers: false,
     officerEffectiveDateRequired: false,
@@ -260,7 +383,14 @@ export interface CorpChangeContent {
    * 기본정보의 대표자 자택 — 구분이 `requiresCeoHome` 일 때 본다. 없으면 「비어 있다」로 거절한다
    * (검증 없이 통과시키지 않는다). 입주사면 문구가 입주사 화면으로 보낸다.
    */
-  company?: { isTenant: boolean; ceoZipCode: string | null; ceoAddress: string | null };
+  company?: {
+    isTenant: boolean;
+    ceoZipCode: string | null;
+    ceoAddress: string | null;
+    memberType?: string | null;
+    /** 구분별 회사유형 규칙(`LAW_CNG_MT`). 없으면 모든 구분이 주식회사만이다(줄이 없는 구분과 같다). */
+    changeTypeRules?: ChangeTypeRules;
+  };
 }
 
 /** 대표자 자택 주소가 비었을 때의 자리 — 기본정보 카드의 그 칸 옆에 붙는다. */
@@ -383,6 +513,16 @@ export function validateCorpChange(content: CorpChangeContent): CorpChangeFieldE
       errors.push({ field: 'officers', message: '임원을 1명 이상 등록하세요' });
     }
     content.officers.forEach((o, i) => errors.push(...validateOfficer(o, i, def.officerEffectiveDateRequired)));
+  }
+
+  // 회사유형과 맞지 않는 구분(결정 2026-11-01 → 2026-11-07 공통 코드) — 회사값이 실려 온 때만 본다
+  if (content.company) {
+    const wrongType = changeTypeMemberTypeError(
+      content.changeType,
+      content.company.memberType ?? null,
+      content.company.changeTypeRules ?? {},
+    );
+    if (wrongType) errors.push({ field: 'changeType', message: wrongType });
   }
 
   if (def.requiresCeoHome) {
@@ -558,12 +698,13 @@ export const REGISTRATION_DEADLINE_DAYS = 14;
 
 /**
  * 구분별 등기 기준일 — 이 표 한 곳에서 정한다.
- *   상호 · 목적 = 결의일 · 본점 = 이전일 · 대표주소 = 전입일 · 임원 = 임원 효력일 중 **가장 이른 날**
+ *   상호 · 목적 = 결의일 · 본점(동일관할 · 타관할) = 이전일 · 대표주소 = 전입일 · 임원 = 임원 효력일 중 **가장 이른 날**
  */
 export const DEADLINE_BASIS: Readonly<Record<CorpChangeType, { label: string; field: string | null }>> = {
   NAME: { label: '결의일', field: 'resolutionDate' },
   PURPOSE: { label: '결의일', field: 'resolutionDate' },
   HQ: { label: '이전일', field: 'relocationDate' },
+  HQ_OUT: { label: '이전일', field: 'relocationDate' },
   CEO_ADDR: { label: '전입일', field: 'moveInDate' },
   OFFICER: { label: '효력일', field: null }, // 임원별 효력일 중 가장 이른 날
 };

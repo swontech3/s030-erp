@@ -26,23 +26,56 @@ export function embeddedNow(): boolean {
 }
 
 /**
+ * 안에 뜬 로그인 화면이 토큰을 기다리는 시간. 넘으면 입력칸을 보인다(삐용 요청 2026-11-08 「예: 5초」).
+ * ★ 「준비됨」 다시 보내기(1초 × 10번)보다 짧다 — 입력칸이 보인 뒤에 토큰이 와도 그대로 로그인된다.
+ */
+export const EMBED_WAIT_MS = 5000;
+
+/**
  * ERP 가 안에 떴을 때(로그인 화면) — 받은 토큰을 기존 로그인 자리로. 성공하면 원래 가려던 ERP 안 주소(redirect),
  * 없거나 바깥 주소면 그 사람의 홈으로(판정은 embedLoginTarget 한 곳)
+ *
+ * ★ 2026-11-08 — 안에 뜬 로그인 화면은 처음에 입력칸을 감추고 「잠시만요」만 보인다(`<html data-embedded>`).
+ *   `showForm` 은 입력칸을 보일 때 부른다 — ① 허용 주소가 비어 받을 길이 없을 때 바로 ② EMBED_WAIT_MS 안에
+ *   토큰이 안 왔을 때 ③ 받은 토큰으로 로그인하지 못했을 때. 받는 규칙(허용 주소 · ERP 안 주소)은 그대로다.
  */
-export function startInnerLogin(): () => void {
-  return startEmbedInner({
+export function startInnerLogin(showForm: () => void): () => void {
+  if (!embeddedNow()) return () => {};
+  if (ALLOWED.length === 0) {
+    showForm();
+    return () => {};
+  }
+  let waiting: ReturnType<typeof setTimeout> | null = setTimeout(showForm, EMBED_WAIT_MS);
+  const stopWaiting = () => {
+    if (waiting !== null) clearTimeout(waiting);
+    waiting = null;
+  };
+  const stopInner = startEmbedInner({
     win: win(),
     allowed: ALLOWED,
     login: async (tokens: EmbedTokens) => {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }),
-      });
-      const body = (await res.json().catch(() => null)) as { home?: string } | null;
-      if (res.ok && body?.home) window.location.assign(embedLoginTarget(window.location.search, body.home));
+      stopWaiting(); // 받았다 — 로그인 처리 중에 입력칸이 튀어나오지 않게
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }),
+        });
+        const body = (await res.json().catch(() => null)) as { home?: string } | null;
+        if (res.ok && body?.home) {
+          window.location.assign(embedLoginTarget(window.location.search, body.home));
+          return;
+        }
+      } catch {
+        /* 아래에서 입력칸을 보인다 */
+      }
+      showForm();
     },
   });
+  return () => {
+    stopWaiting();
+    stopInner();
+  };
 }
 
 /** ERP 가 바깥일 때(메뉴 틀) — 내 안에 뜬 창이 「준비됨」이면 서버에서 받은 삐용 토큰을 넘긴다(저장하지 않는다) */

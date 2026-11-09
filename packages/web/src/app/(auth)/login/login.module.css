@@ -65,3 +65,32 @@
 
 /* 원본은 min-width:1440px 고정이다. 반응형은 회의실 예약·현황판 두 화면만 한다
    (SWONBIZ_PROJECT_STRUCTURE.md §5). 여기서는 원본을 그대로 따른다. */
+
+/*
+ * ★ 2026-11-08 — 삐용 안에 떴을 때 — 입력칸을 감추고 「잠시만요」만 보인다(삐용 요청 「로그인 화면 깜박임」).
+ *   `<html data-embedded>` 는 루트 레이아웃 스크립트가 첫 페인트 전에 붙인다. 토큰이 안 오거나 로그인에
+ *   실패하면 화면이 `.embedReveal` 을 붙여 입력칸을 되살린다(lib/embed.ts startInnerLogin).
+ *   혼자 열렸으면 이 규칙들은 아무것도 하지 않는다 — 「잠시만요」는 감춰지고 입력칸은 그대로다.
+ */
+.embedWait {
+  display: none;
+}
+:global(html[data-embedded]) .embedWait {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  font-family: var(--font-core);
+  font-size: 15px;
+  color: var(--text-muted);
+}
+:global(html[data-embedded]) .embedForm {
+  display: none;
+}
+:global(html[data-embedded]) .embedReveal .embedWait {
+  display: none;
+}
+:global(html[data-embedded]) .embedReveal .embedForm {
+  display: block;
+}

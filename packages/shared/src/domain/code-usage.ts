@@ -196,6 +196,11 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
 
   // --- 세무 세무사 전달 서류 (s050500010) — 2026-11-07 추가. 218_tax_handoff.sql · 2026-11-08 224 로 표가 최종 발송(tb_s050_handoff_last)으로 바뀜 ---
   { category: 'TAX_HANDOFF_TP', useTp: '000', table: 'tb_s050_handoff_last', column: 'handoff_tp', label: '세무 세무사 전달 최종 발송' },
+  /**
+   * 법인설립 회사 형태(2026-10-31) — 파티션 **001**(법인설립용). 새 건을 만들 때 고른다.
+   * `domain/incorporation.ts` 의 `INCORP_ENTITY_USE_TP`.
+   */
+  { category: 'MEMBER_TYPE', useTp: '001', table: 'tb_s080_incorporations', column: 'entity_type', label: '법인설립 회사 형태' },
 ] as const;
 
 /** 앱 코드가 코드값을 **상수로** 들고 있는 자리 하나. */
@@ -266,7 +271,7 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
   {
     category: 'LAW_CNG_TP',
     useTp: '000',
-    codes: ['NAME', 'HQ', 'PURPOSE', 'OFFICER', 'CEO_ADDR'],
+    codes: ['NAME', 'HQ', 'HQ_OUT', 'PURPOSE', 'OFFICER', 'CEO_ADDR'],
     source: 'packages/shared/src/domain/corp-change.ts (CORP_CHANGE_TYPES)',
     label: '법인변경 구분별 입력 칸',
   },
@@ -456,6 +461,24 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     codes: ['NTAX', 'LTAX'],
     source: 'packages/shared/src/domain/tax-payments.ts (PAY_SRCS)',
     label: '세무 세금 납부 구분',
+  },
+  /**
+   * 법인설립 회사 형태 · 설립 구분 — 형태마다 이름표 · 검증 · 서류 묶음이, 구분마다 등기 설정 줄이 박혀 있다.
+   * ★ 2026-10-31 추가(유한회사 설립).
+   */
+  {
+    category: 'MEMBER_TYPE',
+    useTp: '001',
+    codes: ['R', 'A'],
+    source: 'packages/shared/src/domain/incorporation.ts (INCORP_ENTITY_TYPES)',
+    label: '법인설립 회사 형태',
+  },
+  {
+    category: 'LAW_EST_TP',
+    useTp: '000',
+    codes: ['R_PROMOTER', 'U_P'],
+    source: 'packages/shared/src/domain/incorporation.ts (INCORP_METHOD · INCORP_LTD_METHOD)',
+    label: '법인설립 설립 구분',
   },
 ] as const;
 

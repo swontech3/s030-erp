@@ -57,7 +57,7 @@ if (!bbiyongMock && !bbiyongBaseUrl) {
 // =============================================================================
 // ★★ **주소에서 추측하지 않는다.** 예전에는 포트로 갈랐다(8082=개발계 · 8080=가동계).
 //    그 규칙이 깨졌다 — 삐용 개발계는 `192.168.0.22:8082`, 가동계는
-//    `192.168.0.14:8082` 로 **포트가 같고 호스트가 다르다.** 호스트로 갈라도 같은
+//    `192.168.0.14:8080` 로 **포트가 같고 호스트가 다르다.** 호스트로 갈라도 같은
 //    사고가 반복된다: 가동계가 도메인·HTTPS 로 바뀌는 순간 또 틀린다.
 //    그래서 계통은 **사람이 선언하고** ERP 는 그 선언을 읽는다.
 //
@@ -175,6 +175,13 @@ const ntsServiceKey = process.env.DATA_GO_KR_KEY?.trim() || null;
  */
 const smtp = smtpConfigOf(process.env);
 
+/**
+ * Claude API 키 — 사업목적 [AI 추천](결정 2026-10-27).
+ *
+ * ★ **없어도 기동한다.** 없으면 [AI 추천]만 「쓸 수 없습니다」 — 일반 추천은 그대로 나온다.
+ */
+const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim() || null;
+
 const key = Buffer.from(required('ERP_ENCRYPTION_KEY'), 'base64');
 if (key.length !== 32) {
   throw new Error(`ERP_ENCRYPTION_KEY 는 base64 로 32바이트여야 한다(현재 ${key.length}바이트).`);
@@ -217,6 +224,8 @@ export const env = {
   ntsServiceKey,
   /** SMTP 설정. `null` 이면 메일 보내기만 꺼진다. */
   smtp,
+  /** Claude API 키. `null` 이면 [AI 추천]만 꺼진다. */
+  anthropicApiKey,
   port: Number(process.env.PORT ?? 3001),
   /**
    * 세션 유효기간 — 삐용 refresh 만료를 넘지 않아야 한다.

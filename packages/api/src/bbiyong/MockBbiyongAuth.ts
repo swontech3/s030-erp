@@ -69,6 +69,8 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     orgName: '에스원비즈',
     scope: 'operator',
     bbiyongMenus: ['S021100010'],
+    // ★ 단체관리의 수정 키 — 받기 셋은 이 키까지 있어야 운영사로 본다(공통 코드 BBIYONG_EDIT_GRANT/OPERATOR, 2026-11-08)
+    bbiyongMenuKeys: { S021100010: ['F002'] },
     // ★ s030200030·s030200040·s030200080 은 운영사 전용(audience_tp='P')이다.
     //   입주사 계정에는 넣지 않는다 — 문의 관리(080)에는 남의 이름·연락처가 모여 있다.
     //   계약 폼(s030200040)은 사이드바에 없고 계약 상세·목록에서 들어가지만, 목록에 없으면
@@ -81,7 +83,7 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     //   회사는 법인변경 상세의 고르기 팝업으로 읽기만 한다(화면 권한이 아니라 목록 API 로).
     // ★ s040100010 법인설립 · 상세 s040100020(10-4, 2026-10-11) — 운영사 · 회사 모두. 목록과 상세는 늘 함께 준다.
     // ★ s040900010 설정(등기 설정, 2026-10-18)은 **운영사 전용**이다 — 회사 계정에는 넣지 않는다.
-    screens: ['s030000050', 's030000060', 's030100010', 's030100020', 's030100030', 's030200030', 's030200040', 's030200070', 's030200080', 's030600010', 's040100010', 's040100020', 's040200010', 's040200011', 's040300010', 's040900010', 's050100010', 's050100020', 's050200010', 's050300010', 's050300040', 's050300050', 's050300060', 's050400010', 's050400020', 's050500010'],
+    screens: ['s030000050', 's030000060', 's030100010', 's030100020', 's030100021', 's030100030', 's030200030', 's030200040', 's030200070', 's030200080', 's030600010', 's040100010', 's040100020', 's040200010', 's040200011', 's040300010', 's040900010', 's050100010', 's050100020', 's050200010', 's050300010', 's050300040', 's050300050', 's050300060', 's050400010', 's050400020', 's050500010'],
   },
   {
     email: 'operator@s-wontech.co.kr',
@@ -92,8 +94,10 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     orgName: '에스원비즈',
     scope: 'operator',
     bbiyongMenus: ['S021100010'],
+    // ★ 단체관리의 수정 키 — 받기 셋은 이 키까지 있어야 운영사로 본다(공통 코드 BBIYONG_EDIT_GRANT/OPERATOR, 2026-11-08)
+    bbiyongMenuKeys: { S021100010: ['F002'] },
     // ★ admin 계정과 같은 목록이다(위 주석 참조) — 센터 관리·표양식 관리·코드 관리·법인변경 포함.
-    screens: ['s030000050', 's030000060', 's030100010', 's030100020', 's030100030', 's030200030', 's030200040', 's030200070', 's030200080', 's030600010', 's040100010', 's040100020', 's040200010', 's040200011', 's040300010', 's040900010', 's050100010', 's050100020', 's050200010', 's050300010', 's050300040', 's050300050', 's050300060', 's050400010', 's050400020', 's050500010'],
+    screens: ['s030000050', 's030000060', 's030100010', 's030100020', 's030100021', 's030100030', 's030200030', 's030200040', 's030200070', 's030200080', 's030600010', 's040100010', 's040100020', 's040200010', 's040200011', 's040300010', 's040900010', 's050100010', 's050100020', 's050200010', 's050300010', 's050300040', 's050300050', 's050300060', 's050400010', 's050400020', 's050500010'],
   },
   {
     email: 'tenant@test.com',
@@ -141,6 +145,9 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
   },
 ];
 
+/** 모의 모드에 mock 토큰이 아닌 토큰이 왔을 때(화면 로그인) — `verifySession`. */
+export const MOCK_SCREEN_LOGIN_MESSAGE = '모의 모드에서는 화면 로그인이 되지 않습니다 — BBIYONG_MOCK=false 로';
+
 export function findMockAccount(memberId: number): MockAccount | undefined {
   return MOCK_ACCOUNTS.find((a) => a.memberId === memberId);
 }
@@ -157,10 +164,13 @@ export class MockBbiyongAuth implements BbiyongAuth {
    *
    * ★ 2026-10-22 부터 로그인 화면은 **브라우저가 삐용을 직접** 부른다(규격서 Q6). 그래서 MOCK 모드에서
    *   화면 로그인은 되지 않는다 — 이 메서드는 시험 · 대본이 mock 토큰으로 세션을 만들 때 쓴다.
+   * ★ mock 토큰이 아니면(화면이 진짜 삐용 토큰을 보낸 것) 그렇게 안내한다(2026-10-27) — 「비밀번호가
+   *   올바르지 않습니다」로 두면 맞는 비밀번호를 계속 의심하게 된다.
    */
   async verifySession(accessToken: string, refreshToken: string): Promise<BbiyongLoginResult> {
     const [kind, id] = accessToken.split('.');
-    const account = kind === 'mock-access' ? findMockAccount(Number(id)) : undefined;
+    if (kind !== 'mock-access') throw new BbiyongAuthError(MOCK_SCREEN_LOGIN_MESSAGE);
+    const account = findMockAccount(Number(id));
     if (!account) throw new BbiyongAuthError(INVALID_CREDENTIALS_MESSAGE);
     return {
       memberId: account.memberId,

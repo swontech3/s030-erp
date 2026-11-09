@@ -8,7 +8,14 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ErpSession, ScopeRole } from '@swonbiz/shared';
 import type { BizRecommendDetail } from '@swonbiz/shared/domain/biz-purpose-recommend';
-import { bizDetailOp, recommendBizOp, registerBizRecommendRoutes, type BizRecommendDeps } from './bizRecommend.ts';
+import {
+  bizDetailOp,
+  prepareAiOp,
+  recommendBizOp,
+  recommendPageOp,
+  registerBizRecommendRoutes,
+  type BizRecommendDeps,
+} from './bizRecommend.ts';
 import type { ScopedClient } from '../db/withCompanyScope.ts';
 
 const session = (role: ScopeRole): ErpSession => ({
@@ -36,11 +43,15 @@ function fakeDeps(): BizRecommendDeps & { calls: unknown[][] } {
     calls,
     recommend: async (_s, q) => {
       calls.push(['recommend', q]);
-      return { items: [], truncated: false };
+      return { items: [], truncated: false, aiEnabled: false };
     },
     detail: async (_s, bizCode) => {
       calls.push(['detail', bizCode]);
       return bizCode === '552303' ? DETAIL : null;
+    },
+    ai: async (_s, q) => {
+      calls.push(['ai', q]);
+      return { items: [], truncated: false, ai: { ok: false, message: '안내' } };
     },
   };
 }
@@ -67,7 +78,7 @@ describe('GET /legal/biz-purposes/recommend', () => {
     const a = await build('tenant', deps);
     const res = await a.inject({ method: 'GET', url: `/legal/biz-purposes/recommend?q=${encodeURIComponent(' 카페 ')}` });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ items: [], truncated: false });
+    expect(res.json()).toEqual({ items: [], truncated: false, aiEnabled: false });
     expect(deps.calls).toEqual([['recommend', '카페']]);
   });
   it('빈 설명은 400', async () => {
@@ -147,5 +158,75 @@ describe('recommendBizOp · bizDetailOp', () => {
 
   it('없는 업종코드는 null', async () => {
     expect(await bizDetailOp(fakeClient([]), '999999')).toBeNull();
+  });
+});
+
+describe('POST /legal/biz-purposes/recommend/ai', () => {
+  it('★ 회사 세션도 부른다 — 설명은 앞뒤 공백을 걷어 넘긴다', async () => {
+    const deps = fakeDeps();
+    const a = await build('tenant', deps);
+    const res = await a.inject({ method: 'POST', url: '/legal/biz-purposes/recommend/ai', payload: { q: ' 카페 ' } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ items: [], truncated: false, ai: { ok: false, message: '안내' } });
+    expect(deps.calls).toEqual([['ai', '카페']]);
+  });
+  it('빈 설명 · 본문 없음은 400 — AI 를 부르지 않는다', async () => {
+    const deps = fakeDeps();
+    const a = await build('operator', deps);
+    expect((await a.inject({ method: 'POST', url: '/legal/biz-purposes/recommend/ai', payload: { q: ' ' } })).statusCode).toBe(400);
+    expect((await a.inject({ method: 'POST', url: '/legal/biz-purposes/recommend/ai', payload: {} })).statusCode).toBe(400);
+    expect(deps.calls).toEqual([]);
+  });
+});
+
+/** 공통 코드 AI_SETTING 줄 — ENABLED 값만 바꿔 본다. */
+const aiSettingRows = (enabled: string) => [
+  { category: 'AI_SETTING', code: 'MODEL', name: 'claude-sonnet-5-5', sort_order: 1 },
+  { category: 'AI_SETTING', code: 'MAX_PICKS', name: '5', sort_order: 2 },
+  { category: 'AI_SETTING', code: 'REASON_MAX', name: '100', sort_order: 3 },
+  { category: 'AI_SETTING', code: 'MAX_TOKENS', name: '1000', sort_order: 4 },
+  { category: 'AI_SETTING', code: 'ENABLED', name: enabled, sort_order: 5 },
+];
+
+const coffeeClient = (enabled: string) =>
+  fakeClient([
+    [/tb_s080_biz_code d/, [
+      { biz_code: '552303', biz_type: '숙박 및 음식점업', item_name: '커피 전문점', ksic: [] },
+      { biz_code: '552304', biz_type: '숙박 및 음식점업', item_name: '커피 음료점', ksic: [] },
+    ]],
+    [/unnest/, aiSettingRows(enabled)],
+    [/tb_s080_biz_purpose_catalog/, [{ biz_code: '552303', biz_name: '커피 전문점 운영업' }]],
+  ]);
+
+describe('recommendPageOp — aiEnabled', () => {
+  it('★ ENABLED = Y 일 때만 true · N 이면 false(일반 추천은 같다)', async () => {
+    const on = await recommendPageOp(coffeeClient('Y'), '커피');
+    const off = await recommendPageOp(coffeeClient('N'), '커피');
+    expect(on.aiEnabled).toBe(true);
+    expect(off.aiEnabled).toBe(false);
+    expect(off.items.map((c) => c.bizCode)).toEqual(['552303', '552304']);
+  });
+});
+
+describe('prepareAiOp', () => {
+  it('★ ENABLED = N 이면 꺼짐 — 후보 문구 · 설정을 읽지 않는다', async () => {
+    const client = coffeeClient('N');
+    const p = await prepareAiOp(client, '커피');
+    expect(p).toMatchObject({ enabled: false, candidates: [], settings: null });
+    expect(p.items.map((c) => c.bizCode)).toEqual(['552303', '552304']);
+    expect(client.sql.some((s) => s.includes('tb_s080_biz_purpose_catalog'))).toBe(false);
+  });
+
+  it('후보마다 서버 문구(카탈로그 → 종목) · 설정은 공통 코드 AI_SETTING · ★ 인허가는 읽지 않는다', async () => {
+    const client = coffeeClient('Y');
+    const p = await prepareAiOp(client, '커피');
+    expect(p.enabled).toBe(true);
+    expect(p.items.map((c) => c.bizCode)).toEqual(['552303', '552304']);
+    expect(p.candidates.map((c) => c.purpose)).toEqual([
+      { text: '커피 전문점 운영업', source: 'catalog' },
+      { text: '커피 음료점', source: 'item' },
+    ]);
+    expect(p.settings).toEqual({ model: 'claude-sonnet-5-5', maxPicks: 5, reasonMax: 100, maxTokens: 1000 });
+    expect(client.sql.some((s) => s.includes('tb_s080_license_rule'))).toBe(false);
   });
 });
