@@ -326,3 +326,70 @@ describe('HttpBbiyongAuth.myOrg', () => {
     await expect(auth.myOrg('eyJ.in')).rejects.toBeInstanceOf(BbiyongUnavailableError);
   });
 });
+
+// =============================================================================
+// 세무사 전달 발송인 메일 · 대표자(2026-11-10) — my-orgs 지금 계정 메일 · 내 단체 정보
+// =============================================================================
+describe('HttpBbiyongAuth.myEmail — my-orgs 지금 계정(current) 줄의 email', () => {
+  const body = {
+    status: 200, result: 'success', massage: null, error: null,
+    data: [
+      { memberId: 4903, orgId: 7, orgName: '다른 회사', memberName: '홍길동', email: '', current: false },
+      { memberId: 4902, orgId: 1, orgName: '지어낸 회사', memberName: '홍길동', email: 'me@example.com', current: true },
+    ],
+  };
+
+  it('Bearer 머리글로 my-orgs 를 부르고 지금 계정 줄의 메일을 준다', async () => {
+    const { impl, calls } = stubFetch(json(body));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+    expect(await auth.myEmail('eyJ.access')).toBe('me@example.com');
+    expect(calls[0]!.url).toBe(`${BASE}/rest/v1/s021200010/my-orgs`);
+    expect((calls[0]!.init.headers as Record<string, string>).authorization).toBe('Bearer eyJ.access');
+  });
+
+  it('지금 계정 줄의 메일이 비었거나 줄이 없으면 null', async () => {
+    const empty = { ...body, data: [{ ...body.data[1], email: '' }] };
+    expect(await new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(json(empty)).impl }).myEmail('t')).toBeNull();
+    const none = { ...body, data: body.data.map((r) => ({ ...r, current: false })) };
+    expect(await new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(json(none)).impl }).myEmail('t')).toBeNull();
+  });
+
+  it('401 은 토큰 만료로 던진다(callBbiyong 이 재발급) · 연결 실패는 장애로 던진다', async () => {
+    await expect(new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(json({}, 401)).impl }).myEmail('t')).rejects.toBeInstanceOf(BbiyongTokenExpiredError);
+    const down = stubFetch(async () => { throw new TypeError('fetch failed'); });
+    await expect(new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: down.impl }).myEmail('t')).rejects.toBeInstanceOf(BbiyongUnavailableError);
+  });
+});
+
+describe('HttpBbiyongAuth.orgRep — GET /s021100020/org?orgId= 의 대표자', () => {
+  const ok = (data: unknown) => json({ status: 200, result: 'success', massage: null, error: null, data });
+
+  it('orgId 를 주소에 싣고 Bearer 로 부른다 — 이름 memberName · 메일 emailFst@emailSnd', async () => {
+    const { impl, calls } = stubFetch(ok({ orgId: 9001, memberName: '최대표', emailFst: 'ceo', emailSnd: 'example.com' }));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+    expect(await auth.orgRep(9001, 'eyJ.access')).toEqual({ name: '최대표', email: 'ceo@example.com' });
+    expect(calls[0]!.url).toBe(`${BASE}/rest/v1/s021100020/org?orgId=9001`);
+    expect((calls[0]!.init.headers as Record<string, string>).authorization).toBe('Bearer eyJ.access');
+  });
+
+  it('메일 반쪽만 있으면 메일 없음(이름은 그대로)', async () => {
+    const a = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(ok({ memberName: '최대표', emailFst: 'ceo', emailSnd: '' })).impl });
+    expect(await a.orgRep(9001, 't')).toEqual({ name: '최대표', email: null });
+    const b = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(ok({ memberName: '최대표', emailFst: null, emailSnd: 'example.com' })).impl });
+    expect(await b.orgRep(9001, 't')).toEqual({ name: '최대표', email: null });
+  });
+
+  it('★ 403(HTTP · 본문 status 403 AUTHZ_DENY)은 대표자 없음(null) — 던지지 않는다', async () => {
+    expect(await new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(json({}, 403)).impl }).orgRep(9001, 't')).toBeNull();
+    const deny = json({ status: 403, result: 'fail', massage: '권한 없음', error: ['AUTHZ_DENY'], data: null });
+    expect(await new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(deny).impl }).orgRep(9001, 't')).toBeNull();
+  });
+
+  it('업무 실패 · 빈 data 는 null · 연결 실패 · 시간 초과는 장애로 던진다', async () => {
+    const fail = json({ status: 400, result: 'fail', massage: '없음', error: null, data: null });
+    expect(await new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(fail).impl }).orgRep(9001, 't')).toBeNull();
+    expect(await new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(ok(null)).impl }).orgRep(9001, 't')).toBeNull();
+    const timeout = stubFetch(async () => { throw new DOMException('The operation was aborted due to timeout', 'TimeoutError'); });
+    await expect(new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: timeout.impl }).orgRep(9001, 't')).rejects.toBeInstanceOf(BbiyongUnavailableError);
+  });
+});

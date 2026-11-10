@@ -19,6 +19,8 @@ import {
   INVALID_CREDENTIALS_MESSAGE,
   type BbiyongAuth,
   type BbiyongLoginResult,
+  type BbiyongOrgRep,
+  type BbiyongPeopleLookup,
   type BbiyongProfile,
   type MyMenusOutcome,
   type MyOrgOutcome,
@@ -158,7 +160,19 @@ function accountOfMockToken(accessToken: string): MockAccount | undefined {
   return m ? findMockAccount(Number(m[1])) : undefined;
 }
 
-export class MockBbiyongAuth implements BbiyongAuth {
+/**
+ * 단체 대표자(세무사 전달 참조 화면 확인용, 2026-11-10) — 삐용 「내 단체 정보」의 자리.
+ * ★ 운영사(1)는 김대표(admin) — operator 로 보내면 참조가 붙고 admin 으로 보내면 안 붙는다.
+ *   입주사(9001)는 지어낸 대표자 — tenant(홍길동)로 보내면 참조가 붙는다. 비입주사(9003)는 이법무 자신(참조 없음).
+ *   9002 는 대표자를 두지 않는다(대표자 모름 → 참조 없음).
+ */
+export const MOCK_ORG_REPS: Readonly<Record<number, BbiyongOrgRep>> = {
+  1: { name: '김대표', email: 'admin@s-wontech.co.kr' },
+  9001: { name: '최대표', email: 'ceo-9001@example.com' },
+  9003: { name: '이법무', email: 'nontenant@test.com' },
+};
+
+export class MockBbiyongAuth implements BbiyongAuth, BbiyongPeopleLookup {
   /**
    * 토큰 확인 — `mock-access.{memberId}.…` 모양의 토큰만 그 mock 계정으로 받는다(2026-10-22).
    *
@@ -203,6 +217,17 @@ export class MockBbiyongAuth implements BbiyongAuth {
   async myOrg(accessToken: string): Promise<MyOrgOutcome> {
     const account = accountOfMockToken(accessToken);
     return account ? { kind: 'ok', orgId: account.orgId } : { kind: 'rejected' };
+  }
+
+  /** 지금 계정 메일 — mock 토큰의 계정 email(my-orgs 의 자리). 모양이 아니면 null. */
+  async myEmail(accessToken: string): Promise<string | null> {
+    return accountOfMockToken(accessToken)?.email ?? null;
+  }
+
+  /** 내 단체 대표자 — `MOCK_ORG_REPS`. mock 토큰이 아니면 null(삐용의 거절 자리). */
+  async orgRep(orgId: number, accessToken: string): Promise<BbiyongOrgRep | null> {
+    if (!accountOfMockToken(accessToken)) return null;
+    return MOCK_ORG_REPS[orgId] ?? null;
   }
 
   async signOut(_refreshToken: string): Promise<void> {

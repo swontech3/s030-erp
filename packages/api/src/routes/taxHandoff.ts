@@ -15,6 +15,7 @@
  * ★ 받는 사람은 세무 설정의 세무사 메일 가운데서만 — 다른 주소는 400(아무 주소로나 보내지 않는다).
  * ★ 참조는 서버가 정한다 — 발송인이 대표자가 아니면 대표자(화면이 보낸 참조는 받지 않는다). 보내는 주소는 SMTP_FROM,
  *   보내는 이름은 로그인 사람 이름, 답장 주소(Reply-To)는 로그인 사람 메일(`handoffPeople` — 삐용에서 얻지 못한 칸은 빼고 보낸다).
+ *   메일 · 대표자는 기존 삐용 조회 my-orgs · 내 단체 정보를 로그인한 사람의 토큰으로 읽는다(2026-11-10, 삐용 팀 요청 없음).
  * ★ 메일 보내기는 트랜잭션 밖에서 한다 — 준비(읽기 · 엑셀) 한 번, 보내기, 최종 발송 덮어쓰기 한 번(성공할 때만).
  */
 import type { FastifyInstance } from 'fastify';
@@ -48,7 +49,8 @@ import { requireSession } from '../session/hook.ts';
 import type { ScopedClient } from '../db/withCompanyScope.ts';
 import { listCategoryNames } from '../db/taxClassify.ts';
 import { getHandoffLast, listHandoffBankRows, upsertHandoffLast, type HandoffBankRow, type HandoffLastKey, type NewHandoffLast } from '../db/taxHandoff.ts';
-import { bbiyongAuth } from '../bbiyong/index.ts';
+import { bbiyongAuth, bbiyongPeople, type BbiyongPeopleLookup } from '../bbiyong/index.ts';
+import { callBbiyong } from '../session/bbiyongToken.ts';
 import { env } from '../env.ts';
 import { buildXlsx, sendXlsx, type XlsxSheet } from '../lib/xlsxExport.ts';
 import { MAIL_NOT_READY, createMailer, type Mailer } from '../lib/mailer.ts';
@@ -310,21 +312,58 @@ export function handoffCc(p: HandoffPeople): HandoffPerson | null {
   return me === repMail ? null : p.rep;
 }
 
-/**
- * 삐용에서 사람을 읽는다(11-08 ⑧). ★ 실패는 빈 채로 — 메일은 그 부분 없이 보낸다.
- *   발송인 이름   `getProfile(memberId).memberName` — 있다
- *   발송인 메일   삐용 회원 표시정보(`BbiyongProfile`)에 메일 칸이 없다 → null(답장 주소 없이 보낸다)
- *   대표자        삐용 단체 조회(`getOrg`)에 대표자 메일이 없고 실연동은 규격 대기(unsupported) → null(참조 없이 보낸다)
- */
-async function handoffPeople(session: ErpSession): Promise<HandoffPeople> {
-  let name: string | null = null;
-  try {
-    name = (await bbiyongAuth.getProfile(session.s020MemberId))?.memberName || null;
-  } catch {
-    name = null;
-  }
-  return { sender: { name, email: null }, rep: null };
+/** 삐용 세 조회 — 발송인 이름 · 발송인 메일 · 대표자. 각각 실패하면 던진다(`readHandoffPeople` 이 null 로 받는다). */
+export interface HandoffPeopleSource {
+  senderName(): Promise<string | null>;
+  senderEmail(): Promise<string | null>;
+  rep(): Promise<HandoffPerson | null>;
 }
+
+/**
+ * 발송인 · 대표자를 함께 읽는다(2026-11-10). ★ 어느 조회가 실패(403 · 장애 · 시간 초과)해도 그 칸만 null —
+ * 화면 · 보내기는 그대로 돈다(오류를 내지 않는다). 대표자 메일이 없으면 참조도 없다(`handoffCc`).
+ */
+export async function readHandoffPeople(src: HandoffPeopleSource): Promise<HandoffPeople> {
+  const safe = async <T>(f: () => Promise<T | null>): Promise<T | null> => {
+    try {
+      return await f();
+    } catch {
+      return null;
+    }
+  };
+  const [name, email, rep] = await Promise.all([safe(src.senderName), safe(src.senderEmail), safe(src.rep)]);
+  return { sender: { name: name || null, email: email || null }, rep };
+}
+
+/** `bbiyongPeopleSource` 가 쓰는 바깥 — 시험이 삐용 없이 갈아 끼운다. */
+export interface BbiyongPeopleDeps {
+  profileName(memberId: number): Promise<string | null>;
+  /** 로그인한 사람의 삐용 토큰으로 부른다(`callBbiyong` — 401 이면 재발급). */
+  call<T>(erpSid: string, fn: (accessToken: string) => Promise<T>): Promise<T>;
+  lookup: BbiyongPeopleLookup;
+}
+
+/**
+ * 삐용에서 사람을 읽는다(11-08 ⑧ · 2026-11-10 메일 · 대표자). 삐용 호출은 두 번 — 세무사 전달 화면 읽기 · 보내기마다.
+ *   발송인 이름   `getProfile(memberId).memberName`(로그인 때 받은 값)
+ *   발송인 메일   `GET /s021200010/my-orgs` 의 지금 계정(current) 줄 `email`
+ *   대표자        `GET /s021100020/org?orgId=(세션 단체)` — 이름 `memberName` · 메일 `emailFst@emailSnd`
+ */
+export function bbiyongPeopleSource(session: ErpSession, deps: BbiyongPeopleDeps): HandoffPeopleSource {
+  return {
+    senderName: () => deps.profileName(session.s020MemberId),
+    senderEmail: () => deps.call(session.erpSid, (t) => deps.lookup.myEmail(t)),
+    rep: () => deps.call(session.erpSid, (t) => deps.lookup.orgRep(session.s020OrgId, t)),
+  };
+}
+
+const liveBbiyongPeople: BbiyongPeopleDeps = {
+  profileName: async (memberId) => (await bbiyongAuth.getProfile(memberId))?.memberName || null,
+  call: callBbiyong,
+  lookup: bbiyongPeople,
+};
+
+const handoffPeople = (session: ErpSession): Promise<HandoffPeople> => readHandoffPeople(bbiyongPeopleSource(session, liveBbiyongPeople));
 
 const withPeople = (r: TaxHandoffResponse, p: HandoffPeople): TaxHandoffResponse => ({ ...r, sender: p.sender, cc: handoffCc(p) });
 

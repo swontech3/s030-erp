@@ -28,6 +28,8 @@ import {
   RELOGIN_MESSAGE,
   type BbiyongAuth,
   type BbiyongLoginResult,
+  type BbiyongOrgRep,
+  type BbiyongPeopleLookup,
   type BbiyongProfile,
   type MyMenusOutcome,
   type MyOrgOutcome,
@@ -199,7 +201,33 @@ export interface HttpBbiyongAuthOptions {
   timeoutMs?: number;
 }
 
-export class HttpBbiyongAuth implements BbiyongAuth {
+/** 내 단체 정보 — 대표자 이름 · 메일(세무사 전달 참조, 2026-11-10). 기존 삐용 조회. */
+export const BBIYONG_ORG_INFO_PATH = '/rest/v1/s021100020/org';
+
+/** my-orgs 본문 → 지금 계정(current:true) 줄의 email. 확인할 수 없거나 비었으면 null. 던지지 않는다. */
+export function parseMyOrgsEmail(body: unknown): string | null {
+  const root = asRecord(body);
+  if (!root || root.result !== 'success' || root.status !== 200 || !Array.isArray(root.data)) return null;
+  const row = root.data.map(asRecord).find((r) => r?.current === true);
+  return str(typeof row?.email === 'string' ? row.email.trim() : null);
+}
+
+/**
+ * 내 단체 정보 본문 → 대표자. 성공(`result` · `status` 200)이 아니거나 data 가 없으면 null(403 AUTHZ_DENY 포함).
+ * ★ 메일은 `emailFst` · `emailSnd` 둘 다 있을 때만 붙인다. data 가 배열이면 첫 줄.
+ */
+export function parseOrgRep(body: unknown): BbiyongOrgRep | null {
+  const root = asRecord(body);
+  if (!root || root.result !== 'success' || root.status !== 200) return null;
+  const data = asRecord(Array.isArray(root.data) ? root.data[0] : root.data);
+  if (!data) return null;
+  const trim = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+  const fst = trim(data.emailFst);
+  const snd = trim(data.emailSnd);
+  return { name: trim(data.memberName), email: fst && snd ? `${fst}@${snd}` : null };
+}
+
+export class HttpBbiyongAuth implements BbiyongAuth, BbiyongPeopleLookup {
   readonly #baseUrl: string;
   readonly #fetch: typeof fetch;
   readonly #timeoutMs: number;
@@ -356,6 +384,38 @@ export class HttpBbiyongAuth implements BbiyongAuth {
     }
     const me = parseMyOrgs(body);
     return me ? { kind: 'ok', orgId: me.orgId } : { kind: 'rejected' };
+  }
+
+  /**
+   * 지금 계정 메일(세무사 전달 발송인, 2026-11-10) — my-orgs 를 로그인한 사람의 토큰으로(`callBbiyong`).
+   * ★ 401 은 토큰 만료로 던진다(재발급은 `callBbiyong`). 연결 · 그 밖 HTTP 오류는 장애로 던진다 — 부르는 쪽이 null 로 받는다.
+   */
+  async myEmail(accessToken: string): Promise<string | null> {
+    const body = await this.#call(
+      `${this.#baseUrl}${BBIYONG.MY_ORGS_PATH}`,
+      { method: 'GET', headers: { authorization: `Bearer ${accessToken}` } },
+      'my-orgs',
+    );
+    return parseMyOrgsEmail(body);
+  }
+
+  /**
+   * 내 단체 대표자(세무사 전달 참조, 2026-11-10) — `GET /s021100020/org?orgId=`.
+   * ★ 403(HTTP · 본문 AUTHZ_DENY)은 null — 권한 없는 계정은 대표자를 모르는 것으로 둔다. 401 · 연결 문제는 던진다.
+   */
+  async orgRep(orgId: number, accessToken: string): Promise<BbiyongOrgRep | null> {
+    let body: unknown;
+    try {
+      body = await this.#call(
+        `${this.#baseUrl}${BBIYONG_ORG_INFO_PATH}?${new URLSearchParams({ orgId: String(orgId) }).toString()}`,
+        { method: 'GET', headers: { authorization: `Bearer ${accessToken}` } },
+        '내 단체 정보',
+      );
+    } catch (err) {
+      if (err instanceof BbiyongUnavailableError && err.httpStatus === 403) return null;
+      throw err;
+    }
+    return parseOrgRep(body);
   }
 
   /**

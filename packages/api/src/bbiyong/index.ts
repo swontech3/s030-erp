@@ -13,7 +13,7 @@ import { MockBbiyongAcl } from './MockBbiyongAcl.ts';
 import { MockBbiyongOrg } from './MockBbiyongOrg.ts';
 import { HttpBbiyongAuth } from './HttpBbiyongAuth.ts';
 import { HttpBbiyongOrg } from './HttpBbiyongOrg.ts';
-import type { BbiyongAcl, BbiyongAuth, BbiyongOrg } from './types.ts';
+import type { BbiyongAcl, BbiyongAuth, BbiyongOrg, BbiyongPeopleLookup } from './types.ts';
 
 export const bbiyongAuth: BbiyongAuth = (() => {
   if (env.bbiyongMock) return new MockBbiyongAuth();
@@ -22,6 +22,14 @@ export const bbiyongAuth: BbiyongAuth = (() => {
   if (!env.bbiyongBaseUrl) throw new Error('BBIYONG_BASE_URL 이 없다 — 삐용 실연동으로 기동할 수 없다.');
   return new HttpBbiyongAuth({ baseUrl: env.bbiyongBaseUrl });
 })();
+
+/**
+ * 지금 계정 메일 · 내 단체 대표자(세무사 전달, 2026-11-10) — 인증 어댑터와 같은 갈래(mock / http).
+ * ★ URL 검사는 바로 위 `bbiyongAuth` 가 이미 했다. 부를 때는 `callBbiyong` 을 거친다.
+ */
+export const bbiyongPeople: BbiyongPeopleLookup = env.bbiyongMock
+  ? new MockBbiyongAuth()
+  : new HttpBbiyongAuth({ baseUrl: env.bbiyongBaseUrl ?? '' });
 
 /**
  * 회사 등록 어댑터(3-5 로 실호출이 붙었다, 2026-10-02).
