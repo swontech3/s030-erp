@@ -5,6 +5,7 @@
  *   답변 수정)은 그대로이고 **모양만** 바뀐다(ERP CLAUDE.md 「한 업무는 한 화면에서」).
  * ★ 휴대폰 모양은 **앱 안일 때만** 켠다(`isAppUserAgent`). PC 브라우저는 좁은 창이어도 지금 그대로다.
  *   - 목록 : 접수만 · 상태 칩 감춤 · 이름 · 연락처 검색과 유형 거르기는 남김 · 정렬은 서버 그대로(원글 순)
+ *     검색칸과 유형 고르기는 **한 줄**(검색칸 = 남는 너비 · 유형 = 오른쪽에 필요한 만큼 · 5-나 덧붙임 2026-11-10)
  *   - 상세 : 글 삭제 감춤(PC 만 — 개인정보를 지우는 되돌릴 수 없는 처리)
  *   - 목록 ↔ 상세는 한 장씩. 상세를 열 때 방문 기록을 남긴다 — 폰 [뒤로] 가 목록으로 돌아온다
  *     (PC 는 지금처럼 `replaceState` — 기록을 쌓지 않는다)
@@ -24,12 +25,14 @@ export interface InquiryAdminLayout {
   fixedStatus: string | null;
   /** 목록에서 상세를 열 때 주소를 적는 방법 */
   detailHistory: 'push' | 'replace';
+  /** 유형 고르기를 검색 줄(검색칸 오른쪽)에 둔다 — `false` 면 PC 처럼 아래 거르기 줄에 */
+  typeInSearchRow: boolean;
 }
 
 export function inquiryAdminLayout(inApp: boolean): InquiryAdminLayout {
   return inApp
-    ? { phone: true, statusChips: false, deleteButton: false, fixedStatus: RECEIVED, detailHistory: 'push' }
-    : { phone: false, statusChips: true, deleteButton: true, fixedStatus: null, detailHistory: 'replace' };
+    ? { phone: true, statusChips: false, deleteButton: false, fixedStatus: RECEIVED, detailHistory: 'push', typeInSearchRow: true }
+    : { phone: false, statusChips: true, deleteButton: true, fixedStatus: null, detailHistory: 'replace', typeInSearchRow: false };
 }
 
 /** 처음 상태 거르기 — PC 는 지금 그대로(`st=all` → 전체 · 없으면 접수), 앱 안은 접수 고정 */

@@ -14,11 +14,11 @@ const APP = inquiryAdminLayout(true);
 const PC = inquiryAdminLayout(false);
 
 describe('inquiryAdminLayout', () => {
-  it('앱 안 — 휴대폰 모양 · 상태 칩 감춤 · 삭제 감춤 · 접수 고정 · 상세 열기는 기록을 남긴다', () => {
-    expect(APP).toEqual({ phone: true, statusChips: false, deleteButton: false, fixedStatus: 'R', detailHistory: 'push' });
+  it('앱 안 — 휴대폰 모양 · 상태 칩 감춤 · 삭제 감춤 · 접수 고정 · 상세 열기는 기록을 남긴다 · 검색 · 유형 한 줄', () => {
+    expect(APP).toEqual({ phone: true, statusChips: false, deleteButton: false, fixedStatus: 'R', detailHistory: 'push', typeInSearchRow: true });
   });
   it('앱 아님(PC) — 지금 그대로', () => {
-    expect(PC).toEqual({ phone: false, statusChips: true, deleteButton: true, fixedStatus: null, detailHistory: 'replace' });
+    expect(PC).toEqual({ phone: false, statusChips: true, deleteButton: true, fixedStatus: null, detailHistory: 'replace', typeInSearchRow: false });
   });
 });
 
