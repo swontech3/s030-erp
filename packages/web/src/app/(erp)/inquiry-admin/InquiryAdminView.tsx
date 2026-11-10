@@ -341,6 +341,23 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- codeName 은 props 파생이라 안정적이다
   }, [items, listError, status, type, query, total, codes]);
 
+  /* 유형은 5종이라 칩으로 두면 줄이 넘친다 — 420px 목록 머리에는 선택이 맞다 */
+  const typeSelect = (
+    <select
+      className={styles.typeSelect}
+      value={type ?? ''}
+      aria-label="문의 유형"
+      onChange={(e) => setType(e.target.value || null)}
+    >
+      <option value="">유형 전체</option>
+      {codes.types.map((t) => (
+        <option key={t.code} value={t.code}>
+          {t.name}
+        </option>
+      ))}
+    </select>
+  );
+
   return (
     <div
       className={
@@ -375,8 +392,11 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
                 />
               </span>
               <span className={styles.count}>{total}건</span>
+              {/* ★ 앱 안은 유형 고르기를 검색칸 오른쪽에 — 한 줄(5-나 덧붙임) */}
+              {layout.typeInSearchRow ? typeSelect : null}
             </div>
 
+            {layout.statusChips || !layout.typeInSearchRow ? (
             <div className={styles.filterRow}>
               {/* ★ 상태 칩의 문구는 코드 마스터(QU_ST)에서 온다 — 「접수」를 박지 않는다.
                   ★ 앱 안에서는 감춘다 — 접수만 본다(5-나). */}
@@ -402,21 +422,9 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
               </div>
               ) : null}
 
-              {/* 유형은 5종이라 칩으로 두면 줄이 넘친다 — 420px 목록 머리에는 선택이 맞다 */}
-              <select
-                className={styles.typeSelect}
-                value={type ?? ''}
-                aria-label="문의 유형"
-                onChange={(e) => setType(e.target.value || null)}
-              >
-                <option value="">유형 전체</option>
-                {codes.types.map((t) => (
-                  <option key={t.code} value={t.code}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+              {layout.typeInSearchRow ? null : typeSelect}
             </div>
+            ) : null}
           </div>
 
           <div className={styles.cards}>

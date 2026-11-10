@@ -883,6 +883,18 @@
   display: none;
 }
 
+/* 검색칸 · 유형 고르기 한 줄(5-나 덧붙임 2026-11-10) — 검색칸은 남는 너비, 유형은 필요한 만큼.
+   높이만 검색칸(40px)에 맞춘다 — 색 · 글꼴은 위 .typeSelect 그대로 */
+.phone .searchRow {
+  gap: 8px;
+}
+
+.phone .searchRow .typeSelect {
+  flex: 0 0 auto;
+  margin-left: 0;
+  height: 40px;
+}
+
 .phone.phoneDetail .list {
   display: none;
 }
