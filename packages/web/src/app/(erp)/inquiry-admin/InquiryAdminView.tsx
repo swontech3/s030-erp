@@ -394,7 +394,8 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
                   onChange={(e) => setKeyword(e.target.value)}
                 />
               </span>
-              <span className={styles.count}>{total}건</span>
+              {/* ★ 앱 안은 감춘다 — 제목 아래 안내 줄 「접수 N건」과 겹친다(5-나 덧붙임 2026-11-12) */}
+              {layout.searchCount ? <span className={styles.count}>{total}건</span> : null}
               {/* ★ 앱 안은 유형 고르기를 검색칸 오른쪽에 — 한 줄(5-나 덧붙임) */}
               {layout.typeInSearchRow ? typeSelect : null}
             </div>

@@ -27,12 +27,33 @@ export interface InquiryAdminLayout {
   detailHistory: 'push' | 'replace';
   /** 유형 고르기를 검색 줄(검색칸 오른쪽)에 둔다 — `false` 면 PC 처럼 아래 거르기 줄에 */
   typeInSearchRow: boolean;
+  /**
+   * 검색 줄의 「N건」을 보이는가 — 5-나 덧붙임(2026-11-12 대표 폰 확인)
+   * ★ 앱 안은 감춘다 — 제목 아래 안내 줄(「접수 N건」)과 같은 숫자가 겹쳐 나온다. 안내 줄은 그대로 둔다.
+   */
+  searchCount: boolean;
 }
 
 export function inquiryAdminLayout(inApp: boolean): InquiryAdminLayout {
   return inApp
-    ? { phone: true, statusChips: false, deleteButton: false, fixedStatus: RECEIVED, detailHistory: 'push', typeInSearchRow: true }
-    : { phone: false, statusChips: true, deleteButton: true, fixedStatus: null, detailHistory: 'replace', typeInSearchRow: false };
+    ? {
+        phone: true,
+        statusChips: false,
+        deleteButton: false,
+        fixedStatus: RECEIVED,
+        detailHistory: 'push',
+        typeInSearchRow: true,
+        searchCount: false,
+      }
+    : {
+        phone: false,
+        statusChips: true,
+        deleteButton: true,
+        fixedStatus: null,
+        detailHistory: 'replace',
+        typeInSearchRow: false,
+        searchCount: true,
+      };
 }
 
 /** 처음 상태 거르기 — PC 는 지금 그대로(`st=all` → 전체 · 없으면 접수), 앱 안은 접수 고정 */
