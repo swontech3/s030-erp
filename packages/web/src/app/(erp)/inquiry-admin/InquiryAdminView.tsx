@@ -447,7 +447,14 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
                       ? `${statusName(status)} 문의가 없습니다`
                       : '조건에 맞는 문의가 없습니다'
                   }
-                  sub={status === 'R' && !type && !query ? '답변을 기다리는 문의가 없습니다' : '필터나 검색어를 바꿔 보세요'}
+                  /* ★ 앱 안은 접수 빈 목록 둘째 줄을 감춘다 — 첫 줄과 뜻이 겹친다(5-나 덧붙임 2026-11-12) */
+                  sub={
+                    status === 'R' && !type && !query
+                      ? layout.receivedEmptySub
+                        ? '답변을 기다리는 문의가 없습니다'
+                        : undefined
+                      : '필터나 검색어를 바꿔 보세요'
+                  }
                   action={{
                     label: '전체 보기',
                     onClick: () => {
