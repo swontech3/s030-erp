@@ -1,0 +1,311 @@
+/*
+ * 세무(S05) 공용 모양 — 시안 `doc/tax-service/prototypes/s05-tax/tax.css` 의 클래스를 그대로 옮겼다.
+ *
+ * ★ 토큰 이름이 시안과 ERP(`src/styles/tokens.css`)가 같다 — 값을 새로 박지 않고 토큰만 쓴다.
+ * ★ 세무 화면만 쓴다. ERP · 법무 화면의 모양을 바꾸지 않는다(그쪽 CSS 를 가져다 쓰지도 않는다).
+ * ★ 시안의 1280px 틀 · 삐용 메뉴 · 제목줄 · 개발 확인 막대는 옮기지 않는다(본문만 그린다 — 결과서 0-1).
+ */
+
+/* ── 본문 — 영역 사이 20px. ★ 2026-11-08 대표 지시: 내용 폭 960px 고정을 없애 ERP 청구 · 센터 관리처럼 셸 폭을 다 쓴다(결과서 0-1) ── */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: var(--text-body);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── 안내 줄(달 선택을 숨긴 화면) ── */
+.ctx { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.ctxNote { font-size: 13px; color: var(--text-muted); }
+
+/* ── 화면 제목 ── */
+.pageH { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.pageH h1 { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.35; color: var(--text-heading); letter-spacing: -.015em; }
+.pageH p { margin: 4px 0 0; font-size: 14px; color: var(--text-body); max-width: 640px; text-wrap: pretty; }
+
+/* ── 카드 ── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.cardPad { padding: 20px 24px; }
+/* ★ 2026-11-07 ERP 디자인 컨셉에 맞춤 — 16px + 왼쪽 인디고 막대 → 18px/700 막대 없음(05-patterns §2) */
+.secT { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; color: var(--text-heading); }
+.help { margin: 0; font-size: 13px; color: var(--text-muted); line-height: 1.6; text-wrap: pretty; }
+.sm { font-size: 12px; color: var(--text-muted); }
+.tnum { font-variant-numeric: tabular-nums; }
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.between { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+
+/* ── 버튼 ── */
+.btn {
+  height: 40px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--text-heading);
+  font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; text-decoration: none;
+  letter-spacing: -.01em;
+  transition: background var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out), color var(--dur) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+/* ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(03-components Button) — 크기는 그대로, 글자색 · 그림자 · 눌림 · 초점 · 위험 꼴을 ERP 값으로.
+ *   40px 버튼은 화면에서 ERP 공통 Button(sm)을 쓰고, 이 클래스는 32px · 빨강 · 링크 · 엑셀 · 확인 팝업(44px)에만 남는다. */
+.btn:hover { background: var(--surface-alt); color: var(--text-heading); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.btnPrimary { background: var(--color-primary); border-color: transparent; color: var(--text-on-primary); box-shadow: var(--shadow-primary); }
+.btnPrimary:hover { background: var(--color-primary-hover); color: var(--text-on-primary); box-shadow: var(--shadow-primary-hover); }
+.btnDanger { color: var(--color-danger); }
+.btnDanger:hover { background: var(--color-danger-bg); color: var(--color-danger); }
+.btnDangerSolid { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
+.btnDangerSolid:hover { background: var(--red-800); color: #fff; }
+.btnSm { height: 32px; padding: 0 12px; font-size: 13px; }
+.btnLink { height: auto; padding: 0; border: 0; background: transparent; color: var(--color-primary); font-weight: 700; }
+.btnLink:hover { background: transparent; color: var(--color-primary-hover); }
+.btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+
+/* ── 입력 ── */
+.input, .select {
+  height: 40px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface);
+  color: var(--text-heading); font-family: inherit; font-size: 14px; outline: none;
+  transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+.select {
+  appearance: none; padding-right: 32px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.input:focus, .select:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.chk { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-heading); }
+.chk input { width: 18px; height: 18px; margin: 0; accent-color: var(--color-primary); }
+.rowchk { width: 18px; height: 18px; margin: 0; accent-color: var(--color-primary); cursor: pointer; flex: 0 0 auto; }
+.isErr { border-color: var(--color-danger) !important; }
+.errT { font-size: 12px; color: var(--color-danger); }
+
+/* ── 상태 안내 띠 ── */
+.note {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; border-radius: var(--radius-md);
+  background: var(--surface-alt); border: 1px solid var(--border); font-size: 13px; line-height: 1.6; color: var(--text-body);
+}
+.note > span:first-child { flex: 0 0 auto; margin-top: 3px; }
+.noteDanger { background: var(--color-danger-bg); border-color: rgba(220, 38, 38, .25); color: var(--color-danger-text); }
+.note b { font-weight: 700; }
+
+/* ── 팝업 · 확인 창(결과서 0-6) ── */
+.overlay {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center;
+  padding: 80px 24px 24px; background: rgba(11, 17, 32, .45);
+}
+.modalSm {
+  width: 480px; max-width: 100%; display: flex; flex-direction: column; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-overlay); overflow: hidden;
+}
+.confirm { padding: 28px 28px 8px; text-align: center; }
+/* ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(계약 폼 확인 모달) — 아이콘 52 → 56px, 제목 20/700 → 22/600, 본문 줄 간격 1.6, 버튼 높이 44px */
+.confirmIc {
+  width: 56px; height: 56px; margin: 0 auto; border-radius: 999px; display: grid; place-items: center;
+  background: var(--color-accent-bg); color: var(--color-primary);
+}
+.confirmIcRed { background: var(--color-danger-bg); color: var(--color-danger); }
+.confirm h3 { margin: 16px 0 0; font-size: 22px; font-weight: 600; color: var(--text-heading); }
+.confirm p { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: var(--text-body); text-wrap: pretty; }
+.confirmF { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 24px 28px 28px; }
+.confirmF .btn { height: 44px; }
+
+/* ── 토스트 — ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(월별 청구 · 03-components Toast): 아래 가운데 44px 검정 →
+ *   오른쪽 아래 380px 흰 카드 + 인디고 점, 2.4초 → 2.8초 ── */
+.toast {
+  position: fixed; right: 32px; bottom: 32px; z-index: 200;
+  display: flex; align-items: center; gap: 10px; width: 380px; padding: 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-float);
+}
+.toastDot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 999px; background: var(--color-primary); }
+.toastMsg { flex: 1; font-size: 14px; font-weight: 700; color: var(--text-heading); }
+
+/* ══ 1-2 에서 더함 — 자료 올리기 · 거래처(시안 tax.css 그대로 옮김) ══════════════════════════ */
+
+/* ── 작업할 달 줄(결과서 0-2) ── */
+.ctxL { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ctxLab { font-size: 12px; color: var(--text-muted); }
+.month {
+  display: inline-flex; align-items: center; gap: 2px; height: 40px; padding: 0 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
+}
+.month button {
+  width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.month button:hover { background: var(--surface-alt); }
+.month button:disabled { opacity: .35; cursor: not-allowed; }
+.monthV { min-width: 112px; text-align: center; font-size: 15px; font-weight: 700; color: var(--text-heading); }
+
+/* ── 카드 머리 ── */
+.cardH { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.cardH h2 { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.4; color: var(--text-heading); }
+.cardHSub { font-size: 13px; color: var(--text-muted); }
+
+/* ── 배지(녹색 없음: 끝남 = 인디고) ── */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: var(--radius-pill);
+  font-size: 12px; font-weight: 700; white-space: nowrap; flex: 0 0 auto;
+}
+.bTodo { background: var(--surface-alt); color: var(--text-muted); border: 1px solid var(--border); }
+.bDoing { background: var(--color-warning-bg); color: var(--color-warning-text); }
+.bDone { background: var(--color-accent-bg); color: var(--color-primary-hover); }
+.bGray { background: var(--surface-alt); color: var(--text-caption); border: 1px solid var(--border); }
+
+/* ── 칩 ── */
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  height: 32px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+  border-radius: var(--radius-pill); background: var(--surface); color: var(--text-muted); font-family: inherit; font-size: 13px;
+  cursor: pointer; white-space: nowrap;
+}
+.chip b { font-weight: 700; color: var(--text-heading); font-variant-numeric: tabular-nums; }
+.chipOn { border-color: var(--color-primary); background: var(--color-accent-bg); color: var(--color-primary-hover); font-weight: 700; }
+.chipOn b { color: var(--color-primary-hover); }
+
+/* ── 탭 — ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(월별 청구 탭 · 03-components Tabs underline): 사이 4 → 24px,
+ *   높이 44px · 좌우 14px → 위 10 · 아래 12px · 좌우 0, 글자 14 → 15px ── */
+.tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tab {
+  padding: 10px 0 12px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: transparent;
+  color: var(--text-muted); font-family: inherit; font-size: 15px; cursor: pointer; white-space: nowrap;
+}
+.tabOn { border-bottom-color: var(--color-primary); color: var(--text-heading); font-weight: 700; }
+/* 탭 줄을 가로 스크롤 없이 한 줄에 — 간격 · 글자 크기만 줄인다(2026-11-08 ⑧ 세무사 전달 서류 시트 아홉) */
+.tabsFit { gap: 14px; padding: 0 16px; overflow-x: visible; flex-wrap: nowrap; flex: 0 0 auto; }
+.tabsFit .tab { font-size: 13px; padding: 10px 0 10px; }
+
+/* ── 표 — 글자 왼쪽 · 숫자 오른쪽 ── */
+.tblWrap { overflow: hidden; border-radius: var(--radius-lg); }
+.tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.tbl th {
+  height: 44px; padding: 0 12px; font-size: 12px; font-weight: 700; color: var(--text-muted); text-align: left;
+  background: var(--surface-alt); border-bottom: 1px solid var(--border); white-space: nowrap; /* ★ 2026-11-07 바탕 --surface → --surface-alt */
+}
+.tbl td {
+  padding: 13px 12px; font-size: 14px; color: var(--text-heading); border-bottom: 1px solid var(--border);
+  vertical-align: middle; overflow-wrap: anywhere;
+}
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tbl td.mut { color: var(--text-muted); }
+.tbl .wChk { width: 44px; }
+.clickable { cursor: pointer; }
+.clickable:hover td { background: var(--surface-alt); }
+.pick td { background: var(--color-accent-bg); }
+.ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(월별 청구 BillingEmpty) — 글자 한 줄 → 가운데 아이콘 40px + 16px 문구 + 14px 보조 문구.
+ *   표 안이면 <td className={t.empty}> 에 `TaxEmpty` 를 넣는다. */
+.empty { text-align: center; padding: 56px 24px !important; }
+.emptyIcon { color: var(--text-caption); }
+.emptyLead { margin: 12px 0 0; font-size: 16px; color: var(--text-muted); }
+.emptySub { margin: 4px 0 0; font-size: 14px; color: var(--text-caption); }
+
+/* ── 목록 위 버튼 줄 ── */
+.tbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border); }
+/* 목록 카드 밖에 따로 두는 버튼 줄(2026-11-07 거래처 — 검색 조건 카드 / 버튼 줄 / 목록 카드) */
+.tbarOut { padding: 0; border-top: 0; }
+
+/* ── 목록만 스크롤 · 머리 줄 고정 — ★ 2026-11-07 거래처부터 세무 목록 화면의 기준.
+ *   ERP 센터 관리(s030100010, facility.module.css)와 같은 꼴: 화면이 셸 `.main` 높이를 채우고(height 100% · 최소 520px),
+ *   목록 카드만 남는 높이를 받아(flex 1 · min-height 0) 그 안에서만 스크롤한다. 표 머리는 sticky.
+ *   ★ sticky 머리의 아래 테두리가 함께 굴러 사라지지 않게 표는 border-collapse: separate(센터 관리와 같은 까닭). ── */
+.pageFill { height: 100%; min-height: 520px; }
+.pageFill > * { flex: 0 0 auto; }
+.pageFill > .listCard { flex: 1 1 auto; }
+.listCard { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.listScroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.listScroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.listScroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.listScroll:hover::-webkit-scrollbar-thumb { background: var(--text-caption); }
+.tblSticky { border-collapse: separate; border-spacing: 0; }
+.tblSticky th { position: sticky; top: 0; z-index: 1; }
+.tbar .sm { margin-left: 4px; }
+.tbarSep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+/* ── 자료 종류 카드 ── */
+.kind { display: flex; flex-direction: column; gap: 10px; padding: 16px; min-height: 178px; }
+.kindIc {
+  width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--radius-md);
+  background: var(--surface-alt); color: var(--text-muted);
+}
+.kindUp .kindIc { background: var(--color-accent-bg); color: var(--color-primary); }
+.kindNm { font-size: 15px; font-weight: 700; color: var(--text-heading); }
+.kindDs { font-size: 12px; color: var(--text-muted); line-height: 1.5; text-wrap: pretty; }
+.kindFt { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+/* ── ★ 2026-11-07 ④ 자료 올리기 — 테두리 있는 세 섹션. 위 둘(년월 · 파일 올리기)은 낮게, 올린 파일 목록이 많이 보이게.
+ *   카드 3행: 제목 + [파일 첨부] · [표준양식 받기] / 등록현황 / 설명 한 줄(작은 회색, 넘치면 …).
+ *   카드를 누르면 그 자료의 파일만(고른 표시 = 고르기 카드 `.candOn` 과 같은 테두리), 다시 누르면 전체. ── */
+.secLow { padding: 12px 20px; }
+.kindCard {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 10px 12px; cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+.kindCard:hover { border-color: var(--border-strong); }
+.kindOn, .kindOn:hover { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.kindOff { cursor: default; }
+.kindOff:hover { border-color: var(--border); }
+.kindHead { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.kindHead .kindNm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kindCnt { font-size: 13px; color: var(--text-heading); font-variant-numeric: tabular-nums; }
+/* 2행 — 등록현황 왼쪽 · [표준양식 받기] 오른쪽(현금 경비, 2026-11-08) */
+.kindCntRow { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 32px; }
+/* ★ 2026-11-08 — 2행은 한 줄: 등록현황 글자는 줄바꿈 없음, [양식받기](아이콘 + 글자)는 작게(28px · 12px · 좌우 6px).
+ *   카드 안쪽 폭은 가장 좁을 때(셸 최소 1440px) 약 230px — 등록현황(약 88) + 틈 6 + 버튼(약 80) ≈ 174px 로 들어간다.
+ *   (2026-11-08 세무 화면 폭 960px 고정을 없앤 뒤 — 그 전에는 늘 약 194px)
+ *   마우스를 올리면 감싼 칸의 title 「표준양식 받기」. */
+.kindCntTxt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tplBtn { height: 28px; padding: 0 6px; font-size: 12px; gap: 4px; flex: 0 0 auto; }
+/* 올린 파일 표 — 고정 칸 합 694 + 파일 이름 최소 160. 더 좁으면 목록 안에서 옆으로 스크롤(작업 칸 버튼이 잘리지 않게, 2026-11-08) */
+.tblUploads { min-width: 854px; }
+.kindCard .kindDs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 올리기 팝업 — 파일마다 한 칸(미리보기 · 같은 파일 · 오류). 은행은 한 줄 = 계좌 · 파일 종류 · 파일 */
+.fileBlk { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.fileBlkH { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bankRow { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.6fr) 32px; gap: 8px; align-items: center; }
+
+/* ── 상태 띠 더함 ── */
+.noteWarn { background: var(--color-warning-bg); border-color: rgba(217, 119, 6, .25); color: var(--color-warning-text); }
+.noteInfo { background: var(--color-accent-bg); border-color: rgba(79, 70, 229, .18); color: var(--color-primary-hover); }
+.warnT { font-size: 12px; color: var(--color-warning-text); }
+
+/* ── 팝업(기본 640 · 작은 것 480 · 큰 것 820) ── */
+.modal {
+  width: 640px; max-width: 100%; max-height: calc(100vh - 120px); display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+}
+.modalSmW { width: 480px; }
+.modalLg { width: 820px; }
+.mH { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.mH h3 { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.4; color: var(--text-heading); }
+.mH p { margin: 2px 0 0; font-size: 13px; color: var(--text-muted); }
+.mB { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 18px; }
+.mF { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--border); }
+.sp { flex: 1; }
+.iconBtn {
+  width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.iconBtn:hover { background: var(--surface-alt); }
+.drop {
+  display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 24px; border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-md); background: var(--surface-alt); text-align: center;
+}
+.dropOn { border-color: var(--color-primary); background: var(--color-accent-bg); }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lab { font-size: 12px; color: var(--text-muted); }
+
+/* ── 고르기 카드(합치기의 남길 이름) ── */
+.cands { display: flex; flex-direction: column; gap: 8px; }
+.cand {
+  display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); cursor: pointer;
+}
+.candOn { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.cand input { margin: 0; accent-color: var(--color-primary); }
+.candT { font-size: 14px; font-weight: 700; color: var(--text-heading); }

@@ -126,6 +126,76 @@ export const CODE_USAGE: readonly CodeUsageRef[] = [
    * `domain/corp-change-detail.ts` 의 `LEGAL_MEMBER_TYPE_USE_TP`.
    */
   { category: 'MEMBER_TYPE', useTp: '002', table: 'tb_s080_legal_orgs', column: 'member_type', label: '법무 회사유형' },
+
+  // --- 세무 설정 (s050100010) — 2026-10-25 추가. 201_tax_settings.sql ---
+  /**
+   * ★ `tb_s050_settings.unused_kinds`(TAX_KIND 목록, text[])는 여기 없다 — `칸 = 코드` 로 셀 수 없는
+   *   목록 칸이라 `PINNED_CODES` 로 막는다.
+   * ★ 은행 · 카드사는 칸이 둘이다(bank_code · card_co_code) — 한 칸에 두 분류를 적으면 값이 겹칠 때
+   *   남의 분류 줄까지 센다(201 머리말).
+   */
+  { category: 'TAX_BIZ_TP', useTp: '000', table: 'tb_s050_settings', column: 'biz_type', label: '세무 사업자 유형' },
+  {
+    category: 'TAX_WH_CYCLE',
+    useTp: '000',
+    table: 'tb_s050_settings',
+    column: 'withholding_cycle',
+    label: '세무 원천세 신고 주기',
+  },
+  { category: 'TAX_FIN_KIND', useTp: '000', table: 'tb_s050_fin_accounts', column: 'kind', label: '세무 계좌·카드' },
+  { category: 'BANK', useTp: '000', table: 'tb_s050_fin_accounts', column: 'bank_code', label: '세무 사업용 계좌' },
+  {
+    category: 'CARD_COMPANY',
+    useTp: '000',
+    table: 'tb_s050_fin_accounts',
+    column: 'card_co_code',
+    label: '세무 사업용 카드',
+  },
+
+  // --- 세무 자료 올리기 (s050200010) · 거래처 (s050100020) — 2026-10-26 추가. 203_tax_uploads.sql ---
+  { category: 'TAX_KIND', useTp: '000', table: 'tb_s050_upload_files', column: 'kind', label: '세무 올린 파일' },
+  { category: 'TAX_KIND', useTp: '000', table: 'tb_s050_vendors', column: 'first_kind', label: '세무 거래처' },
+  { category: 'TAX_KIND', useTp: '000', table: 'tb_s050_import_maps', column: 'kind', label: '세무 대응표' },
+  { category: 'TAX_INV_DIR', useTp: '000', table: 'tb_s050_upload_files', column: 'direction', label: '세무 올린 파일' },
+  { category: 'TAX_INV_DIR', useTp: '000', table: 'tb_s050_invoices', column: 'direction', label: '세무 세금계산서' },
+  { category: 'TAX_INV_DIR', useTp: '000', table: 'tb_s050_vendors', column: 'first_direction', label: '세무 거래처' },
+  { category: 'TAX_INV_CLASS', useTp: '000', table: 'tb_s050_invoices', column: 'inv_class', label: '세무 세금계산서' },
+  { category: 'TAX_INV_TYPE', useTp: '000', table: 'tb_s050_invoices', column: 'inv_type', label: '세무 세금계산서' },
+  { category: 'TAX_VENDOR_TP', useTp: '000', table: 'tb_s050_vendors', column: 'vendor_tp', label: '세무 거래처' },
+
+  // --- 세무 거래 분류 (s050300010) — 2026-10-27 추가. 207_tax_classify.sql ---
+  // ★ 파티션 = 사업자 유형(001 법인 · 002 개인 일반과세자). 사업자 유형을 바꾼 회사의 옛 항목도 막히게 둘 다 적는다.
+  { category: 'TAX_ITEM_OUT', useTp: '001', table: 'tb_s050_invoices', column: 'item_code', label: '세무 거래 분류' },
+  { category: 'TAX_ITEM_OUT', useTp: '002', table: 'tb_s050_invoices', column: 'item_code', label: '세무 거래 분류' },
+
+  // --- 세무 카드 사용 내역 · 현금 경비 (s050200010) — 2026-10-30 추가. 208_tax_card_cash.sql ---
+  { category: 'TAX_ITEM_OUT', useTp: '001', table: 'tb_s050_card_txns', column: 'item_code', label: '세무 카드 항목' },
+  { category: 'TAX_ITEM_OUT', useTp: '002', table: 'tb_s050_card_txns', column: 'item_code', label: '세무 카드 항목' },
+  { category: 'TAX_ITEM_OUT', useTp: '001', table: 'tb_s050_cash_txns', column: 'item_code', label: '세무 현금 항목' },
+  { category: 'TAX_ITEM_OUT', useTp: '002', table: 'tb_s050_cash_txns', column: 'item_code', label: '세무 현금 항목' },
+  { category: 'TAX_CARD_DEDUCT', useTp: '000', table: 'tb_s050_card_txns', column: 'vat_deduct', label: '세무 카드 사용 내역' },
+  { category: 'TAX_INV_DIR', useTp: '000', table: 'tb_s050_cash_txns', column: 'direction', label: '세무 현금 경비' },
+  { category: 'TAX_PAY_METHOD', useTp: '000', table: 'tb_s050_cash_txns', column: 'pay_method', label: '세무 현금 경비' },
+  { category: 'TAX_PROOF', useTp: '000', table: 'tb_s050_cash_txns', column: 'proof', label: '세무 현금 경비' },
+  /** 은행 거래내역 · 이체 내역(212 · 213, 2026-11-01) — 은행 코드 · 은행 파일 종류. */
+  { category: 'BANK', useTp: '000', table: 'tb_s050_bank_txns', column: 'bank_code', label: '세무 은행 거래내역' },
+  { category: 'BANK', useTp: '000', table: 'tb_s050_upload_files', column: 'bank_code', label: '세무 올린 파일' },
+  { category: 'BANK', useTp: '000', table: 'tb_s050_import_maps', column: 'bank_code', label: '세무 대응표' },
+  { category: 'TAX_BANK_FILE', useTp: '000', table: 'tb_s050_upload_files', column: 'bank_file_tp', label: '세무 올린 파일' },
+  { category: 'TAX_BANK_FILE', useTp: '000', table: 'tb_s050_import_maps', column: 'bank_file_tp', label: '세무 대응표' },
+  /**
+   * 국세 · 지방세 · 4대보험 · 대출(214 · 215, 2026-11-01) — 자료 종류 · 4대보험 종류 · 대출 기관 · 대출 거래 구분.
+   * ★ 대응표의 `social_ins_tps`(보험 종류 목록, text[])는 `칸 = 코드` 로 셀 수 없어 여기 없다 — `PINNED_CODES` 로 막는다.
+   * ★ TAX_TAX_NOEXP(비용이 아닌 세목)는 담는 칸이 없다 — 이름으로 견주므로 코드 관리에서 더하고 지운다.
+   */
+  { category: 'TAX_KIND', useTp: '000', table: 'tb_s050_tax_payments', column: 'kind', label: '세무 국세 · 지방세 납부' },
+  { category: 'TAX_SOCIAL_INS', useTp: '000', table: 'tb_s050_social_ins', column: 'ins_tp', label: '세무 4대보험 고지' },
+  { category: 'TAX_SOCIAL_INS', useTp: '000', table: 'tb_s050_upload_files', column: 'social_ins_tp', label: '세무 올린 파일' },
+  { category: 'BANK', useTp: '000', table: 'tb_s050_loan_txns', column: 'bank_code', label: '세무 대출 거래' },
+  { category: 'TAX_LOAN_TP', useTp: '000', table: 'tb_s050_loan_txns', column: 'txn_tp', label: '세무 대출 거래' },
+
+  // --- 세무 세무사 전달 서류 (s050500010) — 2026-11-07 추가. 218_tax_handoff.sql · 2026-11-08 224 로 표가 최종 발송(tb_s050_handoff_last)으로 바뀜 ---
+  { category: 'TAX_HANDOFF_TP', useTp: '000', table: 'tb_s050_handoff_last', column: 'handoff_tp', label: '세무 세무사 전달 최종 발송' },
   /**
    * 법인설립 회사 형태(2026-10-31) — 파티션 **001**(법인설립용). 새 건을 만들 때 고른다.
    * `domain/incorporation.ts` 의 `INCORP_ENTITY_USE_TP`.
@@ -222,6 +292,175 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     codes: ['R', 'A'],
     source: 'packages/shared/src/domain/legal-form-mark.ts (LEGAL_FORM_COMPANY_TYPES)',
     label: '법무 양식 회사유형',
+  },
+  /**
+   * 세무(S05) — 2026-10-25 추가. 원천세 주기는 DB 기본값(`withholding_cycle DEFAULT 'M'`)이 박았고,
+   * 마감일 · 신고자료 만드는 때가 M · H 에 기댄다.
+   */
+  {
+    category: 'TAX_WH_CYCLE',
+    useTp: '000',
+    codes: ['M', 'H'],
+    source: 'supabase/migrations/201_tax_settings.sql (tb_s050_settings.withholding_cycle DEFAULT)',
+    label: '세무 원천세 신고 주기',
+  },
+  /** 쓰지 않는 자료(`unused_kinds`, text[])는 목록 칸이라 `CODE_USAGE` 로 셀 수 없어 여기 박는다. */
+  {
+    category: 'TAX_KIND',
+    useTp: '000',
+    codes: ['INVOICE', 'CARD', 'CASH', 'BANK', 'NTAX', 'LTAX', 'SOCIAL', 'LOAN'],
+    source: 'supabase/migrations/201_tax_settings.sql (tb_s050_settings.unused_kinds)',
+    label: '세무 자료 종류',
+  },
+  /** 번호 검사(DB CHECK)가 B(계좌 10~14자리) · C(카드 끝 4자리)에 기댄다. */
+  {
+    category: 'TAX_FIN_KIND',
+    useTp: '000',
+    codes: ['B', 'C'],
+    source: 'supabase/migrations/201_tax_settings.sql (ck_s050_fin_accounts_kind · ck_s050_fin_accounts_number)',
+    label: '세무 계좌·카드 번호 검사',
+  },
+  /** 세무 자료 올리기 · 거래처 — 2026-10-26 추가. 매입 · 매출 판정과 DB CHECK 가 P · S 에 기댄다. */
+  {
+    category: 'TAX_INV_DIR',
+    useTp: '000',
+    codes: ['P', 'S'],
+    source: 'supabase/migrations/203_tax_uploads.sql (ck_s050_upload_files_direction · ck_s050_invoices_direction)',
+    label: '세무 계산서 매입·매출 판정',
+  },
+  /** 대응표의 값 바꾸기표(jsonb)가 원본 글자를 이 코드값으로 바꾼다 — 칸이 아니라 jsonb 안이라 여기 박는다. */
+  {
+    category: 'TAX_INV_CLASS',
+    useTp: '000',
+    codes: ['TAX'],
+    source: 'supabase/migrations/204_tax_upload_codes.sql (tb_s050_import_maps.columns.invClass)',
+    label: '세무 대응표 계산서 종류',
+  },
+  /** 위와 같다. 「일반」(GEN)이 아닌 줄은 넣지 않는다 — 수정 · 취소 거르기가 GEN 에 기댄다. */
+  {
+    category: 'TAX_INV_TYPE',
+    useTp: '000',
+    codes: ['GEN'],
+    source: 'supabase/migrations/204_tax_upload_codes.sql (tb_s050_import_maps.columns.invType)',
+    label: '세무 대응표 계산서 세부 종류',
+  },
+  /** 업로드가 세금계산서 거래처를 M 으로 만들고 올린다. DB CHECK 도 M · G 에 기댄다. */
+  {
+    category: 'TAX_VENDOR_TP',
+    useTp: '000',
+    codes: ['M', 'G'],
+    source: 'supabase/migrations/203_tax_uploads.sql (ck_s050_vendors_tp)',
+    label: '세무 거래처 주거래처 승격',
+  },
+  /** 뺀 줄 종류(205) — 코드값이 API 응답의 키(`InvoiceExcluded`)와 같아야 화면이 이름을 찾는다. 담는 칸은 없다. */
+  {
+    category: 'TAX_SKIP_REASON',
+    useTp: '000',
+    codes: ['nonGeneral', 'noBizNo', 'badAmount', 'noApproval', 'dupInFile', 'otherClass', 'badDate'],
+    source: 'packages/shared/src/domain/tax-uploads.ts (InvoiceExcluded)',
+    label: '세무 뺀 줄 종류',
+  },
+  /**
+   * 카드 · 현금 뺀 줄 종류(209) — 위와 같은 이유. 날짜 · 금액은 205 의 badDate · badAmount 를 함께 쓴다.
+   * 210(2026-10-31): 현금 양식이 구분 + 금액 한 칸이 되어 bothAmounts 를 빼고 badDirection 을 더했다.
+   */
+  {
+    category: 'TAX_SKIP_REASON',
+    useTp: '000',
+    codes: ['noCardNo', 'noDescription', 'noAmount', 'badPayMethod', 'badDirection'],
+    source: 'packages/shared/src/domain/tax-card-cash.ts (CardExcluded · CashExcluded)',
+    label: '세무 카드 · 현금 뺀 줄 종류',
+  },
+  /** 카드 공제 여부 — 208 CHECK 와 대응표 바꾸기표(jsonb `vatDeduct.values`)가 Y · N 에 기댄다. 2026-10-30 추가. */
+  {
+    category: 'TAX_CARD_DEDUCT',
+    useTp: '000',
+    codes: ['Y', 'N'],
+    source: 'supabase/migrations/208_tax_card_cash.sql (ck_s050_card_txns_vat_deduct) · 209 (HOMETAX_BIZ_CARD.vatDeduct)',
+    label: '세무 카드 공제 여부',
+  },
+  /** 계좌이체(직원 정산) — 은행 짝 맞추기가 직원 정산 줄을 이 값으로 찾는다(대표 결정 2026-10-30). 이름은 210 부터 「계좌이체」. */
+  {
+    category: 'TAX_PAY_METHOD',
+    useTp: '000',
+    codes: ['TRANSFER'],
+    source: 'packages/shared/src/domain/tax-card-cash.ts (TAX_PAY_METHOD_TRANSFER)',
+    label: '세무 결제방법 직원 정산',
+  },
+  /** 은행 파일 종류 — 212 CHECK(올린 파일 · 대응표)가 TXN · XFER 에 기댄다. 2026-11-01 추가. */
+  {
+    category: 'TAX_BANK_FILE',
+    useTp: '000',
+    codes: ['TXN', 'XFER'],
+    source: 'supabase/migrations/212_tax_bank_txns.sql (ck_s050_upload_files_bank_file_tp · ck_s050_import_maps_bank_file_tp)',
+    label: '세무 은행 파일 종류',
+  },
+  /** 은행 뺀 줄 종류(213) — 위 뺀 줄 종류와 같은 이유. 날짜 · 금액은 badDate · badAmount · noAmount 를 함께 쓴다. */
+  {
+    category: 'TAX_SKIP_REASON',
+    useTp: '000',
+    codes: ['bothInOut', 'noBalance', 'xferNotDone', 'otherAccount', 'noToAccount'],
+    source: 'packages/shared/src/domain/tax-bank.ts (BankTxnExcluded · BankXferExcluded)',
+    label: '세무 은행 뺀 줄 종류',
+  },
+  /** 4대보험 종류 — 214 CHECK(4대보험 줄 · 올린 파일 · 대응표 목록)가 코드값에 기댄다. 2026-11-01 추가. */
+  {
+    category: 'TAX_SOCIAL_INS',
+    useTp: '000',
+    codes: ['NP', 'HI', 'LTC', 'EI', 'IA'],
+    source: 'supabase/migrations/214_tax_pay_social_loan.sql (ck_s050_social_ins_tp · ck_s050_upload_files_social_ins_tp · ck_s050_import_maps_social_tps)',
+    label: '세무 4대보험 종류',
+  },
+  /** 대출 거래 구분 — 214 CHECK(대출 줄)가 D · R 에 기댄다. 2026-11-01 추가. */
+  {
+    category: 'TAX_LOAN_TP',
+    useTp: '000',
+    codes: ['D', 'R'],
+    source: 'supabase/migrations/214_tax_pay_social_loan.sql (ck_s050_loan_txns_tp) · packages/shared/src/domain/tax-pay-social-loan.ts',
+    label: '세무 대출 거래 구분',
+  },
+  /** 납부 · 4대보험 · 대출 뺀 줄 종류(215) — 위 뺀 줄 종류와 같은 이유. 날짜 · 금액은 badDate · badAmount · noAmount 를 함께 쓴다. */
+  {
+    category: 'TAX_SKIP_REASON',
+    useTp: '000',
+    codes: ['noPayNo', 'dupPayNo', 'noMemberName', 'noLoanAmount'],
+    source: 'packages/shared/src/domain/tax-pay-social-loan.ts (PayExcluded · SocialExcluded · LoanExcluded)',
+    label: '세무 납부 · 4대보험 · 대출 뺀 줄 종류',
+  },
+  /** 세무사 전달 종류 — 224 CHECK(최종 발송, 218 보낸 이력을 바꿈)가 T · M 에 기대고, 화면 · API 가 T 만 동작시킨다(M 은 준비 중). 2026-11-07 추가. */
+  {
+    category: 'TAX_HANDOFF_TP',
+    useTp: '000',
+    codes: ['T', 'M'],
+    source: 'packages/shared/src/domain/tax-handoff.ts (HANDOFF_TP_VAT · HANDOFF_TP_WH) · 224 (ck_s050_handoff_last_tp)',
+    label: '세무 세무사 전달 종류',
+  },
+  /** 항목 지정 검색조건 「구분」 — 서버가 L(미지정) · D(지정)로 거른다(`filterClassifyRows`). 담는 칸은 없다. 2026-11-08 추가(222). */
+  {
+    category: 'TAX_CLS_STATUS',
+    useTp: '000',
+    codes: ['L', 'D'],
+    source: 'packages/shared/src/domain/tax-classify.ts (CLASSIFY_STATUSES)',
+    label: '세무 항목 지정 구분',
+  },
+  /**
+   * 항목 지정 검색조건 「출처」 — 서버가 코드값으로 고를 자료를 정한다(`listClassifyOp`). 담는 칸은 없다. 2026-11-08 추가(222).
+   * PCARD(개인카드) · BANK(은행)는 「사용 안 함」으로 들어 있다 — 기능이 생기면 켠다.
+   */
+  {
+    category: 'TAX_CLS_SOURCE',
+    useTp: '000',
+    codes: ['P', 'S', 'CARD', 'CASH', 'PCARD', 'BANK'],
+    source: 'packages/shared/src/domain/tax-classify.ts (CLASSIFY_KINDS)',
+    label: '세무 항목 지정 출처',
+  },
+  /** 세금 납부 검색조건 「세금 전체 / 국세 / 지방세」 — 코드값이 자료 종류(주소 tab)와 같아야 거른다. 담는 칸은 없다. 2026-11-08 추가(223). */
+  {
+    category: 'TAX_PAY_SRC',
+    useTp: '000',
+    codes: ['NTAX', 'LTAX'],
+    source: 'packages/shared/src/domain/tax-payments.ts (PAY_SRCS)',
+    label: '세무 세금 납부 구분',
   },
   /**
    * 법인설립 회사 형태 · 설립 구분 — 형태마다 이름표 · 검증 · 서류 묶음이, 구분마다 등기 설정 줄이 박혀 있다.

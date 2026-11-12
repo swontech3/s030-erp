@@ -41,8 +41,14 @@ const asOperator = (fn) => withCompanyScope({ role: 'operator', companyId: null 
  * ★ 2026-10-10 118 → 122 — 법인변경(LAW_CNG_TP · LAW_PROG_ST) 쓰임 2줄 + 고정 코드 2줄.
  * ★ 2026-10-10 122 → 123 — 법무 회사유형(MEMBER_TYPE 002 · tb_s080_legal_orgs, 038) 쓰임 1줄.
  * ★ 2026-10-11 123 → 124 — 법무 양식 회사유형 고정 코드(MEMBER_TYPE 002 R · A, PINNED_CODES) 1줄.
+ * ★ 2026-10-30 148 → 159 — 세무 카드 · 현금(208 · 209) 쓰임 8줄 + 고정 코드 3줄.
+ * ★ 2026-11-01 159 → 166 — 세무 은행(212 · 213) 쓰임 5줄 + 고정 코드 2줄.
+ * ★ 2026-11-01 166 → 174 — 세무 국세 · 지방세 · 4대보험 · 대출(214 · 215) 쓰임 5줄 + 고정 코드 3줄.
+ * ★ 2026-11-07 174 → 176 — 세무 세무사 전달 서류(218 TAX_HANDOFF_TP) 쓰임 1줄 + 고정 코드 1줄.
+ * ★ 2026-11-08 176 → 178 — 세무 항목 지정 검색조건(222 TAX_CLS_STATUS · TAX_CLS_SOURCE) 고정 코드 2줄(담는 칸이 없어 쓰임은 없다).
+ * ★ 2026-11-08 178 → 179 — 세무 세금 납부 구분(223 TAX_PAY_SRC) 고정 코드 1줄.
  */
-const EXPECTED_ITEMS = 124;
+const EXPECTED_ITEMS = 179;
 let pass = 0;
 let fail = 0;
 const failures = [];

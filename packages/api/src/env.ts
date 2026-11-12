@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { envDir, loadEnvFiles } from '@swonbiz/shared/envFiles';
+import { smtpConfigOf } from './lib/mailer.ts';
 
 /**
  * 환경 파일 — 저장소 밖 한 폴더의 **common.env + erp-api.env**(결정 2026-10-24).
@@ -167,6 +168,14 @@ if (ocrCredentialsPath && !existsSync(ocrCredentialsPath)) {
 const ntsServiceKey = process.env.DATA_GO_KR_KEY?.trim() || null;
 
 /**
+ * 메일 발송(SMTP) — 세무사 전달 서류(1-9, 2026-11-07).
+ *
+ * ★ **없어도 기동한다.** 국세청 키와 같은 이유다 — 없으면 [메일 보내기]만 막히고 엑셀 내려받기는 된다.
+ *   주소 · 포트 · 보내는 주소가 다 있어야 켜진다(계정 · 비밀번호는 둘 다 있거나 둘 다 없다) — `lib/mailer.ts`.
+ */
+const smtp = smtpConfigOf(process.env);
+
+/**
  * Claude API 키 — 사업목적 [AI 추천](결정 2026-10-27).
  *
  * ★ **없어도 기동한다.** 없으면 [AI 추천]만 「쓸 수 없습니다」 — 일반 추천은 그대로 나온다.
@@ -213,6 +222,8 @@ export const env = {
    * 국세청 상태조회 인증키. `null` 이면 **그 기능만** 꺼진다 — 계약 등록은 그대로 된다.
    */
   ntsServiceKey,
+  /** SMTP 설정. `null` 이면 메일 보내기만 꺼진다. */
+  smtp,
   /** Claude API 키. `null` 이면 [AI 추천]만 꺼진다. */
   anthropicApiKey,
   port: Number(process.env.PORT ?? 3001),

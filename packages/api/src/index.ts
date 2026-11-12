@@ -37,6 +37,14 @@ import { registerBizPurposeRoutes } from './routes/bizPurposes.ts';
 import { registerBizRecommendRoutes } from './routes/bizRecommend.ts';
 import { registerIncorporationRoutes } from './routes/incorporations.ts';
 import { registerDocFormSettingRoutes } from './routes/docFormSettings.ts';
+import { registerTaxClassifyRoutes } from './routes/taxClassify.ts';
+import { registerTaxPaymentsRoutes } from './routes/taxPayments.ts';
+import { registerTaxPlRoutes } from './routes/taxPl.ts';
+import { registerTaxSettingRoutes } from './routes/taxSettings.ts';
+import { registerSpreadsheetBodyParser, registerTaxUploadRoutes } from './routes/taxUploads.ts';
+import { registerTaxVatRoutes } from './routes/taxVat.ts';
+import { registerTaxHandoffRoutes } from './routes/taxHandoff.ts';
+import { registerTaxVendorRoutes } from './routes/taxVendors.ts';
 import { closePool } from './db/pool.ts';
 import { ALLOWED_MIME_TYPES, MAX_FILE_BYTES } from '@swonbiz/shared/domain/contract-files';
 
@@ -106,6 +114,8 @@ app.addContentTypeParser(
   { parseAs: 'buffer', bodyLimit: MAX_FILE_BYTES },
   (_req, body, done) => done(null, body),
 );
+// ★ 세무 자료 올리기의 엑셀 본문(xls · xlsx, 5MB) — 위 사진 · PDF 와 형식이 겹치지 않아 따로 등록한다.
+registerSpreadsheetBodyParser(app);
 
 // ★ 순서가 중요하다 — 훅을 먼저 걸어야 이후 등록되는 모든 라우트가 인증을 거친다.
 //   라우트를 먼저 등록해도 onRequest 훅은 전역이라 걸리지만, 읽는 사람이 헷갈린다.
@@ -170,6 +180,17 @@ registerIncorporationRoutes(app);
 // ★ 등기 설정(s040900010) — 운영사만(읽기도). 표에 RLS 가 없어 쓰기를 막는 것은 이 라우트다.
 //   기본 줄은 지우지 않고 사용 끔, 회사유형 줄만 지운다(`routes/docFormSettings.ts` 머리말).
 registerDocFormSettingRoutes(app);
+// ★ 세무 설정(s050100010, 세무 S05) — 운영사 · 회사 모두 **자기 단체만**(org_id = 세션 단체 ID 를 직접 건다).
+registerTaxSettingRoutes(app);
+// ★ 세무 자료 올리기(s050200010) · 거래처(s050100020) — 같은 규칙(자기 단체만). 엑셀은 세무 전용 창구로 받는다.
+registerTaxUploadRoutes(app);
+registerTaxVendorRoutes(app);
+registerTaxClassifyRoutes(app);
+registerTaxPaymentsRoutes(app);
+registerTaxPlRoutes(app);
+registerTaxVatRoutes(app);
+// ★ 세무사 전달 서류(s050500010) — 엑셀 아홉 시트 · 메일(SMTP 설정이 없으면 보내기만 503).
+registerTaxHandoffRoutes(app);
 
 app.get('/health', { config: { public: true } }, async () => ({
   ok: true,
