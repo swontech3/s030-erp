@@ -32,6 +32,11 @@ export interface InquiryAdminLayout {
    * ★ 앱 안은 감춘다 — 제목 아래 안내 줄(「접수 N건」)과 같은 숫자가 겹쳐 나온다. 안내 줄은 그대로 둔다.
    */
   searchCount: boolean;
+  /**
+   * 접수 목록이 비었을 때 둘째 줄 「답변을 기다리는 문의가 없습니다」를 보이는가 — 5-나 덧붙임(2026-11-12 대표 폰 확인)
+   * ★ 앱 안은 감춘다 — 첫 줄 「접수 문의가 없습니다」와 뜻이 겹친다. 거른 뒤의 「필터나 검색어를 바꿔 보세요」는 그대로.
+   */
+  receivedEmptySub: boolean;
 }
 
 export function inquiryAdminLayout(inApp: boolean): InquiryAdminLayout {
@@ -44,6 +49,7 @@ export function inquiryAdminLayout(inApp: boolean): InquiryAdminLayout {
         detailHistory: 'push',
         typeInSearchRow: true,
         searchCount: false,
+        receivedEmptySub: false,
       }
     : {
         phone: false,
@@ -53,6 +59,7 @@ export function inquiryAdminLayout(inApp: boolean): InquiryAdminLayout {
         detailHistory: 'replace',
         typeInSearchRow: false,
         searchCount: true,
+        receivedEmptySub: true,
       };
 }
 

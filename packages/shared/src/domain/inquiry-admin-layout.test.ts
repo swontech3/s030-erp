@@ -23,6 +23,7 @@ describe('inquiryAdminLayout', () => {
       detailHistory: 'push',
       typeInSearchRow: true,
       searchCount: false,
+      receivedEmptySub: false,
     });
   });
   it('앱 아님(PC) — 지금 그대로', () => {
@@ -34,7 +35,12 @@ describe('inquiryAdminLayout', () => {
       detailHistory: 'replace',
       typeInSearchRow: false,
       searchCount: true,
+      receivedEmptySub: true,
     });
+  });
+  it('접수 빈 목록 둘째 줄 「답변을 기다리는 문의가 없습니다」 — 앱 안은 감춘다(첫 줄 「접수 문의가 없습니다」와 뜻이 겹친다 · 5-나 덧붙임 2026-11-12) · PC 는 보인다', () => {
+    expect(APP.receivedEmptySub).toBe(false);
+    expect(PC.receivedEmptySub).toBe(true);
   });
   it('검색 줄 「N건」 — 앱 안은 감춘다(제목 아래 안내 줄 「접수 N건」과 겹친다 · 5-나 덧붙임 2026-11-12) · PC 는 보인다', () => {
     expect(APP.searchCount).toBe(false);
