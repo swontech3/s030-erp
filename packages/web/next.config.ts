@@ -36,6 +36,20 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@swonbiz/shared'],
 
   /**
+   * ★ `next dev` 를 `localhost` 가 아닌 주소로 열 때(폰 · 앱 웹뷰 → `http://192.168.0.22:3300`) — 2026-11-12
+   *   Next 16 개발 서버는 HMR 웹소켓(`/_next/hmr`)을 `localhost` 에만 열어 준다. 다른 주소면 연결이 끊기고,
+   *   **그러면 화면이 살아나지(hydration) 않는다** — 서버가 그린 HTML 만 보이고 버튼 · 목록 요청이 하나도
+   *   돌지 않는다(실측: 문의상담관리 「불러오는 중입니다」에서 멈춤 · `/api/admin/inquiries` 요청 0건 ·
+   *   `localhost` 는 살아나고 `127.0.0.1` · `192.168.0.22` 는 안 살아남).
+   * ★ 주소는 코드에 박지 않는다 — `.env` 의 `ERP_DEV_ALLOWED_ORIGINS`(쉼표로 여럿). 개발 서버에만 쓰인다
+   *   (`next build`/`next start` 는 이 값을 보지 않는다).
+   */
+  allowedDevOrigins: (process.env.ERP_DEV_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+
+  /**
    * ══════════════════════════════════════════════════════════════════════════
    * ★★★ `no-store` — **로그아웃한 뒤 [뒤로] 로 되돌아가지 못하게 한다**
    * ══════════════════════════════════════════════════════════════════════════
