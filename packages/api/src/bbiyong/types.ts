@@ -543,3 +543,25 @@ export interface AclLogContext {
   route?: string;
   httpMethod?: string;
 }
+
+// =============================================================================
+// 세무사 전달 발송인 메일 · 대표자(2026-11-10) — 로그인한 사람의 토큰으로(`callBbiyong`) 부른다
+// =============================================================================
+
+/** 단체 대표자 — 이름 `memberName` · 메일 `emailFst@emailSnd`(둘 중 하나라도 비면 null). */
+export interface BbiyongOrgRep {
+  name: string | null;
+  email: string | null;
+}
+
+/**
+ * 지금 계정 메일 · 내 단체 대표자 — 기존 삐용 조회 둘(my-orgs · 내 단체 정보)만 쓴다(삐용 팀 요청 없음).
+ * ★ `BbiyongAuth` 에 넣지 않았다 — 시험 대역들을 건드리지 않으려고 따로 둔다. 구현은 `HttpBbiyongAuth` · `MockBbiyongAuth`.
+ * ★ 401 은 `BbiyongTokenExpiredError` 로 던진다(`callBbiyong` 이 재발급). `orgRep` 의 403 은 null(권한 없음 = 대표자 모름).
+ */
+export interface BbiyongPeopleLookup {
+  /** `GET /s021200010/my-orgs` 의 `current:true` 줄 `email` — 비었으면 null. */
+  myEmail(accessToken: string): Promise<string | null>;
+  /** `GET /s021100020/org?orgId=` 의 대표자 — 403 · 업무 실패 · 빈 응답이면 null. */
+  orgRep(orgId: number, accessToken: string): Promise<BbiyongOrgRep | null>;
+}

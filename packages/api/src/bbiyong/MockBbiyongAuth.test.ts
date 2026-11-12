@@ -67,3 +67,25 @@ describe('MockBbiyongAuth.verifySession', () => {
     await expect(auth.verifySession('mock-access.9999.1', 'r')).rejects.toThrow(INVALID_CREDENTIALS_MESSAGE);
   });
 });
+
+describe('MockBbiyongAuth.myEmail · orgRep — 세무사 전달 발송인 · 참조(2026-11-10)', () => {
+  it('지금 계정 메일 = mock 토큰 계정의 email · 모양이 아니면 null', async () => {
+    const auth = new MockBbiyongAuth();
+    expect(await auth.myEmail(mockAccess('operator@s-wontech.co.kr'))).toBe('operator@s-wontech.co.kr');
+    expect(await auth.myEmail('eyJ.real')).toBeNull();
+  });
+
+  it('★ 운영사(1) 대표자 = 김대표(admin) — operator 로 보내면 참조가 붙고 admin 이면 안 붙는다', async () => {
+    const auth = new MockBbiyongAuth();
+    expect(await auth.orgRep(1, mockAccess('operator@s-wontech.co.kr'))).toEqual({ name: '김대표', email: 'admin@s-wontech.co.kr' });
+  });
+
+  it('입주사(9001) 대표자는 지어낸 사람 · 대표자를 둔 적 없는 단체 · mock 토큰이 아니면 null', async () => {
+    const auth = new MockBbiyongAuth();
+    const rep = await auth.orgRep(9001, mockAccess('tenant@test.com'));
+    expect(rep?.name).toBeTruthy();
+    expect(rep?.email).toMatch(/@example\.com$/);
+    expect(await auth.orgRep(9002, mockAccess('noaccess@test.com'))).toBeNull();
+    expect(await auth.orgRep(1, 'eyJ.real')).toBeNull();
+  });
+});
