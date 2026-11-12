@@ -708,6 +708,78 @@
   padding: 16px;
 }
 
+/* -----------------------------------------------------------------------------
+ * 앱 안 디자인 값 — 앱 화면과 같은 색 · 글꼴 · 글자 크기 · 줄 · 모서리 (5-나 덧붙임 · 2026-11-12)
+ * -----------------------------------------------------------------------------
+ * ★★ **한곳이다.** 디자인 변수(tokens.css)를 앱 안에서만 앱 값으로 덮는다. 화면 CSS 는 손대지 않는다 —
+ *    화면들이 `var(--color-primary)` 처럼 변수로 쓰므로 여기서 바꾸면 따라온다.
+ * ★ 값 = 앱 s02-app `pages/common/theme.js` 의 COLORS · SHAPE · TYPE(오른쪽 주석이 그 이름). 앱이 바꾸면 같이 고친다.
+ * ★ tokens.css 는 디자인 원본의 사본이라 고치지 않는다(lint-no-green.js 머리 주석) — 덮기만 한다.
+ * ★ `html` 에 거는 이유: 대화창 · 알림처럼 셸 밖(body 바로 아래)에 뜨는 것도 같은 값을 받게.
+ *   `.inApp` 은 서버가 첫 렌더에 붙이므로(UA 꼬리표) 깜빡임 없이 처음부터 앱 값이다.
+ *   PC 브라우저에는 `.inApp` 이 없으니 이 규칙이 걸리지 않는다.
+ * ★ 화면 CSS 에 px 로 박힌 글자 크기(12 · 13 · 14 · 15 · 16)는 그대로다 — 앱 TYPE 단계와 거의 같다.
+ * --------------------------------------------------------------------------- */
+:global(html):has(.inApp) {
+  /* 색 — COLORS */
+  --color-primary: #0B93B8;            /* BRAND */
+  --color-primary-hover: #087A99;      /* BRAND_STRONG */
+  --color-secondary: #5BC0D9;          /* BRAND_LIGHT */
+  --color-accent: #5BC0D9;             /* BRAND_LIGHT */
+  --color-accent-bg: #E6F6FA;          /* BRAND_BG */
+  --text-link: #0B93B8;                /* BRAND */
+  --text-link-hover: #087A99;          /* BRAND_STRONG */
+  --text-on-primary: #FFFFFF;          /* SURFACE */
+  --surface: #FFFFFF;                  /* SURFACE */
+  --surface-card: #FFFFFF;             /* SURFACE */
+  --surface-alt: #F8FAFC;              /* SURFACE_SUB */
+  --border: #E2E8F0;                   /* LINE */
+  --text-heading: #0B1120;             /* TEXT_STRONG */
+  --text-body: #475569;                /* TEXT_BODY */
+  --text-muted: #64748B;               /* TEXT_MUTED */
+  --text-caption: #64748B;             /* TEXT_SUB */
+  --color-warning: #D97706;            /* ACTION */
+  --color-warning-bg: #FEF3C7;         /* STATE_WAIT_BG */
+  --color-warning-text: #92400E;       /* STATE_WAIT_FG */
+  --color-danger: #DC2626;             /* DANGER */
+  --color-danger-bg: #FEE2E2;          /* STATE_REJECT_BG */
+  --color-danger-text: #991B1B;        /* STATE_REJECT_FG */
+  --focus-ring: rgba(11, 147, 184, 0.32);                      /* FOCUS_RING */
+  --shadow-primary: 0 4px 16px rgba(11, 147, 184, 0.22);       /* BRAND 빛 그림자 */
+  --shadow-primary-hover: 0 6px 20px rgba(11, 147, 184, 0.28); /* BRAND 빛 그림자 */
+  --gradient-brand: linear-gradient(120deg, rgba(11, 147, 184, 0.18), rgba(91, 192, 217, 0.18)); /* BRAND → BRAND_LIGHT */
+  --gradient-brand-line: linear-gradient(90deg, #0B93B8, #5BC0D9);                              /* BRAND → BRAND_LIGHT */
+
+  /* 글꼴 — 앱은 기기 기본 글꼴(TYPE 머리 주석) */
+  --font-core: system-ui, -apple-system, sans-serif;
+
+  /* 글자 크기 · 굵기 — TYPE */
+  --text-h1-size: 17px;                /* H1 */
+  --text-h2-size: 15px;                /* H2 */
+  --text-h3-size: 14px;                /* H3 */
+  --text-h3-weight: 700;               /* H3 굵기 */
+  --text-body-size: 14px;              /* BODY */
+  --text-body-lg-size: 15px;           /* H2 크기 */
+  --text-caption-size: 13px;           /* LABEL */
+  --text-micro-size: 12px;             /* SMALL */
+
+  /* 줄 · 모서리 · 칸 높이 — SHAPE */
+  --border-width: 1px;                 /* LINE */
+  --radius-md: 8px;                    /* RADIUS */
+  --radius-lg: 8px;                    /* RADIUS */
+  --control-h: 40px;                   /* FIELD_HEIGHT */
+  --control-h-sm: 40px;                /* FIELD_HEIGHT */
+}
+
+/*
+ * 앱 안 — 화면 제목 줄을 감춘다(5-나 덧붙임 · 2026-11-12)
+ * ★ 제목은 앱 위 띠 하나만 보인다. 화면은 제목 `h1` 에 `data-app-band-title` 만 붙이고, 감추는 것은 여기 하나다.
+ * ★ 제목 아래 안내 줄(건수 · 불러오는 중)과 단추는 그대로 둔다.
+ */
+.inApp [data-app-band-title] {
+  display: none;
+}
+
 /*
  * ★ 2026-11-08 — 다른 화면(삐용) 안에 떴으면 메뉴 틀(사이드바 · 접기 · 상단 띠)을 **처음부터** 감춘다.
  *   `<html data-embedded>` 는 루트 레이아웃 스크립트가 첫 페인트 전에 붙인다. 마운트 뒤의 `embedded`
