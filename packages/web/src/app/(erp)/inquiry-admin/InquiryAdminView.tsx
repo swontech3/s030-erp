@@ -370,7 +370,10 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
     >
       <div className={styles.head}>
         <div>
-          <h1 className={styles.title}>문의상담관리</h1>
+          {/* ★ 앱 안이면 감춘다 — 앱 위 띠가 제목을 보인다(AppShell.module.css `[data-app-band-title]`) */}
+          <h1 className={styles.title} data-app-band-title="1">
+            문의상담관리
+          </h1>
           <p className={styles.sub}>{headNote}</p>
         </div>
       </div>

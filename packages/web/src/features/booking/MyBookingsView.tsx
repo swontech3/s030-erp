@@ -57,7 +57,10 @@ export function MyBookingsView() {
     <div className={styles.page}>
       <div className={styles.head}>
         <div>
-          <h1 className={styles.title}>내 예약</h1>
+          {/* ★ 앱 안이면 감춘다 — 앱 위 띠가 제목을 보인다(AppShell.module.css `[data-app-band-title]`) */}
+          <h1 className={styles.title} data-app-band-title="1">
+            내 예약
+          </h1>
           <p className={styles.sub}>
             {items === null ? '불러오는 중입니다' : error ? error : `오늘부터 예정된 우리 회사 예약 ${items.length}건`}
           </p>
