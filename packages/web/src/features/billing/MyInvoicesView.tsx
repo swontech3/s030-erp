@@ -82,7 +82,10 @@ export function MyInvoicesView() {
   return (
     <div className={styles.page}>
       <div className={styles.head}>
-        <h1 className={styles.title}>내 청구서</h1>
+        {/* ★ 앱 안이면 감춘다 — 앱 위 띠가 제목을 보인다(AppShell.module.css `[data-app-band-title]`) */}
+        <h1 className={styles.title} data-app-band-title="1">
+          내 청구서
+        </h1>
         <p className={styles.sub}>
           {items === null ? '불러오는 중입니다' : error ? error : '우리 회사 청구와 납부 내역입니다'}
         </p>
