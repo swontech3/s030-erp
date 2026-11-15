@@ -52,6 +52,7 @@ import {
 } from '../db/deposits.ts';
 import { depositBalance, splitDepositOnSettle } from '@swonbiz/shared/domain/deposit-ledger';
 import { maskAccount, pendingKind } from '@swonbiz/shared/domain/settlement-view';
+import { DUE_RANGE_TOO_LONG, isDueRangeTooLong } from '@swonbiz/shared/domain/billing-due-range';
 
 /** 수납을 쓸 수 있는 역할. 조회는 입주사도 한다. */
 const WRITE_ROLE = 'operator';
@@ -270,6 +271,10 @@ export function registerBillingRoutes(app: FastifyInstance): void {
     }
     if (from > to) {
       return reply.code(400).send({ error: 'invalid_request', message: '납부기한 시작일이 끝일보다 늦습니다' });
+    }
+    // ★ 기간 상한 6개월(2026-11-15) — 화면과 같은 함수 · 같은 말(shared `billing-due-range`).
+    if (isDueRangeTooLong(from, to)) {
+      return reply.code(400).send({ error: 'invalid_request', message: DUE_RANGE_TOO_LONG });
     }
     const rows = await withCompanyScope(scopeOf(session), (client) =>
       listBillingInvoices(client, { due: { from, to }, companyId: null }),

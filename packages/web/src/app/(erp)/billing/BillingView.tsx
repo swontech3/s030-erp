@@ -33,6 +33,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { DUE_RANGE_TOO_LONG, isDueRangeTooLong } from '@swonbiz/shared/domain/billing-due-range';
 import { Icon } from '@/components/ds';
 import { ListFrame, ListNote, ListScroll } from '@/components/patterns/ListFrame';
 import { BillingEmpty, BillingTable } from '@/features/billing/BillingTable';
@@ -77,6 +78,8 @@ function condError(c: Cond, company: string | null): string | null {
   if (c.to && !isIsoDay(c.to)) return '납부기한 끝일을 확인해 주세요';
   if (!company && (!c.from || !c.to)) return '납부기한 시작일과 끝일을 넣어 주세요';
   if (c.from && c.to && c.from > c.to) return '납부기한 시작일이 끝일보다 늦습니다';
+  // ★ 기간 상한 6개월(2026-11-15) — API 와 같은 함수 · 같은 말. 입주사로 거른 경우(전 기간)는 보지 않는다.
+  if (!company && isDueRangeTooLong(c.from, c.to)) return DUE_RANGE_TOO_LONG;
   return null;
 }
 
