@@ -89,3 +89,17 @@ describe('MockBbiyongAuth.myEmail · orgRep — 세무사 전달 발송인 · �
     expect(await auth.orgRep(1, 'eyJ.real')).toBeNull();
   });
 });
+
+describe('MockBbiyongAuth.orgCompany — 세무 설정 회사 기본정보(2026-11-15)', () => {
+  const auth = new MockBbiyongAuth();
+  it('운영사 계정 · 그 단체 대표는 지어낸 회사 정보를 받는다', async () => {
+    expect((await auth.orgCompany(1, mockAccess('operator@s-wontech.co.kr')))?.name).toBe('에스원비즈(삐용)');
+    expect((await auth.orgCompany(1, mockAccess('admin@s-wontech.co.kr')))?.corpNumber).toBe('1101110000001');
+    expect((await auth.orgCompany(9003, mockAccess('nontenant@test.com')))?.bizNumber).toBe('3148600001');
+  });
+  it('★ 대표 아닌 회사 계정 · 정보 없는 단체 · mock 토큰이 아니면 null(삐용 403 자리)', async () => {
+    expect(await auth.orgCompany(9001, mockAccess('tenant@test.com'))).toBeNull();
+    expect(await auth.orgCompany(9002, mockAccess('noaccess@test.com'))).toBeNull();
+    expect(await auth.orgCompany(1, 'eyJ.real')).toBeNull();
+  });
+});

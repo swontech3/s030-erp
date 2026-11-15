@@ -118,10 +118,11 @@ export interface TaxFinAccountView {
 /**
  * 회사 기본정보 — 보기만 한다. 어디서 읽었는지(`source`)를 함께 준다.
  *   · `tenant` ERP 입주사 표 · `legal` 법무 비입주사 회사 정보 · `none` 둘 다 없음(회사명만 세션 값)
+ *   · `bbiyong` 삐용 「내 단체 정보」(2026-11-15 — 먼저 읽는다. 403 · 실패 · 시간 초과면 위 ERP 셋 중 하나로 돌아간다)
  * ★ 번호는 숫자만이다(세무 규칙). 없으면 null.
  */
 export interface TaxCompanyInfo {
-  source: 'tenant' | 'legal' | 'none';
+  source: 'bbiyong' | 'tenant' | 'legal' | 'none';
   name: string | null;
   bizNumber: string | null;
   corpNumber: string | null;

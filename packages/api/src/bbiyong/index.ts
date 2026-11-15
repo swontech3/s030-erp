@@ -14,6 +14,7 @@ import { MockBbiyongOrg } from './MockBbiyongOrg.ts';
 import { HttpBbiyongAuth } from './HttpBbiyongAuth.ts';
 import { HttpBbiyongOrg } from './HttpBbiyongOrg.ts';
 import type { BbiyongAcl, BbiyongAuth, BbiyongOrg, BbiyongPeopleLookup } from './types.ts';
+import type { BbiyongOrgCompanyLookup } from './types.ts';
 
 export const bbiyongAuth: BbiyongAuth = (() => {
   if (env.bbiyongMock) return new MockBbiyongAuth();
@@ -28,6 +29,13 @@ export const bbiyongAuth: BbiyongAuth = (() => {
  * ★ URL 검사는 바로 위 `bbiyongAuth` 가 이미 했다. 부를 때는 `callBbiyong` 을 거친다.
  */
 export const bbiyongPeople: BbiyongPeopleLookup = env.bbiyongMock
+  ? new MockBbiyongAuth()
+  : new HttpBbiyongAuth({ baseUrl: env.bbiyongBaseUrl ?? '' });
+
+/**
+ * 내 단체 회사 정보(세무 설정 회사 기본정보, 2026-11-15) — 위 `bbiyongPeople` 과 같은 갈래(mock / http). 부를 때는 `callBbiyong`.
+ */
+export const bbiyongOrgCompany: BbiyongOrgCompanyLookup = env.bbiyongMock
   ? new MockBbiyongAuth()
   : new HttpBbiyongAuth({ baseUrl: env.bbiyongBaseUrl ?? '' });
 

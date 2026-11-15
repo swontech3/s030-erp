@@ -20,6 +20,9 @@
  * ★ 회사 정보는 법무 `readCompanySource` 를 **고치지 않고** 부른다 — 입주사면 ERP 회사 표, 아니면 법무 회사 정보.
  *   둘 다 없으면 번호는 비운다. 회사명이 비어 있으면(source 와 상관없이) 세션 회사명(삐용 my-orgs → `getProfile`)으로
  *   채운다. 번호는 숫자만 내려 준다.
+ * ★ 2026-11-15 — 회사 정보는 **삐용 「내 단체 정보」(`GET /s021100020/org?orgId=세션 단체`)를 먼저** 읽는다(로그인한 사람의 토큰,
+ *   `callBbiyong`). 403(대표 · 운영사가 아님) · 실패 · 시간 초과면 위 ERP 회사 정보로 돌아간다(화면이 안내 글을 붙인다).
+ *   법인 고정(`lockedBizType`)은 **읽은 쪽**의 법인등록번호로 — 읽기와 저장이 같은 값을 본다. 삐용 호출은 트랜잭션 밖에서.
  */
 import type { FastifyInstance } from 'fastify';
 import type { ErpSession } from '@swonbiz/shared';
@@ -45,7 +48,8 @@ import { requireSession } from '../session/hook.ts';
 import { scopeOfSession, withCompanyScope, type ScopedClient } from '../db/withCompanyScope.ts';
 import { listCodes } from '../db/lookups.ts';
 import { readCompanySource } from '../db/corpChanges.ts';
-import { bbiyongAuth } from '../bbiyong/index.ts';
+import { bbiyongAuth, bbiyongOrgCompany } from '../bbiyong/index.ts';
+import { callBbiyong } from '../session/bbiyongToken.ts';
 import {
   deleteFinAccountsExcept,
   insertFinAccount,
@@ -116,12 +120,15 @@ async function companyOf(client: ScopedClient, orgId: number): Promise<TaxCompan
   };
 }
 
-/** 읽기 — 이 단체(`orgId` = 세션 단체 ID)의 것만. */
-export async function readTaxSettingsOp(client: ScopedClient, orgId: number): Promise<TaxSettingsResponse> {
+/**
+ * 읽기 — 이 단체(`orgId` = 세션 단체 ID)의 것만.
+ * `remote` 는 삐용에서 읽은 회사 정보(못 읽었으면 null — ERP 회사 정보를 읽는다).
+ */
+export async function readTaxSettingsOp(client: ScopedClient, orgId: number, remote: TaxCompanyInfo | null = null): Promise<TaxSettingsResponse> {
   const row = await readTaxSettingsRow(client, orgId);
   const finAccounts = await listFinAccounts(client, orgId);
   const codes = await loadTaxCodes(client);
-  const company = await companyOf(client, orgId);
+  const company = remote ?? (await companyOf(client, orgId));
   // ★ 법인등록번호가 있으면 법인으로 고정 — 저장된 값과 상관없이 법인을 보인다(2026-11-07 대표 결정)
   const locked = lockedBizType(company.corpNumber);
   const settings = row
@@ -146,6 +153,7 @@ export async function saveTaxSettingsOp(
   orgId: number,
   save: TaxSettingsSave,
   actor: string,
+  remote: TaxCompanyInfo | null = null,
 ): Promise<TaxSaveResult> {
   const existing = new Set(await lockFinAccountIds(client, orgId));
   if (save.finAccounts.some((a) => a.id !== null && !existing.has(a.id))) {
@@ -153,7 +161,7 @@ export async function saveTaxSettingsOp(
   }
 
   // ★ 법인등록번호가 있는 회사는 보낸 값과 상관없이 법인으로 저장한다(화면은 보이기만 — 2026-11-07)
-  const locked = lockedBizType((await companyOf(client, orgId)).corpNumber);
+  const locked = lockedBizType((remote ?? (await companyOf(client, orgId))).corpNumber);
   await upsertTaxSettings(client, orgId, locked ? { ...save, bizType: locked } : save, actor);
   await deleteFinAccountsExcept(
     client,
@@ -167,7 +175,7 @@ export async function saveTaxSettingsOp(
     if (a.id === null) await insertFinAccount(client, orgId, a, sortOrder, actor);
     else await updateFinAccount(client, orgId, { ...a, id: a.id }, sortOrder, actor);
   }
-  return { ok: true, data: await readTaxSettingsOp(client, orgId) };
+  return { ok: true, data: await readTaxSettingsOp(client, orgId, remote) };
 }
 
 /** 바꿔 끼울 수 있는 바깥 — 시험이 DB 없이 본문 · 역할 · 404 를 본다. */
@@ -204,11 +212,34 @@ async function withSessionName(session: ErpSession, data: TaxSettingsResponse): 
   return { ...data, company: fillCompanyName(data.company, name) };
 }
 
+/** 삐용 회사 정보 → 세무 회사 정보(source `bbiyong`). 못 읽었으면 null. */
+export function companyOfBbiyong(remote: { name: string | null; bizNumber: string | null; corpNumber: string | null } | null): TaxCompanyInfo | null {
+  if (!remote) return null;
+  const num = (v: string | null) => (v && digitsOnly(v) !== '' ? digitsOnly(v) : null);
+  return { source: 'bbiyong', name: remote.name, bizNumber: num(remote.bizNumber), corpNumber: num(remote.corpNumber) };
+}
+
+/**
+ * 삐용 「내 단체 정보」의 회사 정보 — 로그인한 사람의 토큰으로(`callBbiyong`). 403 · 실패 · 시간 초과 · 재로그인 필요는 모두 null.
+ * ★ 화면을 깨뜨리지 않는다 — null 이면 ERP 회사 정보를 보인다.
+ */
+async function bbiyongCompanyOf(session: ErpSession): Promise<TaxCompanyInfo | null> {
+  try {
+    return companyOfBbiyong(await callBbiyong(session.erpSid, (t) => bbiyongOrgCompany.orgCompany(session.s020OrgId, t)));
+  } catch {
+    return null;
+  }
+}
+
 const defaultDeps: TaxSettingsDeps = {
   codeSets: async (session) => codeSetsOf(await run(session, loadTaxCodes)),
-  read: async (session) => withSessionName(session, await run(session, (c) => readTaxSettingsOp(c, session.s020OrgId))),
+  read: async (session) => {
+    const remote = await bbiyongCompanyOf(session);
+    return withSessionName(session, await run(session, (c) => readTaxSettingsOp(c, session.s020OrgId, remote)));
+  },
   save: async (session, save) => {
-    const r = await run(session, (c) => saveTaxSettingsOp(c, session.s020OrgId, save, String(session.s020MemberId)));
+    const remote = await bbiyongCompanyOf(session);
+    const r = await run(session, (c) => saveTaxSettingsOp(c, session.s020OrgId, save, String(session.s020MemberId), remote));
     return r.ok ? { ok: true, data: await withSessionName(session, r.data) } : r;
   },
 };

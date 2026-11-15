@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { ErpSession, ScopeRole } from '@swonbiz/shared';
 import type { TaxSettingsResponse, TaxSettingsSave } from '@swonbiz/shared/domain/tax-settings';
 import { fillCompanyName, registerTaxSettingRoutes, type TaxSettingsDeps } from './taxSettings.ts';
+import { companyOfBbiyong } from './taxSettings.ts';
 
 const session = (role: ScopeRole): ErpSession => ({
   erpSid: 'sid-hash',
@@ -145,5 +146,14 @@ describe('fillCompanyName — 회사명이 비어 있으면 세션 회사명', (
   it('★ 상호가 빈 법무 비입주사도 세션 회사명으로 채운다(source 와 상관없이)', () => {
     const company = { source: 'legal' as const, name: null, bizNumber: '2208162517', corpNumber: null };
     expect(fillCompanyName(company, '에스원테크')).toEqual({ ...company, name: '에스원테크' });
+  });
+});
+
+describe('companyOfBbiyong — 삐용 회사 정보 → 세무 회사 정보(2026-11-15)', () => {
+  it('source bbiyong · 번호는 숫자만 · 못 읽었으면 null', () => {
+    expect(companyOfBbiyong({ name: '한성무역', bizNumber: '105-87-68687', corpNumber: null })).toEqual({
+      source: 'bbiyong', name: '한성무역', bizNumber: '1058768687', corpNumber: null,
+    });
+    expect(companyOfBbiyong(null)).toBeNull();
   });
 });
