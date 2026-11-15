@@ -15,6 +15,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { AppShell } from '@/components/patterns/AppShell';
 import { getMe, getBbiyongPending } from '@/lib/session';
+import { isInApp } from '@/lib/appClient';
 import { buildNavItems, SIDEBAR_COOKIE } from '@/lib/sidebar';
 
 export default async function ErpLayout({ children }: { children: React.ReactNode }) {
@@ -37,9 +38,16 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   const store = await cookies();
   const initialCollapsed = store.get(SIDEBAR_COOKIE)?.value === '1';
 
+  /*
+   * ★ 앱(s02-app) 웹뷰 안인가 — UA 꼬리표로 **서버에서** 안다(앱 1단계 5-나 · 2026-11-07).
+   *   셸이 첫 렌더부터 왼쪽 메뉴 · 위 띠를 감춘다. 화면 모양에만 쓴다 — 권한에는 쓰지 않는다.
+   */
+  const inApp = await isInApp();
+
   return (
     <AppShell
       initialCollapsed={initialCollapsed}
+      inApp={inApp}
       /* ★ 삐용이 준 목록만 넘긴다. 역할로 거르는 코드는 이 경로 어디에도 없다(ACL-07′). */
       items={buildNavItems(me.screens)}
       linkAlert={linkAlert}

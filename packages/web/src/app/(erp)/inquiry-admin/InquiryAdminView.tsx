@@ -31,6 +31,12 @@ import { useSearchParams } from 'next/navigation';
 import { Icon, type IconName } from '@/components/ds';
 import { codeName, dotDate, type InquiryCodes } from '@/features/inquiry/inquiry-model';
 import type { ThreadMessage } from '@/features/inquiry/inquiry-model';
+import {
+  detailHistory,
+  initialStatus,
+  inquiryAdminLayout,
+  resetStatus,
+} from '@swonbiz/shared/domain/inquiry-admin-layout';
 import { DeleteInquiryDialog } from './DeleteInquiryDialog';
 import { InquiryDetail } from './InquiryDetail';
 import styles from './inquiry-admin.module.css';
@@ -46,6 +52,13 @@ const SEARCH_DEBOUNCE_MS = 250;
 
 interface Props {
   codes: InquiryCodes;
+  /**
+   * ★ 앱(s02-app) 웹뷰 안인가 — 서버가 UA 꼬리표로 읽어 넘긴 값(앱 1단계 5-나 · 2026-11-07).
+   *   참이면 휴대폰 모양이다: 접수만 · 상태 칩 감춤 · 글 삭제 감춤 · 목록 ↔ 상세 한 장씩 ·
+   *   상세를 열 때 방문 기록을 남긴다(폰 [뒤로] = 목록). 규칙은 shared `inquiry-admin-layout` 하나다.
+   *   **처리 기능(답변 · 전화로 답변함 · 답변 수정)은 그대로다** — 모양만 바뀐다.
+   */
+  inApp?: boolean;
 }
 
 interface Detail {
@@ -53,14 +66,12 @@ interface Detail {
   messages: ThreadMessage[];
 }
 
-export function InquiryAdminView({ codes }: Props) {
+export function InquiryAdminView({ codes, inApp = false }: Props) {
   const params = useSearchParams();
+  const layout = useMemo(() => inquiryAdminLayout(inApp), [inApp]);
 
   /** ★ 첫 값은 주소에서 온다. 없으면 「접수」다 — 답해야 할 것부터. */
-  const [status, setStatus] = useState<string | null>(() => {
-    const v = params.get('st');
-    return v === 'all' ? null : v || 'R';
-  });
+  const [status, setStatus] = useState<string | null>(() => initialStatus(layout, params.get('st')));
   const [type, setType] = useState<string | null>(() => params.get('type') || null);
   const [keyword, setKeyword] = useState(() => params.get('q') ?? '');
   const [query, setQuery] = useState(keyword);
@@ -190,8 +201,15 @@ export function InquiryAdminView({ codes }: Props) {
     setSelectedId(null);
   }, [filterKey]);
 
-  // 주소에 적는다 — [이전]·새로고침에 살아남는다. 기록은 쌓지 않는다.
+  /*
+   * 주소에 적는다 — [이전]·새로고침에 살아남는다. 기록은 쌓지 않는다.
+   * ★ 앱 안(5-나)은 하나만 다르다 — 목록에서 상세를 열 때 **기록을 남긴다**(`pushState`).
+   *   그래야 폰 [뒤로] 가 웹뷰를 닫지 않고 목록으로 돌아온다. 어느 때 남기는지는 shared `detailHistory` 하나다.
+   */
+  const lastSelected = useRef(selectedId);
   useEffect(() => {
+    const how = detailHistory(layout, lastSelected.current, selectedId);
+    lastSelected.current = selectedId;
     const qs = new URLSearchParams();
     if (status === null) qs.set('st', 'all');
     else if (status !== 'R') qs.set('st', status);
@@ -201,9 +219,21 @@ export function InquiryAdminView({ codes }: Props) {
     const search = qs.toString();
     const next = window.location.pathname + (search ? `?${search}` : '');
     if (next !== window.location.pathname + window.location.search) {
-      window.history.replaceState(null, '', next);
+      if (how === 'push') window.history.pushState(null, '', next);
+      else window.history.replaceState(null, '', next);
     }
-  }, [status, type, query, selectedId]);
+  }, [status, type, query, selectedId, layout]);
+
+  /*
+   * ★ 앱 안 — [뒤로] 로 주소의 `?id=` 가 빠지면 상세를 닫고 목록을 보인다(5-나).
+   *   PC 는 기록을 쌓지 않으므로 여기 올 일이 없다 — 지금 그대로 둔다.
+   */
+  useEffect(() => {
+    if (!layout.phone) return;
+    const onPop = () => setSelectedId(new URLSearchParams(window.location.search).get('id') || null);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [layout.phone]);
 
   /**
    * 답변 등록 · 전화 답변 기록.
@@ -311,11 +341,40 @@ export function InquiryAdminView({ codes }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- codeName 은 props 파생이라 안정적이다
   }, [items, listError, status, type, query, total, codes]);
 
+  /* 유형은 5종이라 칩으로 두면 줄이 넘친다 — 420px 목록 머리에는 선택이 맞다 */
+  const typeSelect = (
+    <select
+      className={styles.typeSelect}
+      value={type ?? ''}
+      aria-label="문의 유형"
+      onChange={(e) => setType(e.target.value || null)}
+    >
+      <option value="">유형 전체</option>
+      {codes.types.map((t) => (
+        <option key={t.code} value={t.code}>
+          {t.name}
+        </option>
+      ))}
+    </select>
+  );
+
   return (
-    <div className={styles.page}>
+    <div
+      className={
+        styles.page +
+        /* ★ 앱 안 휴대폰 모양 — 목록 ↔ 상세 한 장씩(고른 문의가 있으면 상세) */
+        (layout.phone ? ` ${styles.phone}` : '') +
+        (layout.phone && selectedId ? ` ${styles.phoneDetail}` : '')
+      }
+      data-phone={layout.phone ? '1' : undefined}
+    >
       <div className={styles.head}>
         <div>
-          <h1 className={styles.title} data-page-title>문의상담관리</h1>
+          {/* ★ 앱 안이면 감춘다 — 앱 위 띠가 제목을 보인다(AppShell.module.css `[data-app-band-title]`) ·
+              삐용 안이면 data-page-title 로 감춘다(legal-dev cb94a93) — 둘 다 둔다 */}
+          <h1 className={styles.title} data-page-title data-app-band-title="1">
+            문의상담관리
+          </h1>
           <p className={styles.sub}>{headNote}</p>
         </div>
       </div>
@@ -336,11 +395,17 @@ export function InquiryAdminView({ codes }: Props) {
                   onChange={(e) => setKeyword(e.target.value)}
                 />
               </span>
-              <span className={styles.count}>{total}건</span>
+              {/* ★ 앱 안은 감춘다 — 제목 아래 안내 줄 「접수 N건」과 겹친다(5-나 덧붙임 2026-11-12) */}
+              {layout.searchCount ? <span className={styles.count}>{total}건</span> : null}
+              {/* ★ 앱 안은 유형 고르기를 검색칸 오른쪽에 — 한 줄(5-나 덧붙임) */}
+              {layout.typeInSearchRow ? typeSelect : null}
             </div>
 
+            {layout.statusChips || !layout.typeInSearchRow ? (
             <div className={styles.filterRow}>
-              {/* ★ 상태 칩의 문구는 코드 마스터(QU_ST)에서 온다 — 「접수」를 박지 않는다. */}
+              {/* ★ 상태 칩의 문구는 코드 마스터(QU_ST)에서 온다 — 「접수」를 박지 않는다.
+                  ★ 앱 안에서는 감춘다 — 접수만 본다(5-나). */}
+              {layout.statusChips ? (
               <div className={styles.chipRow}>
                 {codes.statuses.map((s) => (
                   <button
@@ -360,22 +425,11 @@ export function InquiryAdminView({ codes }: Props) {
                   전체
                 </button>
               </div>
+              ) : null}
 
-              {/* 유형은 5종이라 칩으로 두면 줄이 넘친다 — 420px 목록 머리에는 선택이 맞다 */}
-              <select
-                className={styles.typeSelect}
-                value={type ?? ''}
-                aria-label="문의 유형"
-                onChange={(e) => setType(e.target.value || null)}
-              >
-                <option value="">유형 전체</option>
-                {codes.types.map((t) => (
-                  <option key={t.code} value={t.code}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+              {layout.typeInSearchRow ? null : typeSelect}
             </div>
+            ) : null}
           </div>
 
           <div className={styles.cards}>
@@ -394,11 +448,19 @@ export function InquiryAdminView({ codes }: Props) {
                       ? `${statusName(status)} 문의가 없습니다`
                       : '조건에 맞는 문의가 없습니다'
                   }
-                  sub={status === 'R' && !type && !query ? '답변을 기다리는 문의가 없습니다' : '필터나 검색어를 바꿔 보세요'}
+                  /* ★ 앱 안은 접수 빈 목록 둘째 줄을 감춘다 — 첫 줄과 뜻이 겹친다(5-나 덧붙임 2026-11-12) */
+                  sub={
+                    status === 'R' && !type && !query
+                      ? layout.receivedEmptySub
+                        ? '답변을 기다리는 문의가 없습니다'
+                        : undefined
+                      : '필터나 검색어를 바꿔 보세요'
+                  }
                   action={{
                     label: '전체 보기',
                     onClick: () => {
-                      setStatus(null);
+                      // ★ 앱 안은 접수를 놓지 않는다 — 유형 · 검색어만 비운다(5-나)
+                      setStatus(resetStatus(layout));
                       setType(null);
                       setKeyword('');
                     },
@@ -475,12 +537,13 @@ export function InquiryAdminView({ codes }: Props) {
               onReply={reply}
               onEdit={editReply}
               onAskDelete={() => setAsking(true)}
+              showDelete={layout.deleteButton}
             />
           )}
         </div>
       </div>
 
-      {asking && detail ? (
+      {asking && detail && layout.deleteButton ? (
         <DeleteInquiryDialog
           typeName={typeName(detail.inquiry.type)}
           name={detail.inquiry.name}

@@ -19,6 +19,7 @@
  */
 import { callApi } from '@/lib/api';
 import { requireScreen } from '@/lib/session';
+import { isInApp } from '@/lib/appClient';
 import type { InquiryCodes } from '@/features/inquiry/inquiry-model';
 import { InquiryAdminView } from './InquiryAdminView';
 
@@ -29,5 +30,8 @@ export default async function InquiryAdminPage() {
   const res = await callApi<InquiryCodes>('/inquiries/codes');
   const codes = res.ok ? res.body : { types: [], statuses: [] };
 
-  return <InquiryAdminView codes={codes} />;
+  // ★ 앱(s02-app) 웹뷰 안이면 휴대폰 모양(앱 1단계 5-나). 모양에만 쓴다 — 입장은 위 requireScreen 이 막는다.
+  const inApp = await isInApp();
+
+  return <InquiryAdminView codes={codes} inApp={inApp} />;
 }

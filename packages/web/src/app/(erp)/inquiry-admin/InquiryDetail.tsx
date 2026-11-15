@@ -28,6 +28,7 @@ import {
   operatorReplyBlock,
   type MessageKind,
 } from '@swonbiz/shared/domain/inquiry';
+import { retentionDeleteHint } from '@swonbiz/shared/domain/inquiry-admin-layout';
 import { Icon } from '@/components/ds';
 import {
   codeName,
@@ -47,9 +48,11 @@ interface Props {
   onReply: (kind: 'text' | 'phone', body: string) => Promise<boolean>;
   onEdit: (messageId: string, body: string) => Promise<boolean>;
   onAskDelete: () => void;
+  /** [글 삭제] 를 그리는가 — 앱 안에서는 감춘다(PC 만 · 앱 1단계 5-나). 기본은 그린다 */
+  showDelete?: boolean;
 }
 
-export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit, onAskDelete }: Props) {
+export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit, onAskDelete, showDelete = true }: Props) {
   const [draft, setDraft] = useState('');
   const [draftErr, setDraftErr] = useState(false);
   /** 고치고 있는 답변. `null` 이면 아무것도 고치지 않는 중이다. */
@@ -111,15 +114,17 @@ export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit,
             확인 창을 거친다. 보관 기간이 지나지 않은 글도 지울 수 있다(스팸 제거 —
             2026-09-28 결정, 03-thread §5 가 운영 판단으로 남긴 자리다).
         */}
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnDanger} ${styles.btnSm}`}
-          data-delete="1"
-          onClick={onAskDelete}
-        >
-          <Icon name="trash-2" size={16} />
-          글 삭제
-        </button>
+        {showDelete ? (
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnDanger} ${styles.btnSm}`}
+            data-delete="1"
+            onClick={onAskDelete}
+          >
+            <Icon name="trash-2" size={16} />
+            글 삭제
+          </button>
+        ) : null}
       </div>
 
       <div className={styles.detailBody}>
@@ -128,8 +133,9 @@ export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit,
             <Icon name="info" size={16} />
             <span>
               등록일부터 {inquiry.retentionMonths}개월이 지났습니다(보유 기간 「등록일로부터{' '}
-              {inquiry.retentionMonths}개월 보관 후 파기」). <b>자동으로 삭제되지 않습니다</b> — 상담이 끝난 글이면
-              [글 삭제]로 개인정보를 지워 주세요. 고객 화면에는 이 안내가 보이지 않습니다.
+              {inquiry.retentionMonths}개월 보관 후 파기」). <b>자동으로 삭제되지 않습니다</b> — 상담이 끝난 글이면{' '}
+              {/* 앱 안은 [글 삭제] 를 감춘다 → 「PC 화면에서」 (앱 1단계 9-나) */}
+              {retentionDeleteHint(showDelete)} 고객 화면에는 이 안내가 보이지 않습니다.
             </span>
           </div>
         ) : null}
