@@ -211,7 +211,7 @@ export function DocFormSettingsView() {
 
   return (
     <div className={cs.page}>
-      <div className={cs.head}>
+      <div className={cs.head} data-page-title>
         <h1 className={cs.title}>설정</h1>
       </div>
 

@@ -172,7 +172,7 @@ export function FacilityView() {
            않는다 — 화면의 주 액션은 하나이고 그 자리는 우상단이다.
       */}
       <div className={styles.head}>
-        <h1 className={styles.title}>센터 관리</h1>
+        <h1 className={styles.title} data-page-title>센터 관리</h1>
         <Button size="sm" variant="primary" onClick={() => setDialog({ kind: 'building', building: null })}>
           <Icon name="plus" size={16} />
           건물 추가

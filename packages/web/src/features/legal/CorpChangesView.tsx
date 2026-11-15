@@ -132,7 +132,7 @@ export function CorpChangesView({ pickOrg }: { pickOrg: boolean }) {
     <div className={styles.page}>
       <div className={styles.head}>
         <div>
-          <h1 className={styles.title}>법인변경</h1>
+          <h1 className={styles.title} data-page-title>법인변경</h1>
           <p className={styles.sub}>
             {load.state === 'loading'
               ? '불러오는 중입니다'
