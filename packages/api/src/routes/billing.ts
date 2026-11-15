@@ -154,6 +154,8 @@ function toBillingItem(row: BillingListRow) {
     usageStart: row.start_day,
     usageEnd: row.usage_end_day,
     terminated: row.terminated,
+    /** 실제로 낸 날 — 양수 수납 중 가장 늦은 날. 없으면 `null`(`BillingListRow.last_paid_day`). */
+    lastPaidOn: row.last_paid_day,
   };
 }
 
@@ -243,28 +245,36 @@ function toDeposits(rows: readonly DepositRow[]) {
 /** 두 번 처리하려 했다 — 트랜잭션을 되돌리려고 던진다. */
 class AlreadyProcessed extends Error {}
 
-/** `YYYY-MM`. 틀리면 `null`. */
-function parseYearMonth(value: unknown): string | null {
+/** `YYYY-MM-DD` — 달력에 있는 날만. 틀리면 `null`. */
+function parseDayParam(value: unknown): string | null {
   const s = String(value ?? '');
-  return /^\d{4}-(0[1-9]|1[0-2])$/.test(s) ? s : null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s ? s : null;
 }
 
 export function registerBillingRoutes(app: FastifyInstance): void {
   /* ── 월별 청구 (s030200070) ─────────────────────────────────────────────
      ★ 운영사 전용. 남의 입주사 청구액이 한 화면에 모이는 자리다 — RLS 가 입주사
        세션을 자기 것으로 좁히긴 하지만, 화면 자체가 운영 업무라 403 으로 닫는다. */
-  app.get<{ Querystring: { yearMonth?: string } }>('/billing/invoices', async (req, reply) => {
+  /* ★ 2026-11-15 — 조건이 월(yearMonth)에서 **납부기한 기간**(dueFrom ~ dueTo, 양 끝 포함)으로 바뀌었다.
+       둘 다 있어야 한다 — 청구서 전체를 한 번에 내리는 길은 두지 않는다(`listBillingInvoices`). */
+  app.get<{ Querystring: { dueFrom?: string; dueTo?: string } }>('/billing/invoices', async (req, reply) => {
     const session = requireSession(req);
     if (session.role !== WRITE_ROLE) return forbidden(reply);
 
-    const yearMonth = parseYearMonth(req.query.yearMonth);
-    if (!yearMonth) {
-      return reply.code(400).send({ error: 'invalid_request', message: '청구 월은 YYYY-MM 이어야 합니다' });
+    const from = parseDayParam(req.query.dueFrom);
+    const to = parseDayParam(req.query.dueTo);
+    if (!from || !to) {
+      return reply.code(400).send({ error: 'invalid_request', message: '납부기한은 YYYY-MM-DD 이어야 합니다' });
+    }
+    if (from > to) {
+      return reply.code(400).send({ error: 'invalid_request', message: '납부기한 시작일이 끝일보다 늦습니다' });
     }
     const rows = await withCompanyScope(scopeOf(session), (client) =>
-      listBillingInvoices(client, { yearMonth, companyId: null }),
+      listBillingInvoices(client, { due: { from, to }, companyId: null }),
     );
-    return reply.send({ yearMonth, invoices: rows.map(toBillingItem) });
+    return reply.send({ dueFrom: from, dueTo: to, invoices: rows.map(toBillingItem) });
   });
 
   /* ── 입주사 청구 탭 (s030200030 오른쪽) — 청구서 전부 + 정산 원장 ─────── */
@@ -275,7 +285,7 @@ export function registerBillingRoutes(app: FastifyInstance): void {
     const found = await withCompanyScope(scopeOf(session), async (client) => {
       // ★ 차례로 부른다 — 한 트랜잭션 커넥션에 동시에 쿼리를 걸면 pg 가 경고하고(pg@9 에서 막힌다)
       //   어차피 한 줄로 서서 돈다.
-      const invoices = await listBillingInvoices(client, { yearMonth: null, companyId: req.params.id });
+      const invoices = await listBillingInvoices(client, { due: null, companyId: req.params.id });
       const settlements = await listCompanySettlements(client, req.params.id);
       const deposits = await listCompanyDeposits(client, req.params.id);
       return { invoices, settlements, deposits };

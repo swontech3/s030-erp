@@ -77,6 +77,12 @@ const CONTRACT_FORM_CODES: readonly CodeSpec[] = [
    * 줄이 없으면 화면이 「입금 계좌가 설정되지 않았습니다」를 보인다(shared `depositAccountOf`).
    */
   { category: DEPOSIT_ACCOUNT_CATEGORY, useTp: DEPOSIT_ACCOUNT_USE_TP },
+  /**
+   * 납부상태(청구 화면 검색 상자 「상태」 선택지, 2026-11-15). 파티션 `000` — P 납부대기 · E 납부완료 · O 미납 · C 취소.
+   * ★ **이름만** 쓴다. 판정은 shared `displayInvoiceStatus` 가 그대로 하고, 화면이 코드값으로 묶는다
+   *   (`features/billing/billing-model.ts` `payStCodeOf`). 「전체」는 화면에만 있다.
+   */
+  { category: 'PAY_ST', useTp: '000' },
 ];
 
 const scopeOf = (session: { role: string; companyId: string | null }): CompanyScope => ({

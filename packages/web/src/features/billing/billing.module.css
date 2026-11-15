@@ -270,24 +270,25 @@
 }
 
 /* 표 — 헤더·행·합계가 같은 열 정의를 쓴다 */
-/* 입주사 · 항목 · 청구액 · 예치금 · 이용 시작일 · 이용 종료일 · 납부일 · 상태 · 액션 */
+/* 입주사 · 항목 · 청구액 · 예치금 · 이용 시작일 · 이용 종료일 · 납부기한 · 납부일 · 상태 · 액션
+   ★ 2026-11-15 — 납부기한(내야 하는 날) 열을 더하고 납부일은 실제로 낸 날. 둘 다 「2026.11.25」라 88px. */
 .tHead,
 .tRow,
 .tFoot {
   display: grid;
   grid-template-columns:
     minmax(120px, 1.2fr) minmax(110px, 1fr) minmax(104px, 0.9fr)
-    96px 88px 104px 68px 92px 150px;
+    96px 88px 104px 88px 88px 92px 150px;
   align-items: center;
   column-gap: 12px;
   padding: 0 20px;
 }
 
-/* 입주사 청구 탭 — 첫 열이 입주사가 아니라 청구 월이다 */
+/* 입주사로 거른 청구(?company=) — 첫 열이 입주사가 아니라 청구 월이다 */
 .tCompany {
   grid-template-columns:
     72px minmax(110px, 1.2fr) minmax(104px, 0.9fr)
-    96px 88px 104px 68px 92px 150px;
+    96px 88px 104px 88px 88px 92px 150px;
 }
 
 /*
@@ -314,6 +315,38 @@
   height: 44px;
   background: var(--surface-alt);
   border-bottom: 1px solid var(--border);
+}
+
+/* 청구 화면 — 공통 목록 틀의 목록 상자 안에서 스크롤해도 머리 줄은 위에 남는다(2026-11-15) */
+.tHeadSticky {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* ── 검색 상자 칸(공통 목록 틀, 2026-11-15) — 이름표가 위, 칸이 아래 ── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.fieldRange {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+
+.searchError {
+  align-self: center;
+  font-size: 13px;
+  color: var(--color-danger);
 }
 
 .tHead span {
