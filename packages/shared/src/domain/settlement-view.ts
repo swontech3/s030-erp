@@ -64,3 +64,40 @@ export function pendingKind(args: {
   if (args.depositBalance > 0) return 'deposit';
   return null;
 }
+
+/**
+ * 정산 탭(s030200070 「정산」) 구분 · 상태 · 정산 기준일 — 대표 지시 2026-11-15.
+ *
+ * ★ 코드값은 공통 코드(일회용 37)의 것이다 — 이름(「중도해지」 · 「대기」 등)은 화면이 `GET /codes` 로 읽는다.
+ *   여기는 코드값과 판정만 둔다. 「전체」는 화면에만 있다.
+ *   · 구분 `SETTLE_TP`(000): EARLY 중도해지 · EXPIRE 기간만료
+ *   · 상태 `SETTLE_ST`(000): WAIT 대기 · DONE 완료
+ * ★ 중도해지 = 중도해지일이 **종료일보다 앞선다**. 같거나 뒤거나 없으면 기간만료다.
+ * ★ 정산 기준일 = 중도해지면 중도해지일, 기간만료면 종료일 — 검색 기간이 이 날로 거른다.
+ *   API 의 SQL(`listSettlementQueue`)도 같은 규칙으로 거른다 — 바꾸면 둘 다 바꾼다.
+ */
+export const SETTLE_TYPE_CATEGORY = 'SETTLE_TP';
+export const SETTLE_STATUS_CATEGORY = 'SETTLE_ST';
+export const SETTLE_CODE_USE_TP = '000';
+
+export type SettleTypeCode = 'EARLY' | 'EXPIRE';
+export type SettleStatusCode = 'WAIT' | 'DONE';
+
+/** 앱이 박아 둔 코드값 — 코드 관리가 바꾸거나 지우지 못하게 `PINNED_CODES` 에도 적는다. */
+export const SETTLE_TYPE_CODES: readonly SettleTypeCode[] = ['EARLY', 'EXPIRE'];
+export const SETTLE_STATUS_CODES: readonly SettleStatusCode[] = ['WAIT', 'DONE'];
+
+/** 구분 — `endDate` · `terminatedDate` 는 `YYYY-MM-DD`(중도해지일이 없으면 null). */
+export function settleTypeOf(endDate: string, terminatedDate: string | null): SettleTypeCode {
+  return terminatedDate !== null && terminatedDate < endDate ? 'EARLY' : 'EXPIRE';
+}
+
+/** 정산 기준일 — 중도해지면 중도해지일, 기간만료면 종료일. */
+export function settleBasisDate(endDate: string, terminatedDate: string | null): string {
+  return settleTypeOf(endDate, terminatedDate) === 'EARLY' ? (terminatedDate as string) : endDate;
+}
+
+/** 상태 — 운영자가 할 일이 남았으면(`pendingKind`) 대기, 아니면 완료. */
+export function settleStatusOf(kind: PendingKind | null): SettleStatusCode {
+  return kind === null ? 'DONE' : 'WAIT';
+}

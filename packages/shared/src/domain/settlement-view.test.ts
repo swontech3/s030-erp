@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { maskAccount, settlementDirection } from './settlement-view.ts';
+import {
+  SETTLE_STATUS_CATEGORY,
+  SETTLE_TYPE_CATEGORY,
+  maskAccount,
+  settleBasisDate,
+  settleStatusOf,
+  settleTypeOf,
+  settlementDirection,
+} from './settlement-view.ts';
 
 describe('settlementDirection — 「순정산금」 대신 방향이 드러나는 이름', () => {
   it('양수 → 환불할 금액', () => {
@@ -57,5 +65,32 @@ describe('pendingKind — 정산 탭의 처리 대기', () => {
 
   it('★ 계약중인 계약은 예치금이 있어도 대기 아님 — 들고 있는 게 맞다', () => {
     expect(pendingKind({ ...base, contractStatus: 'confirmed', depositBalance: 1_000_000 })).toBeNull();
+  });
+});
+
+/** 정산 탭 구분 · 상태 · 정산 기준일(2026-11-15) — 코드값은 공통 코드 SETTLE_TP · SETTLE_ST(일회용 37). */
+describe('정산 탭 구분 · 상태 · 정산 기준일', () => {
+  it('분류 이름', () => {
+    expect(SETTLE_TYPE_CATEGORY).toBe('SETTLE_TP');
+    expect(SETTLE_STATUS_CATEGORY).toBe('SETTLE_ST');
+  });
+
+  it('★ 중도해지일이 종료일보다 앞서면 중도해지 — 기준일은 중도해지일', () => {
+    expect(settleTypeOf('2026-12-31', '2026-09-10')).toBe('EARLY');
+    expect(settleBasisDate('2026-12-31', '2026-09-10')).toBe('2026-09-10');
+  });
+
+  it('중도해지일이 없거나 종료일과 같거나 뒤면 기간만료 — 기준일은 종료일', () => {
+    expect(settleTypeOf('2026-05-31', null)).toBe('EXPIRE');
+    expect(settleTypeOf('2026-05-31', '2026-05-31')).toBe('EXPIRE');
+    expect(settleTypeOf('2026-05-31', '2026-06-02')).toBe('EXPIRE');
+    expect(settleBasisDate('2026-05-31', '2026-05-31')).toBe('2026-05-31');
+    expect(settleBasisDate('2026-05-31', null)).toBe('2026-05-31');
+  });
+
+  it('상태 — pendingKind 가 있으면 대기, 없으면 완료', () => {
+    expect(settleStatusOf('settlement')).toBe('WAIT');
+    expect(settleStatusOf('deposit')).toBe('WAIT');
+    expect(settleStatusOf(null)).toBe('DONE');
   });
 });

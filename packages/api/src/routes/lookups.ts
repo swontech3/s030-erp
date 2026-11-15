@@ -25,6 +25,11 @@ import { requireSession } from '../session/hook.ts';
 import { withCompanyScope, type CompanyScope } from '../db/withCompanyScope.ts';
 import { listCodes, listSpaces, type CodeSpec } from '../db/lookups.ts';
 import { DEPOSIT_ACCOUNT_CATEGORY, DEPOSIT_ACCOUNT_USE_TP } from '@swonbiz/shared/domain/deposit-account';
+import {
+  SETTLE_CODE_USE_TP,
+  SETTLE_STATUS_CATEGORY,
+  SETTLE_TYPE_CATEGORY,
+} from '@swonbiz/shared/domain/settlement-view';
 
 /** 계약 화면과 같은 값이다(`routes/contracts.ts`). */
 const READ_ROLE = 'operator';
@@ -83,6 +88,12 @@ const CONTRACT_FORM_CODES: readonly CodeSpec[] = [
    *   (`features/billing/billing-model.ts` `payStCodeOf`). 「전체」는 화면에만 있다.
    */
   { category: 'PAY_ST', useTp: '000' },
+  /**
+   * 정산 구분 · 정산 상태(청구 화면 「정산」 탭 검색 · 목록, 2026-11-15 · 일회용 37).
+   * ★ **이름만** 쓴다. 코드값은 API(`GET /billing/settlements`)가 shared `settleTypeOf` · `settleStatusOf` 로 행마다 싣는다.
+   */
+  { category: SETTLE_TYPE_CATEGORY, useTp: SETTLE_CODE_USE_TP },
+  { category: SETTLE_STATUS_CATEGORY, useTp: SETTLE_CODE_USE_TP },
 ];
 
 const scopeOf = (session: { role: string; companyId: string | null }): CompanyScope => ({

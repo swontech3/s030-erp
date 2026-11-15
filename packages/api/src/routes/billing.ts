@@ -51,7 +51,13 @@ import {
   type DepositRow,
 } from '../db/deposits.ts';
 import { depositBalance, splitDepositOnSettle } from '@swonbiz/shared/domain/deposit-ledger';
-import { maskAccount, pendingKind } from '@swonbiz/shared/domain/settlement-view';
+import {
+  maskAccount,
+  pendingKind,
+  settleBasisDate,
+  settleStatusOf,
+  settleTypeOf,
+} from '@swonbiz/shared/domain/settlement-view';
 import { DUE_RANGE_TOO_LONG, isDueRangeTooLong } from '@swonbiz/shared/domain/billing-due-range';
 
 /** 수납을 쓸 수 있는 역할. 조회는 입주사도 한다. */
@@ -302,14 +308,28 @@ export function registerBillingRoutes(app: FastifyInstance): void {
     });
   });
 
-  /* ── 정산 탭 (s030200070 「정산」) — 처리 대기 · 최근 처리 완료 ──────────
+  /* ── 정산 탭 (s030200070 「정산」) — 처리 대기 · 처리 완료 ──────────
      ★ 대기인지는 `pendingKind`(shared) 하나가 정한다. 정산서 한 장을 그릴 수 있게 정산
-       전체도 같이 준다(계좌는 가린다 — 전체 번호는 정산서를 열 때 입주사 청구 API 로 받는다). */
-  app.get('/billing/settlements', async (req, reply) => {
+       전체도 같이 준다(계좌는 가린다 — 전체 번호는 정산서를 열 때 입주사 청구 API 로 받는다).
+     ★ 2026-11-15 — `?from=&to=` **정산 기준일**(중도해지면 중도해지일, 만료면 종료일 · 양 끝 포함)이 있어야 한다.
+       기간 상한 6개월은 청구 화면과 같은 함수 · 같은 말(shared `billing-due-range`, 대표 결정).
+       행마다 종료일 · 중도해지일(만료면 null) · 구분 코드(SETTLE_TP) · 상태 코드(SETTLE_ST)를 싣는다. */
+  app.get<{ Querystring: { from?: string; to?: string } }>('/billing/settlements', async (req, reply) => {
     const session = requireSession(req);
     if (session.role !== WRITE_ROLE) return forbidden(reply);
 
-    const rows = await withCompanyScope(scopeOf(session), (client) => listSettlementQueue(client));
+    const from = parseDayParam(req.query.from);
+    const to = parseDayParam(req.query.to);
+    if (!from || !to) {
+      return reply.code(400).send({ error: 'invalid_request', message: '정산 기준일은 YYYY-MM-DD 이어야 합니다' });
+    }
+    if (from > to) {
+      return reply.code(400).send({ error: 'invalid_request', message: '정산 기준일 시작일이 끝일보다 늦습니다' });
+    }
+    if (isDueRangeTooLong(from, to)) {
+      return reply.code(400).send({ error: 'invalid_request', message: DUE_RANGE_TOO_LONG });
+    }
+    const rows = await withCompanyScope(scopeOf(session), (client) => listSettlementQueue(client, { from, to }));
     const pending: unknown[] = [];
     const done: unknown[] = [];
     for (const r of rows) {
@@ -318,6 +338,7 @@ export function registerBillingRoutes(app: FastifyInstance): void {
         settlement: r.settlement_id ? { processed: r.processed_day !== null } : null,
         depositBalance: r.deposit_balance,
       });
+      const type = settleTypeOf(r.end_day, r.terminated_day);
       const head = {
         contractId: r.contract_id,
         companyId: r.company_id,
@@ -325,7 +346,16 @@ export function registerBillingRoutes(app: FastifyInstance): void {
         roomNames: r.room_names ?? '',
         /** ★ 계약 시작일 — 목록의 「시작일」 열. 종료일 앞에 온다. */
         startDate: r.start_day,
-        terminatedDate: r.terminated_day ?? r.end_day,
+        /** 계약 종료일 — 목록의 「종료일」. */
+        endDate: r.end_day,
+        /** 중도해지일 — **기간만료면 null**(목록의 「중도해지일」 빈칸). */
+        terminatedDate: type === 'EARLY' ? r.terminated_day : null,
+        /** 정산 기준일 — 검색 기간이 거른 날. */
+        basisDate: settleBasisDate(r.end_day, r.terminated_day),
+        /** 구분 코드(SETTLE_TP) — 이름은 화면이 공통 코드에서 읽는다. */
+        typeCode: type,
+        /** 상태 코드(SETTLE_ST) — `pendingKind` 그대로(있으면 대기 · 없으면 완료). */
+        statusCode: settleStatusOf(kind),
       };
       if (kind === 'settlement') {
         pending.push({ ...head, kind, amount: r.net_amount ?? 0 });
