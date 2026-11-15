@@ -5,7 +5,7 @@
  * 결과서 `08-screen-report.md` S05-11 그대로.
  *
  *   [저장] 버튼 줄(오른쪽 위) · 회사 기본정보(회사 이름 · 사업자번호 · 사업자 유형) · 세무사 메일(4칸) · 회사 계좌 | 회사 카드
- * ★ 2026-11-15: 회사 기본정보는 삐용 「내 단체 정보」에서(못 읽으면 ERP 회사 정보 + 안내 글). 세무사 메일은 No · 이름 · 메일 주소 작은 표 4줄.
+ * ★ 2026-11-15: 회사 기본정보는 삐용 「내 단체 정보」에서(못 읽으면 ERP 회사 정보 + 안내 글). 세무사 메일은 2행 × 두 사람(묶음마다 No · 이름 · 메일 주소, 사이 굵은 세로선).
  *
  * ★ 2026-11-07 대표 수정: 맨 위 안내 · 설명 · 「삐용 단체관리가 정본…」 문구를 지웠다. 사업자 유형은 회사 기본정보 안으로 옮겼다 —
  *   법인등록번호가 있으면 법인으로 고정해 보이기만(`bizTypeLocked`), 없으면 고르는 상자(코드 TAX_BIZ_TP). (법인등록번호 칸은 수정 2 에서 지웠다)
@@ -334,15 +334,48 @@ export function TaxSettingsView() {
   };
 
   /**
-   * 세무사 메일 4명 — 작은 표(2026-11-15 대표 수정): 머리 줄 No · 이름 · 메일 주소, 아래 4줄(1 ~ 4).
-   * 빈 칸 허용(서버가 둘 다 빈 사람은 버린다). 저장 규칙 · 개수 · 검사는 그대로.
+   * 세무사 메일 4명 — 2행 × 두 사람(2026-11-15 대표 수정): 1행 1 · 2, 2행 3 · 4. 머리 줄은 묶음마다 No · 이름 · 메일 주소,
+   * 묶음 앞 작은 번호 칸, 두 묶음 사이 굵은 세로선(ERP 테두리 색 2px). 빈 칸 허용(서버가 둘 다 빈 사람은 버린다). 저장 규칙 · 개수 · 검사는 그대로.
    */
+  const SPLIT = '2px solid var(--border)';
+  const cellPad = { padding: '6px 12px' } as const;
+  const emailPerson = (e: (typeof draft.taxEmails)[number], i: number, right: boolean) => [
+    <td key={`${e.key}-no`} className={t.tnum} style={{ ...cellPad, color: 'var(--text-muted)', ...(right ? { borderLeft: SPLIT } : null) }}>
+      {i + 1}
+    </td>,
+    <td key={`${e.key}-n`} style={cellPad}>
+      <input
+        className={`${t.input} ${errCls(`email:${e.key}:name`)}`}
+        style={{ width: '100%' }}
+        value={e.name}
+        placeholder="이름"
+        aria-label={`세무사 ${i + 1} 이름`}
+        onChange={(ev) => editEmail(e.key, 'name', ev.target.value)}
+      />
+    </td>,
+    <td key={`${e.key}-m`} style={cellPad}>
+      <input
+        className={`${t.input} ${errCls(`email:${e.key}:email`)}`}
+        style={{ width: '100%' }}
+        type="email"
+        value={e.email}
+        placeholder="메일주소"
+        aria-label={`세무사 ${i + 1} 메일`}
+        onChange={(ev) => editEmail(e.key, 'email', ev.target.value)}
+      />
+    </td>,
+  ];
+  const emailPairs = draft.taxEmails.flatMap((e, i, all) => (i % 2 === 0 ? [[e, all[i + 1]] as const] : []));
   const emailGrid = (
-    <div style={{ marginTop: 12, maxWidth: 640, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+    // ★ 폭은 예전 카드 안쪽 폭(920px)까지만 — 화면이 넓어도 메일 칸이 늘어지지 않게(2026-11-08)
+    <div style={{ marginTop: 12, maxWidth: 920, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
       <table className={t.tbl}>
         <colgroup>
-          <col style={{ width: 56 }} />
-          <col style={{ width: '38%' }} />
+          <col style={{ width: 48 }} />
+          <col style={{ width: '18%' }} />
+          <col />
+          <col style={{ width: 48 }} />
+          <col style={{ width: '18%' }} />
           <col />
         </colgroup>
         <thead>
@@ -350,35 +383,16 @@ export function TaxSettingsView() {
             <th>No</th>
             <th>이름</th>
             <th>메일 주소</th>
+            <th style={{ borderLeft: SPLIT }}>No</th>
+            <th>이름</th>
+            <th>메일 주소</th>
           </tr>
         </thead>
         <tbody>
-          {draft.taxEmails.map((e, i) => (
-            <tr key={e.key}>
-              <td className={t.tnum} style={{ padding: '6px 12px', color: 'var(--text-muted)' }}>
-                {i + 1}
-              </td>
-              <td style={{ padding: '6px 12px' }}>
-                <input
-                  className={`${t.input} ${errCls(`email:${e.key}:name`)}`}
-                  style={{ width: '100%' }}
-                  value={e.name}
-                  placeholder="이름"
-                  aria-label={`세무사 ${i + 1} 이름`}
-                  onChange={(ev) => editEmail(e.key, 'name', ev.target.value)}
-                />
-              </td>
-              <td style={{ padding: '6px 12px' }}>
-                <input
-                  className={`${t.input} ${errCls(`email:${e.key}:email`)}`}
-                  style={{ width: '100%' }}
-                  type="email"
-                  value={e.email}
-                  placeholder="메일주소"
-                  aria-label={`세무사 ${i + 1} 메일`}
-                  onChange={(ev) => editEmail(e.key, 'email', ev.target.value)}
-                />
-              </td>
+          {emailPairs.map(([a, b], r) => (
+            <tr key={a.key}>
+              {emailPerson(a, r * 2, false)}
+              {b ? emailPerson(b, r * 2 + 1, true) : <td colSpan={3} style={{ borderLeft: SPLIT }} />}
             </tr>
           ))}
         </tbody>
