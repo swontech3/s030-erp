@@ -60,7 +60,8 @@ export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly
 
   return (
     <>
-      <div className={`${styles.tHead} ${grid}${readOnly ? '' : ` ${styles.tHeadSticky}`}`}>
+      {/* ★ 2026-11-15 — 청구 화면(readOnly 아님)은 머리 · 줄을 촘촘하게(tHeadDense · tRowDense). 입주사 청구 탭은 그대로. */}
+      <div className={`${styles.tHead} ${grid}${readOnly ? '' : ` ${styles.tHeadSticky} ${styles.tHeadDense}`}`}>
         <span>{mode === 'month' ? '입주사' : '청구 월'}</span>
         <span>항목(호실)</span>
         <span className={styles.right}>청구액</span>
@@ -95,7 +96,7 @@ export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly
           <div
             key={item.invoiceId}
             data-invoice-row={item.invoiceId}
-            className={`${styles.tRow} ${grid}${canceled ? ` ${styles.tRowCanceled}` : ''}`}
+            className={`${styles.tRow} ${grid}${readOnly ? '' : ` ${styles.tRowDense}`}${canceled ? ` ${styles.tRowCanceled}` : ''}`}
           >
             <span className={`${styles.ellipsis} ${styles.strong}`} title={mode === 'month' ? item.companyName : ''}>
               {mode === 'month' ? item.companyName : yearMonthDot(item.yearMonth)}

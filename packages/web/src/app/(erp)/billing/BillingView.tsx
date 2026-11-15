@@ -365,6 +365,11 @@ export function BillingView() {
 
   return (
     <>
+      {/*
+        ★ 2026-11-15 — 촘촘하게(대표 지시: 목록을 한 화면에 최대한 많이). 공통 목록 틀은 그대로 두고
+          청구 화면만 이 감싸개(.dense)로 틀 안 간격 · 검색 상자 여백을 줄인다.
+      */}
+      <div className={styles.dense}>
       <ListFrame
         head={tabs}
         search={
@@ -423,6 +428,8 @@ export function BillingView() {
               <Icon name="rotate-ccw" size={16} />
               초기화
             </button>
+            {/* ★ 2026-11-15 — 건수는 [초기화] 오른쪽. 목록 위 건수 줄은 없앴다(입주사 칩이 있을 때만 그 자리에 칩). */}
+            <ListNote>{items === null || error ? '' : `${visible.length}건`}</ListNote>
             {formError ? (
               <span className={styles.searchError} role="alert">
                 {formError}
@@ -442,10 +449,10 @@ export function BillingView() {
             {/*
               ★★ 환불액 — **과납 합계**다(받은 것이 청구보다 많은 장). 미수금과 반대 방향이고
                  절대 섞지 않는다. 정산 처리가 음수 수납으로 0 을 만든다.
-              ★ 2026-11-15 — 이름 · 값 두 줄. 「없음」 · 「정산 대기 N건」 셋째 줄은 지웠다.
+              ★ 2026-11-15 — 이름 · 값 한 줄(나란히). 「없음」 · 「정산 대기 N건」 셋째 줄은 지웠다.
             */}
             <SumCell label="환불액 (과납)" value={won(sum.overpaid)} />
-            {/* ★ 2026-11-15 — 두 줄. 미납 금액은 건수 옆 괄호에(예: 3건 (1,250,000)). */}
+            {/* ★ 2026-11-15 — 이름 · 값 한 줄. 미납 금액은 건수 옆 괄호에(예: 3건 (1,250,000)). */}
             <div className={styles.sumCell}>
               <div className={styles.sumLabel}>미납</div>
               <div className={`${styles.sumValue} ${sum.unpaidCount === 0 ? styles.sumCountZero : styles.sumCount}`}>
@@ -455,12 +462,7 @@ export function BillingView() {
             </div>
           </div>
         }
-        actions={
-          <>
-            {companyChip}
-            <ListNote>{items === null || error ? '' : `${visible.length}건`}</ListNote>
-          </>
-        }
+        actions={companyChip}
       >
         <ListScroll>
           {items === null ? (
@@ -495,12 +497,13 @@ export function BillingView() {
           )}
         </ListScroll>
       </ListFrame>
+      </div>
       {toastEl}
     </>
   );
 }
 
-/** 총괄표 한 칸 — 이름 · 값(· 있으면 작은 글). 값은 `summarize` 가 낸다. */
+/** 총괄표 한 칸 — 이름 · 값(· 있으면 작은 글)을 한 줄에 나란히. 값은 `summarize` 가 낸다. */
 function SumCell({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className={styles.sumCell} data-sum={label}>
