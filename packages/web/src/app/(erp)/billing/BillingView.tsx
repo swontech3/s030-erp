@@ -351,13 +351,17 @@ export function BillingView() {
   ) : null;
 
   if (tab === 'settle') {
+    // ★ 2026-11-15 — 왼쪽 목록(공통 목록 틀) 6 : 오른쪽 상세 4. 입주사 칩은 목록의 버튼 줄에.
     return (
-      <div className={styles.page}>
+      <div className={styles.settlePage}>
         {tabs}
-        {company ? <div className={styles.monthNav}>{companyChip}</div> : null}
-        <div className={styles.panel}>
-          <SettlementQueue notify={toastOnly} company={company} selected={contract} onSelect={setContract} />
-        </div>
+        <SettlementQueue
+          notify={toastOnly}
+          company={company}
+          selected={contract}
+          onSelect={setContract}
+          actions={companyChip}
+        />
         {toastEl}
       </div>
     );

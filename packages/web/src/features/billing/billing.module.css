@@ -38,13 +38,6 @@
   color: var(--text-muted);
 }
 
-/* 월 이동 — [‹] 2026년 9월 [›] [이번 달] */
-.monthNav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .iconBtn {
   width: 40px;
   height: 40px;
@@ -680,15 +673,6 @@ div.wideModal {
   text-align: left;
 }
 
-/* ── 정산 결과 ── */
-.settleList {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-}
-
 .settleCard {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -897,20 +881,51 @@ div.wideModal {
   background: var(--color-primary);
 }
 
-/* 정산 탭 표 */
-.qHead,
-.qRow {
-  display: grid;
-  /* 구분 · 입주사 · 호실 · 시작일 · 종료일 · 금액 · 액션(정산서·계좌) */
-  grid-template-columns:
-    150px minmax(140px, 1.2fr) minmax(110px, 1fr)
-    98px 98px minmax(150px, 1fr) 190px;
-  align-items: center;
-  column-gap: 12px;
-  padding: 0 20px;
+/* ── 정산 탭(2026-11-15) — 왼쪽 목록(공통 목록 틀) 6 : 오른쪽 상세 4 ── */
+.settlePage {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  min-height: 520px;
 }
 
-.qHead {
+.settleSplit {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 4fr);
+  gap: 20px;
+}
+
+.settleLeft {
+  min-width: 0;
+  min-height: 0;
+}
+
+.settleRight {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+/* 정산 목록 — 구분 · 입주사 · 호실 · 시작일 · 종료일 · 중도해지일 · 정산금액 · 상태 (왼쪽 60% 안에 들게) */
+.sHead,
+.sRow {
+  display: grid;
+  grid-template-columns:
+    64px minmax(90px, 1.2fr) minmax(60px, 1fr)
+    80px 80px 80px minmax(96px, 1fr) 52px;
+  align-items: center;
+  column-gap: 8px;
+  padding: 0 12px;
+}
+
+.sHead {
   height: 44px;
   background: var(--surface-alt);
   border-bottom: 1px solid var(--border);
@@ -920,14 +935,14 @@ div.wideModal {
   color: var(--text-caption);
 }
 
-.qRow {
-  min-height: 56px;
+.sRow {
+  min-height: 52px;
   border-bottom: 1px solid var(--border);
   font-size: 14px;
   color: var(--text-heading);
 }
 
-/* 정산 행 — 눌러서 그 아래에 정산 상세를 연다 */
+/* 정산 행 — 눌러서 오른쪽에 상세를 연다 */
 .qRowClickable {
   cursor: pointer;
 }
@@ -942,11 +957,3 @@ div.wideModal {
   outline-offset: -2px;
 }
 
-.sectionLabel {
-  margin: 0;
-  padding: 14px 20px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-heading);
-  border-bottom: 1px solid var(--border);
-}

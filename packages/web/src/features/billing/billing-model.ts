@@ -12,6 +12,7 @@
  * ★ 납부일은 **로컬 자정**으로 만든다. `daysBetweenLocal` 이 로컬 날짜를 보기 때문이다
  *   (`day.ts` 머리말). `parseDay` 는 UTC 자정이라 시간대가 음수인 곳에서는 하루 밀린다.
  */
+import type { SettleStatusCode, SettleTypeCode } from '@swonbiz/shared/domain/settlement-view';
 import { displayInvoiceStatus, type DisplayStatus } from '@swonbiz/shared/domain/invoice-status';
 import { localDayOf, summarizeInvoices, type InvoiceSummary } from '@swonbiz/shared/domain/invoice-summary';
 import type { DepositEntryKind } from '@swonbiz/shared/domain/deposit-ledger';
@@ -325,7 +326,16 @@ export interface QueueItem {
   roomNames: string;
   /** 계약 시작일 `YYYY-MM-DD` — 목록의 「시작일」. */
   startDate: string;
-  terminatedDate: string;
+  /** 계약 종료일 — 목록의 「종료일」(2026-11-15). */
+  endDate: string;
+  /** 중도해지일 — **기간만료면 null**(목록의 「중도해지일」 빈칸, 2026-11-15). */
+  terminatedDate: string | null;
+  /** 정산 기준일 — 중도해지면 중도해지일, 만료면 종료일. 검색 기간이 이 날로 거른다. */
+  basisDate: string;
+  /** 구분 코드(공통 코드 `SETTLE_TP`) — 이름은 `GET /codes` 에서 읽는다. */
+  typeCode: SettleTypeCode;
+  /** 상태 코드(공통 코드 `SETTLE_ST`) — 대기 · 완료. */
+  statusCode: SettleStatusCode;
   amount: number;
   /** 처리 완료 줄에만. */
   processedOn?: string;
