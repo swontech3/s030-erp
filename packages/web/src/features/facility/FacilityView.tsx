@@ -108,15 +108,25 @@ export function FacilityView() {
       setFloors(t.floors);
       setCodes(t.codes);
       setError(null);
+      return t.buildings;
     } catch (err) {
       setError(err instanceof FacilityError ? err.message : '불러오지 못했습니다');
+      return null;
     } finally {
       setLoading(false);
     }
   }, []);
 
+  /*
+   * ★ 처음 열 때는 첫 건물을 골라 둔다 — 우측에 건물 정보가 보인다(대표 지시 2026-11-15 「지금은 비어 있음」).
+   *   처음 한 번만이다. 저장 · 삭제 뒤의 다시 받기(afterWrite)는 고른 것을 건드리지 않는다.
+   *   트리는 펼치지 않는다 — 건물을 누르면 지금처럼 펼쳐진다.
+   */
   useEffect(() => {
-    void refreshTree();
+    void refreshTree().then((list) => {
+      const first = list?.[0];
+      if (first) setNode((n) => n ?? { kind: 'building', buildingId: first.buildId });
+    });
   }, [refreshTree]);
 
   /** 고른 층의 호실·회의실. ★ 층을 옮길 때만 받는다 — 트리에 전부 싣지 않는다. */
