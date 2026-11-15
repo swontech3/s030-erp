@@ -913,16 +913,18 @@ div.wideModal {
   border-radius: var(--radius-lg);
 }
 
-/* 정산 목록 — 구분 · 입주사 · 호실 · 시작일 · 종료일 · 중도해지일 · 정산금액 · 상태 (왼쪽 60% 안에 들게) */
+/* 정산 목록 — 구분 · 입주사 · 호실 · 시작일 · 종료일 · 중도해지일 · 정산금액 · 환불일자 · 상태 (왼쪽 60% 안에 들게)
+   ★ 2026-11-15 — 환불일자 칸을 넣으며 줄였다(대표 결정): 구분 60 · 입주사 최소 80 · 날짜 넷 72(글자 13px, .sDate) ·
+     정산금액 최소 88 · 칸 사이 6 · 좌우 여백 10. 1500px 창(사이드바 펼침)에서 가로로 넘치지 않는다. */
 .sHead,
 .sRow {
   display: grid;
   grid-template-columns:
-    64px minmax(90px, 1.2fr) minmax(60px, 1fr)
-    80px 80px 80px minmax(96px, 1fr) 52px;
+    60px minmax(80px, 1.2fr) minmax(60px, 1fr)
+    72px 72px 72px minmax(88px, 1fr) 72px 52px;
   align-items: center;
-  column-gap: 8px;
-  padding: 0 12px;
+  column-gap: 6px;
+  padding: 0 10px;
 }
 
 .sHead {
@@ -933,6 +935,11 @@ div.wideModal {
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--text-caption);
+}
+
+/* 정산 목록 날짜 칸(시작일 · 종료일 · 중도해지일 · 환불일자) — 72px 에 들게 13px */
+.sDate {
+  font-size: 13px;
 }
 
 .sRow {

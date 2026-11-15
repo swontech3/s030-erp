@@ -4,7 +4,7 @@
  * 청구 화면의 「정산」 탭 — 왼쪽 목록(공통 목록 틀) 6 : 오른쪽 상세 4 (대표 지시 2026-11-15).
  *
  *   왼쪽  검색(정산 기준일 From ~ To · 입주사 · 구분 · 상태 + [조회] [초기화] + 건수) → 버튼 줄 → 목록
- *         목록 칸: 구분 · 입주사 · 호실 · 시작일 · 종료일 · 중도해지일(만료는 빈칸) · 정산금액 · 상태
+ *         목록 칸: 구분 · 입주사 · 호실 · 시작일 · 종료일 · 중도해지일(만료는 빈칸) · 정산금액 · 환불일자(완료 건만) · 상태
  *   오른쪽 고른 행의 상세 — 처음엔 「왼쪽에서 고르세요」
  *         중도해지 정산이 있는 계약 → 정산 카드([정산서] · 처리 전이면 [정산 처리])
  *         정산 없이 예치금만 남은 계약 → 반환할 예치금 · [반환 처리] / 반환한 뒤에는 반환일 · 금액 · 가린 계좌
@@ -317,7 +317,7 @@ export function SettlementQueue({ notify, company, selected, onSelect, actions }
 
   /**
    * 정산금액 칸 — 금액 한 줄만(대표 지시 2026-11-15). 처리 전 · 처리 뒤 같은 규칙.
-   *   입주사가 낼 돈(추가로 받을 금액) → 앞에 「-」 · 예: -₩120,000
+   *   입주사가 낼 돈(추가로 받을 금액) → 앞에 「−」(저장소 다른 금액과 같은 빼기표, `won`) · 예: −₩120,000
    *   입주사에게 돌려줄 돈(환불 · 예치금 반환) → 부호 없음 · 예: ₩350,000
    *   0 → 「—」
    * ★ `amount` 부호는 순정산금과 같다(양수 = 돌려줄 돈). 방향 판정은 `settlementDirection` 하나.
@@ -327,7 +327,7 @@ export function SettlementQueue({ notify, company, selected, onSelect, actions }
     return (
       <span className={styles.right}>
         <span className={styles.amount}>
-          {dir.kind === 'none' ? '—' : dir.kind === 'charge' ? `-${won(dir.amount)}` : won(dir.amount)}
+          {dir.kind === 'none' ? '—' : won(item.amount)}
         </span>
       </span>
     );
@@ -351,6 +351,7 @@ export function SettlementQueue({ notify, company, selected, onSelect, actions }
           <span>종료일</span>
           <span>중도해지일</span>
           <span className={styles.right}>정산금액</span>
+          <span>환불일자</span>
           <span className={styles.center}>상태</span>
         </div>
         {visible.map((item) => (
@@ -362,10 +363,16 @@ export function SettlementQueue({ notify, company, selected, onSelect, actions }
             <span className={styles.ellipsis} title={item.roomNames}>
               {item.roomNames || '—'}
             </span>
-            <span className={styles.mono}>{item.startDate ? dotDate(item.startDate) : '—'}</span>
-            <span className={styles.mono}>{dotDate(item.endDate)}</span>
-            <span className={styles.mono}>{item.terminatedDate ? dotDate(item.terminatedDate) : ''}</span>
+            <span className={`${styles.mono} ${styles.sDate}`}>{item.startDate ? dotDate(item.startDate) : '—'}</span>
+            <span className={`${styles.mono} ${styles.sDate}`}>{dotDate(item.endDate)}</span>
+            <span className={`${styles.mono} ${styles.sDate}`}>
+              {item.terminatedDate ? dotDate(item.terminatedDate) : ''}
+            </span>
             {amountCell(item)}
+            {/* ★ 환불일자 — 완료 건은 처리한 날(processedOn), 대기 건은 빈칸(2026-11-15). */}
+            <span className={`${styles.mono} ${styles.sDate}`}>
+              {item.statusCode === 'DONE' && item.processedOn ? dotDate(item.processedOn) : ''}
+            </span>
             <span className={styles.center}>
               <span className={`${styles.badge} ${item.statusCode === 'WAIT' ? styles.st_partial : styles.st_paid}`}>
                 {nameOf(statusOptions, item.statusCode)}
