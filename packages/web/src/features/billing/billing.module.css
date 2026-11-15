@@ -45,23 +45,6 @@
   gap: 8px;
 }
 
-.monthInput {
-  height: 40px;
-  padding: 0 12px;
-  font-family: inherit;
-  font-size: 14px;
-  color: var(--text-heading);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  outline: none;
-}
-
-.monthInput:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
 .iconBtn {
   width: 40px;
   height: 40px;
@@ -207,40 +190,6 @@
   flex-wrap: wrap;
 }
 
-.searchWrap {
-  position: relative;
-  flex: 0 1 320px;
-  min-width: 200px;
-  display: flex;
-  align-items: center;
-}
-
-.searchIcon {
-  position: absolute;
-  left: 14px;
-  display: flex;
-  color: var(--text-caption);
-  pointer-events: none;
-}
-
-.search {
-  width: 100%;
-  height: 40px;
-  padding: 0 14px 0 40px;
-  font-family: inherit;
-  font-size: 14px;
-  color: var(--text-heading);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  outline: none;
-}
-
-.search:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
 .chipRow {
   display: flex;
   gap: 6px;
@@ -271,14 +220,16 @@
 
 /* 표 — 헤더·행·합계가 같은 열 정의를 쓴다 */
 /* 입주사 · 항목 · 청구액 · 예치금 · 이용 시작일 · 이용 종료일 · 납부기한 · 납부일 · 상태 · 액션
-   ★ 2026-11-15 — 납부기한(내야 하는 날) 열을 더하고 납부일은 실제로 낸 날. 둘 다 「2026.11.25」라 88px. */
+   ★ 2026-11-15 — 납부기한(내야 하는 날) 열을 더하고 납부일은 실제로 낸 날. 둘 다 「2026.11.25」라 88px.
+   ★ 2026-11-15 — 1500px 창(사이드바 펼침)에서 가로 스크롤 없이 [수납][내역]이 보이게 칸 너비만 줄였다(칸은 그대로):
+     입주사 최소 120→110 · 상태 92→80 · 액션 150→112. 최소 합(칸 사이 · 좌우 여백 포함) 1,188→1,128px. */
 .tHead,
 .tRow,
 .tFoot {
   display: grid;
   grid-template-columns:
-    minmax(120px, 1.2fr) minmax(110px, 1fr) minmax(104px, 0.9fr)
-    96px 88px 104px 88px 88px 92px 150px;
+    minmax(110px, 1.2fr) minmax(110px, 1fr) minmax(104px, 0.9fr)
+    96px 88px 104px 88px 88px 80px 112px;
   align-items: center;
   column-gap: 12px;
   padding: 0 20px;
@@ -288,7 +239,7 @@
 .tCompany {
   grid-template-columns:
     72px minmax(110px, 1.2fr) minmax(104px, 0.9fr)
-    96px 88px 104px 88px 88px 92px 150px;
+    96px 88px 104px 88px 88px 80px 112px;
 }
 
 /*
@@ -322,25 +273,6 @@
   position: sticky;
   top: 0;
   z-index: 1;
-}
-
-/* ── 검색 상자 칸(공통 목록 틀, 2026-11-15) — 이름표가 위, 칸이 아래 ── */
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.fieldLabel {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.fieldRange {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
 }
 
 .searchError {

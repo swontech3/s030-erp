@@ -39,6 +39,8 @@ import { ListFrame, ListNote, ListScroll } from '@/components/patterns/ListFrame
 import { BillingEmpty, BillingTable } from '@/features/billing/BillingTable';
 import { SettlementQueue } from '@/features/billing/SettlementQueue';
 import styles from '@/features/billing/billing.module.css';
+// ★ 검색 상자 칸은 법인변경 목록과 같은 모양 · 같은 클래스(.field · .label · .range · .input · .select) — 대표 지시 2026-11-15.
+import cs from '@/features/legal/corp-changes.module.css';
 import {
   PAY_ST_CATEGORY,
   currentMonthRange,
@@ -87,7 +89,7 @@ export function BillingView() {
   const params = useSearchParams();
 
   /**
-   * 「월별 청구 | 정산」 — 정산 탭은 중도해지 정산 대기와 예치금 반환 대기(`SettlementQueue`).
+   * 「청구 | 정산」 — 정산 탭은 중도해지 정산 대기와 예치금 반환 대기(`SettlementQueue`).
    * ★ 주소에 적는다(`?tab=settle`) — 정산서를 보고 [이전] 으로 돌아와도 같은 탭이다.
    */
   const [tab, setTab] = useState<'month' | 'settle'>(() => (params.get('tab') === 'settle' ? 'settle' : 'month'));
@@ -295,7 +297,7 @@ export function BillingView() {
     <div className={styles.tabs} role="tablist">
       {(
         [
-          ['month', '월별 청구'],
+          ['month', '청구'],
           ['settle', '정산'],
         ] as const
       ).map(([key, label]) => (
@@ -367,12 +369,12 @@ export function BillingView() {
         head={tabs}
         search={
           <>
-            <div className={styles.field}>
-              <span className={styles.fieldLabel}>납부기한</span>
-              <span className={styles.fieldRange}>
+            <div className={cs.field}>
+              <span className={cs.label}>납부기한</span>
+              <span className={cs.range}>
                 <input
                   type="date"
-                  className={styles.monthInput}
+                  className={cs.input}
                   aria-label="납부기한 시작일"
                   value={draft.from}
                   onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
@@ -380,34 +382,29 @@ export function BillingView() {
                 ~
                 <input
                   type="date"
-                  className={styles.monthInput}
+                  className={cs.input}
                   aria-label="납부기한 끝일"
                   value={draft.to}
                   onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
                 />
               </span>
             </div>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>회사명</span>
-              <span className={styles.searchWrap}>
-                <span className={styles.searchIcon}>
-                  <Icon name="search" size={16} />
-                </span>
-                <input
-                  className={styles.search}
-                  placeholder="입주사, 호실"
-                  value={draft.name}
-                  onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') search();
-                  }}
-                />
-              </span>
+            <label className={cs.field}>
+              <span className={cs.label}>회사명</span>
+              <input
+                className={cs.input}
+                placeholder="입주사, 호실"
+                value={draft.name}
+                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') search();
+                }}
+              />
             </label>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>상태</span>
+            <label className={cs.field}>
+              <span className={cs.label}>상태</span>
               <select
-                className={styles.monthInput}
+                className={cs.select}
                 value={draft.st ?? ''}
                 onChange={(e) => setDraft((d) => ({ ...d, st: e.target.value || null }))}
               >
