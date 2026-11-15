@@ -150,7 +150,7 @@ export function FormsView({ initialId }: { initialId: string | null }) {
 
   return (
     <div className={codes.page}>
-      <div className={codes.head}>
+      <div className={codes.head} data-page-title>
         <h1 className={codes.title}>표양식 관리</h1>
       </div>
 

@@ -52,7 +52,7 @@ export function BizPurposesView() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.head}>
+      <div className={styles.head} data-page-title>
         <h1 className={styles.title}>사업목적</h1>
       </div>
 

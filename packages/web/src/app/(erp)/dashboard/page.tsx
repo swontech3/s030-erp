@@ -15,7 +15,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h2 style={{ margin: 0, fontSize: 'var(--text-h3-size)', color: 'var(--text-heading)' }}>대시보드</h2>
+      <h2 data-page-title style={{ margin: 0, fontSize: 'var(--text-h3-size)', color: 'var(--text-heading)' }}>대시보드</h2>
       <p style={{ marginTop: 6, fontSize: 14, color: 'var(--text-muted)' }}>
         화면 이관은 페이즈 3에서 한다 (design/erp-dashboard).
       </p>

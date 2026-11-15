@@ -165,7 +165,7 @@ export function CodesView() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.head}>
+      <div className={styles.head} data-page-title>
         <h1 className={styles.title}>코드 관리</h1>
       </div>
 

@@ -293,7 +293,7 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
   return (
     <div className={styles.page}>
       <div className={styles.head}>
-        <h1 className={styles.title}>입주사 · 계약 관리</h1>
+        <h1 className={styles.title} data-page-title>입주사 · 계약 관리</h1>
         {/*
           ★ **계약 폼을 빈 값으로 연다**(`?companyId=` 없이). 새 원본이 계약 등록 모달
             3종을 없애고 폼 한 장으로 일원화했고(02-master-detail.md 최종 문단),
