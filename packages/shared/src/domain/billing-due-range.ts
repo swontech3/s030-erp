@@ -10,7 +10,7 @@ import { parseDay, toDay } from './day.ts';
 
 export const DUE_RANGE_MAX_MONTHS = 6;
 
-export const DUE_RANGE_TOO_LONG = '납부기한은 6개월 안으로 넣어 주세요';
+export const DUE_RANGE_TOO_LONG = '조회 기간은 6개월 안으로 넣어 주세요';
 
 /** 시작일 + 6개월 `YYYY-MM-DD` — 끝일이 이 날까지면 된다. 읽을 수 없는 날이면 `null`. */
 export function dueRangeLimit(from: string): string | null {

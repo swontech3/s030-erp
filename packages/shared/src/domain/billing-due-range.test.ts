@@ -5,7 +5,7 @@ import { DUE_RANGE_MAX_MONTHS, DUE_RANGE_TOO_LONG, dueRangeLimit, isDueRangeTooL
 describe('납부기한 기간 상한 6개월', () => {
   it('상한은 6개월 · 안내 말', () => {
     expect(DUE_RANGE_MAX_MONTHS).toBe(6);
-    expect(DUE_RANGE_TOO_LONG).toBe('납부기한은 6개월 안으로 넣어 주세요');
+    expect(DUE_RANGE_TOO_LONG).toBe('조회 기간은 6개월 안으로 넣어 주세요');
   });
 
   it('시작일 + 6개월 날까지는 된다 · 하루 넘으면 막는다', () => {
