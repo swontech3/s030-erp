@@ -367,8 +367,8 @@ export function TaxSettingsView() {
   ];
   const emailPairs = draft.taxEmails.flatMap((e, i, all) => (i % 2 === 0 ? [[e, all[i + 1]] as const] : []));
   const emailGrid = (
-    // ★ 폭은 예전 카드 안쪽 폭(920px)까지만 — 화면이 넓어도 메일 칸이 늘어지지 않게(2026-11-08)
-    <div style={{ marginTop: 12, maxWidth: 920, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+    // ★ 2026-11-15 — 920px 제한을 없애고 카드 폭을 꽉 채운다. 번호 칸은 48px 그대로, 이름 18% · 메일은 나머지(메일이 더 넓다)
+    <div style={{ marginTop: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
       <table className={t.tbl}>
         <colgroup>
           <col style={{ width: 48 }} />
@@ -464,9 +464,10 @@ export function TaxSettingsView() {
       </div>
 
       <div className={`${t.card} ${t.cardPad}`}>
-        <div className={t.between}>
+        {/* ★ 2026-11-15 — 오른쪽 안내 「4명까지 · …」를 지우고 제목 옆 작은 회색 글로 */}
+        <div className={t.row}>
           <div className={t.secT}>세무사 메일</div>
-          <span className={t.sm}>4명까지 · 세무사 사무실 담당자, 대표 참조 등</span>
+          <span className={t.sm}>(세무사 메일은 4명 등록가능)</span>
         </div>
         {emailGrid}
         {cardError('taxEmails')}
