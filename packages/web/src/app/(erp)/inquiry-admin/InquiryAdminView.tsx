@@ -29,6 +29,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Icon, type IconName } from '@/components/ds';
+import { LoadingBar } from '@/components/patterns/LoadingBar';
 import { codeName, dotDate, type InquiryCodes } from '@/features/inquiry/inquiry-model';
 import type { ThreadMessage } from '@/features/inquiry/inquiry-model';
 import {
@@ -520,7 +521,8 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
           ) : detailError ? (
             <PanelEmpty icon="circle-alert" lead={detailError} />
           ) : !detail ? (
-            <PanelEmpty icon="message-square-text" lead="불러오는 중입니다" />
+            /* ★ 상세를 받아 오는 동안 칸 맨 위에 막대(공통 로딩바 · 2026-11-15) */
+            <LoadingBar />
           ) : (
             /*
              * ★★★ `key` 로 **문의마다 새로 그린다.** 상세는 쓰다 만 답변과 「수정 중」 상태를

@@ -26,6 +26,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Icon, type IconName } from '@/components/ds';
+import { LoadingBar } from '@/components/patterns/LoadingBar';
 import { ModalShell, cf } from '@/features/facility/ModalShell';
 import codes from '@/features/codes/codes.module.css';
 import { inputFieldsOf, isLegalForm } from '@swonbiz/shared/domain/form-template';
@@ -263,6 +264,8 @@ export function FormsView({ initialId }: { initialId: string | null }) {
 
         {/* ══════════ 우측 · 입력칸 · 미리보기 ══════════ */}
         <section className={codes.panel}>
+          {/* ★ 고른 양식을 받아 오는 동안 칸 맨 위에 막대(공통 로딩바 · 2026-11-15) */}
+          {selectedId && (currentBusy || !current) ? <LoadingBar /> : null}
           {error ? <p className={codes.error}>{error}</p> : null}
 
           {!selectedId ? (
@@ -271,9 +274,7 @@ export function FormsView({ initialId }: { initialId: string | null }) {
               lead="양식을 고르세요"
               sub="왼쪽에서 양식을 누르면 칸을 채워 인쇄할 수 있습니다"
             />
-          ) : currentBusy || !current ? (
-            <p className={codes.hint}>불러오는 중…</p>
-          ) : (
+          ) : currentBusy || !current ? null : (
             <>
               <div className={codes.panelHead}>
                 <div>

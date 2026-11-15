@@ -37,6 +37,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Icon, type IconName } from '@/components/ds';
+import { LoadingBar } from '@/components/patterns/LoadingBar';
 import {
   FacilityError,
   area,
@@ -108,15 +109,25 @@ export function FacilityView() {
       setFloors(t.floors);
       setCodes(t.codes);
       setError(null);
+      return t.buildings;
     } catch (err) {
       setError(err instanceof FacilityError ? err.message : '불러오지 못했습니다');
+      return null;
     } finally {
       setLoading(false);
     }
   }, []);
 
+  /*
+   * ★ 처음 열 때는 첫 건물을 골라 둔다 — 우측에 건물 정보가 보인다(대표 지시 2026-11-15 「지금은 비어 있음」).
+   *   처음 한 번만이다. 저장 · 삭제 뒤의 다시 받기(afterWrite)는 고른 것을 건드리지 않는다.
+   *   트리는 펼치지 않는다 — 건물을 누르면 지금처럼 펼쳐진다.
+   */
   useEffect(() => {
-    void refreshTree();
+    void refreshTree().then((list) => {
+      const first = list?.[0];
+      if (first) setNode((n) => n ?? { kind: 'building', buildingId: first.buildId });
+    });
   }, [refreshTree]);
 
   /** 고른 층의 호실·회의실. ★ 층을 옮길 때만 받는다 — 트리에 전부 싣지 않는다. */
@@ -611,12 +622,15 @@ function SpacePanel({
   if (!floor) return <p className={styles.hint}>층을 찾을 수 없습니다.</p>;
   return (
     <>
+      {/* ★ 받아 오는 동안 칸 맨 위에 막대(공통 로딩바 · 2026-11-15) */}
+      {busy ? <LoadingBar /> : null}
       <div className={styles.panelHead}>
         <div>
           <h2 className={styles.panelTitle}>호실관리</h2>
           <p className={styles.panelSub}>
             {/* ★ 받아 오는 중에는 수를 적지 않는다 — 0 이라고 적으면 거짓이다. */}
-            {floorLabel(floor)} · {busy ? '불러오는 중…' : hint}
+            {floorLabel(floor)}
+            {busy ? null : ` · ${hint}`}
           </p>
         </div>
         <div className={styles.actions}>
@@ -685,9 +699,7 @@ function SpacePanel({
         </div>
       ) : null}
 
-      {busy ? (
-        <p className={styles.hint}>불러오는 중…</p>
-      ) : spaces.length === 0 ? (
+      {busy ? null : spaces.length === 0 ? (
         <PanelEmpty icon="package-open" lead="등록된 호실이 없습니다" sub="[호실 추가] 로 만들어 주세요" />
       ) : visible.length === 0 ? (
         /* ★ 「호실이 없다」와 다른 말이다 — 거른 결과가 없을 뿐이다. */
@@ -775,11 +787,14 @@ function MeetingRoomPanel({
   if (!floor) return <p className={styles.hint}>층을 찾을 수 없습니다.</p>;
   return (
     <>
+      {/* ★ 받아 오는 동안 칸 맨 위에 막대(공통 로딩바 · 2026-11-15) */}
+      {busy ? <LoadingBar /> : null}
       <div className={styles.panelHead}>
         <div>
           <h2 className={styles.panelTitle}>회의실관리</h2>
           <p className={styles.panelSub}>
-            {floorLabel(floor)} · {busy ? '불러오는 중…' : `${rooms.length}개`}
+            {floorLabel(floor)}
+            {busy ? null : ` · ${rooms.length}개`}
           </p>
         </div>
         <div className={styles.actions}>
@@ -790,9 +805,7 @@ function MeetingRoomPanel({
         </div>
       </div>
 
-      {busy ? (
-        <p className={styles.hint}>불러오는 중…</p>
-      ) : rooms.length === 0 ? (
+      {busy ? null : rooms.length === 0 ? (
         <PanelEmpty icon="door-open" lead="등록된 회의실이 없습니다" sub="[회의실 추가] 로 만들어 주세요" />
       ) : (
         <div className={styles.tableWrap}>

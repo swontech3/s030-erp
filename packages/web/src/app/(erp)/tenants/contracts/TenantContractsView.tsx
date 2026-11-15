@@ -38,6 +38,7 @@ import {
 } from '@swonbiz/shared/domain/tenant-list-params';
 import { compareTenants, matchesChips, type TenantFilterKey } from '@swonbiz/shared/domain/tenant-status';
 import { Icon, type IconName } from '@/components/ds';
+import { LoadingBar } from '@/components/patterns/LoadingBar';
 import { CompanyBillingTab } from '@/features/billing/CompanyBillingTab';
 import {
   contractStatusLabel,
@@ -428,6 +429,8 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
             <PanelEmpty icon="mouse-pointer-click" lead="왼쪽에서 입주사를 선택하세요" />
           ) : (
             <>
+              {/* ★ 계약을 받아 오는 동안 칸 맨 위에 막대(공통 로딩바 · 2026-11-15) */}
+              {tab !== 'billing' && loadingContracts ? <LoadingBar /> : null}
               <div className={styles.detailHead}>
                 <div className={styles.who}>
                   <h2>{selected.companyName}</h2>
@@ -484,9 +487,7 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                 <div className={styles.detailBody}>
                   <CompanyBillingTab companyId={selected.companyId} />
                 </div>
-              ) : loadingContracts ? (
-                <PanelEmpty icon="file-text" lead="계약을 불러오는 중입니다" />
-              ) : contracts && contracts.length === 0 ? (
+              ) : loadingContracts ? null : contracts && contracts.length === 0 ? (
                 <div className={styles.detailBody}>
                   <PanelEmpty
                     icon="file-text"

@@ -1,0 +1,87 @@
+/*
+ * ERP 공통 목록 틀 — ListFrame.tsx 머리 주석.
+ * ★ 값은 세무 「거래처」 배치(tax.module.css .page · .pageFill · .card · .cardPad · .tbarOut · .listCard · .listScroll)와 같다.
+ *   세무 파일을 import 하지 않고 여기 따로 적는다.
+ * ★ 색은 기존 토큰만.
+ */
+.frame {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  min-height: 520px;
+}
+
+.frame > * {
+  flex: 0 0 auto;
+}
+
+/* 검색 조건 상자 — 이름표가 위에 붙은 칸도 바닥이 맞게 flex-end */
+.search {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+/* 버튼 줄 — 상자 밖 */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 목록 상자 — 남는 높이를 받고 안에서만 스크롤 */
+.frame > .list {
+  flex: 1 1 auto;
+}
+
+.list {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.listPadded {
+  padding: 20px;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.scroll:hover::-webkit-scrollbar-thumb {
+  background: var(--text-caption);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.note {
+  margin-left: 4px;
+  font-size: 14px;
+  color: var(--text-muted);
+}

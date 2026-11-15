@@ -13,6 +13,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Icon } from '@/components/ds';
+import { ListFrame } from '@/components/patterns/ListFrame';
 import { cf } from '@/features/facility/ModalShell';
 import { BizPurposeError, loadBizPurposes, type BizPurposeItem } from './biz-purposes-model';
 import { BizPurposeDialog } from './BizPurposeDialog';
@@ -51,31 +52,20 @@ export function BizPurposesView() {
   const activeCount = items.filter((i) => i.active).length;
 
   return (
-    <div className={styles.page}>
-      <div className={styles.head} data-page-title>
-        <h1 className={styles.title}>사업목적</h1>
-      </div>
-
-      <div className={styles.body}>
-        <section className={styles.panel}>
-          {error ? <p className={styles.error}>{error}</p> : null}
-
-          <div className={styles.panelHead}>
-            <div>
-              <h2 className={styles.panelTitle}>사업목적 문구</h2>
-              <p className={styles.panelSub}>
-                회사는 법인변경 화면의 [목록에서 고르기]로 「사용」 문구만 고릅니다.
-              </p>
-            </div>
-            <div className={styles.actions}>
-              <Button size="sm" variant="primary" onClick={() => setDialog(null)}>
-                <Icon name="plus" size={16} />
-                문구 추가
-              </Button>
-            </div>
-          </div>
-
-          <div className={styles.panelSearch}>
+    /*
+      ★ 2026-11-15 — 공통 목록 틀(세무 「거래처」와 같은 배치): 검색 조건 → 버튼 줄 → 목록.
+        조건 칸 · 버튼 · 목록 칸은 그대로이고 자리만 옮겼다 — 검색은 위 상자로, [문구 추가]는 버튼 줄로.
+        목록 상자 안의 소제목 · 안내 · 표 · 꼬리 줄은 그대로다.
+    */
+    <>
+    <ListFrame
+      head={
+        <div className={styles.head} data-page-title>
+          <h1 className={styles.title}>사업목적</h1>
+        </div>
+      }
+      search={
+        <>
             <input
               className={`${cf.input} ${styles.panelSearchInput}`}
               value={input}
@@ -97,6 +87,25 @@ export function BizPurposesView() {
             >
               초기화
             </button>
+        </>
+      }
+      actions={
+        <Button size="sm" variant="primary" onClick={() => setDialog(null)}>
+          <Icon name="plus" size={16} />
+          문구 추가
+        </Button>
+      }
+      listPadded
+    >
+          {error ? <p className={styles.error}>{error}</p> : null}
+
+          <div className={styles.panelHead}>
+            <div>
+              <h2 className={styles.panelTitle}>사업목적 문구</h2>
+              <p className={styles.panelSub}>
+                회사는 법인변경 화면의 [목록에서 고르기]로 「사용」 문구만 고릅니다.
+              </p>
+            </div>
           </div>
 
           <div className={styles.tableWrap}>
@@ -153,8 +162,7 @@ export function BizPurposesView() {
               <span className={styles.panelFootSub}>앞의 {items.length}개만 보입니다 — 검색어로 좁히세요</span>
             ) : null}
           </div>
-        </section>
-      </div>
+    </ListFrame>
 
       {dialog !== undefined ? (
         <BizPurposeDialog
@@ -166,6 +174,6 @@ export function BizPurposesView() {
           }}
         />
       ) : null}
-    </div>
+    </>
   );
 }

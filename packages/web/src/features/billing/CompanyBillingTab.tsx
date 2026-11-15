@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEPOSIT_ENTRY_LABEL } from '@swonbiz/shared/domain/deposit-ledger';
 import { settlementDirection } from '@swonbiz/shared/domain/settlement-view';
+import { LoadingBar } from '@/components/patterns/LoadingBar';
 import styles from './billing.module.css';
 import { BillingEmpty, BillingTable } from './BillingTable';
 import { billingHref, dotDate, type BillingItem, type ContractDeposit, type Settlement } from './billing-model';
@@ -82,7 +83,8 @@ export function CompanyBillingTab({ companyId }: { companyId: string }) {
     void load();
   }, [load]);
 
-  if (data === null) return <BillingEmpty lead="청구를 불러오는 중입니다" />;
+  // ★ 받아 오는 동안 칸 맨 위에 막대(공통 로딩바 · 2026-11-15)
+  if (data === null) return <LoadingBar />;
   if (error) return <BillingEmpty lead={error} />;
 
   const held = data.deposits.filter((d) => d.balance > 0);

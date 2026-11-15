@@ -34,6 +34,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Icon, type IconName } from '@/components/ds';
+import { LoadingBar } from '@/components/patterns/LoadingBar';
 import { cf } from '@/features/facility/ModalShell';
 import {
   CodesError,
@@ -310,6 +311,8 @@ export function CodesView() {
 
         {/* ══════════ 우측 · 코드값 ══════════ */}
         <section className={styles.panel}>
+          {/* ★ 코드값을 받아 오는 동안 칸 맨 위에 막대(공통 로딩바 · 2026-11-15). 표는 비워 둔다. */}
+          {master !== null && linesBusy ? <LoadingBar /> : null}
           {error ? <p className={styles.error}>{error}</p> : null}
 
           {master === null ? (
@@ -421,13 +424,7 @@ export function CodesView() {
                   </thead>
                   <tbody>
                     {/* ★ 「불러오는 중」과 「없음」을 가른다 — 둘을 섞으면 거짓을 보여 준다. */}
-                    {linesBusy ? (
-                      <tr>
-                        <td colSpan={6} className={styles.center}>
-                          불러오는 중…
-                        </td>
-                      </tr>
-                    ) : shownLines.length === 0 ? (
+                    {linesBusy ? null : shownLines.length === 0 ? (
                       <tr>
                         <td colSpan={6} className={styles.center}>
                           {lines.length === 0 ? '코드값이 없습니다' : '조회 결과가 없습니다'}
