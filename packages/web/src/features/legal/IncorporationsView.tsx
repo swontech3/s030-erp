@@ -29,6 +29,7 @@ import {
 } from '@swonbiz/shared/domain/incorporation-detail';
 import type { CodeOption } from '@swonbiz/shared/domain/corp-change-list';
 import { Icon } from '@/components/ds';
+import { ListFrame, ListNote, ListScroll } from '@/components/patterns/ListFrame';
 import { OrgLookupDialog } from '@/components/org-lookup/OrgLookupDialog';
 import styles from './corp-changes.module.css';
 
@@ -99,26 +100,19 @@ export function IncorporationsView({ pickOrg }: { pickOrg: boolean }) {
   };
 
   return (
-    <div className={styles.page}>
-      <div className={styles.head}>
-        <div>
-          <h1 className={styles.title} data-page-title>법인설립</h1>
-          <p className={styles.sub}>
-            {load.state === 'loading'
-              ? '불러오는 중입니다'
-              : load.state === 'error'
-              ? '목록을 불러오지 못했습니다'
-              : `${items.length}건${filter.includeCancelled ? ' · 취소 포함' : ''}`}
-          </p>
+    /*
+      ★ 2026-11-15 — 공통 목록 틀(세무 「거래처」와 같은 배치): 검색 조건 → 버튼 줄 → 목록.
+        조건 칸 · 버튼 · 목록 칸은 그대로이고 자리만 옮겼다 — [새 건] · 건수는 버튼 줄로, 조건은 위 상자로.
+    */
+    <>
+    <ListFrame
+      head={
+        <div className={styles.head} data-page-title>
+          <h1 className={styles.title}>법인설립</h1>
         </div>
-        <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={start}>
-          <Icon name="plus" size={16} />
-          새 건
-        </button>
-      </div>
-
-      <div className={styles.panel}>
-        <div className={styles.toolbar}>
+      }
+      search={
+        <>
           <label className={styles.field}>
             <span className={styles.label}>진행상태</span>
             <select
@@ -151,8 +145,24 @@ export function IncorporationsView({ pickOrg }: { pickOrg: boolean }) {
             <Icon name="rotate-ccw" size={16} />
             조건 초기화
           </button>
-        </div>
-
+        </>
+      }
+      actions={
+        <>
+          <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={start}>
+            <Icon name="plus" size={16} />
+            새 건
+          </button>
+          <ListNote>
+            {load.state === 'loading'
+              ? '불러오는 중입니다'
+              : load.state === 'error'
+              ? '목록을 불러오지 못했습니다'
+              : `${items.length}건${filter.includeCancelled ? ' · 취소 포함' : ''}`}
+          </ListNote>
+        </>
+      }
+    >
         <div className={`${styles.tHead} ${styles.cols4}`}>
           <span>상호</span>
           <span>진행상태</span>
@@ -160,6 +170,7 @@ export function IncorporationsView({ pickOrg }: { pickOrg: boolean }) {
           <span>등록일</span>
         </div>
 
+        <ListScroll>
         {load.state === 'loading' ? (
           <Empty lead="법인설립 건을 불러오는 중입니다" />
         ) : load.state === 'error' ? (
@@ -193,7 +204,8 @@ export function IncorporationsView({ pickOrg }: { pickOrg: boolean }) {
             );
           })
         )}
-      </div>
+        </ListScroll>
+    </ListFrame>
 
       {lookup ? (
         <OrgLookupDialog
@@ -207,7 +219,7 @@ export function IncorporationsView({ pickOrg }: { pickOrg: boolean }) {
           }}
         />
       ) : null}
-    </div>
+    </>
   );
 }
 

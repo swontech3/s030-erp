@@ -38,6 +38,7 @@ import {
 import type { CorpChangeStatus, CorpChangeType } from '@swonbiz/shared/domain/corp-change';
 import Link from 'next/link';
 import { Icon } from '@/components/ds';
+import { ListFrame, ListNote, ListScroll } from '@/components/patterns/ListFrame';
 import { NewCorpChangeDialog } from './NewCorpChangeDialog';
 import styles from './corp-changes.module.css';
 
@@ -129,32 +130,19 @@ export function CorpChangesView({ pickOrg }: { pickOrg: boolean }) {
   const items = load.state === 'ok' ? load.items : [];
 
   return (
-    <div className={styles.page}>
-      <div className={styles.head}>
-        <div>
-          <h1 className={styles.title} data-page-title>법인변경</h1>
-          <p className={styles.sub}>
-            {load.state === 'loading'
-              ? '불러오는 중입니다'
-              : load.state === 'error'
-              ? '목록을 불러오지 못했습니다'
-              : `${items.length}건${filter.includeCancelled ? ' · 취소 포함' : ''}`}
-          </p>
+    /*
+      ★ 2026-11-15 — 공통 목록 틀(세무 「거래처」와 같은 배치): 검색 조건 → 버튼 줄 → 목록.
+        조건 칸 · 버튼 · 목록 칸은 그대로이고 자리만 옮겼다 — [새 건] · 건수는 버튼 줄로, 조건은 위 상자로.
+    */
+    <>
+    <ListFrame
+      head={
+        <div className={styles.head} data-page-title>
+          <h1 className={styles.title}>법인변경</h1>
         </div>
-        {/* ★ 구분 선택지가 아직 없으면(목록을 못 받음) 누를 수 없다 — 고를 것이 없다. */}
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnPrimary}`}
-          disabled={changeTypes.length === 0}
-          onClick={() => setCreating(true)}
-        >
-          <Icon name="plus" size={16} />
-          새 건
-        </button>
-      </div>
-
-      <div className={styles.panel}>
-        <div className={styles.toolbar}>
+      }
+      search={
+        <>
           <div className={styles.field}>
             <span className={styles.label}>작업일자</span>
             <span className={styles.range}>
@@ -238,8 +226,30 @@ export function CorpChangesView({ pickOrg }: { pickOrg: boolean }) {
             <Icon name="rotate-ccw" size={16} />
             조건 초기화
           </button>
-        </div>
-
+        </>
+      }
+      actions={
+        <>
+          {/* ★ 구분 선택지가 아직 없으면(목록을 못 받음) 누를 수 없다 — 고를 것이 없다. */}
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnPrimary}`}
+            disabled={changeTypes.length === 0}
+            onClick={() => setCreating(true)}
+          >
+            <Icon name="plus" size={16} />
+            새 건
+          </button>
+          <ListNote>
+            {load.state === 'loading'
+              ? '불러오는 중입니다'
+              : load.state === 'error'
+              ? '목록을 불러오지 못했습니다'
+              : `${items.length}건${filter.includeCancelled ? ' · 취소 포함' : ''}`}
+          </ListNote>
+        </>
+      }
+    >
         <div className={styles.tHead}>
           <span>회사</span>
           <span>변경구분</span>
@@ -248,6 +258,7 @@ export function CorpChangesView({ pickOrg }: { pickOrg: boolean }) {
           <span>등록일</span>
         </div>
 
+        <ListScroll>
         {load.state === 'loading' ? (
           <Empty lead="법인변경 건을 불러오는 중입니다" />
         ) : load.state === 'error' ? (
@@ -284,12 +295,13 @@ export function CorpChangesView({ pickOrg }: { pickOrg: boolean }) {
             </Link>
           ))
         )}
-      </div>
+        </ListScroll>
+    </ListFrame>
 
       {creating ? (
         <NewCorpChangeDialog changeTypes={changeTypes} pickOrg={pickOrg} onClose={() => setCreating(false)} />
       ) : null}
-    </div>
+    </>
   );
 }
 
