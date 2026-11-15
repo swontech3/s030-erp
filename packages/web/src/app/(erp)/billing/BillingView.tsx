@@ -89,7 +89,7 @@ export function BillingView() {
   const params = useSearchParams();
 
   /**
-   * 「청구 | 정산」 — 정산 탭은 중도해지 정산 대기와 예치금 반환 대기(`SettlementQueue`).
+   * 「청구 · 수납 | 정산」 — 정산 탭은 중도해지 정산 대기와 예치금 반환 대기(`SettlementQueue`).
    * ★ 주소에 적는다(`?tab=settle`) — 정산서를 보고 [이전] 으로 돌아와도 같은 탭이다.
    */
   const [tab, setTab] = useState<'month' | 'settle'>(() => (params.get('tab') === 'settle' ? 'settle' : 'month'));
@@ -297,7 +297,7 @@ export function BillingView() {
     <div className={styles.tabs} role="tablist">
       {(
         [
-          ['month', '청구'],
+          ['month', '청구 · 수납'],
           ['settle', '정산'],
         ] as const
       ).map(([key, label]) => (
