@@ -315,27 +315,20 @@ export function SettlementQueue({ notify, company, selected, onSelect, actions }
     },
   });
 
-  /** 정산금액 칸 — 처리 전은 방향 이름 + 금액, 처리 뒤는 처리 구분 · 처리일 + 금액(지금 보이던 그대로). */
+  /**
+   * 정산금액 칸 — 금액 한 줄만(대표 지시 2026-11-15). 처리 전 · 처리 뒤 같은 규칙.
+   *   입주사가 낼 돈(추가로 받을 금액) → 앞에 「-」 · 예: -₩120,000
+   *   입주사에게 돌려줄 돈(환불 · 예치금 반환) → 부호 없음 · 예: ₩350,000
+   *   0 → 「—」
+   * ★ `amount` 부호는 순정산금과 같다(양수 = 돌려줄 돈). 방향 판정은 `settlementDirection` 하나.
+   */
   const amountCell = (item: QueueItem) => {
     const dir = settlementDirection(item.amount);
-    if (item.statusCode === 'WAIT') {
-      return (
-        <span className={styles.right}>
-          <span className={styles.amountSub} style={{ marginTop: 0 }}>
-            {item.kind === 'deposit' ? '예치금 반환' : dir.label}
-          </span>
-          <span className={styles.amount}>{dir.kind === 'none' ? '—' : won(dir.amount)}</span>
-        </span>
-      );
-    }
     return (
       <span className={styles.right}>
-        {/* ★ 처리일은 금액 위에 — 「언제 이 돈이 오갔는가」라서 금액 옆이 제자리다. */}
-        <span className={styles.amountSub} style={{ marginTop: 0 }}>
-          {item.kind === 'deposit' ? '예치금 반환' : dir.kind === 'charge' ? '받음' : '환불'}
-          {item.processedOn ? ` · ${dotDate(item.processedOn)}` : ''}
+        <span className={styles.amount}>
+          {dir.kind === 'none' ? '—' : dir.kind === 'charge' ? `-${won(dir.amount)}` : won(dir.amount)}
         </span>
-        <span className={styles.amount}>{won(Math.abs(item.amount))}</span>
       </span>
     );
   };
