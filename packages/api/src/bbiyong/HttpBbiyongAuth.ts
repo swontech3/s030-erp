@@ -36,6 +36,7 @@ import {
 } from './types.ts';
 
 export { INVALID_CREDENTIALS_MESSAGE, ORG_SELECT_MESSAGE, RELOGIN_MESSAGE } from './types.ts';
+import type { BbiyongOrgCompany } from './types.ts';
 
 export type ReIssueOutcome =
   | { kind: 'success'; accessToken: string }
@@ -227,6 +228,23 @@ export function parseOrgRep(body: unknown): BbiyongOrgRep | null {
   return { name: trim(data.memberName), email: fst && snd ? `${fst}@${snd}` : null };
 }
 
+/**
+ * 내 단체 정보 본문 → 회사 정보(세무 설정 회사 기본정보, 2026-11-15). 성공이 아니거나 data 가 없으면 null(403 AUTHZ_DENY 포함).
+ * ★ 칸 이름은 회사 수정(`erp-patch-org`)과 같은 `orgName` · `bizNumber` · `corpNumber`. 번호는 숫자만, 비면 null. data 가 배열이면 첫 줄.
+ */
+export function parseOrgCompany(body: unknown): BbiyongOrgCompany | null {
+  const root = asRecord(body);
+  if (!root || root.result !== 'success' || root.status !== 200) return null;
+  const data = asRecord(Array.isArray(root.data) ? root.data[0] : root.data);
+  if (!data) return null;
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+  const num = (v: unknown) => {
+    const d = typeof v === 'string' || typeof v === 'number' ? String(v).replace(/\D/g, '') : '';
+    return d === '' ? null : d;
+  };
+  return { name: text(data.orgName), bizNumber: num(data.bizNumber), corpNumber: num(data.corpNumber) };
+}
+
 export class HttpBbiyongAuth implements BbiyongAuth, BbiyongPeopleLookup {
   readonly #baseUrl: string;
   readonly #fetch: typeof fetch;
@@ -416,6 +434,25 @@ export class HttpBbiyongAuth implements BbiyongAuth, BbiyongPeopleLookup {
       throw err;
     }
     return parseOrgRep(body);
+  }
+
+  /**
+   * 내 단체 회사 정보(세무 설정, 2026-11-15) — `orgRep` 과 같은 `GET /s021100020/org?orgId=`.
+   * ★ 403(대표 · 운영사가 아님)은 null. 401 · 연결 · 시간 초과는 던진다 — 부르는 쪽이 ERP 회사 정보로 돌아간다.
+   */
+  async orgCompany(orgId: number, accessToken: string): Promise<BbiyongOrgCompany | null> {
+    let body: unknown;
+    try {
+      body = await this.#call(
+        `${this.#baseUrl}${BBIYONG_ORG_INFO_PATH}?${new URLSearchParams({ orgId: String(orgId) }).toString()}`,
+        { method: 'GET', headers: { authorization: `Bearer ${accessToken}` } },
+        '내 단체 정보',
+      );
+    } catch (err) {
+      if (err instanceof BbiyongUnavailableError && err.httpStatus === 403) return null;
+      throw err;
+    }
+    return parseOrgCompany(body);
   }
 
   /**

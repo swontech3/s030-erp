@@ -5,6 +5,7 @@
  * 결과서 `08-screen-report.md` S05-11 그대로.
  *
  *   [저장] 버튼 줄(오른쪽 위) · 회사 기본정보(회사 이름 · 사업자번호 · 사업자 유형) · 세무사 메일(4칸) · 회사 계좌 | 회사 카드
+ * ★ 2026-11-15: 회사 기본정보는 삐용 「내 단체 정보」에서(못 읽으면 ERP 회사 정보 + 안내 글). 세무사 메일은 No · 이름 · 메일 주소 작은 표 4줄.
  *
  * ★ 2026-11-07 대표 수정: 맨 위 안내 · 설명 · 「삐용 단체관리가 정본…」 문구를 지웠다. 사업자 유형은 회사 기본정보 안으로 옮겼다 —
  *   법인등록번호가 있으면 법인으로 고정해 보이기만(`bizTypeLocked`), 없으면 고르는 상자(코드 TAX_BIZ_TP). (법인등록번호 칸은 수정 2 에서 지웠다)
@@ -54,6 +55,8 @@ type ListName = FinList;
 const INPUT_GUIDE = '메일은 name@example.com 모양, 계좌번호는 숫자와 - 만(숫자 10~14자리), 카드는 끝 4자리 숫자입니다.';
 /** 값이 없는 칸 — 회사 이름 · 사업자번호(2026-11-07 「삐용에서 아직 받지 못했습니다」 → 「—」). */
 const NOT_RECEIVED = '—';
+/** 삐용에서 회사 정보를 못 읽었을 때 회사 기본정보 옆 작은 글(2026-11-15). */
+const FROM_REP_NOTE = '대표자 계정에서 최신 정보로 보입니다';
 /** 「사용 안 함」 줄의 흐림 — 꺼진 버튼(`.btn:disabled`)과 같은 값. */
 const OFF_OPACITY = 0.45;
 
@@ -330,29 +333,56 @@ export function TaxSettingsView() {
     );
   };
 
-  /** 세무사 메일 4칸 — 한 줄에 두 사람(이름 · 메일 · 이름 · 메일), 2줄. 빈 칸 허용(서버가 둘 다 빈 사람은 버린다). */
+  /**
+   * 세무사 메일 4명 — 작은 표(2026-11-15 대표 수정): 머리 줄 No · 이름 · 메일 주소, 아래 4줄(1 ~ 4).
+   * 빈 칸 허용(서버가 둘 다 빈 사람은 버린다). 저장 규칙 · 개수 · 검사는 그대로.
+   */
   const emailGrid = (
-    // ★ 2026-11-08 — 화면 폭 고정(960px)을 없앤 뒤에도 메일 칸이 늘어지지 않게 예전 카드 안쪽 폭(920px)까지만
-    <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1.4fr 1fr 1.4fr', gap: 8, maxWidth: 920 }}>
-      {draft.taxEmails.map((e, i) => [
-        <input
-          key={`${e.key}-n`}
-          className={`${t.input} ${errCls(`email:${e.key}:name`)}`}
-          value={e.name}
-          placeholder="이름"
-          aria-label={`세무사 ${i + 1} 이름`}
-          onChange={(ev) => editEmail(e.key, 'name', ev.target.value)}
-        />,
-        <input
-          key={`${e.key}-m`}
-          className={`${t.input} ${errCls(`email:${e.key}:email`)}`}
-          type="email"
-          value={e.email}
-          placeholder="메일주소"
-          aria-label={`세무사 ${i + 1} 메일`}
-          onChange={(ev) => editEmail(e.key, 'email', ev.target.value)}
-        />,
-      ])}
+    <div style={{ marginTop: 12, maxWidth: 640, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+      <table className={t.tbl}>
+        <colgroup>
+          <col style={{ width: 56 }} />
+          <col style={{ width: '38%' }} />
+          <col />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>이름</th>
+            <th>메일 주소</th>
+          </tr>
+        </thead>
+        <tbody>
+          {draft.taxEmails.map((e, i) => (
+            <tr key={e.key}>
+              <td className={t.tnum} style={{ padding: '6px 12px', color: 'var(--text-muted)' }}>
+                {i + 1}
+              </td>
+              <td style={{ padding: '6px 12px' }}>
+                <input
+                  className={`${t.input} ${errCls(`email:${e.key}:name`)}`}
+                  style={{ width: '100%' }}
+                  value={e.name}
+                  placeholder="이름"
+                  aria-label={`세무사 ${i + 1} 이름`}
+                  onChange={(ev) => editEmail(e.key, 'name', ev.target.value)}
+                />
+              </td>
+              <td style={{ padding: '6px 12px' }}>
+                <input
+                  className={`${t.input} ${errCls(`email:${e.key}:email`)}`}
+                  style={{ width: '100%' }}
+                  type="email"
+                  value={e.email}
+                  placeholder="메일주소"
+                  aria-label={`세무사 ${i + 1} 메일`}
+                  onChange={(ev) => editEmail(e.key, 'email', ev.target.value)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 
@@ -383,7 +413,11 @@ export function TaxSettingsView() {
       {failed ? <TaxFormErrorBanner kind="failed" message={failed} /> : null}
 
       <div className={`${t.card} ${t.cardPad}`}>
-        <div className={t.secT}>회사 기본정보</div>
+        <div className={t.row}>
+          <div className={t.secT}>회사 기본정보</div>
+          {/* ★ 2026-11-15 — 삐용 「내 단체 정보」를 못 읽었으면(403 대표 · 운영사가 아님 · 실패 · 시간 초과) ERP 회사 정보를 보이고 이 글을 붙인다 */}
+          {co.source !== 'bbiyong' ? <span className={t.sm}>{FROM_REP_NOTE}</span> : null}
+        </div>
         <div className={t.grid3} style={{ marginTop: 12 }}>
           {valueCell('회사 이름', co.name)}
           {valueCell('사업자번호', co.bizNumber ? formatBizNumber(co.bizNumber) : null)}

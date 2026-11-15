@@ -25,6 +25,7 @@ import {
   type MyMenusOutcome,
   type MyOrgOutcome,
 } from './types.ts';
+import type { BbiyongOrgCompany } from './types.ts';
 
 interface MockAccount extends Omit<BbiyongLoginResult, 'accessToken' | 'refreshToken'> {
   email: string;
@@ -172,6 +173,18 @@ export const MOCK_ORG_REPS: Readonly<Record<number, BbiyongOrgRep>> = {
   9003: { name: '이법무', email: 'nontenant@test.com' },
 };
 
+/**
+ * 단체 회사 정보(세무 설정 회사 기본정보 화면 확인용, 2026-11-15) — 삐용 「내 단체 정보」의 자리. 지어낸 값이다.
+ * ★ 삐용은 대표 · 운영사가 아니면 403 — mock 은 운영사 계정(scope operator)이거나 그 단체 대표(`MOCK_ORG_REPS` 메일)일 때만 준다.
+ *   admin · operator(운영사 1) · nontenant(9003 대표 이법무)는 삐용 값, tenant(홍길동, 9001 대표 아님)는 거절 → ERP 회사 정보 + 안내 글.
+ *   9002 는 두지 않는다(빈 응답).
+ */
+export const MOCK_ORG_COMPANIES: Readonly<Record<number, BbiyongOrgCompany>> = {
+  1: { name: '에스원비즈(삐용)', bizNumber: '1058768687', corpNumber: '1101110000001' },
+  9001: { name: '주식회사 비앤케이넷(삐용)', bizNumber: '2208162517', corpNumber: '1101110000002' },
+  9003: { name: '주식회사 한빛법인(삐용)', bizNumber: '3148600001', corpNumber: null },
+};
+
 export class MockBbiyongAuth implements BbiyongAuth, BbiyongPeopleLookup {
   /**
    * 토큰 확인 — `mock-access.{memberId}.…` 모양의 토큰만 그 mock 계정으로 받는다(2026-10-22).
@@ -228,6 +241,15 @@ export class MockBbiyongAuth implements BbiyongAuth, BbiyongPeopleLookup {
   async orgRep(orgId: number, accessToken: string): Promise<BbiyongOrgRep | null> {
     if (!accountOfMockToken(accessToken)) return null;
     return MOCK_ORG_REPS[orgId] ?? null;
+  }
+
+  /** 내 단체 회사 정보 — `MOCK_ORG_COMPANIES`. 운영사도 그 단체 대표도 아니면 null(삐용 403 자리). */
+  async orgCompany(orgId: number, accessToken: string): Promise<BbiyongOrgCompany | null> {
+    const account = accountOfMockToken(accessToken);
+    if (!account) return null;
+    const isRep = MOCK_ORG_REPS[orgId]?.email === account.email;
+    if (account.scope !== 'operator' && !isRep) return null;
+    return MOCK_ORG_COMPANIES[orgId] ?? null;
   }
 
   async signOut(_refreshToken: string): Promise<void> {

@@ -565,3 +565,23 @@ export interface BbiyongPeopleLookup {
   /** `GET /s021100020/org?orgId=` 의 대표자 — 403 · 업무 실패 · 빈 응답이면 null. */
   orgRep(orgId: number, accessToken: string): Promise<BbiyongOrgRep | null>;
 }
+
+// =============================================================================
+// 세무 설정 회사 기본정보(2026-11-15) — 같은 「내 단체 정보」를 로그인한 사람의 토큰으로(`callBbiyong`) 읽는다
+// =============================================================================
+
+/** 내 단체 회사 정보 — 회사명 `orgName` · 사업자번호 `bizNumber` · 법인번호 `corpNumber`(번호는 숫자만, 비면 null). */
+export interface BbiyongOrgCompany {
+  name: string | null;
+  bizNumber: string | null;
+  corpNumber: string | null;
+}
+
+/**
+ * ★ `BbiyongPeopleLookup` 에 넣지 않았다 — 그 대역(세무사 전달 시험)을 건드리지 않으려고 따로 둔다.
+ * ★ 403(대표 · 운영사가 아님) · 업무 실패 · 빈 응답은 null. 401 은 `BbiyongTokenExpiredError`, 연결 · 시간 초과는 장애로 던진다.
+ */
+export interface BbiyongOrgCompanyLookup {
+  /** `GET /s021100020/org?orgId=` 의 회사 정보. */
+  orgCompany(orgId: number, accessToken: string): Promise<BbiyongOrgCompany | null>;
+}

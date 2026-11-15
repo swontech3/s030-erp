@@ -393,3 +393,30 @@ describe('HttpBbiyongAuth.orgRep — GET /s021100020/org?orgId= 의 대표자', 
     await expect(new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: timeout.impl }).orgRep(9001, 't')).rejects.toBeInstanceOf(BbiyongUnavailableError);
   });
 });
+
+describe('HttpBbiyongAuth.orgCompany — GET /s021100020/org?orgId= 의 회사 정보(세무 설정, 2026-11-15)', () => {
+  const ok = (data: unknown) => json({ status: 200, result: 'success', massage: null, error: null, data });
+
+  it('orgId 를 주소에 싣고 Bearer 로 부른다 — orgName · bizNumber · corpNumber(번호는 숫자만)', async () => {
+    const { impl, calls } = stubFetch(ok({ orgId: 9001, orgName: '한성무역', bizNumber: '105-87-68687', corpNumber: '1110002313123' }));
+    const auth = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: impl });
+    expect(await auth.orgCompany(9001, 'eyJ.access')).toEqual({ name: '한성무역', bizNumber: '1058768687', corpNumber: '1110002313123' });
+    expect(calls[0]!.url).toBe(`${BASE}/rest/v1/s021100020/org?orgId=9001`);
+    expect((calls[0]!.init.headers as Record<string, string>).authorization).toBe('Bearer eyJ.access');
+  });
+
+  it('없는 칸 · 빈 칸은 null', async () => {
+    const a = new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(ok({ orgName: '한성무역', bizNumber: '' })).impl });
+    expect(await a.orgCompany(9001, 't')).toEqual({ name: '한성무역', bizNumber: null, corpNumber: null });
+  });
+
+  it('★ 403(HTTP · 본문 AUTHZ_DENY) · 업무 실패 · 빈 data 는 null — 연결 실패 · 시간 초과 · 401 은 던진다', async () => {
+    expect(await new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(json({}, 403)).impl }).orgCompany(9001, 't')).toBeNull();
+    const deny = json({ status: 403, result: 'fail', massage: '권한 없음', error: ['AUTHZ_DENY'], data: null });
+    expect(await new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(deny).impl }).orgCompany(9001, 't')).toBeNull();
+    expect(await new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(ok(null)).impl }).orgCompany(9001, 't')).toBeNull();
+    await expect(new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: stubFetch(json({}, 401)).impl }).orgCompany(9001, 't')).rejects.toBeInstanceOf(BbiyongTokenExpiredError);
+    const timeout = stubFetch(async () => { throw new DOMException('The operation was aborted due to timeout', 'TimeoutError'); });
+    await expect(new HttpBbiyongAuth({ baseUrl: BASE, fetchImpl: timeout.impl }).orgCompany(9001, 't')).rejects.toBeInstanceOf(BbiyongUnavailableError);
+  });
+});
