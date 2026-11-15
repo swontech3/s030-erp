@@ -1,0 +1,40 @@
+/*
+ * ERP 공통 로딩바 — LoadingBar.tsx 머리 주석.
+ * ★ 색은 기존 토큰만(새 색 없음).
+ */
+.bar {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--color-accent-bg);
+}
+
+.bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -40%;
+  width: 40%;
+  border-radius: 2px;
+  background: var(--color-primary);
+  animation: loadingBarSlide 1.2s ease-in-out infinite;
+}
+
+@keyframes loadingBarSlide {
+  to {
+    left: 100%;
+  }
+}
+
+/* 움직임을 줄여 달라는 설정이면 흐르지 않고 반쯤 찬 막대로 둔다. */
+@media (prefers-reduced-motion: reduce) {
+  .bar::before {
+    left: 0;
+    width: 50%;
+    animation: none;
+  }
+}

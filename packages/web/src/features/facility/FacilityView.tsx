@@ -37,6 +37,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Icon, type IconName } from '@/components/ds';
+import { LoadingBar } from '@/components/patterns/LoadingBar';
 import {
   FacilityError,
   area,
@@ -621,12 +622,15 @@ function SpacePanel({
   if (!floor) return <p className={styles.hint}>층을 찾을 수 없습니다.</p>;
   return (
     <>
+      {/* ★ 받아 오는 동안 칸 맨 위에 막대(공통 로딩바 · 2026-11-15) */}
+      {busy ? <LoadingBar /> : null}
       <div className={styles.panelHead}>
         <div>
           <h2 className={styles.panelTitle}>호실관리</h2>
           <p className={styles.panelSub}>
             {/* ★ 받아 오는 중에는 수를 적지 않는다 — 0 이라고 적으면 거짓이다. */}
-            {floorLabel(floor)} · {busy ? '불러오는 중…' : hint}
+            {floorLabel(floor)}
+            {busy ? null : ` · ${hint}`}
           </p>
         </div>
         <div className={styles.actions}>
@@ -695,9 +699,7 @@ function SpacePanel({
         </div>
       ) : null}
 
-      {busy ? (
-        <p className={styles.hint}>불러오는 중…</p>
-      ) : spaces.length === 0 ? (
+      {busy ? null : spaces.length === 0 ? (
         <PanelEmpty icon="package-open" lead="등록된 호실이 없습니다" sub="[호실 추가] 로 만들어 주세요" />
       ) : visible.length === 0 ? (
         /* ★ 「호실이 없다」와 다른 말이다 — 거른 결과가 없을 뿐이다. */
@@ -785,11 +787,14 @@ function MeetingRoomPanel({
   if (!floor) return <p className={styles.hint}>층을 찾을 수 없습니다.</p>;
   return (
     <>
+      {/* ★ 받아 오는 동안 칸 맨 위에 막대(공통 로딩바 · 2026-11-15) */}
+      {busy ? <LoadingBar /> : null}
       <div className={styles.panelHead}>
         <div>
           <h2 className={styles.panelTitle}>회의실관리</h2>
           <p className={styles.panelSub}>
-            {floorLabel(floor)} · {busy ? '불러오는 중…' : `${rooms.length}개`}
+            {floorLabel(floor)}
+            {busy ? null : ` · ${rooms.length}개`}
           </p>
         </div>
         <div className={styles.actions}>
@@ -800,9 +805,7 @@ function MeetingRoomPanel({
         </div>
       </div>
 
-      {busy ? (
-        <p className={styles.hint}>불러오는 중…</p>
-      ) : rooms.length === 0 ? (
+      {busy ? null : rooms.length === 0 ? (
         <PanelEmpty icon="door-open" lead="등록된 회의실이 없습니다" sub="[회의실 추가] 로 만들어 주세요" />
       ) : (
         <div className={styles.tableWrap}>
