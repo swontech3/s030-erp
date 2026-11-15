@@ -102,11 +102,13 @@ export async function insertDepositEntry(
 }
 
 /**
- * 정산 탭의 처리 대기 후보 — 종료된 계약 중 **처리 전 정산이 있거나 예치금이 남은** 것,
- * 그리고 최근에 처리된 것.
+ * 정산 탭의 후보 — 종료된 계약 중 **정산이 있거나 예치금 장부가 있는** 것(처리 대기 · 처리 완료 둘 다).
  *
  * ★ 대기인지 아닌지의 판정은 여기서 하지 않는다 — `pendingKind`(shared)가 한다. 여기서는
- *   판정에 필요한 칸만 모은다. 처리 완료는 최근 것만(정산 처리일 · 반환일 기준 90일).
+ *   판정에 필요한 칸만 모은다.
+ * ★ 2026-11-15 — **정산 기준일**(양 끝 포함)로 거른다. 처리 완료의 「최근 90일」 제한은 이 기간 조건으로 바꿨다.
+ *   정산 기준일 = 중도해지일이 종료일보다 앞서면 중도해지일, 아니면 종료일 — shared `settleBasisDate` 와 같은 규칙이다
+ *   (바꾸면 둘 다 바꾼다). 예치금 장부가 없는 기간만료 계약은 지금처럼 넣지 않는다.
  */
 export interface SettlementQueueRow {
   contract_id: string;
@@ -132,7 +134,10 @@ export interface SettlementQueueRow {
   last_return_account: string | null;
 }
 
-export async function listSettlementQueue(client: ScopedClient): Promise<SettlementQueueRow[]> {
+export async function listSettlementQueue(
+  client: ScopedClient,
+  basis: { from: string; to: string },
+): Promise<SettlementQueueRow[]> {
   const { rows } = await q<SettlementQueueRow>(
     client,
     `SELECT k.contract_id, k.company_id, c.company_name, k.status,
@@ -161,10 +166,14 @@ export async function listSettlementQueue(client: ScopedClient): Promise<Settlem
        ) r ON true
       WHERE k.status = 'terminated'
         AND (
-          (st.settlement_id IS NOT NULL AND (st.processed_on IS NULL OR st.processed_on >= current_date - 90))
+          st.settlement_id IS NOT NULL
           OR EXISTS (SELECT 1 FROM public.tb_s080_deposit_ledger d WHERE d.contract_id = k.contract_id)
         )
-      ORDER BY coalesce(k.terminated_date, k.end_date) DESC, c.company_name, k.contract_id`,
+        AND CASE WHEN k.terminated_date < k.end_date THEN k.terminated_date ELSE k.end_date END
+            BETWEEN $1::date AND $2::date
+      ORDER BY CASE WHEN k.terminated_date < k.end_date THEN k.terminated_date ELSE k.end_date END DESC,
+               c.company_name, k.contract_id`,
+    [basis.from, basis.to],
   );
   return rows;
 }

@@ -25,6 +25,11 @@ import { requireSession } from '../session/hook.ts';
 import { withCompanyScope, type CompanyScope } from '../db/withCompanyScope.ts';
 import { listCodes, listSpaces, type CodeSpec } from '../db/lookups.ts';
 import { DEPOSIT_ACCOUNT_CATEGORY, DEPOSIT_ACCOUNT_USE_TP } from '@swonbiz/shared/domain/deposit-account';
+import {
+  SETTLE_CODE_USE_TP,
+  SETTLE_STATUS_CATEGORY,
+  SETTLE_TYPE_CATEGORY,
+} from '@swonbiz/shared/domain/settlement-view';
 
 /** 계약 화면과 같은 값이다(`routes/contracts.ts`). */
 const READ_ROLE = 'operator';
@@ -77,6 +82,18 @@ const CONTRACT_FORM_CODES: readonly CodeSpec[] = [
    * 줄이 없으면 화면이 「입금 계좌가 설정되지 않았습니다」를 보인다(shared `depositAccountOf`).
    */
   { category: DEPOSIT_ACCOUNT_CATEGORY, useTp: DEPOSIT_ACCOUNT_USE_TP },
+  /**
+   * 납부상태(청구 화면 검색 상자 「상태」 선택지, 2026-11-15). 파티션 `000` — P 납부대기 · E 납부완료 · O 미납 · C 취소.
+   * ★ **이름만** 쓴다. 판정은 shared `displayInvoiceStatus` 가 그대로 하고, 화면이 코드값으로 묶는다
+   *   (`features/billing/billing-model.ts` `payStCodeOf`). 「전체」는 화면에만 있다.
+   */
+  { category: 'PAY_ST', useTp: '000' },
+  /**
+   * 정산 구분 · 정산 상태(청구 화면 「정산」 탭 검색 · 목록, 2026-11-15 · 일회용 37).
+   * ★ **이름만** 쓴다. 코드값은 API(`GET /billing/settlements`)가 shared `settleTypeOf` · `settleStatusOf` 로 행마다 싣는다.
+   */
+  { category: SETTLE_TYPE_CATEGORY, useTp: SETTLE_CODE_USE_TP },
+  { category: SETTLE_STATUS_CATEGORY, useTp: SETTLE_CODE_USE_TP },
 ];
 
 const scopeOf = (session: { role: string; companyId: string | null }): CompanyScope => ({

@@ -480,6 +480,21 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     source: 'packages/shared/src/domain/incorporation.ts (INCORP_METHOD · INCORP_LTD_METHOD)',
     label: '법인설립 설립 구분',
   },
+  /** 청구 화면 「정산」 탭 구분 · 상태 — API 가 판정해 코드값을 싣는다. 담는 칸은 없다. 2026-11-15 추가(일회용 37). */
+  {
+    category: 'SETTLE_TP',
+    useTp: '000',
+    codes: ['EARLY', 'EXPIRE'],
+    source: 'packages/shared/src/domain/settlement-view.ts (SETTLE_TYPE_CODES)',
+    label: '정산 탭 구분',
+  },
+  {
+    category: 'SETTLE_ST',
+    useTp: '000',
+    codes: ['WAIT', 'DONE'],
+    source: 'packages/shared/src/domain/settlement-view.ts (SETTLE_STATUS_CODES)',
+    label: '정산 탭 상태',
+  },
 ] as const;
 
 /**

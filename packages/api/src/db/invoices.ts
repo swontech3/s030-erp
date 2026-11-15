@@ -580,20 +580,26 @@ export interface BillingListRow {
   usage_end_day: string | null;
   /** 중도해지로 끝난 계약인가 — 화면이 「해지」 표시를 붙인다. */
   terminated: boolean;
+  /**
+   * 실제로 낸 날 `YYYY-MM-DD` — 그 장의 **양수** 수납 중 가장 늦은 `paid_on`(2026-11-15).
+   * 수납이 없으면 `null`(미납 · 납부대기는 빈칸). ★ 음수 수납(정산 처리의 환불)은 낸 날이 아니라서 뺀다.
+   */
+  last_paid_day: string | null;
 }
 
 /**
- * 청구 목록 — 월 하나, 또는 입주사 하나.
+ * 청구 목록 — 납부기한 기간 하나, 또는 입주사 하나.
  *
- * ★ 둘 다 `null` 이면 던진다. 청구서 전체를 한 번에 내리는 길은 두지 않는다 —
+ * ★ 둘 다 없으면 던진다. 청구서 전체를 한 번에 내리는 길은 두지 않는다 —
  *   계약 하나가 12장을 만들어서 금방 수천 장이 된다.
+ * ★ 기간은 납부기한(`due_date`) 기준이고 양 끝을 넣는다(2026-11-15 — 청구 화면 검색 상자 「납부기한 From ~ To」).
  */
 export async function listBillingInvoices(
   client: ScopedClient,
-  args: { yearMonth: string | null; companyId: string | null },
+  args: { due: { from: string; to: string } | null; companyId: string | null },
 ): Promise<BillingListRow[]> {
-  if (args.yearMonth === null && args.companyId === null) {
-    throw new RangeError('청구 월이나 입주사 중 하나는 있어야 한다');
+  if (args.due === null && args.companyId === null) {
+    throw new RangeError('납부기한 기간이나 입주사 중 하나는 있어야 한다');
   }
   const { rows } = await q<BillingListRow>(
     client,
@@ -610,7 +616,9 @@ export async function listBillingInvoices(
                 WHERE d.contract_id = i.contract_id), 0) AS deposit_balance,
             to_char(k.start_date, 'YYYY-MM-DD') AS start_day,
             to_char(coalesce(k.terminated_date, k.end_date), 'YYYY-MM-DD') AS usage_end_day,
-            (k.terminated_date IS NOT NULL) AS terminated
+            (k.terminated_date IS NOT NULL) AS terminated,
+            (SELECT to_char(max(p.paid_on), 'YYYY-MM-DD') FROM public.tb_s080_payments p
+              WHERE p.invoice_id = i.invoice_id AND p.amount > 0) AS last_paid_day
        FROM public.tb_s080_invoices i
        JOIN public.tb_s080_companies c ON c.company_id = i.company_id
        LEFT JOIN public.tb_s080_contracts k ON k.contract_id = i.contract_id
@@ -623,10 +631,11 @@ export async function listBillingInvoices(
            LEFT JOIN public.tb_s080_spaces s           ON s.space_id = cs.space_id
           WHERE il.invoice_id = i.invoice_id
        ) l ON true
-      WHERE ($1::text IS NULL OR i.year_month = $1)
-        AND ($2::text IS NULL OR i.company_id = $2)
+      WHERE ($1::date IS NULL OR i.due_date >= $1::date)
+        AND ($2::date IS NULL OR i.due_date <= $2::date)
+        AND ($3::text IS NULL OR i.company_id = $3)
       ORDER BY i.year_month, c.company_name, i.contract_id, i.invoice_id`,
-    [args.yearMonth, args.companyId],
+    [args.due?.from ?? null, args.due?.to ?? null, args.companyId],
   );
   return rows;
 }

@@ -921,7 +921,9 @@ const json = (res) => {
 
     /* ═══ 22. 기간 만료 종료 → 「예치금 반환 대기」 → 반환 ═══════════════ */
     console.log('\n22. 기간 만료 — 예치금 반환 대기');
-    const queue = async () => json(await op.inject({ method: 'GET', url: '/billing/settlements' }));
+    // ★ 2026-11-15 — 정산 기준일 기간이 있어야 한다(6개월 안). 아래 두 계약(만료 05-31 · 중도해지 09-10)이 다 든다.
+    const queue = async () =>
+      json(await op.inject({ method: 'GET', url: '/billing/settlements?from=2026-05-01&to=2026-10-31' }));
     {
       const { body } = await createContract({ startDate: '2026-03-01', periodMonths: 3 });
       await op.inject({

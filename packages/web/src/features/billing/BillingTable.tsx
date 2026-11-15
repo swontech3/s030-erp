@@ -60,7 +60,8 @@ export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly
 
   return (
     <>
-      <div className={`${styles.tHead} ${grid}`}>
+      {/* ★ 2026-11-15 — 청구 화면(readOnly 아님)은 머리 · 줄을 촘촘하게(tHeadDense · tRowDense). 입주사 청구 탭은 그대로. */}
+      <div className={`${styles.tHead} ${grid}${readOnly ? '' : ` ${styles.tHeadSticky} ${styles.tHeadDense}`}`}>
         <span>{mode === 'month' ? '입주사' : '청구 월'}</span>
         <span>항목(호실)</span>
         <span className={styles.right}>청구액</span>
@@ -77,7 +78,13 @@ export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly
             <span>이용 종료일</span>
           </>
         ) : null}
-        <span className={styles.right}>납부일</span>
+        {/*
+          ★ 2026-11-15 — 「납부기한」(내야 하는 날)과 「납부일」(실제로 낸 날 · 수납이 없으면 빈칸)을 나눴다.
+            조회 전용(입주사 화면 청구 탭)은 좁아 열을 늘리지 않고 납부기한 하나만 둔다 — 전에 「납부일」이라 적혀
+            있던 그 칸이 내야 하는 날이었다(이름만 바로잡음).
+        */}
+        <span className={readOnly ? styles.right : undefined}>납부기한</span>
+        {readOnly ? null : <span>납부일</span>}
         <span className={styles.center}>상태</span>
         {readOnly ? null : <span />}
       </div>
@@ -89,7 +96,7 @@ export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly
           <div
             key={item.invoiceId}
             data-invoice-row={item.invoiceId}
-            className={`${styles.tRow} ${grid}${canceled ? ` ${styles.tRowCanceled}` : ''}`}
+            className={`${styles.tRow} ${grid}${readOnly ? '' : ` ${styles.tRowDense}`}${canceled ? ` ${styles.tRowCanceled}` : ''}`}
           >
             <span className={`${styles.ellipsis} ${styles.strong}`} title={mode === 'month' ? item.companyName : ''}>
               {mode === 'month' ? item.companyName : yearMonthDot(item.yearMonth)}
@@ -139,7 +146,14 @@ export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly
                 </span>
               </>
             ) : null}
-            <span className={`${styles.right} ${styles.mono}`}>{monthDay(item.dueDate)}</span>
+            {readOnly ? (
+              <span className={`${styles.right} ${styles.mono}`}>{monthDay(item.dueDate)}</span>
+            ) : (
+              <>
+                <span className={styles.mono}>{dotDate(item.dueDate)}</span>
+                <span className={styles.mono}>{item.lastPaidOn ? dotDate(item.lastPaidOn) : ''}</span>
+              </>
+            )}
             <span className={styles.center}>
               <span className={`${styles.badge} ${styles[`st_${st}`]}`}>{STATUS_LABEL[st]}</span>
             </span>
@@ -167,7 +181,8 @@ export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly
         );
       })}
 
-      {items.length > 0 ? (
+      {/* ★ 2026-11-15 — 청구 화면은 합계 줄을 두지 않는다(위 총괄표가 같은 값). 조회 전용 탭에만 남는다. */}
+      {readOnly && items.length > 0 ? (
         <div className={`${styles.tFoot} ${grid}`}>
           <span>합계 {sum.count}건</span>
           <span className={styles.muted} style={{ fontWeight: 400, fontSize: 12 }}>

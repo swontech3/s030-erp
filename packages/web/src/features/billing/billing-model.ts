@@ -12,6 +12,7 @@
  * ★ 납부일은 **로컬 자정**으로 만든다. `daysBetweenLocal` 이 로컬 날짜를 보기 때문이다
  *   (`day.ts` 머리말). `parseDay` 는 UTC 자정이라 시간대가 음수인 곳에서는 하루 밀린다.
  */
+import type { SettleStatusCode, SettleTypeCode } from '@swonbiz/shared/domain/settlement-view';
 import { displayInvoiceStatus, type DisplayStatus } from '@swonbiz/shared/domain/invoice-status';
 import { localDayOf, summarizeInvoices, type InvoiceSummary } from '@swonbiz/shared/domain/invoice-summary';
 import type { DepositEntryKind } from '@swonbiz/shared/domain/deposit-ledger';
@@ -46,6 +47,11 @@ export interface BillingItem {
   usageEnd: string | null;
   /** 중도해지로 끝난 계약 — 종료일 뒤에 「해지」를 붙인다. */
   terminated: boolean;
+  /**
+   * 실제로 낸 날 `YYYY-MM-DD` — 양수 수납 중 가장 늦은 날(2026-11-15). 수납이 없으면 `null` → 목록 「납부일」 빈칸.
+   * ★ 「납부기한」(`dueDate`, 내야 하는 날)과 다르다.
+   */
+  lastPaidOn: string | null;
 }
 
 export interface InvoiceLine {
@@ -158,6 +164,31 @@ export function statusOf(
   });
 }
 
+/**
+ * 검색 상자 「상태」 — 공통 코드 `PAY_ST`(파티션 000)의 코드값으로 묶는다(2026-11-15).
+ *
+ * 선택지와 이름은 코드에서 읽는다(`GET /api/codes`) — 여기에는 이름을 적지 않는다.
+ * 화면 상태 여섯을 코드값 넷에 묶는 방법만 여기 둔다:
+ *   O 미납 = 미납 · P 납부대기 = 납부대기 + 부분납부(저장값 P) · E 납부완료 = 납부완료 + 과납(저장값 E) · C 취소 = 취소
+ * ★ 판정은 그대로 `statusOf` 하나다. 줄의 뱃지는 여섯 이름 그대로 보인다.
+ */
+export const PAY_ST_CATEGORY = 'PAY_ST';
+
+export function payStCodeOf(st: DisplayStatus): 'O' | 'P' | 'E' | 'C' {
+  switch (st) {
+    case 'unpaid':
+      return 'O';
+    case 'pending':
+    case 'partial':
+      return 'P';
+    case 'paid':
+    case 'overpaid':
+      return 'E';
+    case 'canceled':
+      return 'C';
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    합계 — 요약 카드와 표의 합계 줄이 **같은 함수**를 쓴다
    ══════════════════════════════════════════════════════════════════════════
@@ -240,6 +271,19 @@ export function won(n: number): string {
   return n < 0 ? `−₩${abs}` : `₩${abs}`;
 }
 
+/** 이번 달 1일 ~ 말일 `YYYY-MM-DD` — 로컬 기준. 검색 상자 납부기한의 처음 값(2026-11-15). */
+export function currentMonthRange(now = new Date()): { from: string; to: string } {
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  const last = new Date(y, m, 0).getDate();
+  return { from: `${y}-${pad(m)}-01`, to: `${y}-${pad(m)}-${pad(last)}` };
+}
+
+/** `YYYY-MM-DD` 모양인가. */
+export function isIsoDay(s: string | null | undefined): s is string {
+  return !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
 /** 로컬 오늘 `YYYY-MM-DD`. */
 export function localTodayIso(now = new Date()): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
@@ -282,7 +326,16 @@ export interface QueueItem {
   roomNames: string;
   /** 계약 시작일 `YYYY-MM-DD` — 목록의 「시작일」. */
   startDate: string;
-  terminatedDate: string;
+  /** 계약 종료일 — 목록의 「종료일」(2026-11-15). */
+  endDate: string;
+  /** 중도해지일 — **기간만료면 null**(목록의 「중도해지일」 빈칸, 2026-11-15). */
+  terminatedDate: string | null;
+  /** 정산 기준일 — 중도해지면 중도해지일, 만료면 종료일. 검색 기간이 이 날로 거른다. */
+  basisDate: string;
+  /** 구분 코드(공통 코드 `SETTLE_TP`) — 이름은 `GET /codes` 에서 읽는다. */
+  typeCode: SettleTypeCode;
+  /** 상태 코드(공통 코드 `SETTLE_ST`) — 대기 · 완료. */
+  statusCode: SettleStatusCode;
   amount: number;
   /** 처리 완료 줄에만. */
   processedOn?: string;
