@@ -32,7 +32,7 @@
 
 .title {
   margin: 0;
-  font-size: 30px;
+  font-size: var(--text-h2-size);
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.018em;
@@ -41,7 +41,7 @@
 
 .sub {
   margin: 6px 0 0;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-muted);
 }
 
@@ -55,7 +55,7 @@
   gap: 6px;
   border-radius: var(--radius-md);
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
@@ -102,7 +102,7 @@
 .btnXs {
   height: 32px;
   padding: 0 10px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
 }
 
 .btn:disabled {
@@ -164,7 +164,7 @@
   height: 40px;
   padding: 0 14px 0 40px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-heading);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -182,7 +182,7 @@
 
 .count {
   flex: 0 0 auto;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
   white-space: nowrap;
@@ -212,7 +212,7 @@
   background: var(--surface);
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   cursor: pointer;
   white-space: nowrap;
   transition:
@@ -232,7 +232,7 @@
   height: 28px;
   padding: 0 8px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-heading);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -308,7 +308,7 @@
 
 .cardType {
   min-width: 0;
-  font-size: 16px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
   white-space: nowrap;
@@ -323,7 +323,7 @@
 .cardMeta {
   margin-top: 6px;
   display: block;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -333,7 +333,7 @@
 .cardLast {
   margin-top: 3px;
   display: block;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
   white-space: nowrap;
   overflow: hidden;
@@ -349,7 +349,7 @@
   align-items: center;
   gap: 5px;
   border-radius: var(--radius-pill);
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -405,7 +405,7 @@
 
 .who h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: var(--text-bar-title-size);
   font-weight: 600;
   line-height: 1.4;
   letter-spacing: -0.012em;
@@ -422,7 +422,7 @@
 }
 
 .whoSub {
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-body);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -451,13 +451,13 @@
 }
 
 .infoKey {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
 }
 
 .infoVal {
   margin-top: 4px;
-  font-size: 16px;
+  font-size: var(--text-body-size);
   color: var(--text-heading);
   word-break: break-all;
 }
@@ -474,7 +474,7 @@
 
 .bodyText {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--text-body-size);
   line-height: 1.75;
   color: var(--text-heading);
   white-space: pre-line;
@@ -492,7 +492,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-alt);
   color: var(--text-body);
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   line-height: 1.6;
 }
 
@@ -504,7 +504,7 @@
 
 .secTitle {
   margin: 24px 0 12px;
-  font-size: 16px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
 }
@@ -578,7 +578,7 @@
 }
 
 .who2 {
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
 }
@@ -588,20 +588,20 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 2px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
   font-variant-numeric: tabular-nums;
 }
 
 .msgLead {
-  font-size: 16px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
 }
 
 .msgSub {
   margin-top: 2px;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -629,7 +629,7 @@
 
 .lab {
   display: block;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   color: var(--text-muted);
 }
@@ -639,7 +639,7 @@
   margin-top: 8px;
   padding: 14px;
   font-family: inherit;
-  font-size: 15px;
+  font-size: var(--text-body-size);
   line-height: 1.7;
   color: var(--text-heading);
   background: var(--surface);
@@ -667,7 +667,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
 }
 
 .countErr {
@@ -690,7 +690,7 @@
 }
 
 .composeNote {
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
 }
 
@@ -712,7 +712,7 @@
 }
 
 .moreText {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
 }
 
@@ -733,13 +733,13 @@
 
 .emptyLead {
   margin: 14px 0 0;
-  font-size: 16px;
+  font-size: var(--text-body-size);
   color: var(--text-muted);
 }
 
 .emptySub {
   margin: 4px 0 0;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-caption);
 }
 
@@ -783,14 +783,14 @@
 
 .modalTitle {
   margin: 16px 0 0;
-  font-size: 22px;
+  font-size: var(--text-h2-size);
   font-weight: 700;
   color: var(--text-heading);
 }
 
 .modalDesc {
   margin: 10px 0 0;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   line-height: 1.7;
   color: var(--text-body);
   text-align: left;
@@ -801,7 +801,7 @@
   padding: 12px 14px;
   border-radius: var(--radius-md);
   background: var(--surface-alt);
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   line-height: 1.7;
   color: var(--text-body);
   text-align: left;
@@ -821,7 +821,7 @@
 
 .modalErr {
   margin: 12px 0 0;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   color: var(--color-danger);
 }
@@ -853,7 +853,7 @@
 
 .toastMsg {
   flex: 1;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
 }
@@ -921,4 +921,152 @@
 
 .phone .composeActions .btn {
   flex: 1;
+}
+
+/* =============================================================================
+ * 앱 안(웹뷰) — 글자 크기는 2026-11-16 전 그대로 (대표 지시 2026-11-16)
+ * =============================================================================
+ * PC 는 위에서 글자 변수(--text-*)를 쓴다(ERP 웹 글자 크기 키우기). 앱 안은 AppShell 의 .inApp 이 글자 변수를
+ * 앱 값으로 덮기 때문에 변수만 쓰면 앱 안 크기가 바뀐다 — 그래서 이 화면의 앱 모양(.phone = layout.phone = 앱 안)
+ * 아래에서만 바꾸기 전 숫자 크기로 되돌린다. ★ 앱 공통 규칙(.inApp 변수 덮기)은 손대지 않는다.
+ * 셀렉터는 위 규칙에 .phone 하나를 더한 것이라 늘 위 규칙을 이긴다.
+ * ============================================================================= */
+.phone .title {
+  font-size: 30px;
+}
+
+.phone .sub {
+  font-size: 14px;
+}
+
+.phone .btn {
+  font-size: 14px;
+}
+
+.phone .btnXs {
+  font-size: 12px;
+}
+
+.phone .search {
+  font-size: 14px;
+}
+
+.phone .count {
+  font-size: 14px;
+}
+
+.phone .chip {
+  font-size: 12px;
+}
+
+.phone .typeSelect {
+  font-size: 12px;
+}
+
+.phone .cardType {
+  font-size: 16px;
+}
+
+.phone .cardMeta {
+  font-size: 14px;
+}
+
+.phone .cardLast {
+  font-size: 12px;
+}
+
+.phone .badge {
+  font-size: 12px;
+}
+
+.phone .who h2 {
+  font-size: 22px;
+}
+
+.phone .whoSub {
+  font-size: 14px;
+}
+
+.phone .infoKey {
+  font-size: 12px;
+}
+
+.phone .infoVal {
+  font-size: 16px;
+}
+
+.phone .bodyText {
+  font-size: 15px;
+}
+
+.phone .retention {
+  font-size: 13px;
+}
+
+.phone .secTitle {
+  font-size: 16px;
+}
+
+.phone .who2 {
+  font-size: 14px;
+}
+
+.phone .when {
+  font-size: 12px;
+}
+
+.phone .msgLead {
+  font-size: 16px;
+}
+
+.phone .msgSub {
+  font-size: 13px;
+}
+
+.phone .lab {
+  font-size: 12px;
+}
+
+.phone .textarea {
+  font-size: 15px;
+}
+
+.phone .countRow {
+  font-size: 12px;
+}
+
+.phone .composeNote {
+  font-size: 13px;
+}
+
+.phone .moreText {
+  font-size: 12px;
+}
+
+.phone .emptyLead {
+  font-size: 16px;
+}
+
+.phone .emptySub {
+  font-size: 14px;
+}
+
+.phone .modalTitle {
+  font-size: 22px;
+}
+
+.phone .modalDesc {
+  font-size: 14px;
+}
+
+.phone .modalList {
+  font-size: 13px;
+}
+
+.phone .modalErr {
+  font-size: 13px;
+}
+
+.phone .toastMsg {
+  font-size: 14px;
 }
