@@ -182,6 +182,14 @@ const smtp = smtpConfigOf(process.env);
  */
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim() || null;
 
+/**
+ * 삐용 서버끼리 비밀 키 — 새 문의 알림(앱 1단계 3-마, 2026-11-16 · `bbiyong/notifyInquiry.ts`).
+ *
+ * ★ **없어도 기동한다.** 없으면 문의 알림만 건너뛴다(기록 한 줄) — 문의 접수는 그대로 된다.
+ * ★ 삐용 yml `inbound.erp-server-key` 와 **같은 값**이어야 한다. 개발계 · 테스트계 · 가동계는 서로 다른 값.
+ */
+const bbiyongServerKey = process.env.BBIYONG_SERVER_KEY?.trim() || null;
+
 const key = Buffer.from(required('ERP_ENCRYPTION_KEY'), 'base64');
 if (key.length !== 32) {
   throw new Error(`ERP_ENCRYPTION_KEY 는 base64 로 32바이트여야 한다(현재 ${key.length}바이트).`);
@@ -226,6 +234,8 @@ export const env = {
   smtp,
   /** Claude API 키. `null` 이면 [AI 추천]만 꺼진다. */
   anthropicApiKey,
+  /** 삐용 서버끼리 비밀 키. `null` 이면 새 문의 알림만 꺼진다. */
+  bbiyongServerKey,
   port: Number(process.env.PORT ?? 3001),
   /**
    * 세션 유효기간 — 삐용 refresh 만료를 넘지 않아야 한다.
