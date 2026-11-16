@@ -25,6 +25,7 @@
  * ★ 중도해지 정산서(s030200070p3)도 뽑는다 — 검증용 계약을 중도 해지해 정산을 만들고,
  *   사이드바 「청구」 정산 탭에서 그 계약의 상세를 열고 [정산서] 를 눌러 **진짜 인쇄 경로**를 탄다.
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -285,7 +286,7 @@ function readEnv(file) {
  * 청구서·수납·정산·예치금 장부는 계약에서 CASCADE 되지 않는다(일부러 그렇다).
  */
 async function createTempContract() {
-  const env = readEnv('.env');
+  const env = readEnvFiles(['common', 'admin'], { legacy: ['.env'] });
   const TAG = `verify-print-${Date.now()}`;
   const db = new Client({ host: env.DB_HOST, port: +env.DB_PORT, user: env.DB_USER, password: env.DB_PASSWORD, database: env.DB_NAME });
   await db.connect();

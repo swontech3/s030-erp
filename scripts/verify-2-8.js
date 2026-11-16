@@ -9,6 +9,7 @@
  * 쓰기는 세션 테이블과 shadow 로그에만 일어난다. 업무 데이터는 건드리지 않는다.
  * 사용: node scripts/verify-2-8.js .env
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const crypto = require('crypto');
 const { Client } = require('pg');
@@ -21,10 +22,13 @@ const WEB = 'http://localhost:3100';
 const MOCK_MEMBER_IDS = { 'admin@s-wontech.co.kr': 1001, 'operator@s-wontech.co.kr': 1002, 'tenant@test.com': 2001, 'noaccess@test.com': 2002 };
 const mockTokens = (email) => ({ accessToken: `mock-access.${MOCK_MEMBER_IDS[email]}.verify`, refreshToken: `mock-refresh.${MOCK_MEMBER_IDS[email]}.verify` });
 
-const env = Object.fromEntries(
-  fs.readFileSync(process.argv[2] || '.env', 'utf8').split(/\r?\n/)
+// ★ 2026-11-16 — 인자가 없으면 환경 폴더(common + admin.env, shared envFiles)를 읽는다. 있으면 그 파일 그대로.
+const env = process.argv[2]
+  ? Object.fromEntries(
+  fs.readFileSync(process.argv[2], 'utf8').split(/\r?\n/)
     .filter(l => l.includes('=') && !l.trim().startsWith('#'))
-    .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }));
+    .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }))
+  : readEnvFiles(['common', 'admin'], { legacy: ['.env'] });
 
 const c = new Client({ host: env.DB_HOST, port: +env.DB_PORT, user: env.DB_USER, password: env.DB_PASSWORD, database: env.DB_NAME });
 

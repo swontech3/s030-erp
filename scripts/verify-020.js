@@ -7,6 +7,7 @@
  *
  * 사용: node scripts/verify-020.js .env
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const { Client } = require('pg');
 
@@ -22,7 +23,7 @@ const readEnv = (p) =>
       }),
   );
 
-const env = readEnv(process.argv[2] || '.env');
+const env = (process.argv[2] ? readEnv(process.argv[2]) : readEnvFiles(['common', 'admin'], { legacy: ['.env'] }));
 
 const { itemCountGate } = require('./verify-count.js');
 

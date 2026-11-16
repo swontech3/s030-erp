@@ -13,16 +13,20 @@
  *
  * 사용: node scripts/seed-mock-link.js .env
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const { Client } = require('pg');
 
 const MOCK_TENANT_ORG_ID = 9001;
 const TARGET_COMPANY_NAME = '주식회사 비앤케이넷'; // MockBbiyongAuth 의 orgName 과 같아야 화면이 어색하지 않다
 
-const env = Object.fromEntries(
-  fs.readFileSync(process.argv[2] || '.env', 'utf8').split(/\r?\n/)
+// ★ 2026-11-16 — 인자가 없으면 환경 폴더(common + admin.env, shared envFiles)를 읽는다. 있으면 그 파일 그대로.
+const env = process.argv[2]
+  ? Object.fromEntries(
+  fs.readFileSync(process.argv[2], 'utf8').split(/\r?\n/)
     .filter(l => l.includes('=') && !l.trim().startsWith('#'))
-    .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }));
+    .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }))
+  : readEnvFiles(['common', 'admin'], { legacy: ['.env'] });
 
 const c = new Client({ host: env.DB_HOST, port: +env.DB_PORT, user: env.DB_USER, password: env.DB_PASSWORD, database: env.DB_NAME });
 

@@ -16,6 +16,7 @@
  *
  * 종료코드: 0 = 전부 통과 / 1 = 실패 있음 / 2 = 실행 실패
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
@@ -27,8 +28,8 @@ const readEnv = (file) =>
       .map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^"|"$/g, '')]; }),
   );
 
-const rootEnv = readEnv(process.argv[2] || '.env');
-const apiEnv = readEnv(process.argv[3] || 'packages/api/.env');
+const rootEnv = (process.argv[2] ? readEnv(process.argv[2]) : readEnvFiles(['common', 'admin'], { legacy: ['.env'] }));
+const apiEnv = (process.argv[3] ? readEnv(process.argv[3]) : readEnvFiles(['common', 'erp-api'], { legacy: ['packages/api/.env'] }));
 const DRY = process.argv.includes('--dry-run');
 
 const TABLES = ['tb_s080_corp_changes', 'tb_s080_corp_change_officers', 'tb_s080_legal_orgs'];

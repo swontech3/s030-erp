@@ -3,6 +3,7 @@
  * 쓰기 테스트는 전부 트랜잭션 안에서 하고 ROLLBACK 한다. 데이터를 남기지 않는다.
  * 사용: node scripts/verify-001-003.js .env
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const { Client } = require('pg');
 
@@ -15,7 +16,7 @@ const readEnv = (p) => {
 };
 // 루트 .env = postgres 접속(스크립트용), packages/api/.env = erp_app 접속(Fastify용).
 // 2-2 스캐폴딩에서 갈렸으므로 둘 다 읽는다.
-const env = { ...readEnv(process.argv[2] || '.env'), ...readEnv('packages/api/.env') };
+const env = { ...(process.argv[2] ? readEnv(process.argv[2]) : readEnvFiles(['common', 'admin'], { legacy: ['.env'] })), ...readEnvFiles(['common', 'erp-api'], { legacy: ['packages/api/.env'] }) };
 
 const c = new Client({
   host: env.DB_HOST, port: +env.DB_PORT, user: env.DB_USER,
