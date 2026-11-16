@@ -60,7 +60,7 @@
 }
 
 .range {
-  font-size: 17px;
+  font-size: var(--text-nav-size);
   font-weight: 700;
   letter-spacing: -0.015em;
   color: var(--text-heading);
@@ -78,7 +78,7 @@
   border-radius: var(--radius-md);
   border: 1px solid transparent;
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
@@ -176,7 +176,7 @@
   border-radius: var(--radius-md);
   background: var(--surface);
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-heading);
   cursor: pointer;
   outline: none;
@@ -227,7 +227,7 @@
   border-radius: var(--radius-sm);
   background: transparent;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
   cursor: pointer;
   white-space: nowrap;
@@ -265,12 +265,12 @@
 }
 
 .dsDow {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
 }
 
 .dsNum {
-  font-size: 16px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
   font-variant-numeric: tabular-nums;
@@ -355,13 +355,13 @@
 }
 
 .hDow {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   color: var(--text-muted);
 }
 
 .hNum {
-  font-size: 16px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
   font-variant-numeric: tabular-nums;
@@ -397,7 +397,7 @@
   justify-content: flex-end;
   padding: 2px 8px 0 0;
   border-top: 1px solid var(--border);
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
   font-variant-numeric: tabular-nums;
   line-height: 1.4;
@@ -475,7 +475,7 @@
 
 .bkTime {
   display: block;
-  font-size: 11px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   color: var(--color-primary-hover);
   white-space: nowrap;
@@ -485,7 +485,7 @@
 .bkName {
   display: block;
   margin-top: 1px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   color: var(--text-heading);
   white-space: nowrap;
@@ -496,7 +496,7 @@
 .bkMeta {
   display: block;
   margin-top: 1px;
-  font-size: 11px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -515,7 +515,7 @@
   border-radius: 999px;
   background: var(--color-accent-bg);
   color: var(--color-primary-hover);
-  font-size: 10px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -540,11 +540,11 @@
 }
 
 .page[data-w='sm'] .bkName {
-  font-size: 14px;
+  font-size: var(--text-body-size);
 }
 
 .page[data-w='sm'] .bkTime {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
 }
 
 /* 현재 시각 */
@@ -588,7 +588,7 @@
 }
 
 .ghostTime {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   color: var(--color-primary-hover);
   white-space: nowrap;
@@ -596,7 +596,7 @@
 }
 
 .ghostCap {
-  font-size: 11px;
+  font-size: var(--text-micro-size);
   color: var(--color-primary-hover);
   white-space: nowrap;
 }
@@ -611,7 +611,7 @@
   padding: 12px 20px;
   border-top: 1px solid var(--border);
   background: var(--surface-alt);
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
   line-height: 1.5;
 }
@@ -687,7 +687,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   color: var(--text-muted);
 }
@@ -728,7 +728,7 @@
 }
 
 .mNum {
-  font-size: 16px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
   font-variant-numeric: tabular-nums;
@@ -760,7 +760,7 @@
 }
 
 .mSum {
-  font-size: 18px;
+  font-size: var(--text-button-lg-size);
   font-weight: 600;
   color: var(--text-heading);
   white-space: nowrap;
@@ -775,7 +775,7 @@
 }
 
 .page[data-w='md'] .mSum {
-  font-size: 15px;
+  font-size: var(--text-body-size);
 }
 
 /* ── 모바일 하단 CTA ── */
@@ -793,7 +793,7 @@
 .mCta .btn {
   width: 100%;
   height: 48px;
-  font-size: 15px;
+  font-size: var(--text-body-size);
 }
 
 /* ── 빈 상태 ── */
@@ -811,14 +811,14 @@
 
 .emptyLead {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
 }
 
 .emptySub {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
 }
 
@@ -893,7 +893,7 @@
 
 .modalTitle {
   margin: 0;
-  font-size: 22px;
+  font-size: var(--text-h2-size);
   font-weight: 600;
   line-height: 1.4;
   letter-spacing: -0.02em;
@@ -902,7 +902,7 @@
 
 .modalSub {
   margin: 4px 0 0;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-muted);
 }
 
@@ -947,7 +947,7 @@
   height: 24px;
   padding: 0 10px;
   border-radius: var(--radius-pill);
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -983,7 +983,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
 }
@@ -1003,7 +1003,7 @@
 }
 
 .secNote {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -1041,7 +1041,7 @@
 }
 
 .label {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
   line-height: 1.4;
 }
@@ -1057,7 +1057,7 @@
   height: 44px;
   padding: 0 14px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-heading);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1107,13 +1107,13 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--color-danger);
   line-height: 1.5;
 }
 
 .hint {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
   line-height: 1.5;
 }
@@ -1159,7 +1159,7 @@
 .stepValue {
   width: 56px;
   text-align: center;
-  font-size: 16px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
   font-variant-numeric: tabular-nums;
@@ -1199,14 +1199,14 @@
 }
 
 .bookerKey {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
   line-height: 1.4;
 }
 
 .bookerValue {
   margin-top: 2px;
-  font-size: 16px;
+  font-size: var(--text-body-size);
   color: var(--text-heading);
   line-height: 1.4;
 }
@@ -1216,7 +1216,7 @@
 }
 
 .metaLine {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
 }
 
@@ -1239,14 +1239,14 @@
 
 .confirmTitle {
   margin: 16px 0 0;
-  font-size: 22px;
+  font-size: var(--text-bar-title-size);
   font-weight: 600;
   color: var(--text-heading);
 }
 
 .confirmText {
   margin: 8px 0 0;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-body);
 }
 
@@ -1255,7 +1255,7 @@
   padding: 12px 14px;
   border-radius: var(--radius-md);
   background: var(--surface-alt);
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-heading);
   font-variant-numeric: tabular-nums;
 }
@@ -1291,7 +1291,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-inverse);
   color: #fff;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   white-space: nowrap;
   box-shadow: 0 8px 24px rgba(11, 17, 32, 0.1);

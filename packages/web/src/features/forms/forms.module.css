@@ -14,7 +14,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
 }
 
@@ -40,7 +40,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   color: var(--text-heading);
 }
@@ -59,7 +59,7 @@
 .fieldLabel {
   display: block;
   margin-bottom: 4px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   color: var(--text-muted);
 }
@@ -73,7 +73,7 @@
 
 .note {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   line-height: 1.6;
   color: var(--text-caption);
 }
@@ -90,7 +90,7 @@
 }
 
 .tip {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 400;
   color: var(--text-caption);
 }
@@ -121,7 +121,7 @@
 }
 
 .editNote {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
 }
 
@@ -171,7 +171,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
 }
 
@@ -183,7 +183,7 @@
   border-radius: var(--radius-md);
   background: var(--surface);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-heading);
 }
 
@@ -236,7 +236,7 @@
 
 .boxTitle {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   color: var(--text-heading);
 }
@@ -250,7 +250,7 @@
 .small {
   display: block;
   margin-bottom: 4px;
-  font-size: 11px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   color: var(--text-muted);
 }
@@ -263,7 +263,7 @@
   border-radius: var(--radius-md);
   background: var(--surface);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-heading);
   box-sizing: border-box;
 }
@@ -303,14 +303,14 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-body);
 }
 
 .sideEmpty {
   margin: 0;
   padding: 16px 0;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
   text-align: center;
 }
@@ -371,7 +371,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
 }
 
@@ -382,12 +382,12 @@
   border-radius: var(--radius-md);
   background: var(--surface);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-heading);
 }
 
 .legalProblem {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   color: var(--color-danger);
 }

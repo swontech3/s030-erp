@@ -41,7 +41,7 @@
 
 .title {
   margin: 0;
-  font-size: 30px;
+  font-size: var(--text-h2-size);
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.018em;
@@ -151,7 +151,7 @@
   padding: 10px 16px;
   border-top: 1px solid var(--border);
   background: var(--surface-alt);
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   color: var(--text-heading);
 }
@@ -188,7 +188,7 @@
   border-bottom: 1px solid var(--border);
   background: transparent;
   color: var(--text-body);
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   text-align: left;
   transition: background var(--dur) var(--ease-out);
 }
@@ -214,7 +214,7 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   text-align: left;
   cursor: pointer;
 }
@@ -247,19 +247,19 @@
 
 /* 분류 키 — `ROOM_TP`. ★ 이름 옆에 작게 둔다(레거시도 `(category)` 로 보여 줬다). */
 .nodeKey {
-  font-size: 11px;
+  font-size: var(--text-micro-size);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--text-caption);
 }
 
 .nodeCount {
-  font-size: 11px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
 }
 
 .empty {
   padding: 24px 16px;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
   text-align: center;
 }
@@ -291,7 +291,7 @@
 /* ★ 패널 제목은 **화면 제목이 아니다** — 화면 제목은 `.title`(30px) 하나뿐이다. */
 .panelTitle {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--text-button-lg-size);
   font-weight: 700;
   line-height: 1.4;
   letter-spacing: -0.012em;
@@ -300,7 +300,7 @@
 
 .panelSub {
   margin: 4px 0 0;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
 }
 
@@ -349,7 +349,7 @@
   display: grid;
   place-items: center;
   min-height: 240px;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
   text-align: center;
 }
@@ -370,13 +370,13 @@
 
 .emptyLead {
   margin: 14px 0 0;
-  font-size: 16px;
+  font-size: var(--text-body-size);
   color: var(--text-muted);
 }
 
 .emptySub {
   margin: 4px 0 0;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-caption);
 }
 
@@ -400,7 +400,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-alt);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   line-height: 1.6;
 }
 
@@ -444,7 +444,7 @@
   padding: 10px 20px;
   border-top: 1px solid var(--border);
   background: var(--surface-alt);
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   color: var(--text-heading);
 }
@@ -475,7 +475,7 @@
   /* ★ `collapse` 면 sticky 머리말의 아래 테두리가 함께 굴러 사라진다. */
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 14px;
+  font-size: var(--text-body-size);
 }
 
 .table th {
@@ -486,7 +486,7 @@
   padding: 0 10px;
   background: var(--surface-alt);
   border-bottom: 1px solid var(--border);
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--text-caption);
@@ -519,7 +519,7 @@
 /* 코드값 칸 — 고정폭 글꼴. ★ `R1`·`draft` 가 섞여 있어 자릿수를 눈으로 맞춘다. */
 .code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
 }
 
@@ -539,7 +539,7 @@
   background: var(--surface);
   color: var(--text-heading);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
@@ -636,7 +636,7 @@
   display: inline-block;
   padding: 1px 7px;
   border-radius: var(--radius-pill);
-  font-size: 11px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   white-space: nowrap;
 }
@@ -674,7 +674,7 @@
   border-radius: var(--radius-md);
   background: var(--color-warning-bg);
   color: var(--color-warning-text);
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   line-height: 1.6;
 }
 
@@ -698,7 +698,7 @@
 
 .formNote {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   line-height: 1.6;
   color: var(--text-caption);
 }
@@ -721,7 +721,7 @@
 
 .dangerTitle {
   margin: 0 0 2px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   color: var(--text-heading);
 }

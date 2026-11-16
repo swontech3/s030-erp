@@ -19,7 +19,7 @@
   background: transparent;
   padding: 10px 0 12px;
   font-family: inherit;
-  font-size: 15px;
+  font-size: var(--text-nav-size);
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -58,7 +58,7 @@
 .done {
   display: inline-block;
   padding: 2px 8px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   border-radius: 999px;
   white-space: nowrap;
@@ -68,6 +68,6 @@
 
 .count {
   margin: 8px 0 0;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
 }
