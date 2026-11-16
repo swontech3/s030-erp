@@ -59,6 +59,13 @@ import {
   settleTypeOf,
 } from '@swonbiz/shared/domain/settlement-view';
 import { DUE_RANGE_TOO_LONG, isDueRangeTooLong } from '@swonbiz/shared/domain/billing-due-range';
+import {
+  DISPLAY_STATUS_LABEL,
+  billingRowStatus,
+  invoiceItemLabel,
+  matchesBillingFilter,
+} from '@swonbiz/shared/domain/billing-list';
+import { buildXlsx, sendXlsx, type XlsxSheet } from '../lib/xlsxExport.ts';
 
 /** 수납을 쓸 수 있는 역할. 조회는 입주사도 한다. */
 const WRITE_ROLE = 'operator';
@@ -287,6 +294,68 @@ export function registerBillingRoutes(app: FastifyInstance): void {
     );
     return reply.send({ dueFrom: from, dueTo: to, invoices: rows.map(toBillingItem) });
   });
+
+  /* ── 청구 · 수납 [엑셀 내려받기] (2026-11-16) ─────────────────────────────
+     ★ 「지금 검색 결과 전체, 목록 칸 그대로」 — 화면과 같은 조건(`?dueFrom=&dueTo=&company=&q=&st=`)을
+       shared `matchesBillingFilter` 하나로 거른다(화면 `BillingView` 도 같은 함수). 그린 줄 수(40줄 끊기)와 상관없이 전부.
+     ★ 입주사로 걸렀으면(`company`) 그 입주사의 전 기간을 받아 납부기한은 거르기에서 본다 — 목록 API 와 같다.
+       아니면 납부기한 둘 다 있어야 하고 상한 6개월(같은 함수 · 같은 말).
+     ★ 파일은 ERP 공통 부품(`lib/xlsxExport.ts`)이 만든다 — 여기서는 칸만 정한다. */
+  app.get<{ Querystring: { dueFrom?: string; dueTo?: string; company?: string; q?: string; st?: string } }>(
+    '/billing/invoices/export',
+    async (req, reply) => {
+      const session = requireSession(req);
+      if (session.role !== WRITE_ROLE) return forbidden(reply);
+
+      const companyId = req.query.company?.trim() || null;
+      const rawFrom = req.query.dueFrom ?? '';
+      const rawTo = req.query.dueTo ?? '';
+      const from = rawFrom === '' ? '' : parseDayParam(rawFrom);
+      const to = rawTo === '' ? '' : parseDayParam(rawTo);
+      if (from === null || to === null || (!companyId && (!from || !to))) {
+        return reply.code(400).send({ error: 'invalid_request', message: '납부기한은 YYYY-MM-DD 이어야 합니다' });
+      }
+      if (from && to && from > to) {
+        return reply.code(400).send({ error: 'invalid_request', message: '납부기한 시작일이 끝일보다 늦습니다' });
+      }
+      if (!companyId && isDueRangeTooLong(from, to)) {
+        return reply.code(400).send({ error: 'invalid_request', message: DUE_RANGE_TOO_LONG });
+      }
+      const st = /^[A-Z]$/.test(req.query.st ?? '') ? req.query.st! : null;
+      const q = req.query.q ?? '';
+
+      const rows = await withCompanyScope(scopeOf(session), (client) =>
+        listBillingInvoices(client, { due: companyId ? null : { from, to }, companyId }),
+      );
+      const asOf = new Date();
+      const items = rows.map(toBillingItem).filter((it) => matchesBillingFilter(it, { from, to, q, st }, asOf));
+
+      type Item = (typeof items)[number];
+      const dot = (iso: string | null) => (iso ? iso.replaceAll('-', '.') : null);
+      const sheet: XlsxSheet<Item> = {
+        name: '청구 · 수납',
+        columns: [
+          companyId
+            ? { header: '청구 월', value: (r) => r.yearMonth.replace('-', '.') }
+            : { header: '입주사', value: (r) => r.companyName },
+          { header: '항목', value: (r) => invoiceItemLabel(r.roomNames) },
+          { header: '청구액', value: (r) => (r.isFree ? '무상' : r.totalAmount) },
+          { header: '예치금', value: (r) => (r.contractId === null ? null : r.deposit) },
+          { header: '이용 시작일', value: (r) => dot(r.usageStart) },
+          { header: '이용 종료일', value: (r) => dot(r.usageEnd) },
+          { header: '납부기한', value: (r) => dot(r.dueDate) },
+          { header: '납부일', value: (r) => dot(r.lastPaidOn) },
+          {
+            header: '상태',
+            value: (r) => `${DISPLAY_STATUS_LABEL[billingRowStatus(r, asOf)]}${r.terminated ? ' · 해지' : ''}`,
+          },
+        ],
+        rows: items,
+      };
+      const period = from && to ? `${from}_${to}` : '전체기간';
+      return sendXlsx(reply, `청구수납_${period}.xlsx`, buildXlsx([sheet]));
+    },
+  );
 
   /* ── 입주사 청구 탭 (s030200030 오른쪽) — 청구서 전부 + 정산 원장 ─────── */
   app.get<{ Params: { id: string } }>('/companies/:id/billing', async (req, reply) => {
