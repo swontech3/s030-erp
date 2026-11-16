@@ -279,7 +279,6 @@ export function BillingView() {
       (cond.st === null || payStCodeOf(statusOf(it, asOf)) === cond.st),
   );
   const sum = summarize(visible, asOf);
-  const filtered = q !== '' || cond.st !== null;
 
   /*
    * ══════════════════════════════════════════════════════════════════════════
@@ -499,7 +498,8 @@ export function BillingView() {
             }
             summary={
               <div className={styles.summaryBar} data-summary="1">
-                <SumCell label="총 청구액" value={won(sum.total)} note={filtered ? '필터 적용' : undefined} />
+                {/* ★ 2026-11-16 — 「필터 적용」 표시는 뺐다(글자를 키운 뒤 총괄표가 한 줄에 들게, 대표 결정). */}
+                <SumCell label="총 청구액" value={won(sum.total)} />
                 {/*
                   ★ 수납 완료는 **청구에 들어간 몫**만이다. 과납분(돌려줄 돈)은 여기에도 미수금에도
                     섞지 않는다 — 섞으면 다른 입주사의 미수금이 깎여 보인다. 옆의 「환불액」이 그 몫이다.

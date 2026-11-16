@@ -731,7 +731,7 @@ div.wideModal {
 }
 
 /* ★ 2026-11-16 글자 크기 키우기 — 오른쪽 상세(약 430px) 안에서 [수정][삭제 확인]이 칸을 넘지 않게 칸 너비를 다시 맞춤.
-     금액은 한 줄(「−」와 숫자가 갈라지지 않게). 비고는 남는 폭(넘치면 말줄임 · 마우스를 올리면 전체). */
+     금액은 한 줄(「−」와 숫자가 갈라지지 않게). 넷째 칸은 빈 칸(남는 폭) — 비고는 줄 아래 한 줄(.paysMemo). */
 .paysGrid {
   grid-template-columns: 80px 96px 56px minmax(0, 1fr) 124px;
   column-gap: 8px;
@@ -739,6 +739,14 @@ div.wideModal {
 
 .paysGrid > :nth-child(2) {
   white-space: nowrap;
+}
+
+/* 비고 — 칸이 아니라 그 줄 아래 한 줄(비고가 있는 줄만 · 말줄임 없이, 길면 줄바꿈 · 2026-11-16) */
+.paysMemo {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .miniEmpty {
