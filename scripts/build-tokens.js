@@ -23,7 +23,7 @@ const ORDER = ['fonts', 'colors', 'typography', 'spacing', 'shape', 'base'];
  *      (각 저장소 LICENSE 확인. 원문을 packages/web/public/fonts/ 에 동봉했다).
  *
  * ★ 바꾸는 것은 파일 위치뿐이다. 패밀리 이름("Pretendard Variable"·"Inter")도,
- *   CSS 변수(2026-11-16 글자 변수 셋 더해 122개)도 건드리지 않는다 — 그래서 아래 변수 대조가 여전히 성립한다.
+ *   CSS 변수(2026-11-16 글자 변수 셋 더해 130개 — 11-16 --fs-* 여덟 더함)도 건드리지 않는다 — 그래서 아래 변수 대조가 여전히 성립한다.
  */
 const REWRITES = [
   ['https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/woff2/PretendardVariable.woff2',
@@ -62,7 +62,7 @@ if (write) {
     ' *   일이고, 임의로 이름을 지으면 다음 내보내기와 충돌한다.',
     ' *',
     ' * 이관 중 바꾼 것은 웹폰트 src 2건뿐이다 (CDN → 자체 호스팅, /public/fonts/).',
-    ' * 패밀리 이름과 CSS 변수 122개는 원본 그대로다 — 대조로 확인한다.',
+    ' * 패밀리 이름과 CSS 변수 130개는 원본 그대로다 — 대조로 확인한다.',
     ' *',
     ` * 원본:  ${SRC_DIR}/{${ORDER.join(',')}}.css`,
     ` * 생성:  ${stamp}`,

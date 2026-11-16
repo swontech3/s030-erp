@@ -9,18 +9,30 @@
 
   --text-display-size:60px;   --text-display-lh:1.12; --text-display-ls:-.03em; --text-display-weight:800;
   --text-h1-size:40px;        --text-h1-lh:1.2;       --text-h1-ls:-.022em;    --text-h1-weight:700;
+  /* 2026-11-16 통합 방 결정 — 글자 크기 단계는 삐용과 같은 이름 · 같은 값(--fs-*).
+     --text-* 는 같은 값의 --fs-* 를 가리킨다(화면 CSS 는 --text-* 그대로 써도 된다).
+     같은 값이 없는 h1(40) · h3(22) · display(60)는 숫자 그대로. */
+  --fs-xs:13px;
+  --fs-sm:14px;
+  --fs-md:15px;
+  --fs-lg:17px;
+  --fs-xl:18px;
+  --fs-2xl:19px;
+  --fs-3xl:20px;
+  --fs-4xl:24px;
+
   /* 2026-11-16 통합 방 결정 — ERP 웹 글자 크기 키우기: h2 30→24(화면 안 제목 · 창 제목) · body 16→15 ·
      caption 14→15 · micro 12→13. 새 셋: nav 17(사이드바 메뉴 · 화면 안 탭) · button-lg 18(큰 버튼 · 패널 제목 · 금액) ·
      bar-title 20(상단 띠 제목 · 패널 · 소제목). h1 · h3 · body-lg · display 는 그대로. */
-  --text-h2-size:24px;        --text-h2-lh:1.3;       --text-h2-ls:-.018em;    --text-h2-weight:700;
+  --text-h2-size:var(--fs-4xl);       --text-h2-lh:1.3;       --text-h2-ls:-.018em;    --text-h2-weight:700;
   --text-h3-size:22px;        --text-h3-lh:1.4;       --text-h3-ls:-.012em;    --text-h3-weight:600;
-  --text-bar-title-size:20px;
-  --text-body-lg-size:19px;   --text-body-lg-lh:1.65;
-  --text-button-lg-size:18px;
-  --text-nav-size:17px;
-  --text-body-size:15px;      --text-body-lh:1.7;
-  --text-caption-size:15px;   --text-caption-lh:1.55;
-  --text-micro-size:13px;     --text-micro-lh:1.5;
+  --text-bar-title-size:var(--fs-3xl);
+  --text-body-lg-size:var(--fs-2xl);  --text-body-lg-lh:1.65;
+  --text-button-lg-size:var(--fs-xl);
+  --text-nav-size:var(--fs-lg);
+  --text-body-size:var(--fs-md);      --text-body-lh:1.7;
+  --text-caption-size:var(--fs-md);   --text-caption-lh:1.55;
+  --text-micro-size:var(--fs-xs);     --text-micro-lh:1.5;
   --text-eyebrow-ls:.08em;
 }
 html{font-family:var(--font-core);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
