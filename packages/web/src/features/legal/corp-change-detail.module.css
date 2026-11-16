@@ -908,3 +908,27 @@
   width: 100%;
   flex: 1 1 100%;
 }
+
+/* ★ 2026-11-16 — 오른쪽 칸의 임원 표(법인변경) · 사람 표(법인설립): 가로 스크롤은 그대로, **동작 칸([수정] · [삭제])만
+ *   오른쪽 끝에 붙박이**(대표 결정). 칸 폭 · 주소 칸은 그대로다. 바탕은 그 행과 같게 — 머리 행 · 보통 행 · 고치는 중인 행.
+ *   줄 오른쪽 여백(16px)까지 덮어, 붙은 동안에도 단추가 칸 끝에서 16px 안쪽에 있게 한다. */
+.inPane .oHead > :last-child,
+.inPane .oRow > :last-child {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  margin-right: -16px;
+  padding-right: 16px;
+  background: var(--surface);
+}
+
+.inPane .oHead > :last-child {
+  background: var(--surface-alt);
+}
+
+.inPane .oRowEditing > :last-child {
+  background: var(--surface-alt);
+}
