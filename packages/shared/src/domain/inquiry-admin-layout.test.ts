@@ -8,7 +8,15 @@
  *   - 목록 ↔ 상세는 한 장씩. 상세를 열 때 방문 기록을 남긴다 — 폰 [뒤로] = 목록으로
  */
 import { describe, expect, it } from 'vitest';
-import { detailHistory, initialStatus, inquiryAdminLayout, resetStatus, retentionDeleteHint } from './inquiry-admin-layout';
+import {
+  detailHistory,
+  initialStatus,
+  inquiryAdminLayout,
+  inquiryRounds,
+  resetStatus,
+  retentionDeleteHint,
+  showHeadNote,
+} from './inquiry-admin-layout';
 
 const APP = inquiryAdminLayout(true);
 const PC = inquiryAdminLayout(false);
@@ -24,6 +32,9 @@ describe('inquiryAdminLayout', () => {
       typeInSearchRow: true,
       searchCount: false,
       receivedEmptySub: false,
+      detailHeadNote: false,
+      detailRounds: true,
+      fixedReplyActions: true,
     });
   });
   it('앱 아님(PC) — 지금 그대로', () => {
@@ -36,6 +47,9 @@ describe('inquiryAdminLayout', () => {
       typeInSearchRow: false,
       searchCount: true,
       receivedEmptySub: true,
+      detailHeadNote: true,
+      detailRounds: false,
+      fixedReplyActions: false,
     });
   });
   it('접수 빈 목록 둘째 줄 「답변을 기다리는 문의가 없습니다」 — 앱 안은 감춘다(첫 줄 「접수 문의가 없습니다」와 뜻이 겹친다 · 5-나 덧붙임 2026-11-12) · PC 는 보인다', () => {
@@ -100,5 +114,44 @@ describe('retentionDeleteHint — 「보관 기간 지남」 안내의 지우는
   });
   it('앱 안(삭제 단추 감춤) — PC 화면에서 지우라고 알린다', () => {
     expect(retentionDeleteHint(APP.deleteButton)).toBe('PC 화면에서 [글 삭제]로 개인정보를 지워 주세요.');
+  });
+});
+
+describe('showHeadNote — 3-마 덧붙임 3', () => {
+  it('앱 안 — 목록이면 보이고 상세면 감춘다(「접수 N건」은 상세에서 뜻이 없다)', () => {
+    expect(showHeadNote(APP, null)).toBe(true);
+    expect(showHeadNote(APP, 'q-1')).toBe(false);
+  });
+  it('PC — 늘 보인다(지금 그대로)', () => {
+    expect(showHeadNote(PC, null)).toBe(true);
+    expect(showHeadNote(PC, 'q-1')).toBe(true);
+  });
+});
+
+describe('inquiryRounds — 문의-답변 묶음(3-마 덧붙임 3)', () => {
+  it('글이 없으면 원글 묶음 하나(답변 없음)', () => {
+    expect(inquiryRounds([])).toEqual([{ no: 1, question: null, answers: [] }]);
+  });
+  it('원글 + 답변 → 1회에 답변', () => {
+    expect(inquiryRounds(['text'])).toEqual([{ no: 1, question: null, answers: [0] }]);
+    expect(inquiryRounds(['phone'])).toEqual([{ no: 1, question: null, answers: [0] }]);
+  });
+  it('추가 질문이 오면 2회 — 그 질문과 뒤 답변이 한 묶음', () => {
+    expect(inquiryRounds(['text', 'customer', 'phone'])).toEqual([
+      { no: 1, question: null, answers: [0] },
+      { no: 2, question: 1, answers: [2] },
+    ]);
+  });
+  it('답 없는 추가 질문 — 마지막 묶음의 답변이 비어 있다(입력칸 자리)', () => {
+    expect(inquiryRounds(['text', 'customer'])).toEqual([
+      { no: 1, question: null, answers: [0] },
+      { no: 2, question: 1, answers: [] },
+    ]);
+  });
+  it('답 전에 고객이 또 물으면 원글 묶음은 답변 없이 남는다 · 순서는 서버 그대로', () => {
+    expect(inquiryRounds(['customer', 'text', 'text'])).toEqual([
+      { no: 1, question: null, answers: [] },
+      { no: 2, question: 0, answers: [1, 2] },
+    ]);
   });
 });

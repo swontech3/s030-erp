@@ -37,6 +37,7 @@ import {
   initialStatus,
   inquiryAdminLayout,
   resetStatus,
+  showHeadNote,
 } from '@swonbiz/shared/domain/inquiry-admin-layout';
 import { DeleteInquiryDialog } from './DeleteInquiryDialog';
 import { InquiryDetail } from './InquiryDetail';
@@ -376,7 +377,8 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
           <h1 className={styles.title} data-page-title data-app-band-title="1">
             문의상담관리
           </h1>
-          <p className={styles.sub}>{headNote}</p>
+          {/* ★ 앱 안 상세면 감춘다 — 한 건을 보는데 「접수 N건」은 뜻이 없다(3-마 덧붙임 3) */}
+          {showHeadNote(layout, selectedId) ? <p className={styles.sub}>{headNote}</p> : null}
         </div>
       </div>
 
@@ -540,6 +542,8 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
               onEdit={editReply}
               onAskDelete={() => setAsking(true)}
               showDelete={layout.deleteButton}
+              rounds={layout.detailRounds}
+              fixedActions={layout.fixedReplyActions}
             />
           )}
         </div>
