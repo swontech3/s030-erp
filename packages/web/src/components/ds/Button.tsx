@@ -46,8 +46,8 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
 }
 
 const SIZES: Record<Size, CSSProperties> = {
-  md: { height: 'var(--control-h)', padding: '0 var(--control-px)', fontSize: '16px' },
-  sm: { height: 'var(--control-h-sm)', padding: '0 var(--control-px-sm)', fontSize: '14px' },
+  md: { height: 'var(--control-h)', padding: '0 var(--control-px)', fontSize: 'var(--text-body-size)' },
+  sm: { height: 'var(--control-h-sm)', padding: '0 var(--control-px-sm)', fontSize: 'var(--text-body-size)' },
 };
 
 export function Button({
