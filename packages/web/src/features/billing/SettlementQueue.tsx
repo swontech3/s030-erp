@@ -4,7 +4,7 @@
  * 청구 화면의 「정산」 탭 — 왼쪽 목록(공통 목록 틀) 6 : 오른쪽 상세 4 (대표 지시 2026-11-15).
  *
  *   왼쪽  검색 한 줄(정산 기준일 From ~ To · 입주사 · 구분 전체 · 상태 전체 + [조회] [초기화]) → 버튼 줄(입주사 칩 · 건수) → 목록
- *         목록 칸(2026-11-16): 구분 · 입주사 · 호실 · 상태 · 시작일 · 종료일 · 중도해지일(만료는 빈칸) · 환불일자(완료 건만) · 정산금액
+ *         목록 칸(2026-11-16): 구분 · 입주사 · 상태 · 시작일 · 종료일 · 중도해지일(만료는 빈칸) · 환불일자(완료 건만) · 정산금액
  *   오른쪽 고른 행의 상세 — 처음엔 「왼쪽에서 고르세요」 · 받는 동안 공통 로딩바
  *         중도해지 정산이 있는 계약 → 정산 카드([정산서] · 처리 전이면 [정산 처리])
  *         정산 없이 예치금만 남은 계약 → 반환할 예치금 · [반환 처리] / 반환한 뒤에는 반환일 · 금액 · 가린 계좌
@@ -336,10 +336,12 @@ export function SettlementQueue({ notify, company, selected, onSelect, actions }
     ) : (
       <>
         <div className={`${styles.sHead} ${styles.tHeadSticky}`}>
-          {/* ★ 2026-11-16 칸 순서(대표 지시): 구분 · 입주사 · 호실 · 상태 · 시작일 · 종료일 · 중도해지일 · 환불일자 · 정산금액 */}
+          {/*
+            ★ 2026-11-16 칸 순서(대표 지시): 구분 · 입주사 · 상태 · 시작일 · 종료일 · 중도해지일 · 환불일자 · 정산금액.
+              호실 칸은 뺐다 — 오른쪽 상세(정산 카드 · 예치금 반환 머리)에 있다. 남는 폭은 입주사가 받는다.
+          */}
           <span>구분</span>
           <span>입주사</span>
-          <span>호실</span>
           <span>상태</span>
           {/* ★ 시작일 — 종료일 앞이다. 둘을 나란히 보면 얼마나 쓰다 나갔는지가 읽힌다. */}
           <span>시작일</span>
@@ -353,9 +355,6 @@ export function SettlementQueue({ notify, company, selected, onSelect, actions }
             <span className={styles.ellipsis}>{nameOf(typeOptions, item.typeCode)}</span>
             <span className={`${styles.ellipsis} ${styles.strong}`} title={item.companyName}>
               {item.companyName}
-            </span>
-            <span className={styles.ellipsis} title={item.roomNames}>
-              {item.roomNames || '—'}
             </span>
             <span>
               <span className={`${styles.badge} ${item.statusCode === 'WAIT' ? styles.st_partial : styles.st_paid}`}>

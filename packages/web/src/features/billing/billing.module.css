@@ -1054,11 +1054,10 @@ div.wideModal {
 .sHead,
 .sRow {
   display: grid;
-  /* ★ 2026-11-16 — 칸 순서 구분 · 입주사 · 호실 · 상태 · 시작일 · 종료일 · 중도해지일 · 환불일자 · 정산금액.
-       날짜 넷은 70px + 칸 사이 8 로 붙어 보이지 않게, 호실은 0.6fr 로 줄여 호실~시작일 사이가 벌어지지 않게
-       (남는 폭은 입주사가 받는다). */
+  /* ★ 2026-11-16 — 칸 순서 구분 · 입주사 · 상태 · 시작일 · 종료일 · 중도해지일 · 환불일자 · 정산금액(호실 칸은 뺌 — 오른쪽 상세에 있다).
+       날짜 넷은 74px + 칸 사이 8 로 붙어 보이지 않게. 남는 폭은 입주사가 받는다. */
   grid-template-columns:
-    52px minmax(46px, 1.2fr) minmax(44px, 0.6fr) 68px
+    52px minmax(46px, 1fr) 68px
     74px 74px 74px 74px 100px;
   align-items: center;
   column-gap: 8px;
