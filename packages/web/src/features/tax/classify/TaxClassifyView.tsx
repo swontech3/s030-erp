@@ -301,7 +301,8 @@ export function TaxClassifyView({ month, fileId, initialStatus = 'all' }: Props)
               <col style={{ width: 120 }} />
               <col />
               <col style={{ width: 180 }} />
-              <col style={{ width: 110 }} />
+              {/* 금액 110 → 120 — 글자 15px 에서 「-100,000,000」(약 92px)이 칸 안에 들어가게(2026-11-16) */}
+              <col style={{ width: 120 }} />
               <col style={{ width: 260 }} />
             </colgroup>
             <thead>

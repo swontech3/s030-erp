@@ -237,11 +237,11 @@ export function TaxSettingsView() {
     <div key={label}>
       <div className={t.sm}>{label}</div>
       {v ? (
-        <div className={t.tnum} style={{ fontSize: 15, color: 'var(--text-heading)', marginTop: 2 }}>
+        <div className={t.tnum} style={{ fontSize: 'var(--fs-md)', color: 'var(--text-heading)', marginTop: 2 }}>
           {v}
         </div>
       ) : (
-        <div style={{ fontSize: 13, color: 'var(--text-caption)', marginTop: 2 }}>{NOT_RECEIVED}</div>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-caption)', marginTop: 2 }}>{NOT_RECEIVED}</div>
       )}
     </div>
   );
@@ -438,7 +438,7 @@ export function TaxSettingsView() {
           <div>
             <div className={t.sm}>사업자 유형</div>
             {locked ? (
-              <div style={{ fontSize: 15, color: 'var(--text-heading)', marginTop: 2 }}>{nameOf(codes.bizTypes, draft.bizType ?? '')}</div>
+              <div style={{ fontSize: 'var(--fs-md)', color: 'var(--text-heading)', marginTop: 2 }}>{nameOf(codes.bizTypes, draft.bizType ?? '')}</div>
             ) : (
               <select
                 className={`${t.select} ${errCls('bizType')}`}

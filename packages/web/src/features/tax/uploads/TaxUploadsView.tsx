@@ -276,7 +276,8 @@ export function TaxUploadsView({ month }: { month: string }) {
               <col style={{ width: 150 }} />
               <col style={{ width: 170 }} />
               <col />
-              <col style={{ width: 64 }} />
+              {/* 행수 64 → 72 — 글자 15px 에서 「12,345」(약 47px)가 칸 안에 들어가게(2026-11-16) */}
+              <col style={{ width: 72 }} />
               <col style={{ width: 120 }} />
               <col style={{ width: 190 }} />
             </colgroup>
@@ -728,7 +729,7 @@ function FileItem({ item: it, month, data, isBank, deferred, busy, bankName, onC
       ) : (
         <div className={t.fileBlkH}>
           <Icon name="file-text" size={16} style={{ color: 'var(--text-caption)' }} />
-          <b className={t.ell} style={{ flex: 1, minWidth: 0, fontSize: 14 }} title={it.file?.name ?? ''}>
+          <b className={t.ell} style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-md)' }} title={it.file?.name ?? ''}>
             {it.file?.name}
           </b>
           {removeBtn}
@@ -795,7 +796,7 @@ function FilePreview({ preview: p, month, data, isXfer }: { preview: TaxUploadPr
   return (
     <>
       <div className={t.between}>
-        <div className={t.secT} style={{ fontSize: 15 }}>
+        <div className={t.secT} style={{ fontSize: 'var(--fs-md)' }}>
           표준양식으로 바꾼 결과
         </div>
         <span className={t.row}>
