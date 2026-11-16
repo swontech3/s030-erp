@@ -17,7 +17,7 @@ export interface ListFrameProps {
   head?: ReactNode;
   /** 검색 조건 상자 안 */
   search: ReactNode;
-  /** 검색 상자와 버튼 줄 사이(있으면) — 검색 결과의 총괄표 등(청구 화면, 2026-11-15) */
+  /** 버튼 줄과 목록 사이(있으면) — 검색 결과의 총괄표 등(청구 화면 · 2026-11-16 대표 지시: 검색 → 버튼 줄 → 총괄표 → 목록) */
   summary?: ReactNode;
   /** 버튼 줄 */
   actions: ReactNode;
@@ -32,8 +32,8 @@ export function ListFrame({ head, search, summary, actions, children, listPadded
     <div className={styles.frame}>
       {head ?? null}
       <div className={styles.search}>{search}</div>
-      {summary ?? null}
       <div className={styles.actions}>{actions}</div>
+      {summary ?? null}
       <div className={`${styles.list}${listPadded ? ` ${styles.listPadded}` : ''}`}>{children}</div>
     </div>
   );

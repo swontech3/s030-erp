@@ -154,6 +154,30 @@
   white-space: nowrap;
 }
 
+/* ★ 2026-11-16 — 청구 · 수납 탭 왼쪽 60% 안에서 한 줄: 금액 글자를 줄이고 칸 여백을 좁혔다(이름 · 값 나란히 그대로). */
+.dense .summaryBar {
+  flex-wrap: nowrap;
+}
+
+.dense .sumCell {
+  flex: 1 1 auto;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+.dense .sumLabel {
+  font-size: 11px;
+}
+
+.dense .sumValue {
+  font-size: 12px;
+  letter-spacing: -0.01em;
+}
+
+.dense .sumNote {
+  font-size: 10px;
+}
+
 /* 미납 건수 — 0 이면 빨강이 아니다 */
 .sumCount {
   color: var(--color-danger);
@@ -259,6 +283,42 @@
     84px 92px;
 }
 
+/*
+ * 청구 · 수납 탭 — 왼쪽 60% 목록(2026-11-16). 액션 칸 없음(줄을 누르면 오른쪽 상세).
+ *   입주사 · 항목 · 청구액 · 납부기한 · 납부일 · 상태 (예치금 · 이용 기간은 오른쪽 상세 머리로)
+ * ★ 날짜 둘은 정산 목록과 같은 13px(.sDate) — 「2026.11.25」 폭에 여유를 둬 날짜끼리 붙지 않게.
+ * ★ 입주사 · 항목만 남는 폭을 나눠 받는다(넘치면 말줄임). 1500px 창에서 가로로 넘치지 않는지 잰 값이다.
+ */
+.tHead.tSplit,
+.tRow.tSplit {
+  grid-template-columns:
+    minmax(88px, 1.2fr) minmax(96px, 1fr) 96px
+    74px 74px 128px;
+  column-gap: 8px;
+  padding: 0 10px;
+}
+
+.tHead.tSplit.tCompany,
+.tRow.tSplit.tCompany {
+  grid-template-columns:
+    56px minmax(96px, 1fr) 96px
+    74px 74px 128px;
+}
+
+/* 상태 칸 — 납부 상태 뱃지 옆에 작은 「해지」(중도해지 계약) */
+.stCell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.stCell .endMark {
+  margin-left: 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .tHead {
   height: 44px;
   background: var(--surface-alt);
@@ -266,8 +326,9 @@
 }
 
 /* ── 청구 화면 촘촘하게(2026-11-15) — 공통 목록 틀은 그대로, 이 감싸개 안에서만 ──
- * 틀의 자식 순서: 1 탭 · 2 검색 상자 · 3 총괄표 · 4 버튼 줄 · 5 목록 상자(ListFrame.tsx).
- * ★ 버튼 줄은 입주사 칩이 있을 때만 차 있다 — 비면 자리도 간격도 없앤다. */
+ * ★ 2026-11-16 — 청구 · 수납 · 정산 두 탭의 왼쪽 목록이 같이 쓴다(검색 상자 같게).
+ *   틀의 자식 순서: 1 검색 상자 · 2 버튼 줄 · (3 총괄표) · 마지막 목록 상자(ListFrame.tsx).
+ * ★ 버튼 줄이 비면(정산 탭 · 입주사 칩 없음) 자리도 간격도 없앤다. */
 .dense {
   height: 100%;
 }
@@ -276,12 +337,60 @@
   gap: 8px;
 }
 
-.dense > div > div:nth-child(2) {
-  padding: 8px 12px;
+.dense > div > div:first-child {
+  padding: 8px;
+  align-items: center;
+  gap: 6px;
 }
 
-.dense > div > div:nth-child(4):empty {
+.dense > div > div:empty {
   display: none;
+}
+
+/* ── 검색 상자 한 줄(2026-11-16) — 위 이름표 없음. 글자 칸은 안내 글자, 선택 칸은 첫 항목 「… 전체」.
+ *   날짜 기간만 칸 왼쪽 같은 줄에 짧은 이름. 모양(높이 · 테두리 · 글자)은 법인변경 목록의 .input · .select 그대로,
+ *   폭만 왼쪽 60% 한 줄에 들게 좁혔다. */
+.searchRange {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  color: var(--text-caption);
+}
+
+.searchRangeName {
+  margin-right: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-caption);
+  white-space: nowrap;
+}
+
+.dense input.searchDate {
+  width: 118px;
+  padding: 0 6px;
+  font-size: 13px;
+}
+
+.dense input.searchText {
+  flex: 1 1 48px;
+  width: 48px;
+  min-width: 48px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.dense select.searchSelect {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: auto;
+  padding: 0 4px;
+  font-size: 13px;
+}
+
+.dense .searchBtn {
+  flex: 0 0 auto;
+  padding: 0 10px;
 }
 
 /* 머리 줄 · 목록 줄 — 글자 크기는 그대로, 위아래 여백만 줄였다. 줄 높이는 내용(단추 30px · 「무상」 · 「해지」)이 정한다. */
@@ -543,6 +652,19 @@ div.wideModal {
 
 .fact + .fact {
   border-left: 1px solid var(--border);
+}
+
+/* 청구 · 수납 오른쪽 상세 — 둘째 줄(예치금 · 이용 기간, 2026-11-16). 줄 맨 앞 칸에는 왼쪽 선이 없다. */
+.factRow2 {
+  border-top: 1px solid var(--border);
+}
+
+.fact.factRow2:nth-child(4) {
+  border-left: 0;
+}
+
+.factSpan2 {
+  grid-column: span 2;
 }
 
 .factKey {
@@ -913,17 +1035,18 @@ div.wideModal {
   border-radius: var(--radius-lg);
 }
 
-/* 정산 목록 — 구분 · 입주사 · 호실 · 시작일 · 종료일 · 중도해지일 · 정산금액 · 환불일자 · 상태 (왼쪽 60% 안에 들게)
-   ★ 2026-11-15 — 환불일자 칸을 넣으며 줄였다(대표 결정): 구분 60 · 입주사 최소 80 · 날짜 넷 72(글자 13px, .sDate) ·
-     정산금액 최소 88 · 칸 사이 6 · 좌우 여백 10. 1500px 창(사이드바 펼침)에서 가로로 넘치지 않는다. */
+/* 정산 목록 — 왼쪽 60% 안에 들게. 1500px 창(사이드바 펼침)에서 가로로 넘치지 않는지 잰 값이다. */
 .sHead,
 .sRow {
   display: grid;
+  /* ★ 2026-11-16 — 칸 순서 구분 · 입주사 · 호실 · 상태 · 시작일 · 종료일 · 중도해지일 · 환불일자 · 정산금액.
+       날짜 넷은 70px + 칸 사이 8 로 붙어 보이지 않게, 호실은 0.6fr 로 줄여 호실~시작일 사이가 벌어지지 않게
+       (남는 폭은 입주사가 받는다). */
   grid-template-columns:
-    60px minmax(80px, 1.2fr) minmax(60px, 1fr)
-    72px 72px 72px minmax(88px, 1fr) 72px 52px;
+    52px minmax(50px, 1.2fr) minmax(44px, 0.6fr) 64px
+    74px 74px 74px 74px 96px;
   align-items: center;
-  column-gap: 6px;
+  column-gap: 8px;
   padding: 0 10px;
 }
 

@@ -1,21 +1,24 @@
 'use client';
 
 /**
- * 청구 표 — 월별 청구(s030200070)와 입주사 청구 탭이 **같은 표**를 쓴다.
+ * 청구 표 — 청구 · 수납 탭(s030200070)과 입주사 청구 탭이 **같은 표**를 쓴다.
  *
- * ★ [수납]·[내역] 창은 **청구 화면에서만** 연다(한 업무는 한 화면에서 — CLAUDE.md).
- *   입주사 청구 탭은 `readOnly` 로 같은 표를 버튼 없이 보여 주고, 처리는 링크로 보낸다.
+ * ★ 2026-11-16 대표 지시 — 청구 · 수납 탭은 줄마다 있던 [수납] · [내역] 단추를 없앴다. 줄을 누르면
+ *   고른 줄(`selectedId`)이 되고, 부르는 쪽(`BillingView`)이 오른쪽에 그 청구서 상세를 그린다.
+ *   수납은 버튼 줄 [수납](고른 줄)과 오른쪽 상세에서만 한다(한 업무는 한 화면에서 — CLAUDE.md).
+ *   입주사 청구 탭은 `readOnly` 로 같은 표를 고르기 없이 보여 주고, 처리는 링크로 보낸다(모양 그대로).
  *
  * ★ 합계 줄은 `summarize` 가 낸다 — 요약 카드와 **같은 함수**다. 그래서 카드 합계와
  *   표 합계가 다를 수 없다.
  */
-import { useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import type { DisplayStatus } from '@swonbiz/shared/domain/invoice-status';
 import { Icon } from '@/components/ds';
 import styles from './billing.module.css';
 import {
   STATUS_LABEL,
   dotDate,
+  invoiceItemLabel,
   monthDay,
   statusOf,
   summarize,
@@ -23,70 +26,104 @@ import {
   yearMonthDot,
   type BillingItem,
 } from './billing-model';
-import { InvoiceDetailDialog } from './InvoiceDetailDialog';
-import { PaymentDialog } from './PaymentDialog';
 
 interface Props {
   items: readonly BillingItem[];
   /** `month` — 첫 열이 입주사. `company` — 첫 열이 청구 월(입주사는 이미 골랐다). */
   mode: 'month' | 'company';
   asOf: Date;
-  /** 수납이 바뀌었다 — 부르는 쪽이 목록을 다시 받는다. `readOnly` 면 부르지 않는다. */
-  onChanged?: (message: string) => void;
-  /** 조회 전용 — [수납]·[내역] 칸이 없다. 입주사 청구 탭이 쓴다. */
+  /** 조회 전용 — 줄을 고를 수 없고 계약의 값 세 열 · 납부일 칸이 없다. 입주사 청구 탭이 쓴다. */
   readOnly?: boolean;
+  /** 고른 줄(청구 · 수납 탭). */
+  selectedId?: string | null;
+  /** 줄을 눌렀다 — 부르는 쪽이 오른쪽 상세를 연다(청구 · 수납 탭). */
+  onSelect?: (item: BillingItem) => void;
   /**
-   * 합계를 낼 줄들 — **그리는 줄(`items`)보다 많을 수 있다.**
-   *
-   * ★★ 월별 청구는 줄을 40개씩 끊어 그린다(`BillingView`). 합계를 `items` 로 내면
-   *    스크롤할 때마다 합계가 커진다 — 아무도 믿을 수 없는 숫자다. 그래서 「조건에 맞는
-   *    전체」를 따로 받는다. 안 주면 그리는 줄로 낸다(입주사 청구 탭은 다 그린다).
+   * 합계를 낼 줄들 — **그리는 줄(`items`)보다 많을 수 있다.** 안 주면 그리는 줄로 낸다
+   * (입주사 청구 탭은 다 그린다).
    */
   total?: readonly BillingItem[];
 }
 
-export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly = false, total }: Props) {
-  const [paying, setPaying] = useState<BillingItem | null>(null);
-  const [viewing, setViewing] = useState<BillingItem | null>(null);
+export function BillingTable({ items, mode, asOf, readOnly = false, selectedId = null, onSelect, total }: Props) {
   const sum = summarize(total ?? items, asOf);
   const grid = `${mode === 'company' ? styles.tCompany : ''}${readOnly ? ` ${styles.tReadOnly}` : ''}`;
-  /**
-   * 계약의 값 세 열(예치금 · 이용 시작일 · 이용 종료일)을 보이는가.
-   *
-   * ★ 청구 화면에서만 보인다. 조회 전용(입주사 화면 청구 탭)은 420px 목록 옆의 좁은
-   *   패널이라 열이 가로로 넘친다 — 그 탭의 할 일은 조회와 「청구에서 처리」 링크뿐이다.
-   */
-  const contractCols = !readOnly;
 
+  if (!readOnly) {
+    return (
+      <>
+        {/*
+          ★ 2026-11-16 — 왼쪽 60% 목록. 칸: 입주사(청구 월) · 항목 · 청구액 · 납부기한 · 납부일 · 상태.
+            액션 칸은 없다(줄을 누르면 오른쪽 상세). 계약의 값 셋(예치금 · 이용 시작일 · 이용 종료일)은
+            1500px 창에서 넘쳐 오른쪽 상세 머리로 옮겼다(엑셀에는 그대로 있다).
+        */}
+        <div className={`${styles.tHead} ${styles.tSplit} ${grid} ${styles.tHeadSticky} ${styles.tHeadDense}`}>
+          <span>{mode === 'month' ? '입주사' : '청구 월'}</span>
+          <span>항목</span>
+          <span className={styles.right}>청구액</span>
+          <span>납부기한</span>
+          <span>납부일</span>
+          <span>상태</span>
+        </div>
+
+        {items.map((item) => {
+          const st: DisplayStatus = statusOf(item, asOf);
+          const canceled = st === 'canceled';
+          const on = selectedId === item.invoiceId;
+          const pick = () => onSelect?.(item);
+          return (
+            <div
+              key={item.invoiceId}
+              data-invoice-row={item.invoiceId}
+              role="button"
+              tabIndex={0}
+              aria-selected={on}
+              onClick={pick}
+              onKeyDown={(e: KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  pick();
+                }
+              }}
+              className={`${styles.tRow} ${styles.tSplit} ${grid} ${styles.tRowDense} ${styles.qRowClickable}${on ? ` ${styles.qRowOn}` : ''}${canceled ? ` ${styles.tRowCanceled}` : ''}`}
+            >
+              <span className={`${styles.ellipsis} ${styles.strong}`} title={mode === 'month' ? item.companyName : ''}>
+                {mode === 'month' ? item.companyName : yearMonthDot(item.yearMonth)}
+              </span>
+              {/* ★ 「종류(호실)」 — 예: 이용료(FREE03). 엑셀과 같은 함수. */}
+              <span className={styles.ellipsis} title={invoiceItemLabel(item.roomNames)}>
+                {invoiceItemLabel(item.roomNames)}
+              </span>
+              {/* ★ 금액만 — 미수 · 과납 · 수납은 상태 칸 · 오른쪽 상세에 있다. 무상은 금액 대신 「무상」. */}
+              <span className={styles.right}>
+                {item.isFree ? (
+                  <span className={styles.free}>무상</span>
+                ) : (
+                  <span className={styles.amount}>{won(item.totalAmount)}</span>
+                )}
+              </span>
+              <span className={`${styles.mono} ${styles.sDate}`}>{dotDate(item.dueDate)}</span>
+              <span className={`${styles.mono} ${styles.sDate}`}>{item.lastPaidOn ? dotDate(item.lastPaidOn) : ''}</span>
+              <span className={styles.stCell}>
+                <span className={`${styles.badge} ${styles[`st_${st}`]}`}>{STATUS_LABEL[st]}</span>
+                {item.terminated ? <span className={styles.endMark}>해지</span> : null}
+              </span>
+            </div>
+          );
+        })}
+      </>
+    );
+  }
+
+  /* ── 조회 전용(입주사 청구 탭) — 모양 그대로 ── */
   return (
     <>
-      {/* ★ 2026-11-15 — 청구 화면(readOnly 아님)은 머리 · 줄을 촘촘하게(tHeadDense · tRowDense). 입주사 청구 탭은 그대로. */}
-      <div className={`${styles.tHead} ${grid}${readOnly ? '' : ` ${styles.tHeadSticky} ${styles.tHeadDense}`}`}>
+      <div className={`${styles.tHead} ${grid}`}>
         <span>{mode === 'month' ? '입주사' : '청구 월'}</span>
         <span>항목(호실)</span>
         <span className={styles.right}>청구액</span>
-        {/*
-          ★ 예치금 · 이용 시작일 · 이용 종료일은 **그 계약의 값**이다(청구서의 값이 아니다).
-            한 입주사가 계약을 여러 건 들고 있으면 줄마다 다르다.
-          ★★ **조회 전용(입주사 화면 청구 탭)에는 두지 않는다.** 그 탭은 420px 목록 옆의
-             좁은 패널이라 열 아홉 개가 가로로 넘친다. 거기 할 일은 조회와 링크뿐이다.
-        */}
-        {contractCols ? (
-          <>
-            <span className={styles.right}>예치금</span>
-            <span>이용 시작일</span>
-            <span>이용 종료일</span>
-          </>
-        ) : null}
-        {/*
-          ★ 2026-11-15 — 「납부기한」(내야 하는 날)과 「납부일」(실제로 낸 날 · 수납이 없으면 빈칸)을 나눴다.
-            조회 전용(입주사 화면 청구 탭)은 좁아 열을 늘리지 않고 납부기한 하나만 둔다 — 전에 「납부일」이라 적혀
-            있던 그 칸이 내야 하는 날이었다(이름만 바로잡음).
-        */}
-        <span className={readOnly ? styles.right : undefined}>납부기한</span>
-        {readOnly ? null : <span>납부일</span>}
+        <span className={styles.right}>납부기한</span>
         <span className={styles.center}>상태</span>
-        {readOnly ? null : <span />}
       </div>
 
       {items.map((item) => {
@@ -96,7 +133,7 @@ export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly
           <div
             key={item.invoiceId}
             data-invoice-row={item.invoiceId}
-            className={`${styles.tRow} ${grid}${readOnly ? '' : ` ${styles.tRowDense}`}${canceled ? ` ${styles.tRowCanceled}` : ''}`}
+            className={`${styles.tRow} ${grid}${canceled ? ` ${styles.tRowCanceled}` : ''}`}
           >
             <span className={`${styles.ellipsis} ${styles.strong}`} title={mode === 'month' ? item.companyName : ''}>
               {mode === 'month' ? item.companyName : yearMonthDot(item.yearMonth)}
@@ -132,57 +169,15 @@ export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly
                 </>
               )}
             </span>
-            {contractCols ? (
-              <>
-                {/* ★ 예치금은 **장부 잔액**이다 — 반환·차감 뒤에는 0 이다(사용자 결정). */}
-                <span className={`${styles.right} ${styles.mono}`}>
-                  {item.contractId === null ? '—' : won(item.deposit)}
-                </span>
-                <span className={styles.mono}>{item.usageStart ? dotDate(item.usageStart) : '—'}</span>
-                <span className={styles.mono}>
-                  {item.usageEnd ? dotDate(item.usageEnd) : '—'}
-                  {/* ★ 중도해지면 계약 종료일이 아니라 **실제 종료일자**다 — 그렇다고 적는다. */}
-                  {item.terminated ? <span className={styles.endMark}>해지</span> : null}
-                </span>
-              </>
-            ) : null}
-            {readOnly ? (
-              <span className={`${styles.right} ${styles.mono}`}>{monthDay(item.dueDate)}</span>
-            ) : (
-              <>
-                <span className={styles.mono}>{dotDate(item.dueDate)}</span>
-                <span className={styles.mono}>{item.lastPaidOn ? dotDate(item.lastPaidOn) : ''}</span>
-              </>
-            )}
+            <span className={`${styles.right} ${styles.mono}`}>{monthDay(item.dueDate)}</span>
             <span className={styles.center}>
               <span className={`${styles.badge} ${styles[`st_${st}`]}`}>{STATUS_LABEL[st]}</span>
             </span>
-            {readOnly ? null : (
-            <span className={styles.actions}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
-                // ★ 취소된 장·무상 장·남은 금액이 없는 장에는 수납할 것이 없다.
-                disabled={canceled || item.isFree || item.outstanding <= 0}
-                onClick={() => setPaying(item)}
-              >
-                수납
-              </button>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
-                onClick={() => setViewing(item)}
-              >
-                내역
-              </button>
-            </span>
-            )}
           </div>
         );
       })}
 
-      {/* ★ 2026-11-15 — 청구 화면은 합계 줄을 두지 않는다(위 총괄표가 같은 값). 조회 전용 탭에만 남는다. */}
-      {readOnly && items.length > 0 ? (
+      {items.length > 0 ? (
         <div className={`${styles.tFoot} ${grid}`}>
           <span>합계 {sum.count}건</span>
           <span className={styles.muted} style={{ fontWeight: 400, fontSize: 12 }}>
@@ -191,7 +186,7 @@ export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly
           <span className={styles.right}>
             <span className={styles.amount}>{won(sum.total)}</span>
           </span>
-          <span className={styles.right} style={{ gridColumn: readOnly ? 'span 2' : 'span 6', fontWeight: 400 }}>
+          <span className={styles.right} style={{ gridColumn: 'span 2', fontWeight: 400 }}>
             수납 <b className={styles.mono}>{won(sum.received)}</b> · 미수 <b className={styles.mono}>{won(sum.outstanding)}</b>
             {sum.overpaidCount > 0 ? (
               <>
@@ -200,27 +195,6 @@ export function BillingTable({ items, mode, asOf, onChanged = () => {}, readOnly
             ) : null}
           </span>
         </div>
-      ) : null}
-
-      {paying ? (
-        <PaymentDialog
-          target={paying}
-          onClose={() => setPaying(null)}
-          onSaved={(message) => {
-            setPaying(null);
-            onChanged(message);
-          }}
-        />
-      ) : null}
-
-      {viewing ? (
-        <InvoiceDetailDialog
-          invoiceId={viewing.invoiceId}
-          companyName={viewing.companyName}
-          roomNames={viewing.roomNames}
-          onClose={() => setViewing(null)}
-          onChanged={onChanged}
-        />
       ) : null}
     </>
   );

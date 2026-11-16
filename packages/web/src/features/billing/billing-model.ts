@@ -15,6 +15,7 @@
 import type { SettleStatusCode, SettleTypeCode } from '@swonbiz/shared/domain/settlement-view';
 import { displayInvoiceStatus, type DisplayStatus } from '@swonbiz/shared/domain/invoice-status';
 import { localDayOf, summarizeInvoices, type InvoiceSummary } from '@swonbiz/shared/domain/invoice-summary';
+import { DISPLAY_STATUS_LABEL, invoiceItemLabel, payStCodeOf } from '@swonbiz/shared/domain/billing-list';
 import type { DepositEntryKind } from '@swonbiz/shared/domain/deposit-ledger';
 
 /** 청구 목록 한 줄 — `GET /billing/invoices` · `GET /companies/:id/billing` 이 같은 모양이다. */
@@ -137,15 +138,8 @@ export interface Settlement {
    상태 — 판정은 shared 의 `displayInvoiceStatus` 하나
    ══════════════════════════════════════════════════════════════════════════ */
 
-export const STATUS_LABEL: Record<DisplayStatus, string> = {
-  pending: '납부대기',
-  partial: '부분납부',
-  unpaid: '미납',
-  paid: '납부완료',
-  canceled: '취소',
-  // ★ 받은 것이 청구보다 많다 — 돌려줄 돈이 남았다. 「납부완료」로 보이면 끝난 장처럼 읽힌다.
-  overpaid: '과납 · 정산 대기',
-};
+/** ★ 이름은 shared `billing-list` 한 벌 — [엑셀 내려받기](API)와 같은 이름이다(2026-11-16). */
+export const STATUS_LABEL: Record<DisplayStatus, string> = DISPLAY_STATUS_LABEL;
 
 /** 필터 순서 — 할 일이 있는 것부터. */
 export const STATUS_ORDER: readonly DisplayStatus[] = ['unpaid', 'overpaid', 'partial', 'pending', 'paid', 'canceled'];
@@ -174,20 +168,8 @@ export function statusOf(
  */
 export const PAY_ST_CATEGORY = 'PAY_ST';
 
-export function payStCodeOf(st: DisplayStatus): 'O' | 'P' | 'E' | 'C' {
-  switch (st) {
-    case 'unpaid':
-      return 'O';
-    case 'pending':
-    case 'partial':
-      return 'P';
-    case 'paid':
-    case 'overpaid':
-      return 'E';
-    case 'canceled':
-      return 'C';
-  }
-}
+/* ★ 묶는 함수 · 항목 글자는 shared `billing-list` 로 옮겼다 — [엑셀 내려받기](API)가 같은 함수로 거른다(2026-11-16). */
+export { invoiceItemLabel, payStCodeOf };
 
 /* ══════════════════════════════════════════════════════════════════════════
    합계 — 요약 카드와 표의 합계 줄이 **같은 함수**를 쓴다
