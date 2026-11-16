@@ -3,9 +3,9 @@
 /**
  * 청구 화면의 「정산」 탭 — 왼쪽 목록(공통 목록 틀) 6 : 오른쪽 상세 4 (대표 지시 2026-11-15).
  *
- *   왼쪽  검색(정산 기준일 From ~ To · 입주사 · 구분 · 상태 + [조회] [초기화] + 건수) → 버튼 줄 → 목록
- *         목록 칸: 구분 · 입주사 · 호실 · 시작일 · 종료일 · 중도해지일(만료는 빈칸) · 정산금액 · 환불일자(완료 건만) · 상태
- *   오른쪽 고른 행의 상세 — 처음엔 「왼쪽에서 고르세요」
+ *   왼쪽  검색 한 줄(정산 기준일 From ~ To · 입주사 · 구분 전체 · 상태 전체 + [조회] [초기화]) → 버튼 줄(입주사 칩 · 건수) → 목록
+ *         목록 칸(2026-11-16): 구분 · 입주사 · 호실 · 상태 · 시작일 · 종료일 · 중도해지일(만료는 빈칸) · 환불일자(완료 건만) · 정산금액
+ *   오른쪽 고른 행의 상세 — 처음엔 「왼쪽에서 고르세요」 · 받는 동안 공통 로딩바
  *         중도해지 정산이 있는 계약 → 정산 카드([정산서] · 처리 전이면 [정산 처리])
  *         정산 없이 예치금만 남은 계약 → 반환할 예치금 · [반환 처리] / 반환한 뒤에는 반환일 · 금액 · 가린 계좌
  *
@@ -30,6 +30,7 @@ import {
 import { DUE_RANGE_TOO_LONG, isDueRangeTooLong } from '@swonbiz/shared/domain/billing-due-range';
 import { Icon } from '@/components/ds';
 import { ListFrame, ListNote, ListScroll } from '@/components/patterns/ListFrame';
+import { LoadingBar } from '@/components/patterns/LoadingBar';
 // ★ 검색 칸은 청구 탭과 같은 모양 · 같은 클래스(법인변경 목록의 것).
 import cs from '@/features/legal/corp-changes.module.css';
 import styles from './billing.module.css';
@@ -221,78 +222,70 @@ export function SettlementQueue({ notify, company, selected, onSelect, actions }
 
   const pick = (contractId: string) => onSelect(selected === contractId ? null : contractId);
 
+  // ★ 2026-11-16 — 위 이름표 없음 · 한 줄(청구 · 수납 탭과 같은 모양). 날짜 기간만 왼쪽에 짧은 이름.
   const searchBox = (
     <>
-      <div className={cs.field}>
-        <span className={cs.label}>정산 기준일</span>
-        <span className={cs.range}>
-          <input
-            type="date"
-            className={cs.input}
-            aria-label="정산 기준일 시작일"
-            value={draft.from}
-            onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
-          />
-          ~
-          <input
-            type="date"
-            className={cs.input}
-            aria-label="정산 기준일 끝일"
-            value={draft.to}
-            onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
-          />
-        </span>
-      </div>
-      <label className={cs.field}>
-        <span className={cs.label}>입주사</span>
+      <span className={styles.searchRange}>
+        <span className={styles.searchRangeName}>정산 기준일</span>
         <input
-          className={cs.input}
-          placeholder="입주사"
-          value={draft.name}
-          onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') search();
-          }}
+          type="date"
+          className={`${cs.input} ${styles.searchDate}`}
+          aria-label="정산 기준일 시작일"
+          value={draft.from}
+          onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
         />
-      </label>
-      <label className={cs.field}>
-        <span className={cs.label}>구분</span>
-        <select
-          className={cs.select}
-          value={draft.tp ?? ''}
-          onChange={(e) => setDraft((d) => ({ ...d, tp: e.target.value || null }))}
-        >
-          <option value="">전체</option>
-          {typeOptions.map((o) => (
-            <option key={o.code} value={o.code}>
-              {o.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className={cs.field}>
-        <span className={cs.label}>상태</span>
-        <select
-          className={cs.select}
-          value={draft.st ?? ''}
-          onChange={(e) => setDraft((d) => ({ ...d, st: e.target.value || null }))}
-        >
-          <option value="">전체</option>
-          {statusOptions.map((o) => (
-            <option key={o.code} value={o.code}>
-              {o.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={search}>
+        ~
+        <input
+          type="date"
+          className={`${cs.input} ${styles.searchDate}`}
+          aria-label="정산 기준일 끝일"
+          value={draft.to}
+          onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
+        />
+      </span>
+      <input
+        className={`${cs.input} ${styles.searchText}`}
+        placeholder="입주사"
+        aria-label="입주사"
+        value={draft.name}
+        onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') search();
+        }}
+      />
+      <select
+        className={`${cs.select} ${styles.searchSelect}`}
+        aria-label="구분"
+        value={draft.tp ?? ''}
+        onChange={(e) => setDraft((d) => ({ ...d, tp: e.target.value || null }))}
+      >
+        <option value="">구분 전체</option>
+        {typeOptions.map((o) => (
+          <option key={o.code} value={o.code}>
+            {o.name}
+          </option>
+        ))}
+      </select>
+      <select
+        className={`${cs.select} ${styles.searchSelect}`}
+        aria-label="상태"
+        value={draft.st ?? ''}
+        onChange={(e) => setDraft((d) => ({ ...d, st: e.target.value || null }))}
+      >
+        <option value="">상태 전체</option>
+        {statusOptions.map((o) => (
+          <option key={o.code} value={o.code}>
+            {o.name}
+          </option>
+        ))}
+      </select>
+      <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.searchBtn}`} onClick={search}>
         조회
       </button>
-      <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={reset}>
+      <button type="button" className={`${styles.btn} ${styles.btnGhost} ${styles.searchBtn}`} onClick={reset}>
         <Icon name="rotate-ccw" size={16} />
         초기화
       </button>
-      <ListNote>{data === null || error ? '' : `${visible.length}건`}</ListNote>
       {formError ? (
         <span className={styles.searchError} role="alert">
           {formError}
@@ -343,16 +336,17 @@ export function SettlementQueue({ notify, company, selected, onSelect, actions }
     ) : (
       <>
         <div className={`${styles.sHead} ${styles.tHeadSticky}`}>
+          {/* ★ 2026-11-16 칸 순서(대표 지시): 구분 · 입주사 · 호실 · 상태 · 시작일 · 종료일 · 중도해지일 · 환불일자 · 정산금액 */}
           <span>구분</span>
           <span>입주사</span>
           <span>호실</span>
+          <span>상태</span>
           {/* ★ 시작일 — 종료일 앞이다. 둘을 나란히 보면 얼마나 쓰다 나갔는지가 읽힌다. */}
           <span>시작일</span>
           <span>종료일</span>
           <span>중도해지일</span>
-          <span className={styles.right}>정산금액</span>
           <span>환불일자</span>
-          <span className={styles.center}>상태</span>
+          <span className={styles.right}>정산금액</span>
         </div>
         {visible.map((item) => (
           <div key={`${item.kind}:${item.contractId}`} {...rowProps(item)} data-queue-row={item.contractId}>
@@ -363,21 +357,21 @@ export function SettlementQueue({ notify, company, selected, onSelect, actions }
             <span className={styles.ellipsis} title={item.roomNames}>
               {item.roomNames || '—'}
             </span>
+            <span>
+              <span className={`${styles.badge} ${item.statusCode === 'WAIT' ? styles.st_partial : styles.st_paid}`}>
+                {nameOf(statusOptions, item.statusCode)}
+              </span>
+            </span>
             <span className={`${styles.mono} ${styles.sDate}`}>{item.startDate ? dotDate(item.startDate) : '—'}</span>
             <span className={`${styles.mono} ${styles.sDate}`}>{dotDate(item.endDate)}</span>
             <span className={`${styles.mono} ${styles.sDate}`}>
               {item.terminatedDate ? dotDate(item.terminatedDate) : ''}
             </span>
-            {amountCell(item)}
             {/* ★ 환불일자 — 완료 건은 처리한 날(processedOn), 대기 건은 빈칸(2026-11-15). */}
             <span className={`${styles.mono} ${styles.sDate}`}>
               {item.statusCode === 'DONE' && item.processedOn ? dotDate(item.processedOn) : ''}
             </span>
-            <span className={styles.center}>
-              <span className={`${styles.badge} ${item.statusCode === 'WAIT' ? styles.st_partial : styles.st_paid}`}>
-                {nameOf(statusOptions, item.statusCode)}
-              </span>
-            </span>
+            {amountCell(item)}
           </div>
         ))}
       </>
@@ -390,7 +384,8 @@ export function SettlementQueue({ notify, company, selected, onSelect, actions }
     ) : selectedItem?.kind === 'deposit' ? (
       <DepositDetail item={selectedItem} onReturn={() => setReturning(selectedItem)} />
     ) : detail === null || detail.state === 'loading' ? (
-      <p className={styles.muted}>정산을 불러오는 중입니다</p>
+      // ★ 2026-11-16 — 받는 동안 공통 로딩바(「불러오는 중」 글자 대신).
+      <LoadingBar />
     ) : detail.state === 'missing' ? (
       <p className={styles.muted}>{detail.message}</p>
     ) : (
@@ -399,8 +394,18 @@ export function SettlementQueue({ notify, company, selected, onSelect, actions }
 
   return (
     <div className={styles.settleSplit}>
-      <div className={styles.settleLeft}>
-        <ListFrame search={searchBox} actions={actions ?? null}>
+      {/* ★ 2026-11-16 — 청구 · 수납 탭과 같은 촘촘한 틀(.dense) — 검색 상자 같게. */}
+      <div className={`${styles.settleLeft} ${styles.dense}`}>
+        {/* ★ 2026-11-16 — 건수는 버튼 줄로(검색 상자 한 줄). 입주사 칩이 있으면 그 옆. */}
+        <ListFrame
+          search={searchBox}
+          actions={
+            <>
+              {actions ?? null}
+              {data === null || error ? null : <ListNote>{visible.length}건</ListNote>}
+            </>
+          }
+        >
           <ListScroll>{list}</ListScroll>
         </ListFrame>
       </div>

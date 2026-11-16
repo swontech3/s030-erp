@@ -1,7 +1,17 @@
 'use client';
 
 /**
- * s030200070 청구 — 공통 목록 틀(검색 조건 → 총괄표 → 버튼 줄 → 목록, 2026-11-15).
+ * s030200070 청구 — 「청구 · 수납」 탭 · 「정산」 탭.
+ *
+ * =============================================================================
+ * ★★ 2026-11-16 대표 지시 — 청구 · 수납 탭을 정산 탭처럼 왼쪽 목록 6 : 오른쪽 상세 4 로
+ * =============================================================================
+ *   · 왼쪽: 검색 한 줄(위 이름표 없음) → 버튼 줄([수납] · [엑셀 내려받기]) → 총괄표(한 줄) → 목록
+ *   · 줄마다 있던 [수납] · [내역] 단추는 없앴다 — 줄을 누르면 오른쪽에 그 청구서 상세(`InvoiceDetailPane`)
+ *   · [수납] 은 고른 줄을 수납한다(전에 줄의 단추와 같은 창 · 같은 조건). 처리 뒤 목록 · 상세를 다시 받는다
+ *   · [엑셀 내려받기] 는 적용된 조건의 검색 결과 전체를 목록 칸 그대로(`GET /billing/invoices/export`)
+ *
+ * 아래는 2026-11-15 의 조건 · 총괄표 설명이다(그대로 맞다).
  *
  * =============================================================================
  * ★★ 2026-11-15 대표 지시 — 자리 · 조건 · 칸만 바꿨다. 수납 · 정산 처리의 동작은 그대로다
@@ -35,8 +45,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DUE_RANGE_TOO_LONG, isDueRangeTooLong } from '@swonbiz/shared/domain/billing-due-range';
 import { Icon } from '@/components/ds';
-import { ListFrame, ListNote, ListScroll } from '@/components/patterns/ListFrame';
+import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
+import { ListFrame, ListNote, ListScroll, ListSpacer } from '@/components/patterns/ListFrame';
 import { BillingEmpty, BillingTable } from '@/features/billing/BillingTable';
+import { InvoiceDetailPane } from '@/features/billing/InvoiceDetailPane';
+import { PaymentDialog } from '@/features/billing/PaymentDialog';
 import { SettlementQueue } from '@/features/billing/SettlementQueue';
 import styles from '@/features/billing/billing.module.css';
 // ★ 검색 상자 칸은 법인변경 목록과 같은 모양 · 같은 클래스(.field · .label · .range · .input · .select) — 대표 지시 2026-11-15.
@@ -121,6 +134,11 @@ export function BillingView() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** 고른 청구서(오른쪽 상세) · 버튼 줄 [수납] 창 · 상세 다시 받기 표식(2026-11-16). */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [paying, setPaying] = useState<BillingItem | null>(null);
+  const [detailReload, setDetailReload] = useState(0);
 
   // ★ 오늘을 한 번만 정한다 — 행마다 new Date() 를 부르면 자정을 넘길 때 행끼리 기준이 갈린다.
   const asOf = useMemo(() => new Date(), [items]);
@@ -274,6 +292,8 @@ export function BillingView() {
   const [shown, setShown] = useState(PAGE);
   // 조건 · 입주사가 바뀌면 처음부터 다시 그린다
   useEffect(() => setShown(PAGE), [cond, company, items]);
+  // 조건 · 입주사가 바뀌면 고른 줄을 푼다(처리 뒤 다시 받을 때는 그대로 둔다).
+  useEffect(() => setSelectedId(null), [cond, company]);
   const drawn = visible.slice(0, shown);
   const rest = visible.length - drawn.length;
 
@@ -367,145 +387,221 @@ export function BillingView() {
     );
   }
 
+  /** 고른 줄 — 지금 받은 목록에서 찾는다(처리 뒤 다시 받으면 새 값). */
+  const selectedItem = selectedId ? all.find((it) => it.invoiceId === selectedId) ?? null : null;
+  const selectedSt = selectedItem ? statusOf(selectedItem, asOf) : null;
+  /** [수납] — 고른 줄이 있고 받을 돈이 남아 있을 때만(전에 줄의 [수납] 단추와 같은 조건). */
+  const canPay =
+    selectedItem !== null && selectedSt !== 'canceled' && !selectedItem.isFree && selectedItem.outstanding > 0;
+
+  /** [엑셀 내려받기] — 적용된 조건 그대로(그린 줄 수와 상관없이 검색 결과 전체). */
+  const exportHref = `/api/billing/invoices/export?${new URLSearchParams({
+    dueFrom: cond.from,
+    dueTo: cond.to,
+    ...(company ? { company } : {}),
+    ...(cond.name ? { q: cond.name } : {}),
+    ...(cond.st ? { st: cond.st } : {}),
+  }).toString()}`;
+
   return (
-    <>
-      {/*
-        ★ 2026-11-15 — 촘촘하게(대표 지시: 목록을 한 화면에 최대한 많이). 공통 목록 틀은 그대로 두고
-          청구 화면만 이 감싸개(.dense)로 틀 안 간격 · 검색 상자 여백을 줄인다.
-      */}
-      <div className={styles.dense}>
-      <ListFrame
-        head={tabs}
-        search={
-          <>
-            <div className={cs.field}>
-              <span className={cs.label}>납부기한</span>
-              <span className={cs.range}>
+    /*
+      ★ 2026-11-16 — 정산 탭처럼 왼쪽 목록 6 : 오른쪽 상세 4.
+        왼쪽: 검색 → 버튼 줄([수납] · [엑셀 내려받기]) → 총괄표(한 줄) → 목록. 촘촘한 틀(.dense)은 정산 탭과 같다.
+    */
+    <div className={styles.settlePage}>
+      {tabs}
+      <div className={styles.settleSplit}>
+        <div className={`${styles.settleLeft} ${styles.dense}`}>
+          <ListFrame
+            search={
+              <>
+                {/* ★ 2026-11-16 — 위 이름표 없음 · 한 줄. 날짜 기간만 왼쪽에 짧은 이름. */}
+                <span className={styles.searchRange}>
+                  <span className={styles.searchRangeName}>납부기한</span>
+                  <input
+                    type="date"
+                    className={`${cs.input} ${styles.searchDate}`}
+                    aria-label="납부기한 시작일"
+                    value={draft.from}
+                    onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
+                  />
+                  ~
+                  <input
+                    type="date"
+                    className={`${cs.input} ${styles.searchDate}`}
+                    aria-label="납부기한 끝일"
+                    value={draft.to}
+                    onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
+                  />
+                </span>
                 <input
-                  type="date"
-                  className={cs.input}
-                  aria-label="납부기한 시작일"
-                  value={draft.from}
-                  onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
+                  className={`${cs.input} ${styles.searchText}`}
+                  placeholder="입주사, 호실"
+                  aria-label="입주사, 호실"
+                  value={draft.name}
+                  onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') search();
+                  }}
                 />
-                ~
-                <input
-                  type="date"
-                  className={cs.input}
-                  aria-label="납부기한 끝일"
-                  value={draft.to}
-                  onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
-                />
-              </span>
-            </div>
-            <label className={cs.field}>
-              <span className={cs.label}>회사명</span>
-              <input
-                className={cs.input}
-                placeholder="입주사, 호실"
-                value={draft.name}
-                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') search();
-                }}
-              />
-            </label>
-            <label className={cs.field}>
-              <span className={cs.label}>상태</span>
-              <select
-                className={cs.select}
-                value={draft.st ?? ''}
-                onChange={(e) => setDraft((d) => ({ ...d, st: e.target.value || null }))}
-              >
-                <option value="">전체</option>
-                {statusOptions.map((o) => (
-                  <option key={o.code} value={o.code}>
-                    {o.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={search}>
-              조회
-            </button>
-            <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={reset}>
-              <Icon name="rotate-ccw" size={16} />
-              초기화
-            </button>
-            {/* ★ 2026-11-15 — 건수는 [초기화] 오른쪽. 목록 위 건수 줄은 없앴다(입주사 칩이 있을 때만 그 자리에 칩). */}
-            <ListNote>{items === null || error ? '' : `${visible.length}건`}</ListNote>
-            {formError ? (
-              <span className={styles.searchError} role="alert">
-                {formError}
-              </span>
-            ) : null}
-          </>
-        }
-        summary={
-          <div className={styles.summaryBar} data-summary="1">
-            <SumCell label="총 청구액" value={won(sum.total)} note={filtered ? '필터 적용' : undefined} />
-            {/*
-              ★ 수납 완료는 **청구에 들어간 몫**만이다. 과납분(돌려줄 돈)은 여기에도 미수금에도
-                섞지 않는다 — 섞으면 다른 입주사의 미수금이 깎여 보인다. 옆의 「환불액」이 그 몫이다.
-            */}
-            <SumCell label="수납 완료" value={won(sum.received)} />
-            <SumCell label="미수금" value={won(sum.outstanding)} />
-            {/*
-              ★★ 환불액 — **과납 합계**다(받은 것이 청구보다 많은 장). 미수금과 반대 방향이고
-                 절대 섞지 않는다. 정산 처리가 음수 수납으로 0 을 만든다.
-              ★ 2026-11-15 — 이름 · 값 한 줄(나란히). 「없음」 · 「정산 대기 N건」 셋째 줄은 지웠다.
-            */}
-            <SumCell label="환불액 (과납)" value={won(sum.overpaid)} />
-            {/* ★ 2026-11-15 — 이름 · 값 한 줄. 미납 금액은 건수 옆 괄호에(예: 3건 (1,250,000)). */}
-            <div className={styles.sumCell}>
-              <div className={styles.sumLabel}>미납</div>
-              <div className={`${styles.sumValue} ${sum.unpaidCount === 0 ? styles.sumCountZero : styles.sumCount}`}>
-                {sum.unpaidCount}건
-                {sum.unpaidCount > 0 ? ` (${sum.unpaidAmount.toLocaleString('ko-KR')})` : ''}
-              </div>
-            </div>
-          </div>
-        }
-        actions={companyChip}
-      >
-        <ListScroll>
-          {items === null ? (
-            <BillingEmpty lead="청구를 불러오는 중입니다" />
-          ) : error ? (
-            <BillingEmpty lead={error} />
-          ) : inRange.length === 0 ? (
-            <BillingEmpty
-              lead={company ? '이 입주사의 청구서가 없습니다' : '이 납부기한에 든 청구가 없습니다'}
-              sub="청구서는 계약을 확정하면 계약기간 전체가 만들어집니다"
-            />
-          ) : visible.length === 0 ? (
-            <BillingEmpty lead="조건에 맞는 청구가 없습니다" sub="회사명이나 상태를 바꿔 보세요" />
-          ) : (
-            <>
-              <BillingTable items={drawn} mode={company ? 'company' : 'month'} asOf={asOf} onChanged={notify} />
-              {rest > 0 ? (
-                <div className={styles.more} ref={sentinel} data-more={rest}>
-                  <span className={styles.moreText}>
-                    {visible.length}건 중 {drawn.length}건 표시 · 스크롤하면 더 나옵니다
+                <select
+                  className={`${cs.select} ${styles.searchSelect}`}
+                  aria-label="상태"
+                  value={draft.st ?? ''}
+                  onChange={(e) => setDraft((d) => ({ ...d, st: e.target.value || null }))}
+                >
+                  <option value="">상태 전체</option>
+                  {statusOptions.map((o) => (
+                    <option key={o.code} value={o.code}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.searchBtn}`} onClick={search}>
+                  조회
+                </button>
+                <button type="button" className={`${styles.btn} ${styles.btnGhost} ${styles.searchBtn}`} onClick={reset}>
+                  <Icon name="rotate-ccw" size={16} />
+                  초기화
+                </button>
+                {/* ★ 2026-11-15 — 건수는 [초기화] 오른쪽. */}
+                <ListNote>{items === null || error ? '' : `${visible.length}건`}</ListNote>
+                {formError ? (
+                  <span className={styles.searchError} role="alert">
+                    {formError}
                   </span>
-                  <button
-                    type="button"
-                    className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
-                    onClick={() => setShown((n) => n + PAGE)}
-                  >
-                    {Math.min(PAGE, rest)}건 더 보기
-                  </button>
+                ) : null}
+              </>
+            }
+            actions={
+              <>
+                {/* ★ 2026-11-16 — 고른 줄을 수납(전에 줄마다 있던 [수납] 단추). 안 골랐으면 누를 수 없다. */}
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnPrimary}`}
+                  disabled={!canPay}
+                  onClick={() => {
+                    if (selectedItem) setPaying(selectedItem);
+                  }}
+                >
+                  수납
+                </button>
+                {companyChip}
+                <ListSpacer />
+                {/* ★ 지금 검색 결과 전체 · 목록 칸 그대로 — 파일은 API 가 ERP 공통 부품으로 만든다. */}
+                <ExcelDownloadButton
+                  href={exportHref}
+                  className={`${styles.btn} ${styles.btnGhost}`}
+                  disabled={items === null || error !== null || visible.length === 0}
+                  onError={toastOnly}
+                />
+              </>
+            }
+            summary={
+              <div className={styles.summaryBar} data-summary="1">
+                <SumCell label="총 청구액" value={won(sum.total)} note={filtered ? '필터 적용' : undefined} />
+                {/*
+                  ★ 수납 완료는 **청구에 들어간 몫**만이다. 과납분(돌려줄 돈)은 여기에도 미수금에도
+                    섞지 않는다 — 섞으면 다른 입주사의 미수금이 깎여 보인다. 옆의 「환불액」이 그 몫이다.
+                */}
+                <SumCell label="수납 완료" value={won(sum.received)} />
+                <SumCell label="미수금" value={won(sum.outstanding)} />
+                {/* ★★ 환불액 — **과납 합계**다(받은 것이 청구보다 많은 장). 미수금과 반대 방향이고 절대 섞지 않는다. */}
+                <SumCell label="환불액 (과납)" value={won(sum.overpaid)} />
+                {/* ★ 2026-11-15 — 이름 · 값 한 줄. 미납 금액은 건수 옆 괄호에(예: 3건 (1,250,000)). */}
+                <div className={styles.sumCell}>
+                  <div className={styles.sumLabel}>미납</div>
+                  <div className={`${styles.sumValue} ${sum.unpaidCount === 0 ? styles.sumCountZero : styles.sumCount}`}>
+                    {sum.unpaidCount}건
+                    {sum.unpaidCount > 0 ? ` (${sum.unpaidAmount.toLocaleString('ko-KR')})` : ''}
+                  </div>
                 </div>
-              ) : null}
-            </>
+              </div>
+            }
+          >
+            <ListScroll>
+              {items === null ? (
+                <BillingEmpty lead="청구를 불러오는 중입니다" />
+              ) : error ? (
+                <BillingEmpty lead={error} />
+              ) : inRange.length === 0 ? (
+                <BillingEmpty
+                  lead={company ? '이 입주사의 청구서가 없습니다' : '이 납부기한에 든 청구가 없습니다'}
+                  sub="청구서는 계약을 확정하면 계약기간 전체가 만들어집니다"
+                />
+              ) : visible.length === 0 ? (
+                <BillingEmpty lead="조건에 맞는 청구가 없습니다" sub="입주사 · 호실이나 상태를 바꿔 보세요" />
+              ) : (
+                <>
+                  <BillingTable
+                    items={drawn}
+                    mode={company ? 'company' : 'month'}
+                    asOf={asOf}
+                    selectedId={selectedId}
+                    onSelect={(it) => setSelectedId((cur) => (cur === it.invoiceId ? null : it.invoiceId))}
+                  />
+                  {rest > 0 ? (
+                    <div className={styles.more} ref={sentinel} data-more={rest}>
+                      <span className={styles.moreText}>
+                        {visible.length}건 중 {drawn.length}건 표시 · 스크롤하면 더 나옵니다
+                      </span>
+                      <button
+                        type="button"
+                        className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+                        onClick={() => setShown((n) => n + PAGE)}
+                      >
+                        {Math.min(PAGE, rest)}건 더 보기
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </ListScroll>
+          </ListFrame>
+        </div>
+
+        {/* 오른쪽 상세 — 처음엔 「왼쪽에서 고르세요」. 받는 동안 공통 로딩바(InvoiceDetailPane). */}
+        <div className={styles.settleRight} data-invoice-detail-pane={selectedId ?? ''}>
+          {selectedId === null ? (
+            <BillingEmpty lead="왼쪽에서 고르세요" sub="청구 목록의 행을 누르면 여기에 상세가 나옵니다" />
+          ) : (
+            <InvoiceDetailPane
+              invoiceId={selectedId}
+              companyName={selectedItem?.companyName ?? ''}
+              roomNames={selectedItem?.roomNames ?? ''}
+              contract={
+                selectedItem
+                  ? {
+                      deposit: selectedItem.contractId === null ? null : selectedItem.deposit,
+                      usageStart: selectedItem.usageStart,
+                      usageEnd: selectedItem.usageEnd,
+                    }
+                  : null
+              }
+              reloadKey={detailReload}
+              onChanged={notify}
+            />
           )}
-        </ListScroll>
-      </ListFrame>
+        </div>
       </div>
+
+      {paying ? (
+        <PaymentDialog
+          target={paying}
+          onClose={() => setPaying(null)}
+          onSaved={(message) => {
+            setPaying(null);
+            // ★ 처리 뒤 목록 · 상세 다시 받기
+            notify(message);
+            setDetailReload((n) => n + 1);
+          }}
+        />
+      ) : null}
       {toastEl}
-    </>
+    </div>
   );
 }
+
 
 /** 총괄표 한 칸 — 이름 · 값(· 있으면 작은 글)을 한 줄에 나란히. 값은 `summarize` 가 낸다. */
 function SumCell({ label, value, note }: { label: string; value: string; note?: string }) {
