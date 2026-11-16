@@ -886,3 +886,25 @@
 .inPane .formWrap {
   max-width: none;
 }
+
+/* ★ 2026-11-16 — 오른쪽 칸은 창이 넓어도 칸이 좁다(1500px 에서 약 680px). 위 「좁은 창」(max-width: 900px) 규칙 가운데
+ *   **주소 줄 접기 · 격자 1칸**을 오른쪽 칸에서도 쓴다 — 새 모양이 아니라 같은 규칙이다(대표 지시). */
+.inPane .grid4,
+.inPane .payloadGrid {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.inPane .span2,
+.inPane .span4 {
+  grid-column: span 1;
+}
+
+.inPane .addrRow {
+  flex-wrap: wrap;
+}
+
+.inPane .addrMain,
+.inPane .addrDetail {
+  width: 100%;
+  flex: 1 1 100%;
+}

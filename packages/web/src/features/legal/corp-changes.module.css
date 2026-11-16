@@ -477,11 +477,12 @@ a.tRow.tRowOn {
   background: var(--surface-alt);
 }
 
-/* 왼쪽 목록 칸(좁은 칸) — 법인변경: 회사 · 변경구분 · 진행상태 · 등록일 / 법인설립: 상호 · 진행상태 · 설립예정일 · 등록일.
+/* 왼쪽 목록 칸(좁은 칸) — 법인변경: 회사 · 변경구분 · 진행상태 / 법인설립: 상호 · 진행상태 · 설립예정일 · 등록일.
  *   좌우 여백 12 · 칸 사이 8. 남는 폭은 회사(상호)가 받는다. 1500px 창(사이드바 펼침)에서 잰 값이다. */
 .tHead.colsSplit,
 .tRow.colsSplit {
-  grid-template-columns: minmax(0, 1fr) 80px 100px 92px; /* 회사 · 변경구분 · 진행상태(가장 긴 딱지 100px) · 등록일 */
+  /* 회사 · 변경구분 · 진행상태(가장 긴 딱지 100px). 등록일은 뺐다(상세에 있다 · 2026-11-16) — 남는 폭은 회사 이름이 받는다 */
+  grid-template-columns: minmax(0, 1fr) 80px 100px;
   column-gap: 8px;
   padding-left: 12px;
   padding-right: 12px;

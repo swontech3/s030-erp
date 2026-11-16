@@ -25,7 +25,7 @@
  * ★★ 2026-11-16 대표 지시 — **왼쪽 목록 4 : 오른쪽 상세 6**(지시 3.5 : 6.5 — 목록 칸이 들지 않아 4 : 6, corp-changes.module.css .split). 줄을 누르면 상세를 오른쪽 칸에
  *    그린다(`CorpChangeDetailPane` — 상세의 내용 · 동작은 그대로). 고른 건은 주소에 싣는다(`?sel=` — `legal-split.ts`).
  *    [새 건] 도 오른쪽 칸에 임시 모드로 연다. 저장 · 상태 바꾸기 뒤 왼쪽 목록을 다시 받는다.
- *    목록 칸은 회사 · 변경구분 · 진행상태 · 등록일 — 「대표자」 칸은 좁은 칸에 들지 않아 뺐다(상세의 회사 정보에 있다).
+ *    목록 칸은 회사 · 변경구분 · 진행상태 — 「대표자」 칸은 좁은 칸에 들지 않아, 「등록일」은 대표 지시로 뺐다(둘 다 상세에 있다).
  *    검색 상자는 위 이름표 없이(선택 칸은 「… 전체」, 날짜 기간만 짧은 이름).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
@@ -315,7 +315,6 @@ export function CorpChangesView({
               <span>회사</span>
               <span>변경구분</span>
               <span>진행상태</span>
-              <span>등록일</span>
             </div>
 
             <ListScroll>
@@ -356,7 +355,6 @@ export function CorpChangesView({
                           {statusNames[item.status] ?? item.status}
                         </span>
                       </span>
-                      <span className={styles.mono}>{item.createdOn}</span>
                     </a>
                   );
                 })
