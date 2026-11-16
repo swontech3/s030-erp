@@ -107,6 +107,23 @@ interface Props {
    * 회사 정보의 회사유형 칸에 넣는다 — 저장된 값과 달라 첫 [저장] 에 회사 정보로 실려 법무 회사 정보에 저장된다.
    */
   presetMemberType?: string | null;
+  /** 목록 화면 오른쪽 칸(2026-11-16) — 없으면 옛 단독 화면처럼 주소를 옮긴다. */
+  pane?: LegalDetailPane;
+}
+
+/**
+ * 목록 화면 오른쪽 칸에 그릴 때(2026-11-16 대표 지시: 왼쪽 목록 · 오른쪽 상세) — 넘기면 주소를 옮기지 않고 이것을 부른다.
+ * ★ 상세의 내용 · 입력 · 저장 · 상태 바꾸기 · 서류 출력은 그대로다. 바뀌는 것은 「어디로 가는가」뿐이다.
+ */
+export interface LegalDetailPane {
+  /** 첫 저장으로 건이 생겼다 — 그 건을 고른 채로(옛: 그 건의 주소로 replace). */
+  onOpen: (id: string) => void;
+  /** 저장 · 상태 바꾸기 뒤 — 왼쪽 목록을 다시 받는다. */
+  onChanged: () => void;
+  /** 지웠다 — 고른 건을 비운다(옛: 목록 주소로 replace). */
+  onRemoved: () => void;
+  /** 임시 모드에 입력이 있다/없다 — 목록의 [새 건] 이 나가기 확인을 띄울지 본다. */
+  onGuard: (hasInput: boolean) => void;
 }
 
 export type Address = { zipCode: string; address: string; addressDetail: string };
@@ -275,7 +292,7 @@ interface OfficerDraft {
   rrnMasked: string | null;
 }
 
-export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScreen, presetMemberType }: Props) {
+export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScreen, presetMemberType, pane }: Props) {
   const router = useRouter();
   /**
    * ★ 저장된 건은 **상태로** 든다 — 상태 전이가 돌려준 새 상세, 409 뒤에 다시 읽은 상세로 바꿔
@@ -399,6 +416,12 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
       document.removeEventListener('click', onClick, true);
     };
   }, [hasInput]);
+  // ★ 오른쪽 칸 — 목록의 [새 건] 은 링크가 아니라 위 확인이 못 잡는다. 목록이 보고 확인을 띄운다.
+  const onGuard = pane?.onGuard;
+  useEffect(() => {
+    onGuard?.(hasInput);
+    return () => onGuard?.(false);
+  }, [hasInput, onGuard]);
 
   // ── 저장 ────────────────────────────────────────────────────────────────
   /**
@@ -467,7 +490,8 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
   /** 건의 주소로 옮겨 간다 — 나가기 확인을 풀고, 뒤로 가기에 임시 모드가 남지 않게 replace. */
   const goToSaved = (id: string) => {
     leaving.current = true;
-    router.replace(`/legal/corp-changes/${encodeURIComponent(id)}`);
+    if (pane) pane.onOpen(id);
+    else router.replace(`/legal/corp-changes/${encodeURIComponent(id)}`);
   };
 
   /** [저장] — 검증 없이 임시 저장. */
@@ -479,7 +503,10 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
       return;
     }
     setBusy(false);
-    if (done) notify('저장했습니다');
+    if (done) {
+      pane?.onChanged();
+      notify('저장했습니다');
+    }
   };
 
   /**
@@ -607,6 +634,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
     setConfirm(null);
     const res = await send<CorpChangeDetailResponse>('GET', base!);
     if (res.ok) applyDetail(res.body);
+    pane?.onChanged();
     setFieldErrors({});
     setSaveError(res.ok ? message : res.status === 404 ? '이 건을 찾을 수 없습니다 — 다른 사용자가 지웠을 수 있습니다' : message);
   };
@@ -622,6 +650,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
       setConfirm(null);
       setFieldErrors({});
       applyDetail(res.body);
+      pane?.onChanged();
       notify(`「${res.body.statusName}」 상태로 바꿨습니다`);
       return null;
     }
@@ -650,7 +679,8 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
     const res = await send<unknown>('DELETE', `${base}?from=${encodeURIComponent(saved.status)}`);
     if (res.ok) {
       leaving.current = true;
-      router.replace('/legal/corp-changes');
+      if (pane) pane.onRemoved();
+      else router.replace('/legal/corp-changes');
       return null;
     }
     if (res.status === 409) {
@@ -696,7 +726,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
   const deadline = registrationDeadline(draft.changeType, toWire(def.fields, form), localToday(), officers);
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page}${pane ? ` ${styles.inPane}` : ''}`}>
       <div className={styles.pageHead}>
         <div className={styles.pageHeadInner}>
           <div className={styles.headTitle}>
@@ -734,10 +764,13 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
                 onConfirm={setConfirm}
               />
             ) : null}
-            <Link href="/legal/corp-changes" className={`${styles.btn} ${styles.btnGhost}`}>
-              <Icon name="chevron-left" size={16} />
-              법인변경 목록
-            </Link>
+            {/* ★ 오른쪽 칸에서는 목록이 바로 왼쪽에 있다 — 「목록」 단추는 단독 화면에만. */}
+            {pane ? null : (
+              <Link href="/legal/corp-changes" className={`${styles.btn} ${styles.btnGhost}`}>
+                <Icon name="chevron-left" size={16} />
+                법인변경 목록
+              </Link>
+            )}
             {editable ? (
               <button
                 type="button"

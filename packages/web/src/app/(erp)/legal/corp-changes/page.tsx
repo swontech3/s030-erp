@@ -1,7 +1,7 @@
 /** @screen s040200010 법인변경 · 020 법인변경 · 법무 서비스(s04) */
 
 /**
- * 법인변경 목록 — 목록 조회(2단계) · [새 건](3단계, 2026-10-10). 줄을 누르면 상세(s040200011).
+ * 법인변경 목록 — 목록 조회(2단계) · [새 건](3단계, 2026-10-10). 줄을 누르면 상세(s040200011)를 **오른쪽 칸**에 그린다(2026-11-16).
  *
  * ★ 이 화면은 **운영사와 회사가 함께 쓴다.** 운영사는 전체 건을, 회사(입주사·비입주사)는
  *   자기 건만 본다 — 판정은 DB 의 RLS(`erp_org_scope`, 037)가 삐용 단체 ID 로 한다.
@@ -19,5 +19,12 @@ import { CorpChangesView } from '@/features/legal/CorpChangesView';
 export default async function CorpChangesPage() {
   await requireScreen('s040200010', '/legal/corp-changes');
   const me = await getMe();
-  return <CorpChangesView pickOrg={me?.role === 'operator'} />;
+  // ★ 2026-11-16 — 상세(s040200011)는 이 화면 오른쪽 칸에 그린다. 그 코드를 받은 사람에게만 그린다(화면코드 그대로).
+  return (
+    <CorpChangesView
+      pickOrg={me?.role === 'operator'}
+      canOpenDetail={me?.screens.includes('s040200011') ?? false}
+      canOpenTenantScreen={me?.screens.includes('s030200030') ?? false}
+    />
+  );
 }

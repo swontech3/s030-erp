@@ -20,10 +20,15 @@
  *   API 와 같은 이름이다. 방식은 s030200070 과 같다(`history.replaceState`).
  *
  * ★★ 한 업무는 한 화면에서 — 처리 버튼(상태 전이 · 서류 출력)은 이 목록에 두지 않는다.
- *    상세(s040200011)가 맡는다. 줄을 누르면 상세로 간다. 목록에 있는 처리는 [새 건] 하나다
- *    (만든 뒤 바로 상세로 보낸다 — 3단계, 2026-10-10).
+ *    상세(s040200011)가 맡는다. 목록에 있는 처리는 [새 건] 하나다(3단계, 2026-10-10).
+ *
+ * ★★ 2026-11-16 대표 지시 — **왼쪽 목록 4 : 오른쪽 상세 6**(지시 3.5 : 6.5 — 목록 칸이 들지 않아 4 : 6, corp-changes.module.css .split). 줄을 누르면 상세를 오른쪽 칸에
+ *    그린다(`CorpChangeDetailPane` — 상세의 내용 · 동작은 그대로). 고른 건은 주소에 싣는다(`?sel=` — `legal-split.ts`).
+ *    [새 건] 도 오른쪽 칸에 임시 모드로 연다. 저장 · 상태 바꾸기 뒤 왼쪽 목록을 다시 받는다.
+ *    목록 칸은 회사 · 변경구분 · 진행상태 · 등록일 — 「대표자」 칸은 좁은 칸에 들지 않아 뺐다(상세의 회사 정보에 있다).
+ *    검색 상자는 위 이름표 없이(선택 칸은 「… 전체」, 날짜 기간만 짧은 이름).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   corpChangeCompanyLabel,
@@ -36,11 +41,17 @@ import {
   type TenancyFilter,
 } from '@swonbiz/shared/domain/corp-change-list';
 import type { CorpChangeStatus, CorpChangeType } from '@swonbiz/shared/domain/corp-change';
-import Link from 'next/link';
 import { Icon } from '@/components/ds';
 import { ListFrame, ListNote, ListScroll } from '@/components/patterns/ListFrame';
 import { NewCorpChangeDialog } from './NewCorpChangeDialog';
+import type { LegalDetailPane } from './CorpChangeDetail';
+import { CorpChangeDetailPane, PaneEmpty } from './LegalDetailPanes';
+import { readSel, selHref, selKey, writeSel, type LegalSel } from './legal-split';
 import styles from './corp-changes.module.css';
+
+const LIST_PATH = '/legal/corp-changes';
+/** 오른쪽 칸의 새 건에 입력이 있을 때 — 상세의 나가기 확인과 같은 문구 */
+const LEAVE_MESSAGE = '저장하지 않은 내용이 사라집니다. 이 화면을 나갈까요?';
 
 const EMPTY_FILTER: CorpChangeListFilter = {
   from: null,
@@ -58,9 +69,22 @@ type Load =
   | { state: 'error'; message: string }
   | { state: 'ok'; items: CorpChangeListItem[] };
 
-export function CorpChangesView({ pickOrg }: { pickOrg: boolean }) {
+export function CorpChangesView({
+  pickOrg,
+  canOpenDetail,
+  canOpenTenantScreen,
+}: {
+  pickOrg: boolean;
+  /** 상세(s040200011)를 받은 사람만 오른쪽 칸을 그린다 — 화면코드 그대로(2026-11-16). */
+  canOpenDetail: boolean;
+  canOpenTenantScreen: boolean;
+}) {
   const params = useSearchParams();
   const [creating, setCreating] = useState(false);
+  /** 오른쪽 칸의 건 — 첫 값은 주소(`?sel=`)에서 온다. */
+  const [sel, setSel] = useState<LegalSel | null>(() => readSel(new URLSearchParams(params.toString())));
+  /** 오른쪽 칸의 새 건에 입력이 있다 — [새 건] 이 나가기 확인을 띄운다(링크인 줄은 상세의 확인이 잡는다). */
+  const guard = useRef(false);
 
   /** ★ 첫 조건은 주소에서 온다. 틀린 조건이면 기본(취소 제외 전체)으로 연다. */
   const [filter, setFilter] = useState<CorpChangeListFilter>(() => {
@@ -76,9 +100,10 @@ export function CorpChangesView({ pickOrg }: { pickOrg: boolean }) {
 
   /** ★ 늦게 온 응답이 새 조건을 덮지 않게 한다. */
   const seq = useRef(0);
-  const fetchList = useCallback(async (f: CorpChangeListFilter) => {
+  const fetchList = useCallback(async (f: CorpChangeListFilter, quiet = false) => {
     const mine = ++seq.current;
-    setLoad({ state: 'loading' });
+    // ★ 저장 · 상태 바꾸기 뒤 다시 받을 때(quiet)는 목록을 비우지 않는다 — 줄이 깜박이지 않게.
+    if (!quiet) setLoad({ state: 'loading' });
     try {
       const res = await fetch(`/api/legal/corp-changes?${corpChangeListSearch(f).toString()}`);
       const body = (await res.json()) as CorpChangeListResponse & { message?: string };
@@ -98,10 +123,41 @@ export function CorpChangesView({ pickOrg }: { pickOrg: boolean }) {
 
   useEffect(() => {
     void fetchList(filter);
-    const qs = corpChangeListSearch(filter).toString();
+  }, [filter, fetchList]);
+
+  // ★ 조건 + 고른 건을 주소에 — 새로 고침 · 바로가기가 같은 화면을 연다.
+  useEffect(() => {
+    const qs = writeSel(corpChangeListSearch(filter), sel).toString();
     const next = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
     if (next !== window.location.pathname + window.location.search) window.history.replaceState(null, '', next);
-  }, [filter, fetchList]);
+  }, [filter, sel]);
+
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+  /** 오른쪽 칸이 부른다 — 상세의 동작은 그대로, 「어디로 가는가」만 이 화면이 정한다. */
+  const pane = useMemo<LegalDetailPane>(
+    () => ({
+      onOpen: (id) => {
+        setSel({ kind: 'saved', id, print: null });
+        void fetchList(filterRef.current, true);
+      },
+      onChanged: () => void fetchList(filterRef.current, true),
+      onRemoved: () => {
+        setSel(null);
+        void fetchList(filterRef.current, true);
+      },
+      onGuard: (has) => {
+        guard.current = has;
+      },
+    }),
+    [fetchList],
+  );
+
+  /** [새 건] — 오른쪽 칸의 새 건에 입력이 있으면 먼저 묻는다. */
+  const startNew = () => {
+    if (guard.current && !window.confirm(LEAVE_MESSAGE)) return;
+    setCreating(true);
+  };
 
   const set = <K extends keyof CorpChangeListFilter>(key: K, value: CorpChangeListFilter[K]) =>
     setFilter((f) => ({ ...f, [key]: value }));
@@ -129,179 +185,210 @@ export function CorpChangesView({ pickOrg }: { pickOrg: boolean }) {
 
   const items = load.state === 'ok' ? load.items : [];
 
+  const listQs = corpChangeListSearch(filter);
+
+  /** 줄 누름 — 주소를 옮기지 않고 오른쪽 칸에 그린다. 새 탭(가운데 단추 · Ctrl/⌘)은 그 주소를 그대로 연다. */
+  const pick = (e: MouseEvent<HTMLAnchorElement>, id: string) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    setSel({ kind: 'saved', id, print: null });
+  };
+
   return (
     /*
-      ★ 2026-11-15 — 공통 목록 틀(세무 「거래처」와 같은 배치): 검색 조건 → 버튼 줄 → 목록.
-        조건 칸 · 버튼 · 목록 칸은 그대로이고 자리만 옮겼다 — [새 건] · 건수는 버튼 줄로, 조건은 위 상자로.
+      ★ 2026-11-16 — 왼쪽 목록 4 : 오른쪽 상세 6(청구 화면과 같은 틀 · 3.5 에서는 목록 칸이 들지 않았다).
+        왼쪽: 검색(한 줄 · 위 이름표 없음) → 버튼 줄([새 건] · 건수) → 목록. 오른쪽: 고른 건의 상세(받는 동안 공통 로딩바).
     */
-    <>
-    <ListFrame
-      head={
-        <div className={styles.head} data-page-title>
-          <h1 className={styles.title}>법인변경</h1>
-        </div>
-      }
-      search={
-        <>
-          <div className={styles.field}>
-            <span className={styles.label}>작업일자</span>
-            <span className={styles.range}>
-              <input
-                type="date"
-                className={styles.input}
-                aria-label="작업일자 시작"
-                value={filter.from ?? ''}
-                onChange={(e) => setDay('from', e.target.value)}
-              />
-              ~
-              <input
-                type="date"
-                className={styles.input}
-                aria-label="작업일자 끝"
-                value={filter.to ?? ''}
-                onChange={(e) => setDay('to', e.target.value)}
-              />
-            </span>
-          </div>
+    <div className={styles.splitPage}>
+      <div className={styles.head} data-page-title>
+        <h1 className={styles.title}>법인변경</h1>
+      </div>
+      <div className={styles.split}>
+        <div className={`${styles.splitLeft} ${styles.dense}`}>
+          <ListFrame
+            search={
+              <>
+                <span className={styles.searchRange}>
+                  <span className={styles.searchRangeName}>작업일자</span>
+                  <input
+                    type="date"
+                    className={`${styles.input} ${styles.searchDate}`}
+                    aria-label="작업일자 시작"
+                    value={filter.from ?? ''}
+                    onChange={(e) => setDay('from', e.target.value)}
+                  />
+                  ~
+                  <input
+                    type="date"
+                    className={`${styles.input} ${styles.searchDate}`}
+                    aria-label="작업일자 끝"
+                    value={filter.to ?? ''}
+                    onChange={(e) => setDay('to', e.target.value)}
+                  />
+                </span>
 
-          <label className={styles.field}>
-            <span className={styles.label}>변경구분</span>
-            <select
-              className={styles.select}
-              value={filter.changeType ?? ''}
-              onChange={(e) => set('changeType', (e.target.value || null) as CorpChangeType | null)}
-            >
-              <option value="">전체</option>
-              {changeTypes.map((t) => (
-                <option key={t.code} value={t.code}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </label>
+                <select
+                  className={`${styles.select} ${styles.searchSelect}`}
+                  aria-label="변경구분"
+                  value={filter.changeType ?? ''}
+                  onChange={(e) => set('changeType', (e.target.value || null) as CorpChangeType | null)}
+                >
+                  <option value="">변경구분 전체</option>
+                  {changeTypes.map((t) => (
+                    <option key={t.code} value={t.code}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
 
-          <label className={styles.field}>
-            <span className={styles.label}>진행상태</span>
-            <select
-              className={styles.select}
-              value={filter.status ?? ''}
-              onChange={(e) => set('status', (e.target.value || null) as CorpChangeStatus | null)}
-            >
-              <option value="">전체</option>
-              {statuses.map((s) => (
-                <option key={s.code} value={s.code}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
+                <select
+                  className={`${styles.select} ${styles.searchSelect}`}
+                  aria-label="진행상태"
+                  value={filter.status ?? ''}
+                  onChange={(e) => set('status', (e.target.value || null) as CorpChangeStatus | null)}
+                >
+                  <option value="">진행상태 전체</option>
+                  {statuses.map((s) => (
+                    <option key={s.code} value={s.code}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
 
-          <label className={styles.field}>
-            <span className={styles.label}>입주 여부</span>
-            <select
-              className={styles.select}
-              value={filter.tenancy ?? ''}
-              onChange={(e) => set('tenancy', (e.target.value || null) as TenancyFilter | null)}
-            >
-              <option value="">전체</option>
-              {(Object.keys(TENANCY_LABEL) as TenancyFilter[]).map((t) => (
-                <option key={t} value={t}>
-                  {TENANCY_LABEL[t]}
-                </option>
-              ))}
-            </select>
-          </label>
+                <select
+                  className={`${styles.select} ${styles.searchSelect}`}
+                  aria-label="입주 여부"
+                  value={filter.tenancy ?? ''}
+                  onChange={(e) => set('tenancy', (e.target.value || null) as TenancyFilter | null)}
+                >
+                  <option value="">입주 여부 전체</option>
+                  {(Object.keys(TENANCY_LABEL) as TenancyFilter[]).map((t) => (
+                    <option key={t} value={t}>
+                      {TENANCY_LABEL[t]}
+                    </option>
+                  ))}
+                </select>
 
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={filter.includeCancelled}
-              onChange={(e) => set('includeCancelled', e.target.checked)}
-            />
-            취소 포함
-          </label>
+                <label className={styles.check}>
+                  <input
+                    type="checkbox"
+                    checked={filter.includeCancelled}
+                    onChange={(e) => set('includeCancelled', e.target.checked)}
+                  />
+                  취소 포함
+                </label>
 
-          <span className={styles.spacer} />
-          <button type="button" className={styles.btn} disabled={!filtered} onClick={() => setFilter(EMPTY_FILTER)}>
-            <Icon name="rotate-ccw" size={16} />
-            조건 초기화
-          </button>
-        </>
-      }
-      actions={
-        <>
-          {/* ★ 구분 선택지가 아직 없으면(목록을 못 받음) 누를 수 없다 — 고를 것이 없다. */}
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnPrimary}`}
-            disabled={changeTypes.length === 0}
-            onClick={() => setCreating(true)}
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.searchBtn}`}
+                  disabled={!filtered}
+                  onClick={() => setFilter(EMPTY_FILTER)}
+                >
+                  <Icon name="rotate-ccw" size={16} />
+                  조건 초기화
+                </button>
+              </>
+            }
+            actions={
+              <>
+                {/* ★ 구분 선택지가 아직 없으면(목록을 못 받음) 누를 수 없다 — 고를 것이 없다. */}
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnPrimary}`}
+                  disabled={changeTypes.length === 0}
+                  onClick={startNew}
+                >
+                  <Icon name="plus" size={16} />
+                  새 건
+                </button>
+                <ListNote>
+                  {load.state === 'loading'
+                    ? '불러오는 중입니다'
+                    : load.state === 'error'
+                    ? '목록을 불러오지 못했습니다'
+                    : `${items.length}건${filter.includeCancelled ? ' · 취소 포함' : ''}`}
+                </ListNote>
+              </>
+            }
           >
-            <Icon name="plus" size={16} />
-            새 건
-          </button>
-          <ListNote>
-            {load.state === 'loading'
-              ? '불러오는 중입니다'
-              : load.state === 'error'
-              ? '목록을 불러오지 못했습니다'
-              : `${items.length}건${filter.includeCancelled ? ' · 취소 포함' : ''}`}
-          </ListNote>
-        </>
-      }
-    >
-        <div className={styles.tHead}>
-          <span>회사</span>
-          <span>변경구분</span>
-          <span>진행상태</span>
-          <span>대표자</span>
-          <span>등록일</span>
+            <div className={`${styles.tHead} ${styles.colsSplit}`}>
+              <span>회사</span>
+              <span>변경구분</span>
+              <span>진행상태</span>
+              <span>등록일</span>
+            </div>
+
+            <ListScroll>
+              {load.state === 'loading' ? (
+                <Empty lead="법인변경 건을 불러오는 중입니다" />
+              ) : load.state === 'error' ? (
+                <Empty lead={load.message} />
+              ) : items.length === 0 ? (
+                filtered ? (
+                  <Empty lead="조건에 맞는 법인변경 건이 없습니다" sub="조건을 바꾸거나 초기화해 보세요" />
+                ) : (
+                  <Empty lead="등록된 법인변경 건이 없습니다" />
+                )
+              ) : (
+                items.map((item) => {
+                  const on = sel?.kind === 'saved' && sel.id === item.id;
+                  return (
+                    <a
+                      key={item.id}
+                      href={selHref(LIST_PATH, { kind: 'saved', id: item.id, print: null }, listQs)}
+                      onClick={(e) => pick(e, item.id)}
+                      aria-current={on ? 'true' : undefined}
+                      className={`${styles.tRow} ${styles.colsSplit}${on ? ` ${styles.tRowOn}` : ''}${
+                        item.status === 'X' ? ` ${styles.tRowCanceled}` : ''
+                      }`}
+                    >
+                      <span className={styles.company}>
+                        <span className={styles.ellipsis} title={corpChangeCompanyLabel(item)}>
+                          {corpChangeCompanyLabel(item)}
+                        </span>
+                        <span className={`${styles.badge} ${item.isTenant ? styles.tenant : styles.nonTenant}`}>
+                          {item.isTenant ? '입주사' : '비입주사'}
+                        </span>
+                      </span>
+                      <span className={styles.ellipsis}>{typeNames[item.changeType] ?? item.changeType}</span>
+                      <span>
+                        <span className={`${styles.badge} ${statusClass(item.status)}`}>
+                          {statusNames[item.status] ?? item.status}
+                        </span>
+                      </span>
+                      <span className={styles.mono}>{item.createdOn}</span>
+                    </a>
+                  );
+                })
+              )}
+            </ListScroll>
+          </ListFrame>
         </div>
 
-        <ListScroll>
-        {load.state === 'loading' ? (
-          <Empty lead="법인변경 건을 불러오는 중입니다" />
-        ) : load.state === 'error' ? (
-          <Empty lead={load.message} />
-        ) : items.length === 0 ? (
-          filtered ? (
-            <Empty lead="조건에 맞는 법인변경 건이 없습니다" sub="조건을 바꾸거나 초기화해 보세요" />
+        {/* 오른쪽 상세 — 처음엔 「왼쪽에서 고르세요」. 받는 동안 공통 로딩바(CorpChangeDetailPane). */}
+        <div className={styles.splitRight} data-legal-detail={selKey(sel)}>
+          {!canOpenDetail ? (
+            <PaneEmpty lead="법인변경 상세를 볼 권한이 없습니다" />
+          ) : sel === null ? (
+            <PaneEmpty lead="왼쪽에서 고르세요" sub="법인변경 목록의 행을 누르면 여기에 상세가 나옵니다" />
           ) : (
-            <Empty lead="등록된 법인변경 건이 없습니다" />
-          )
-        ) : (
-          items.map((item) => (
-            <Link
-              key={item.id}
-              href={`/legal/corp-changes/${encodeURIComponent(item.id)}`}
-              className={`${styles.tRow}${item.status === 'X' ? ` ${styles.tRowCanceled}` : ''}`}
-            >
-              <span className={styles.company}>
-                <span className={styles.ellipsis} title={corpChangeCompanyLabel(item)}>
-                  {corpChangeCompanyLabel(item)}
-                </span>
-                <span className={`${styles.badge} ${item.isTenant ? styles.tenant : styles.nonTenant}`}>
-                  {item.isTenant ? '입주사' : '비입주사'}
-                </span>
-              </span>
-              <span className={styles.ellipsis}>{typeNames[item.changeType] ?? item.changeType}</span>
-              <span>
-                <span className={`${styles.badge} ${statusClass(item.status)}`}>
-                  {statusNames[item.status] ?? item.status}
-                </span>
-              </span>
-              <span className={item.ceoName ? styles.ellipsis : styles.muted}>{item.ceoName ?? '—'}</span>
-              <span className={styles.mono}>{item.createdOn}</span>
-            </Link>
-          ))
-        )}
-        </ListScroll>
-    </ListFrame>
+            <CorpChangeDetailPane key={selKey(sel)} sel={sel} canOpenTenantScreen={canOpenTenantScreen} pane={pane} />
+          )}
+        </div>
+      </div>
 
       {creating ? (
-        <NewCorpChangeDialog changeTypes={changeTypes} pickOrg={pickOrg} onClose={() => setCreating(false)} />
+        <NewCorpChangeDialog
+          changeTypes={changeTypes}
+          pickOrg={pickOrg}
+          onClose={() => setCreating(false)}
+          onStart={(draft) => {
+            setCreating(false);
+            setSel({ kind: 'new', draft });
+          }}
+        />
       ) : null}
-    </>
+    </div>
   );
 }
 

@@ -869,3 +869,20 @@
   flex-wrap: wrap;
   gap: 8px 16px;
 }
+
+/* ── 목록 화면 오른쪽 칸에 그릴 때(2026-11-16 대표 지시: 왼쪽 목록 · 오른쪽 상세) ──
+ * ★ 자리만 맞춘다 — 머리의 `-32px`(셸 `.main` 패딩)는 오른쪽 칸 안에서는 칸의 패딩(좌우 16px)이다.
+ *   머리는 칸 안에서 위에 붙는다(칸이 스스로 스크롤한다). 입력 칸 · 표의 폭은 그대로다. */
+.inPane .pageHead {
+  top: 0;
+  margin: 0 -16px;
+}
+
+.inPane .pageHeadInner {
+  max-width: none;
+  padding: 8px 16px;
+}
+
+.inPane .formWrap {
+  max-width: none;
+}

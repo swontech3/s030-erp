@@ -26,12 +26,13 @@ export const ARTICLES_REPLACE_CONFIRM = '바꾸면 이전 정관 파일은 지�
 export const INCORP_ARTICLES_NOTE = '우리 시스템에서 설립한 회사 — 설립 건에서 정관을 출력합니다';
 
 /**
- * 「설립 건 정관 보기」 바로가기 — 설립 건 상세 주소에 표시 하나(`?print=articles`)를 단다(결정 2026-11-07).
+ * 「설립 건 정관 보기」 바로가기 — 설립 건 주소에 표시 하나(`print=articles`)를 단다(결정 2026-11-07).
  * 상세가 [서류 출력]을 열고 그 건의 정관을 골라 둔다. 다른 서류 · 다른 경로는 그대로다.
  */
 export const INCORP_PRINT_ARTICLES = 'articles';
 export function incorpArticlesHref(incorporationId: string): string {
-  return `/legal/incorporations/${encodeURIComponent(incorporationId)}?print=${INCORP_PRINT_ARTICLES}`;
+  // ★ 2026-11-16 — 설립 상세가 목록 화면 오른쪽 칸으로 옮겼다: 목록 화면에서 그 건을 고른 채로(web `features/legal/legal-split.ts`).
+  return `/legal/incorporations?sel=${encodeURIComponent(incorporationId)}&print=${INCORP_PRINT_ARTICLES}`;
 }
 
 /**
