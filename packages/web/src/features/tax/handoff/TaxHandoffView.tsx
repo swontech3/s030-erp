@@ -216,7 +216,7 @@ export function TaxHandoffView({ month }: { month: string }) {
           </div>
         ) : null}
         {data.unassignedCount > 0 && data.unassignedFirstMonth ? (
-          <div className={t.tbar} style={{ color: 'var(--color-danger)', fontSize: 13 }}>
+          <div className={t.tbar} style={{ color: 'var(--color-danger)', fontSize: 'var(--fs-xs)' }}>
             미지정 항목이 있으니 확인하시기 바랍니다.
             <Link href={`/tax/classify?month=${data.unassignedFirstMonth}&status=${TAX_CLS_LEFT}`} className={`${t.btn} ${t.btnSm}`}>
               항목지정

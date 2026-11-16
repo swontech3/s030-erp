@@ -149,8 +149,10 @@ export function TaxVatView({ month }: { month: string }) {
 
       {/* ② 표 — 머리 두 줄 */}
       <div className={t.card}>
-        <div className={t.tblWrap}>
-          <table className={t.tbl}>
+        {/* ★ 2026-11-16 글자 15px — 금액 칸이 가장 좁을 때(셸 1440px) 약 105px 라 「100,000,000」(약 86px)이 넘친다.
+            표 최소 폭 1192(월 72 + 금액 10칸 × 112)을 두고, 더 좁으면 표 안에서 옆으로 스크롤한다 */}
+        <div className={t.tblWrap} style={{ overflowX: 'auto' }}>
+          <table className={t.tbl} style={{ minWidth: 1192 }}>
             <colgroup>
               <col style={{ width: 72 }} />
               {KEYS.map((k) => (
@@ -192,7 +194,7 @@ export function TaxVatView({ month }: { month: string }) {
       {/* ③ 비고 */}
       <div className={`${t.card} ${t.cardPad}`}>
         <div style={{ fontWeight: 700, marginBottom: 8 }}>&lt; 비고 &gt;</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 'var(--fs-xs)' }}>
           <span>신고 · 납부 마감 : {dateLabel(period.deadline)}</span>
           {vat.unassignedCount > 0 && vat.unassignedFirstMonth ? (
             <span className={t.row} style={{ gap: 8, color: 'var(--color-danger)' }}>

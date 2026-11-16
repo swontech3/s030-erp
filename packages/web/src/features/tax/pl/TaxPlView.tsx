@@ -82,7 +82,7 @@ export function TaxPlView({ month }: { month: string }) {
 
       <div className={`${t.card} ${t.cardPad}`}>
         <div className={t.between} style={{ marginBottom: 16 }}>
-          <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>{pl.year}년</h2>
+          <h2 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, margin: 0 }}>{pl.year}년</h2>
           <span className={r.leg}>
             <span>
               <i style={{ background: 'var(--color-primary)' }} />매출
