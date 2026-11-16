@@ -47,7 +47,7 @@
  * ★ [서류 출력](5-4, 2026-10-11) — 작성완료(E) · 완료(C) 건에만 뜬다(`canPrintCorpChange`). 운영사 · 회사 모두.
  *   대화상자(`CorpChangePrintDialog`)가 서버에서 값을 받아 서류를 하나씩 인쇄한다.
  */
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -726,7 +726,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
   const deadline = registrationDeadline(draft.changeType, toWire(def.fields, form), localToday(), officers);
 
   return (
-    <div className={`${styles.page}${pane ? ` ${styles.inPane}` : ''}`}>
+    <div className={`${styles.page} ${styles.detailBars}${pane ? ` ${styles.inPane}` : ''}`}>
       <div className={styles.pageHead}>
         <div className={styles.pageHeadInner}>
           <div className={styles.headTitle}>
@@ -797,6 +797,8 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
         </div>
       </div>
 
+      {/* ★ 2026-11-16 대표 지시 — 오른쪽 칸에서는 주소 칸이 모두 「반 줄」 크기(우편번호 84 · 검색 그림만 · 상세 140)로 한 줄 */}
+      <PaneAddressCompact.Provider value={pane !== undefined}>
       <div className={styles.formScroll}>
         <div className={styles.formWrap}>
           {saveError ? (
@@ -873,9 +875,13 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
               </div>
             ) : null}
 
-            {/* ★ 칸 수에 맞춰 한 행에(최소 3열) — 주소 · 사업목적은 한 줄을 다 쓴다(결정 2026-10-10). */}
+            {/*
+              ★ 칸 수에 맞춰 한 행에(최소 3열) — 주소 · 사업목적은 한 줄을 다 쓴다(결정 2026-10-10).
+              ★ 2026-11-16 대표 지시 — 동일관할 본점이전(HQ)은 1행 신규 본점주소 / 2행 결의일 · 이전일을 오른쪽 칸에서도
+                지킨다(`payloadRows` — 오른쪽 칸의 「격자 1칸」을 받지 않는다). 다른 변경구분은 배치 그대로.
+            */}
             <div
-              className={styles.payloadGrid}
+              className={draft.changeType === 'HQ' ? styles.payloadRows : styles.payloadGrid}
               style={{ gridTemplateColumns: `repeat(${payloadColumns(def.fields)}, minmax(0, 1fr))` }}
             >
               {def.fields.map((f) => (
@@ -932,6 +938,7 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
           {saved && saved.status !== 'P' ? <CorpChangePrintHistory id={saved.id} reloadKey={printLogKey} /> : null}
         </div>
       </div>
+      </PaneAddressCompact.Provider>
 
       {confirm && saved ? (
         <CorpChangeConfirmDialog
@@ -1174,10 +1181,16 @@ function PayloadField({
  * 주소 한 줄 — 우편번호 · 기본주소는 카카오 주소 검색으로 채우고, 상세주소는 손으로 적는다.
  * ★ 계약 폼과 같은 부품(`useKakaoPostcode`)이다. 팝업은 상세주소를 건드리지 않는다.
  */
+/**
+ * 오른쪽 칸(목록 화면의 상세)이면 `true` — 그 안의 주소 칸은 모두 「반 줄」 크기로 그린다(2026-11-16 대표 지시).
+ * 두 상세(법인변경 · 법인설립)가 `pane` 일 때 내려 준다.
+ */
+export const PaneAddressCompact = createContext(false);
+
 export function AddressInput({
   value,
   disabled,
-  compact = false,
+  compact: compactProp = false,
   onChange,
   onError,
 }: {
@@ -1189,6 +1202,8 @@ export function AddressInput({
   onError: (message: string) => void;
 }) {
   const postcode = useKakaoPostcode(onError);
+  const inPane = useContext(PaneAddressCompact);
+  const compact = compactProp || inPane;
   return (
     <div className={`${styles.addrRow}${compact ? ` ${styles.addrCompact}` : ''}`}>
       <input
@@ -1288,6 +1303,25 @@ function payloadColumns(fields: readonly CorpChangeFieldDef[]): number {
  */
 const DOC_NAME_LABEL = '서류에 쓰이는 상호';
 
+/**
+ * 기본정보의 행(2026-11-16 대표 지시 · 모든 변경구분 공통) — 1행 등기상 상호 · 회사유형 · 대표자 / 2행 법인등록번호 ·
+ * 사업자등록번호 · 전화(같은 폭 세 칸 `formRow3`) / 3행 본점주소 / 4행 대표자 자택주소 / 5행 서류에 쓰이는 상호 · 정관파일.
+ * 입주사(읽기만)는 이름표가 「회사명」이고, 정관파일은 5행 끝에 붙는다.
+ */
+const COMPANY_ROWS: readonly (readonly string[])[] = [
+  ['회사명', '회사유형', '대표자'],
+  ['법인등록번호', '사업자등록번호', '전화'],
+  ['본점 주소'],
+  ['대표자 자택 주소'],
+  [DOC_NAME_LABEL],
+];
+const COMPANY_SPANS: Readonly<Record<string, 'span2' | 'span4'>> = {
+  회사명: 'span2',
+  '본점 주소': 'span4',
+  '대표자 자택 주소': 'span4',
+  [DOC_NAME_LABEL]: 'span2',
+};
+
 function CompanySection({
   orgId,
   company,
@@ -1353,17 +1387,25 @@ function CompanySection({
         </div>
         <div className={styles.sectionRule} />
         <p className={styles.sectionNote}>입주사 정보는 ERP 입주사 정보를 읽어 보여 줍니다. 여기서는 고치지 않습니다.</p>
-        <div className={styles.grid4}>
-          {rows.map(([label, value, wide]) => (
-            <div key={label} className={`${styles.field}${wide ? ` ${styles.span2}` : ''}`}>
-              <span className={styles.label}>{label}</span>
-              <span className={`${styles.readValue}${value ? '' : ` ${styles.readEmpty}`}`}>{value || '—'}</span>
-              {/* 대표주소 변경의 작성완료 — 자택 주소가 비면 서버가 company.ceo 로 거절한다(입주사 화면에서 입력) */}
-              {label === '대표자 자택 주소' && errorFor('ceo') ? <span className={styles.fieldError}>{errorFor('ceo')}</span> : null}
+        {/* ★ 2026-11-16 대표 지시 — 행은 비입주사와 같다(`COMPANY_ROWS`). 주소는 한 행을 통째로 쓴다. */}
+        <div className={styles.formRows}>
+          {COMPANY_ROWS.map((labels, r) => (
+            <div key={r} className={r === 1 ? styles.formRow3 : styles.formRow}>
+              {labels.map((label) => {
+                const value = rows.find(([l]) => l === label)?.[1] ?? null;
+                return (
+                  <div key={label} className={`${styles.field}${COMPANY_SPANS[label] ? ` ${styles[COMPANY_SPANS[label]]}` : ''}`}>
+                    <span className={styles.label}>{label}</span>
+                    <span className={`${styles.readValue}${value ? '' : ` ${styles.readEmpty}`}`}>{value || '—'}</span>
+                    {/* 대표주소 변경의 작성완료 — 자택 주소가 비면 서버가 company.ceo 로 거절한다(입주사 화면에서 입력) */}
+                    {label === '대표자 자택 주소' && errorFor('ceo') ? <span className={styles.fieldError}>{errorFor('ceo')}</span> : null}
+                  </div>
+                );
+              })}
+              {/* 정관 파일 — 입주사도 법무 쪽에서 관리(운영사만 올린다, 결정 2026-11-07) */}
+              {r === COMPANY_ROWS.length - 1 ? <ArticlesFileField orgId={orgId} onError={onError} /> : null}
             </div>
           ))}
-          {/* 정관 파일 — 입주사도 법무 쪽에서 관리(운영사만 올린다, 결정 2026-11-07) */}
-          <ArticlesFileField orgId={orgId} onError={onError} />
         </div>
       </section>
     );
@@ -1414,7 +1456,9 @@ function CompanySection({
         </div>
       </div>
       <div className={styles.sectionRule} />
-      <div className={styles.grid4}>
+      {/* ★ 2026-11-16 대표 지시 — 행은 `COMPANY_ROWS` 와 같다. 주소는 한 행을 통째로 쓴다(우편번호 · 검색 · 기본 · 상세 한 줄). */}
+      <div className={styles.formRows}>
+      <div className={styles.formRow}>
         {text('legalName', '등기상 상호', true)}
         <label className={styles.field}>
           <span className={styles.label}>
@@ -1437,20 +1481,29 @@ function CompanySection({
           {fieldError('memberType')}
         </label>
         {text('ceoName', '대표자')}
+      </div>
+      {/* 2행은 같은 폭 세 칸(2026-11-16) */}
+      <div className={styles.formRow3}>
         {text('corpNumber', '법인등록번호')}
         {text('bizNumber', '사업자등록번호')}
-        {text('tel', '전화', true)}
-        {/* 두 주소를 한 행에 나란히(반 줄씩) — 한 화면에 들어오게(결정 2026-10-10) */}
-        <div className={`${styles.field} ${styles.span2}`}>
+        {text('tel', '전화')}
+      </div>
+      {/* 주소는 한 행에 하나씩(2026-11-16 — 전에는 두 주소를 반 줄씩 나란히, 결정 2026-10-10) */}
+      <div className={styles.formRow}>
+        <div className={`${styles.field} ${styles.span4}`}>
           <span className={styles.label}>본점 주소</span>
-          <AddressInput value={form.head} disabled={disabled} compact onChange={(head) => set({ head })} onError={onError} />
+          <AddressInput value={form.head} disabled={disabled} onChange={(head) => set({ head })} onError={onError} />
           {fieldError('headAddress') ?? fieldError('headZipCode') ?? fieldError('headAddressDetail')}
         </div>
-        <div className={`${styles.field} ${styles.span2}`}>
+      </div>
+      <div className={styles.formRow}>
+        <div className={`${styles.field} ${styles.span4}`}>
           <span className={styles.label}>대표자 자택 주소</span>
-          <AddressInput value={form.ceo} disabled={disabled} compact onChange={(ceo) => set({ ceo })} onError={onError} />
+          <AddressInput value={form.ceo} disabled={disabled} onChange={(ceo) => set({ ceo })} onError={onError} />
           {fieldError('ceo') ?? fieldError('ceoAddress') ?? fieldError('ceoZipCode') ?? fieldError('ceoAddressDetail')}
         </div>
+      </div>
+      <div className={styles.formRow}>
         {/* 서류에 쓰이는 상호 — 읽기만. 입력 중인 상호 · 회사유형으로 출력과 같은 함수를 부른다(결정 2026-11-06) */}
         <div className={`${styles.field} ${styles.span2}`}>
           <span className={styles.label}>{DOC_NAME_LABEL}</span>
@@ -1458,6 +1511,7 @@ function CompanySection({
         </div>
         {/* 정관 파일 — 건의 [저장] 과 따로, 고르는 즉시 올라간다(결정 2026-11-07) */}
         <ArticlesFileField orgId={orgId} onError={onError} />
+      </div>
       </div>
     </section>
   );

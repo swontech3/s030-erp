@@ -253,6 +253,46 @@
   grid-column: span 4;
 }
 
+/* ★ 2026-11-16 대표 지시 — 법인설립 · 법인변경 상세의 **정한 행**. 한 행 = 4칸 격자 하나(칸이 모자라면 뒤가 빈다).
+ *   오른쪽 칸(`.inPane`)에서도 1칸으로 접지 않는다 — 행 배치가 대표 지시다. */
+.formRows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 16px;
+}
+
+/* 같은 폭 세 칸 — 법인변경 기본정보 2행(법인등록번호 · 사업자등록번호 · 전화) */
+.formRow3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 16px;
+}
+
+/* 칸 간격 8px — 발기인(사원) 입력 1행(성명 · 인수 주식 수 · 취임일 · 주민등록번호) */
+.formRowTight {
+  column-gap: 8px;
+}
+
+/* 변경 내용 — 동일관할 본점이전(HQ). 열 수는 `payloadGrid` 와 같이 화면이 정하고, 오른쪽 칸에서도 접지 않는다 */
+.payloadRows {
+  display: grid;
+  column-gap: 16px;
+  row-gap: 12px;
+}
+
+/* ★ 2026-11-16 — 두 상세의 섹션 이름 앞 세로 막대(3px). 색은 **앱 기본색** `--color-app-primary`(삐용 앱 공통 테마색,
+ *   대표 결정) — ERP 기본색(`--color-primary`)이 아니다. 다른 화면에는 붙지 않는다(`.detailBars`). */
+.detailBars .sectionHeader h2 {
+  border-left: 3px solid var(--color-app-primary);
+  padding-left: 8px;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -560,8 +600,16 @@
 
 @media (max-width: 900px) {
   .grid4,
-  .payloadGrid {
+  .payloadGrid,
+  .formRow,
+  .formRow3,
+  .payloadRows {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .formRow,
+  .formRow3 {
+    row-gap: 12px;
   }
 
   .span2,
@@ -888,7 +936,10 @@
 }
 
 /* ★ 2026-11-16 — 오른쪽 칸은 창이 넓어도 칸이 좁다(1500px 에서 약 680px). 위 「좁은 창」(max-width: 900px) 규칙 가운데
- *   **주소 줄 접기 · 격자 1칸**을 오른쪽 칸에서도 쓴다 — 새 모양이 아니라 같은 규칙이다(대표 지시). */
+ *   **격자 1칸**을 오른쪽 칸에서도 쓴다 — 새 모양이 아니라 같은 규칙이다(대표 지시).
+ * ★ 같은 날 뒤 지시 — 대표가 행을 정한 곳(`.formRow` · `.payloadRows`)은 접지 않고, **주소는 한 줄**
+ *   (우편번호 · 검색 · 기본주소 · 상세주소)로 둔다 — 「주소 줄 접기」는 뺐다. 크기는 「반 줄」(`.addrCompact`)이다
+ *   (오른쪽 칸이면 `AddressInput` 이 스스로 고른다 — `PaneAddressCompact`). */
 .inPane .grid4,
 .inPane .payloadGrid {
   grid-template-columns: minmax(0, 1fr) !important;
@@ -899,14 +950,12 @@
   grid-column: span 1;
 }
 
-.inPane .addrRow {
-  flex-wrap: wrap;
+.inPane .formRow > .span2 {
+  grid-column: span 2;
 }
 
-.inPane .addrMain,
-.inPane .addrDetail {
-  width: 100%;
-  flex: 1 1 100%;
+.inPane .formRow > .span4 {
+  grid-column: span 4;
 }
 
 /* ★ 2026-11-16 — 오른쪽 칸의 임원 표(법인변경) · 사람 표(법인설립): 가로 스크롤은 그대로, **동작 칸([수정] · [삭제])만
