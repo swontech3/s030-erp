@@ -144,7 +144,7 @@ function assertServiceRole(token: string): void {
  *    순간 OCR 이 죽었다. 상대경로를 그대로 두면 이번에는 **프로세스의 cwd** 에
  *    따라 죽는다(`npm --prefix` 로 띄우면 cwd 가 저장소 루트다). 그래서 읽는
  *    자리에서 한 번 확정한다.
- * ★ 2026-10-24 부터 키 파일은 환경 폴더(C:\workspace\env\)에 두고 **절대경로**로 적는다.
+ * ★ 2026-10-24 부터 키 파일은 환경 폴더(SWONBIZ_ENV_DIR)에 두고 **절대경로**로 적는다.
  *    절대경로는 아래 resolve 가 그대로 둔다. 상대경로 처리는 옛 `.env` 용으로 남긴다.
  */
 const credentialsRaw = process.env.GOOGLE_APPLICATION_CREDENTIALS;
