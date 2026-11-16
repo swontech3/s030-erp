@@ -43,7 +43,7 @@
 
 .title {
   margin: 0;
-  font-size: 30px;
+  font-size: var(--text-h2-size);
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.018em;
@@ -106,7 +106,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   color: var(--text-heading);
 }
@@ -122,7 +122,7 @@
   background: transparent;
   color: var(--text-body);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   text-align: left;
   cursor: pointer;
   transition: background var(--dur) var(--ease-out);
@@ -151,7 +151,7 @@
 }
 
 .nodeCount {
-  font-size: 11px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
 }
 
@@ -164,7 +164,7 @@
 
 .leaf {
   composes: node;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   padding: 5px 8px;
 }
 
@@ -174,7 +174,7 @@
   flex-wrap: wrap;
   gap: 2px 8px;
   padding: 2px 8px 6px;
-  font-size: 11px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
 }
 
@@ -184,7 +184,7 @@
 
 .empty {
   padding: 8px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
 }
 
@@ -216,7 +216,7 @@
 /* ★ 패널 제목은 **화면 제목이 아니다** — 화면 제목은 `.title`(30px) 하나뿐이다. */
 .panelTitle {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--text-button-lg-size);
   font-weight: 700;
   line-height: 1.4;
   letter-spacing: -0.012em;
@@ -225,7 +225,7 @@
 
 .panelSub {
   margin: 4px 0 0;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
 }
 
@@ -240,7 +240,7 @@
   display: grid;
   place-items: center;
   min-height: 240px;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
   text-align: center;
 }
@@ -265,13 +265,13 @@
 
 .emptyLead {
   margin: 14px 0 0;
-  font-size: 16px;
+  font-size: var(--text-body-size);
   color: var(--text-muted);
 }
 
 .emptySub {
   margin: 4px 0 0;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-caption);
 }
 
@@ -298,7 +298,7 @@
 
 .filterLabel {
   flex: 0 0 56px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   color: var(--text-caption);
 }
@@ -319,7 +319,7 @@
   background: var(--surface);
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -360,14 +360,14 @@
 
 .defLabel {
   margin: 0 0 4px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   color: var(--text-caption);
 }
 
 .defValue {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-body);
   word-break: break-word;
 }
@@ -407,7 +407,7 @@
   /* ★ `collapse` 면 sticky 머리말의 아래 테두리가 함께 굴러 사라진다. */
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 14px;
+  font-size: var(--text-body-size);
 }
 
 .table th {
@@ -418,7 +418,7 @@
   padding: 0 10px;
   background: var(--surface-alt);
   border-bottom: 1px solid var(--border);
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--text-caption);
@@ -465,7 +465,7 @@
   background: var(--surface);
   color: var(--text-heading);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
@@ -551,7 +551,7 @@
   display: inline-block;
   padding: 1px 7px;
   border-radius: var(--radius-pill);
-  font-size: 11px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   white-space: nowrap;
 }
@@ -582,7 +582,7 @@
   border-radius: var(--radius-md);
   background: var(--color-warning-bg);
   color: var(--color-warning-text);
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   line-height: 1.6;
 }
 
@@ -618,7 +618,7 @@
 
 .sectionTitle {
   margin: 0 0 10px;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   color: var(--text-caption);
 }

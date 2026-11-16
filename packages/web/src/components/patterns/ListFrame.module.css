@@ -82,6 +82,6 @@
 
 .note {
   margin-left: 4px;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-muted);
 }

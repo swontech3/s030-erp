@@ -249,10 +249,17 @@ export function InvoiceDetailPane({ invoiceId, companyName, roomNames, contract,
                       <span>입금일</span>
                       <span className={styles.right}>금액</span>
                       <span>수단</span>
-                      <span>비고</span>
+                      <span />
                       <span />
                     </div>
-                    {detail.payments.map((p) => (
+                    {detail.payments.map((p) => {
+                      /*
+                       * ★ 2026-11-16 — 비고는 칸이 아니라 **그 줄 아래 한 줄**(말줄임 없이). 비고가 있는 줄만.
+                       *   오른쪽 상세(약 430px)에 다섯 칸이 들지 않아 비고 칸이 거의 0 이 됐다(대표 결정).
+                       *   보이는 글은 전과 같다 — 비고, 비고 없는 음수 수납은 「환불」.
+                       */
+                      const memo = p.amount < 0 && !p.memo ? '환불' : p.memo;
+                      return (
                       <div key={p.paymentId} className={`${styles.miniRow} ${styles.paysGrid}`}>
                         <span className={styles.mono}>{dotDate(p.paidOn)}</span>
                         <span
@@ -261,9 +268,7 @@ export function InvoiceDetailPane({ invoiceId, companyName, roomNames, contract,
                           {won(p.amount)}
                         </span>
                         <span>{PAY_METHOD_LABEL[p.payMethod] ?? p.payMethod}</span>
-                        <span className={`${styles.ellipsis} ${styles.muted}`} title={p.memo}>
-                          {p.amount < 0 && !p.memo ? '환불' : p.memo || '—'}
-                        </span>
+                        <span />
                         <span className={styles.actions}>
                           <button
                             type="button"
@@ -282,8 +287,10 @@ export function InvoiceDetailPane({ invoiceId, companyName, roomNames, contract,
                             {confirmDelete === p.paymentId ? '삭제 확인' : '삭제'}
                           </button>
                         </span>
+                        {memo ? <span className={`${styles.muted} ${styles.paysMemo}`}>{memo}</span> : null}
                       </div>
-                    ))}
+                      );
+                    })}
                   </>
                 )}
               </div>

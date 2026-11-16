@@ -72,7 +72,7 @@ export function Checkbox({ label, description, checked, onChange, disabled, styl
         ) : null}
       </span>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ fontSize: '16px', color: 'var(--text-heading)' }}>{label}</span>
+        <span style={{ fontSize: 'var(--text-body-size)', color: 'var(--text-heading)' }}>{label}</span>
         {description ? (
           <span style={{ fontSize: 'var(--text-caption-size)', color: 'var(--text-muted)' }}>{description}</span>
         ) : null}

@@ -61,7 +61,7 @@ export function Input({ label, hint, error, size = 'md', iconLeft, id, style, ..
             height: h,
             padding: iconLeft ? '0 16px 0 42px' : '0 16px',
             fontFamily: 'var(--font-core)',
-            fontSize: '16px',
+            fontSize: 'var(--text-body-size)',
             color: 'var(--text-heading)',
             background: 'var(--surface)',
             border: `1px solid ${border}`,

@@ -279,7 +279,6 @@ export function BillingView() {
       (cond.st === null || payStCodeOf(statusOf(it, asOf)) === cond.st),
   );
   const sum = summarize(visible, asOf);
-  const filtered = q !== '' || cond.st !== null;
 
   /*
    * ══════════════════════════════════════════════════════════════════════════
@@ -499,15 +498,16 @@ export function BillingView() {
             }
             summary={
               <div className={styles.summaryBar} data-summary="1">
-                <SumCell label="총 청구액" value={won(sum.total)} note={filtered ? '필터 적용' : undefined} />
+                {/* ★ 2026-11-16 — 「필터 적용」 표시는 뺐다(글자를 키운 뒤 총괄표가 한 줄에 들게, 대표 결정). */}
+                <SumCell label="총 청구액" value={sumAmount(sum.total)} />
                 {/*
                   ★ 수납 완료는 **청구에 들어간 몫**만이다. 과납분(돌려줄 돈)은 여기에도 미수금에도
                     섞지 않는다 — 섞으면 다른 입주사의 미수금이 깎여 보인다. 옆의 「환불액」이 그 몫이다.
                 */}
-                <SumCell label="수납 완료" value={won(sum.received)} />
-                <SumCell label="미수금" value={won(sum.outstanding)} />
+                <SumCell label="수납 완료" value={sumAmount(sum.received)} />
+                <SumCell label="미수금" value={sumAmount(sum.outstanding)} />
                 {/* ★★ 환불액 — **과납 합계**다(받은 것이 청구보다 많은 장). 미수금과 반대 방향이고 절대 섞지 않는다. */}
-                <SumCell label="환불액 (과납)" value={won(sum.overpaid)} />
+                <SumCell label="환불액 (과납)" value={sumAmount(sum.overpaid)} />
                 {/* ★ 2026-11-15 — 이름 · 값 한 줄. 미납 금액은 건수 옆 괄호에(예: 3건 (1,250,000)). */}
                 <div className={styles.sumCell}>
                   <div className={styles.sumLabel}>미납</div>
@@ -602,6 +602,14 @@ export function BillingView() {
   );
 }
 
+
+/**
+ * 총괄표 금액 — 「₩」 없이 숫자만(음수는 앞에 「−」 그대로). ★ 2026-11-16 대표 결정: 1억 이상에서도 한 줄에 들게.
+ *   목록 · 상세 · 엑셀은 그대로 `won`(₩ 붙음).
+ */
+function sumAmount(n: number): string {
+  return won(n).replace('₩', '');
+}
 
 /** 총괄표 한 칸 — 이름 · 값(· 있으면 작은 글)을 한 줄에 나란히. 값은 `summarize` 가 낸다. */
 function SumCell({ label, value, note }: { label: string; value: string; note?: string }) {

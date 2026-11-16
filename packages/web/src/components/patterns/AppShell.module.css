@@ -92,7 +92,7 @@
 }
 
 .wordmark {
-  font-size: 17px;
+  font-size: var(--text-body-lg-size);
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--text-heading);
@@ -125,7 +125,7 @@
   background: transparent;
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 15px;
+  font-size: var(--text-nav-size);
   font-weight: 400;
   text-align: left;
   text-decoration: none;
@@ -194,7 +194,7 @@
   border-radius: var(--radius-sm);
   background: var(--surface-inverse);
   color: #ffffff;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 400;
   white-space: nowrap;
   box-shadow: var(--shadow-float);
@@ -275,7 +275,7 @@
   border-radius: var(--radius-sm);
   background: var(--surface-inverse);
   color: #ffffff;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 400;
   white-space: nowrap;
   box-shadow: var(--shadow-float);
@@ -319,12 +319,12 @@
 }
 
 .crumb {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-caption);
 }
 
 .title {
-  font-size: 17px;
+  font-size: var(--text-bar-title-size);
   font-weight: 700;
   letter-spacing: -0.015em;
   color: var(--text-heading);
@@ -417,13 +417,13 @@
 }
 
 .userMenuName {
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
 }
 
 .userMenuOrg {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
   margin-top: 2px;
 }
@@ -440,7 +440,7 @@
   background: transparent;
   color: var(--text-heading);
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   cursor: pointer;
   transition: background 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -460,7 +460,7 @@
   color: var(--color-primary-hover);
   display: grid;
   place-items: center;
-  font-size: 13px;
+  font-size: var(--text-micro-size);
   font-weight: 700;
   flex: 0 0 auto;
 }
@@ -474,7 +474,7 @@
 
 .userName {
   display: block;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
   white-space: nowrap;
@@ -482,7 +482,7 @@
 
 .userOrg {
   display: block;
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -631,7 +631,7 @@
 }
 
 .roleNote {
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -658,7 +658,7 @@
   background: var(--color-warning-bg);
   border: 1px solid var(--color-warning);
   color: var(--color-warning-text);
-  font-size: 12px;
+  font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   text-decoration: none;
   white-space: nowrap;
