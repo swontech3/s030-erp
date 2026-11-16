@@ -13,6 +13,7 @@
  *
  * 종료코드: 0 = 전부 통과 / 1 = 실패 있음 / 2 = 실행 실패
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const { Client } = require('pg');
 
@@ -58,7 +59,7 @@ if (require.main === module) {
         .filter((l) => l.includes('=') && !l.trim().startsWith('#'))
         .map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^"|"$/g, '')]; }),
     );
-  const apiEnv = readEnv(process.argv[3] || 'packages/api/.env');
+  const apiEnv = (process.argv[3] ? readEnv(process.argv[3]) : readEnvFiles(['common', 'erp-api'], { legacy: ['packages/api/.env'] }));
   (async () => {
     let results;
     const erpUrl = apiEnv.ERP_DATABASE_URL || '';

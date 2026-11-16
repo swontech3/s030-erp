@@ -11,6 +11,7 @@
  *
  * 종료코드: 0 = 전부 통과 / 1 = 실패 있음 / 2 = 실행 실패
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const { Client } = require('pg');
 
@@ -21,7 +22,7 @@ const readEnv = (file) =>
       .map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^"|"$/g, '')]; }),
   );
 
-const apiEnv = readEnv(process.argv[3] || 'packages/api/.env');
+const apiEnv = (process.argv[3] ? readEnv(process.argv[3]) : readEnvFiles(['common', 'erp-api'], { legacy: ['packages/api/.env'] }));
 
 /** 분류 → [분류 이름, [코드, 이름] 순서대로, 고정 코드인가]. 202 와 같은 값이다. */
 const WANT = {

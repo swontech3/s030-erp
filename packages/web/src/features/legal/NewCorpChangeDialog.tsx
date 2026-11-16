@@ -40,9 +40,14 @@ interface Props {
   /** 운영사면 true — 회사를 팝업으로 고른다. */
   pickOrg: boolean;
   onClose: () => void;
+  /**
+   * 고른 조건으로 새 건(임시 모드)을 연다 — 2026-11-16 부터 목록 화면 오른쪽 칸에(`legal-split.ts` 의 draft).
+   * 없으면 옛 주소(`/legal/corp-changes/new?…`)로 간다.
+   */
+  onStart?: (draft: string) => void;
 }
 
-export function NewCorpChangeDialog({ changeTypes, pickOrg, onClose }: Props) {
+export function NewCorpChangeDialog({ changeTypes, pickOrg, onClose, onStart }: Props) {
   const router = useRouter();
   const [changeType, setChangeType] = useState('');
   const [org, setOrg] = useState<OrgPick | null>(null);
@@ -117,6 +122,10 @@ export function NewCorpChangeDialog({ changeTypes, pickOrg, onClose }: Props) {
       qs.set('orgCode', org.orgCode);
     }
     if (canPickType && pickedType !== '') qs.set('memberType', pickedType);
+    if (onStart) {
+      onStart(qs.toString());
+      return;
+    }
     router.push(`/legal/corp-changes/new?${qs.toString()}`);
   };
 

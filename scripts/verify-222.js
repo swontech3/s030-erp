@@ -10,6 +10,7 @@
  *
  * 종료코드: 0 = 전부 통과 / 1 = 실패 있음 / 2 = 실행 실패
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const { Client } = require('pg');
 
@@ -20,7 +21,7 @@ const readEnv = (file) =>
       .map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^"|"$/g, '')]; }),
   );
 
-const rootEnv = readEnv(process.argv[2] || '.env');
+const rootEnv = (process.argv[2] ? readEnv(process.argv[2]) : readEnvFiles(['common', 'admin'], { legacy: ['.env'] }));
 const dryAt = process.argv.indexOf('--dry-run');
 const dryFiles = dryAt >= 0 ? process.argv.slice(dryAt + 1) : null;
 

@@ -869,3 +869,66 @@
   flex-wrap: wrap;
   gap: 8px 16px;
 }
+
+/* ── 목록 화면 오른쪽 칸에 그릴 때(2026-11-16 대표 지시: 왼쪽 목록 · 오른쪽 상세) ──
+ * ★ 자리만 맞춘다 — 머리의 `-32px`(셸 `.main` 패딩)는 오른쪽 칸 안에서는 칸의 패딩(좌우 16px)이다.
+ *   머리는 칸 안에서 위에 붙는다(칸이 스스로 스크롤한다). 입력 칸 · 표의 폭은 그대로다. */
+.inPane .pageHead {
+  top: 0;
+  margin: 0 -16px;
+}
+
+.inPane .pageHeadInner {
+  max-width: none;
+  padding: 8px 16px;
+}
+
+.inPane .formWrap {
+  max-width: none;
+}
+
+/* ★ 2026-11-16 — 오른쪽 칸은 창이 넓어도 칸이 좁다(1500px 에서 약 680px). 위 「좁은 창」(max-width: 900px) 규칙 가운데
+ *   **주소 줄 접기 · 격자 1칸**을 오른쪽 칸에서도 쓴다 — 새 모양이 아니라 같은 규칙이다(대표 지시). */
+.inPane .grid4,
+.inPane .payloadGrid {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.inPane .span2,
+.inPane .span4 {
+  grid-column: span 1;
+}
+
+.inPane .addrRow {
+  flex-wrap: wrap;
+}
+
+.inPane .addrMain,
+.inPane .addrDetail {
+  width: 100%;
+  flex: 1 1 100%;
+}
+
+/* ★ 2026-11-16 — 오른쪽 칸의 임원 표(법인변경) · 사람 표(법인설립): 가로 스크롤은 그대로, **동작 칸([수정] · [삭제])만
+ *   오른쪽 끝에 붙박이**(대표 결정). 칸 폭 · 주소 칸은 그대로다. 바탕은 그 행과 같게 — 머리 행 · 보통 행 · 고치는 중인 행.
+ *   줄 오른쪽 여백(16px)까지 덮어, 붙은 동안에도 단추가 칸 끝에서 16px 안쪽에 있게 한다. */
+.inPane .oHead > :last-child,
+.inPane .oRow > :last-child {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  margin-right: -16px;
+  padding-right: 16px;
+  background: var(--surface);
+}
+
+.inPane .oHead > :last-child {
+  background: var(--surface-alt);
+}
+
+.inPane .oRowEditing > :last-child {
+  background: var(--surface-alt);
+}

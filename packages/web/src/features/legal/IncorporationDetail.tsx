@@ -80,6 +80,7 @@ import { BizPurposePickerDialog } from './BizPurposePickerDialog';
 import { IncorporationPrintDialog } from './IncorporationPrintDialog';
 import { IncorporationPrintHistory } from './IncorporationPrintHistory';
 import styles from './corp-change-detail.module.css';
+import type { LegalDetailPane } from './CorpChangeDetail';
 
 interface Props {
   /** 머리 · 선택지 — 임시 모드는 임시 모드 읽기 응답, 저장된 건은 상세 응답 그대로. */
@@ -99,6 +100,8 @@ interface Props {
    * 서류를 출력할 수 있는 건(작성완료 · 완료)일 때만. 처음 한 번만 — 닫으면 지금과 같다.
    */
   openArticlesPrint?: boolean;
+  /** 목록 화면 오른쪽 칸(2026-11-16) — 없으면 옛 단독 화면처럼 주소를 옮긴다. */
+  pane?: LegalDetailPane;
 }
 
 /**
@@ -320,7 +323,7 @@ const personBody = (p: {
   rrn: p.rrn === '' ? null : p.rrn,
 });
 
-export function IncorporationDetail({ draft, saved: initialSaved, picked = null, openArticlesPrint = false }: Props) {
+export function IncorporationDetail({ draft, saved: initialSaved, picked = null, openArticlesPrint = false, pane }: Props) {
   const router = useRouter();
   /** ★ 저장된 건은 **상태로** 든다 — 전이 · 저장이 돌려준 새 상세, 409 뒤에 다시 읽은 상세로 다시 그린다. */
   const [saved, setSaved] = useState<IncorporationDetailResponse | null>(initialSaved);
@@ -419,6 +422,12 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
       document.removeEventListener('click', onClick, true);
     };
   }, [hasInput]);
+  // ★ 오른쪽 칸 — 목록의 [새 건] 은 링크가 아니라 위 확인이 못 잡는다. 목록이 보고 확인을 띄운다.
+  const onGuard = pane?.onGuard;
+  useEffect(() => {
+    onGuard?.(hasInput);
+    return () => onGuard?.(false);
+  }, [hasInput, onGuard]);
 
   // ── 저장 ────────────────────────────────────────────────────────────────
   /** 새 상세로 다시 그린다 — 상태 · 버튼 · 설립 정보 · 사람 모두 서버 값으로. */
@@ -470,7 +479,8 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
   /** 건의 주소로 옮겨 간다 — 나가기 확인을 풀고, 뒤로 가기에 임시 모드가 남지 않게 replace. */
   const goToSaved = (id: string) => {
     leaving.current = true;
-    router.replace(`/legal/incorporations/${encodeURIComponent(id)}`);
+    if (pane) pane.onOpen(id);
+    else router.replace(`/legal/incorporations/${encodeURIComponent(id)}`);
   };
 
   /** [저장] — 검증 없이 임시 저장. */
@@ -482,7 +492,10 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
       return;
     }
     setBusy(false);
-    if (done) notify('저장했습니다');
+    if (done) {
+      pane?.onChanged();
+      notify('저장했습니다');
+    }
   };
 
   /**
@@ -589,6 +602,7 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
     setConfirm(null);
     const res = await send<IncorporationDetailResponse>('GET', base!);
     if (res.ok) applyDetail(res.body);
+    pane?.onChanged();
     setFieldErrors({});
     setSaveError(res.ok ? message : res.status === 404 ? '이 건을 찾을 수 없습니다 — 다른 사용자가 지웠을 수 있습니다' : message);
   };
@@ -605,6 +619,7 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
       setConfirm(null);
       setFieldErrors({});
       applyDetail(res.body);
+      pane?.onChanged();
       setTypeNotice(res.body.companyTypeNotice ?? null);
       notify(`「${res.body.statusName}」 상태로 바꿨습니다`);
       return null;
@@ -633,7 +648,8 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
     const res = await send<unknown>('DELETE', `${base}?from=${encodeURIComponent(saved.status)}`);
     if (res.ok) {
       leaving.current = true;
-      router.replace('/legal/incorporations');
+      if (pane) pane.onRemoved();
+      else router.replace('/legal/incorporations');
       return null;
     }
     if (res.status === 409) {
@@ -764,7 +780,7 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
   );
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page}${pane ? ` ${styles.inPane}` : ''}`}>
       <div className={styles.pageHead}>
         <div className={styles.pageHeadInner}>
           <div className={styles.headTitle}>
@@ -801,10 +817,13 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
                 onConfirm={setConfirm}
               />
             ) : null}
-            <Link href="/legal/incorporations" className={`${styles.btn} ${styles.btnGhost}`}>
-              <Icon name="chevron-left" size={16} />
-              법인설립 목록
-            </Link>
+            {/* ★ 오른쪽 칸에서는 목록이 바로 왼쪽에 있다 — 「목록」 단추는 단독 화면에만. */}
+            {pane ? null : (
+              <Link href="/legal/incorporations" className={`${styles.btn} ${styles.btnGhost}`}>
+                <Icon name="chevron-left" size={16} />
+                법인설립 목록
+              </Link>
+            )}
             {editable ? (
               <button
                 type="button"
