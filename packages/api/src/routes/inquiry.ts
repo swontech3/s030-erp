@@ -69,6 +69,7 @@ import {
 } from '../db/inquiries.ts';
 import { hashPassword, verifyPassword } from '../lib/password.ts';
 import { phoneDigitsToken } from '../lib/crypto.ts';
+import { inquiryTypeName, notifyNewInquiryLater } from '../bbiyong/notifyInquiry.ts';
 
 /** 세션이 없는 요청이 쓰는 스코프 — RLS 가 0건으로 보는 자리(`routes/kiosk.ts` 와 같다). */
 const NO_SCOPE = { role: 'tenant' as const, companyId: null };
@@ -239,6 +240,10 @@ export function registerInquiryRoutes(app: FastifyInstance): void {
         passwordHash,
       }),
     );
+
+    // ★ 앱 1단계 3-마(2026-11-16) — 삐용에 「새 문의」 알림을 부탁한다. **기다리지 않는다** · 실패해도 저장 · 응답은 그대로.
+    //   싣는 것은 문의 번호와 유형 이름뿐(고객 이름 · 연락처 없음) — bbiyong/notifyInquiry.ts
+    notifyNewInquiryLater({ inquiryId, typeName: inquiryTypeName(codes, input.type) }, req.log);
 
     // 완료 화면의 「목록 표시」 미리보기용 — 실명이 아니라 가린 이름을 돌려준다.
     return reply.code(201).send({ inquiryId, maskedName: maskName(input.name), type: input.type });
