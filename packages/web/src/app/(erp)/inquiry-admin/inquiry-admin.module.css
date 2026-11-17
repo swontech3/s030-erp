@@ -1187,3 +1187,128 @@
 .roundActionsFixed .roundActions {
   margin-top: 0;
 }
+
+/* =============================================================================
+ * 앱 안 문의 목록 — 결재함 목록과 같은 배치 · 모양 (2026-11-17 대표 지시)
+ * =============================================================================
+ * 앱 s02-app 결재함(pages/s0221a3000) 목록 값을 옮긴다: 검색 줄(글자 34 · 고르기 상자) · 카드(여백 12 · 사이 8 · 모서리 8) · 2행.
+ * 색은 변수만 쓴다 — 앱 안은 AppShell `.inApp` 이 변수를 앱 값(아쿠아 · 회색)으로 덮는다.
+ *   유형 꼬리표 = 회색 바탕 · 회색 글자 / 접수(진행) = 옅은 아쿠아 · 진한 아쿠아 / 그 밖(끝남) = 회색
+ * ★ `.phone` 아래에만 건다 — PC 는 그대로.
+ * ============================================================================= */
+.phone .listHead {
+  padding: 8px 12px;
+}
+
+.typeField {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.typeLabel {
+  flex: 0 0 34px;
+  font-size: 12px;
+  color: var(--text-caption);
+}
+
+.typeBoxWrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.typeBox {
+  width: 100%;
+  padding: 6px 28px 6px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-heading);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.typeArrow {
+  position: absolute;
+  right: 10px;
+  font-size: 12px;
+  color: var(--text-caption);
+  pointer-events: none;
+}
+
+.phone .cards {
+  padding-bottom: 8px;
+  background: var(--surface-alt);
+}
+
+.phone .card {
+  width: calc(100% - 24px);
+  margin: 8px 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.appTag {
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.appState {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.appStateIng {
+  color: var(--color-primary-hover);
+  background: var(--color-accent-bg);
+}
+
+.appStateEnd {
+  color: var(--text-muted);
+  background: var(--surface-alt);
+}
+
+.appRow2 {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.appName {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.appDate {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--text-caption);
+  white-space: nowrap;
+}

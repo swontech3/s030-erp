@@ -33,6 +33,7 @@ import { LoadingBar } from '@/components/patterns/LoadingBar';
 import { codeName, dotDate, type InquiryCodes } from '@/features/inquiry/inquiry-model';
 import type { ThreadMessage } from '@/features/inquiry/inquiry-model';
 import {
+  cardTail,
   detailHistory,
   initialStatus,
   inquiryAdminLayout,
@@ -344,7 +345,30 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
   }, [items, listError, status, type, query, total, codes]);
 
   /* 유형은 5종이라 칩으로 두면 줄이 넘친다 — 420px 목록 머리에는 선택이 맞다 */
-  const typeSelect = (
+  const typeSelect = layout.typeBox ? (
+    /* ★ 앱 안 — 결재함 「구분」 모양: 「유형」 글자 + 「전체 ▾」 상자. 상자는 기본 select 라 누르면 폰 기본 고르기 창(2026-11-17) */
+    <label className={styles.typeField}>
+      <span className={styles.typeLabel}>유형</span>
+      <span className={styles.typeBoxWrap}>
+        <select
+          className={styles.typeBox}
+          value={type ?? ''}
+          aria-label="문의 유형"
+          onChange={(e) => setType(e.target.value || null)}
+        >
+          <option value="">전체</option>
+          {codes.types.map((t) => (
+            <option key={t.code} value={t.code}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        <span className={styles.typeArrow} aria-hidden="true">
+          ▾
+        </span>
+      </span>
+    </label>
+  ) : (
     <select
       className={styles.typeSelect}
       value={type ?? ''}
@@ -387,6 +411,8 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
         <div className={styles.list}>
           <div className={styles.listHead}>
             <div className={styles.searchRow}>
+              {/* ★ 앱 안은 감춘다 — 검색 조건은 유형 하나(결재함 목록과 같은 배치 · 2026-11-17) */}
+              {layout.keywordSearch ? (
               <span className={styles.searchWrap}>
                 <span className={styles.searchIcon}>
                   <Icon name="search" size={16} />
@@ -398,6 +424,7 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
                   onChange={(e) => setKeyword(e.target.value)}
                 />
               </span>
+              ) : null}
               {/* ★ 앱 안은 감춘다 — 제목 아래 안내 줄 「접수 N건」과 겹친다(5-나 덧붙임 2026-11-12) */}
               {layout.searchCount ? <span className={styles.count}>{total}건</span> : null}
               {/* ★ 앱 안은 유형 고르기를 검색칸 오른쪽에 — 한 줄(5-나 덧붙임) */}
@@ -482,6 +509,29 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
                     className={`${styles.card}${it.inquiryId === selectedId ? ` ${styles.cardSelected}` : ''}`}
                     onClick={() => setSelectedId(it.inquiryId)}
                   >
+                    {layout.phone ? (
+                      /* ★ 앱 안 — 결재함 목록과 같은 2행(2026-11-17)
+                         1행 유형 꼬리표 · 상태 / 2행 문의자 이름 · 문의일자 · 원글만(추가 질문) */
+                      <>
+                        <span className={styles.cardRow1}>
+                          <span className={styles.appTag}>{typeName(it.type)}</span>
+                          <span className={`${styles.appState} ${it.status === 'R' ? styles.appStateIng : styles.appStateEnd}`}>
+                            {statusName(it.status)}
+                          </span>
+                        </span>
+                        <span className={styles.appRow2}>
+                          <span className={styles.appName}>
+                            {it.name}
+                            {it.retentionPassed ? <span className={styles.badgeOld} style={{ marginLeft: 6 }}>보관 기간 지남</span> : null}
+                          </span>
+                          <span className={styles.appDate}>
+                            {dotDate(it.day)}
+                            {cardTail(it.lastKind) ? ` · ${cardTail(it.lastKind)}` : ''}
+                          </span>
+                        </span>
+                      </>
+                    ) : (
+                    <>
                     <span className={styles.cardRow1}>
                       {/* 제목 칸이 없다 — **문의 유형이 제목**이다(02-screens §2) */}
                       <span className={styles.cardType}>{typeName(it.type)}</span>
@@ -495,6 +545,8 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
                       {it.retentionPassed ? <span className={styles.badgeOld} style={{ marginLeft: 6 }}>보관 기간 지남</span> : null}
                     </span>
                     <span className={styles.cardLast}>{lastLine(it)}</span>
+                    </>
+                    )}
                   </button>
                 ))}
                 {rest > 0 ? (

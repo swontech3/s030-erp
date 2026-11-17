@@ -54,6 +54,21 @@ export interface InquiryAdminLayout {
    * ★ 앱 안 : 문의 · 답변 묶음만 스크롤되고 단추는 늘 보인다. PC 는 지금 그대로.
    */
   fixedReplyActions: boolean;
+  /**
+   * 목록일 때 제목 아래 안내 줄(「접수 N건」)을 보이는가 — 문의 목록 앱 모양(2026-11-17 대표 지시)
+   * ★ 앱 안은 감춘다(목록 · 상세 모두). PC 는 그대로.
+   */
+  listHeadNote: boolean;
+  /**
+   * 이름 · 연락처 검색칸을 보이는가 — 문의 목록 앱 모양(2026-11-17)
+   * ★ 앱 안 검색 조건은 유형 하나다(결재함 목록과 같은 배치). PC 는 그대로.
+   */
+  keywordSearch: boolean;
+  /**
+   * 유형 고르기를 결재함 「구분」 모양(「유형」 글자 + 「전체 ▾」 상자)으로 그리는가 — 문의 목록 앱 모양(2026-11-17)
+   * ★ 상자는 기본 select 를 꾸민 것이다 — 누르면 폰 기본 고르기 창(대표 답 2026-11-17). PC 는 그대로.
+   */
+  typeBox: boolean;
 }
 
 export function inquiryAdminLayout(inApp: boolean): InquiryAdminLayout {
@@ -70,6 +85,9 @@ export function inquiryAdminLayout(inApp: boolean): InquiryAdminLayout {
         detailHeadNote: false,
         detailRounds: true,
         fixedReplyActions: true,
+        listHeadNote: false,
+        keywordSearch: false,
+        typeBox: true,
       }
     : {
         phone: false,
@@ -83,6 +101,9 @@ export function inquiryAdminLayout(inApp: boolean): InquiryAdminLayout {
         detailHeadNote: true,
         detailRounds: false,
         fixedReplyActions: false,
+        listHeadNote: true,
+        keywordSearch: true,
+        typeBox: false,
       };
 }
 
@@ -118,9 +139,20 @@ export function retentionDeleteHint(deleteButtonShown: boolean): string {
   return `${deleteButtonShown ? '' : 'PC 화면에서 '}[글 삭제]로 개인정보를 지워 주세요.`;
 }
 
-/** 제목 아래 안내 줄(「접수 N건」)을 보이는가 — 앱 안 상세면 감춘다(3-마 덧붙임 3) */
+/** 제목 아래 안내 줄(「접수 N건」)을 보이는가 — 앱 안은 상세(3-마 덧붙임 3) · 목록(2026-11-17) 모두 감춘다 */
 export function showHeadNote(layout: InquiryAdminLayout, selectedId: string | null): boolean {
-  return layout.detailHeadNote || !selectedId;
+  return selectedId ? layout.detailHeadNote : layout.listHeadNote;
+}
+
+/**
+ * 앱 안 목록 2행 오른쪽 — 문의일자 뒤에 붙는 글(2026-11-17 대표 답)
+ *   - 답글이 없으면(`lastKind` 없음) 「원글만」 · 고객 추가 질문이 마지막이면 「추가 질문」
+ *   - 답변(글 · 전화)이 마지막이면 붙이지 않는다 — 앱 안 목록은 접수만(`fixedStatus`)이라 오지 않는다
+ * ★ 「답변 없음」은 붙이지 않는다. PC 셋째 줄(`lastLine`)은 그대로다.
+ */
+export function cardTail(lastKind: string | null): string {
+  if (!lastKind) return '원글만';
+  return lastKind === 'customer' ? '추가 질문' : '';
 }
 
 /**
