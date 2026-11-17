@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  cardTail,
   detailHistory,
   initialStatus,
   inquiryAdminLayout,
@@ -35,6 +36,9 @@ describe('inquiryAdminLayout', () => {
       detailHeadNote: false,
       detailRounds: true,
       fixedReplyActions: true,
+      listHeadNote: false,
+      keywordSearch: false,
+      typeBox: true,
     });
   });
   it('앱 아님(PC) — 지금 그대로', () => {
@@ -50,6 +54,9 @@ describe('inquiryAdminLayout', () => {
       detailHeadNote: true,
       detailRounds: false,
       fixedReplyActions: false,
+      listHeadNote: true,
+      keywordSearch: true,
+      typeBox: false,
     });
   });
   it('접수 빈 목록 둘째 줄 「답변을 기다리는 문의가 없습니다」 — 앱 안은 감춘다(첫 줄 「접수 문의가 없습니다」와 뜻이 겹친다 · 5-나 덧붙임 2026-11-12) · PC 는 보인다', () => {
@@ -118,13 +125,36 @@ describe('retentionDeleteHint — 「보관 기간 지남」 안내의 지우는
 });
 
 describe('showHeadNote — 3-마 덧붙임 3', () => {
-  it('앱 안 — 목록이면 보이고 상세면 감춘다(「접수 N건」은 상세에서 뜻이 없다)', () => {
-    expect(showHeadNote(APP, null)).toBe(true);
+  it('앱 안 — 목록에서도 상세에서도 감춘다(목록 「접수 N건」 지움 · 문의 목록 앱 모양 2026-11-17)', () => {
+    expect(showHeadNote(APP, null)).toBe(false);
     expect(showHeadNote(APP, 'q-1')).toBe(false);
   });
   it('PC — 늘 보인다(지금 그대로)', () => {
     expect(showHeadNote(PC, null)).toBe(true);
     expect(showHeadNote(PC, 'q-1')).toBe(true);
+  });
+});
+
+describe('문의 목록 앱 모양 — 2026-11-17 대표 지시(결재함 목록과 같은 배치)', () => {
+  it('검색 조건은 유형 하나 — 앱 안은 이름 · 연락처 검색칸을 감춘다 · PC 는 그대로', () => {
+    expect(APP.keywordSearch).toBe(false);
+    expect(PC.keywordSearch).toBe(true);
+  });
+  it('유형 고르기 = 결재함 「구분」 모양(「유형」 글자 + 「전체 ▾」 상자) — 앱 안만', () => {
+    expect(APP.typeBox).toBe(true);
+    expect(PC.typeBox).toBe(false);
+  });
+});
+
+describe('cardTail — 앱 안 목록 2행 오른쪽 일자 뒤 글(2026-11-17)', () => {
+  it('답글이 없으면 「원글만」(「답변 없음」은 붙이지 않는다)', () => {
+    expect(cardTail(null)).toBe('원글만');
+  });
+  it('고객 추가 질문이 마지막이면 「추가 질문」', () => {
+    expect(cardTail('customer')).toBe('추가 질문');
+  });
+  it.each([['text'], ['phone']])('답변이 마지막(%p)이면 붙이지 않는다 — 앱 안 목록은 접수만이라 오지 않는다', (k) => {
+    expect(cardTail(k)).toBe('');
   });
 });
 
