@@ -10,6 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cardTail,
+  replyNotice,
   detailHistory,
   initialStatus,
   inquiryAdminLayout,
@@ -155,6 +156,21 @@ describe('cardTail — 앱 안 목록 2행 오른쪽 일자 뒤 글(2026-11-17)'
   });
   it.each([['text'], ['phone']])('답변이 마지막(%p)이면 붙이지 않는다 — 앱 안 목록은 접수만이라 오지 않는다', (k) => {
     expect(cardTail(k)).toBe('');
+  });
+});
+
+describe('replyNotice — 답변 뒤 안내 문구(2026-11-17 대표 폰 확인 · 세로 화면에서 다 안 보임)', () => {
+  it('앱 안 [답변 등록] 뒤 — 「답변 등록했습니다.」', () => {
+    expect(replyNotice(APP, 'text')).toBe('답변 등록했습니다.');
+  });
+  it('앱 안 [전화로 답변함] 뒤 — 「전화 답변 등록했습니다.」', () => {
+    expect(replyNotice(APP, 'phone')).toBe('전화 답변 등록했습니다.');
+  });
+  it('PC — 지금 문구 그대로', () => {
+    expect(replyNotice(PC, 'text')).toBe('답변을 등록했습니다 · 상태가 「답변완료」로 바뀌었습니다');
+    expect(replyNotice(PC, 'phone')).toBe(
+      '전화로 답변한 기록을 남겼습니다 · 고객 화면에 「전화로 답변드렸습니다」로 보입니다',
+    );
   });
 });
 

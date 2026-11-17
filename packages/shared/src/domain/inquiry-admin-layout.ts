@@ -145,6 +145,17 @@ export function showHeadNote(layout: InquiryAdminLayout, selectedId: string | nu
 }
 
 /**
+ * 답변 뒤 안내 문구(토스트) — 2026-11-17 대표 폰 확인 : 앱 안은 세로 화면에서 긴 문구가 다 안 보인다
+ * ★ 앱 안만 짧게. 안내가 나오는 자리 · 방식은 그대로다. PC 는 지금 문구 그대로.
+ */
+export function replyNotice(layout: InquiryAdminLayout, kind: 'text' | 'phone'): string {
+  if (layout.phone) return kind === 'phone' ? '전화 답변 등록했습니다.' : '답변 등록했습니다.';
+  return kind === 'phone'
+    ? '전화로 답변한 기록을 남겼습니다 · 고객 화면에 「전화로 답변드렸습니다」로 보입니다'
+    : '답변을 등록했습니다 · 상태가 「답변완료」로 바뀌었습니다';
+}
+
+/**
  * 앱 안 목록 2행 오른쪽 — 문의일자 뒤에 붙는 글(2026-11-17 대표 답)
  *   - 답글이 없으면(`lastKind` 없음) 「원글만」 · 고객 추가 질문이 마지막이면 「추가 질문」
  *   - 답변(글 · 전화)이 마지막이면 붙이지 않는다 — 앱 안 목록은 접수만(`fixedStatus`)이라 오지 않는다

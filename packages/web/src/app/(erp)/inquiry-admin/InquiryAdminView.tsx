@@ -37,6 +37,7 @@ import {
   detailHistory,
   initialStatus,
   inquiryAdminLayout,
+  replyNotice,
   resetStatus,
   showHeadNote,
 } from '@swonbiz/shared/domain/inquiry-admin-layout';
@@ -265,11 +266,8 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
         });
         // ★ 목록을 다시 받는다 — 상태가 바뀌어 「접수」 필터에서 빠지거나 뱃지가 바뀐다.
         void loadList(1, false);
-        notify(
-          kind === 'phone'
-            ? '전화로 답변한 기록을 남겼습니다 · 고객 화면에 「전화로 답변드렸습니다」로 보입니다'
-            : '답변을 등록했습니다 · 상태가 「답변완료」로 바뀌었습니다',
-        );
+        // ★ 앱 안은 짧은 문구(세로 화면 · 2026-11-17) — PC 는 그대로. 문구는 shared replyNotice 한곳
+        notify(replyNotice(layout, kind));
         return true;
       } catch {
         notify('서버에 연결할 수 없습니다');
@@ -278,7 +276,7 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
         setDetailBusy(false);
       }
     },
-    [selectedId, detail, loadList, notify],
+    [selectedId, detail, loadList, notify, layout],
   );
 
   /** 답변 수정 — 「수정됨」. 순서는 그대로다(서버가 `created_at` 을 건드리지 않는다). */
