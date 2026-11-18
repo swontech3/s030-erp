@@ -13,9 +13,9 @@
  * ★ 시트는 지금 화면의 처리 · 시트 함수를 그대로 부른다 — 매입 · 매출 · 카드 · 현금은 항목 지정 「이번 달 자료 전체」(기간 직접 지정),
  *   국세 · 지방세 · 대출은 세금 · 4대보험 · 대출 화면(기간 직접 지정). 은행거래내역 · 이체내역 시트만 새로(화면이 아직 없다).
  * ★ 받는 사람은 세무 설정의 세무사 메일 가운데서만 — 다른 주소는 400(아무 주소로나 보내지 않는다).
- * ★ 참조는 서버가 정한다 — 발송인이 대표자가 아니면 대표자(화면이 보낸 참조는 받지 않는다). 보내는 주소는 SMTP_FROM,
+ * ★ 참조는 서버가 정한다 — 발송인이 운영자가 아니면 운영자(화면이 보낸 참조는 받지 않는다). 보내는 주소는 SMTP_FROM,
  *   보내는 이름은 로그인 사람 이름, 답장 주소(Reply-To)는 로그인 사람 메일(`handoffPeople` — 삐용에서 얻지 못한 칸은 빼고 보낸다).
- *   메일 · 대표자는 기존 삐용 조회 my-orgs · 내 단체 정보를 로그인한 사람의 토큰으로 읽는다(2026-11-10, 삐용 팀 요청 없음).
+ *   메일 · 운영자는 기존 삐용 조회 my-orgs · 내 단체 정보를 로그인한 사람의 토큰으로 읽는다(2026-11-10, 삐용 팀 요청 없음).
  * ★ 메일 보내기는 트랜잭션 밖에서 한다 — 준비(읽기 · 엑셀) 한 번, 보내기, 최종 발송 덮어쓰기 한 번(성공할 때만).
  */
 import type { FastifyInstance } from 'fastify';
@@ -294,16 +294,16 @@ async function withSessionName(session: ErpSession, r: TaxHandoffResponse): Prom
 
 /* ── 발송인 · 참조 ───────────────────────────────────────────────────────── */
 
-/** 발송인(로그인 사람) · 대표자 — 삐용에서 얻은 것. 얻지 못한 칸은 null. */
+/** 발송인(로그인 사람) · 운영자 — 삐용에서 얻은 것. 얻지 못한 칸은 null. */
 export interface HandoffPeople {
   sender: HandoffPerson;
-  /** 대표자 — 삐용에서 얻지 못하면 null. */
+  /** 운영자 — 삐용에서 얻지 못하면 null. */
   rep: HandoffPerson | null;
 }
 
 /**
- * 참조 — 발송인이 대표자가 아니면 대표자(대표자 메일이 있을 때만). 발송인이 대표자면 참조 없음.
- * ★ 같은 사람인지는 메일로 본다. 발송인 메일을 모르면 대표자가 아닌 것으로 본다.
+ * 참조 — 발송인이 운영자가 아니면 운영자(운영자 메일이 있을 때만). 발송인이 운영자면 참조 없음.
+ * ★ 같은 사람인지는 메일로 본다. 발송인 메일을 모르면 운영자가 아닌 것으로 본다.
  */
 export function handoffCc(p: HandoffPeople): HandoffPerson | null {
   const repMail = p.rep?.email?.trim().toLowerCase();
@@ -312,7 +312,7 @@ export function handoffCc(p: HandoffPeople): HandoffPerson | null {
   return me === repMail ? null : p.rep;
 }
 
-/** 삐용 세 조회 — 발송인 이름 · 발송인 메일 · 대표자. 각각 실패하면 던진다(`readHandoffPeople` 이 null 로 받는다). */
+/** 삐용 세 조회 — 발송인 이름 · 발송인 메일 · 운영자. 각각 실패하면 던진다(`readHandoffPeople` 이 null 로 받는다). */
 export interface HandoffPeopleSource {
   senderName(): Promise<string | null>;
   senderEmail(): Promise<string | null>;
@@ -320,8 +320,8 @@ export interface HandoffPeopleSource {
 }
 
 /**
- * 발송인 · 대표자를 함께 읽는다(2026-11-10). ★ 어느 조회가 실패(403 · 장애 · 시간 초과)해도 그 칸만 null —
- * 화면 · 보내기는 그대로 돈다(오류를 내지 않는다). 대표자 메일이 없으면 참조도 없다(`handoffCc`).
+ * 발송인 · 운영자를 함께 읽는다(2026-11-10). ★ 어느 조회가 실패(403 · 장애 · 시간 초과)해도 그 칸만 null —
+ * 화면 · 보내기는 그대로 돈다(오류를 내지 않는다). 운영자 메일이 없으면 참조도 없다(`handoffCc`).
  */
 export async function readHandoffPeople(src: HandoffPeopleSource): Promise<HandoffPeople> {
   const safe = async <T>(f: () => Promise<T | null>): Promise<T | null> => {
@@ -344,10 +344,10 @@ export interface BbiyongPeopleDeps {
 }
 
 /**
- * 삐용에서 사람을 읽는다(11-08 ⑧ · 2026-11-10 메일 · 대표자). 삐용 호출은 두 번 — 세무사 전달 화면 읽기 · 보내기마다.
+ * 삐용에서 사람을 읽는다(11-08 ⑧ · 2026-11-10 메일 · 운영자). 삐용 호출은 두 번 — 세무사 전달 화면 읽기 · 보내기마다.
  *   발송인 이름   `getProfile(memberId).memberName`(로그인 때 받은 값)
  *   발송인 메일   `GET /s021200010/my-orgs` 의 지금 계정(current) 줄 `email`
- *   대표자        `GET /s021100020/org?orgId=(세션 단체)` — 이름 `memberName` · 메일 `emailFst@emailSnd`
+ *   운영자        `GET /s021100020/org?orgId=(세션 단체)` — 이름 `memberName` · 메일 `emailFst@emailSnd`
  */
 export function bbiyongPeopleSource(session: ErpSession, deps: BbiyongPeopleDeps): HandoffPeopleSource {
   return {
@@ -379,7 +379,7 @@ export interface HandoffPrepared {
 /** 바꿔 끼울 수 있는 부분 — 시험이 DB · 삐용 없이 흐름을 본다. */
 export interface HandoffSendParts {
   prepare(session: ErpSession, q: HandoffQuery): Promise<HandoffOp<HandoffPrepared>>;
-  /** 발송인 · 대표자 — 삐용에서 읽는다, 못 읽은 칸은 null. */
+  /** 발송인 · 운영자 — 삐용에서 읽는다, 못 읽은 칸은 null. */
   people(session: ErpSession): Promise<HandoffPeople>;
   /** 성공한 발송으로 최종 발송을 덮어쓴다. */
   saveLast(session: ErpSession, key: HandoffLastKey, last: NewHandoffLast): Promise<HandoffLastView>;

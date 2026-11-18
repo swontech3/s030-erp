@@ -219,7 +219,7 @@ async function main() {
       const s2 = await sendHandoff(session(ORG_A), { ...body, to: ['ceo@example.com'] }, badMail, parts);
       const s3 = await sendHandoff(session(ORG_A), { ...body, to: ['someone@else.com'] }, okMail, parts);
       const xl = mails[0] ? XLSX.read(mails[0].attachments[0].content, { type: 'array' }) : null;
-      check('T12', '★ 보내기 — 성공(제목 · 내용 그대로 · 첨부 아홉 시트 · 참조 대표자 · 답장 발송인) · 실패는 사유만 · 세무 설정에 없는 메일은 400 · 메일은 한 번만',
+      check('T12', '★ 보내기 — 성공(제목 · 내용 그대로 · 첨부 아홉 시트 · 참조 운영자 · 답장 발송인) · 실패는 사유만 · 세무 설정에 없는 메일은 400 · 메일은 한 번만',
         s1.ok && s1.data.ok && s1.data.last.sentBy === '7' && s1.data.last.sentByName === '지어낸 보낸이' && s1.data.last.cc === 'rep@example.com' &&
         s2.ok && !s2.data.ok && s2.data.message === '메일을 보내지 못했습니다 — 지어낸 메일 서버 오류' &&
         !s3.ok && s3.status === 400 && mails.length === 1 && mails[0].subject === '지어낸 제목' && mails[0].text === '지어낸 내용' &&
