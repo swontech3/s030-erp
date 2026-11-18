@@ -503,6 +503,22 @@ describe('HttpBbiyongOrg — 단체 목록(org-list)', () => {
     ]);
   });
 
+  it('★★ 대표자(repName) = 행의 ceoName — 운영자 memberName 은 쓰지 않는다 · 없거나 비면 null(2026-11-18)', async () => {
+    const { org } = adapter(page([
+      { ...row(5, 'VHF', '해피프렌즈', 3), ceoName: ' 김대표자 ' },
+      { ...row(1, 'SWT', '에스원', 3), ceoName: '' },
+      row(2, 'TWO', '둘', 3),
+    ]));
+    const out = await org.listOrgs({ name: '' }, 'tok');
+    expect(out.kind === 'ok' ? out.value.map((o) => [o.orgCode, o.repName]) : out).toEqual([
+      ['SWT', null],
+      ['TWO', null],
+      ['VHF', '김대표자'],
+    ]);
+    const one = await org.getOrg({ orgId: 5 }, 'tok');
+    expect(one.kind === 'ok' ? one.value?.repName : one).toBe('김대표자');
+  });
+
   it('★ GET · 토큰 · 회사명 일부 · 쪽 크기 100 · 1쪽 — 행을 다섯 칸으로, 코드 순', async () => {
     const { org, calls } = adapter(page([row(5, 'VHF', '해피프렌즈', 2), row(1, 'SWT', '(주)에스원테크', 2)]));
     const out = await org.listOrgs({ name: ' 프렌 ' }, 'tok');

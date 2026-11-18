@@ -47,6 +47,11 @@ interface MockAccount extends Omit<BbiyongLoginResult, 'accessToken' | 'refreshT
    */
   orgCode?: string;
   /**
+   * 삐용 단체 정보의 「대표자」(`ceoName`, 2026-11-18) — 회사 단체에만. 단체 조회의 대표자(`repName`)가 된다.
+   * ★ `memberName`(운영자 이름)과 다른 사람이다. 없으면 대표자 빈칸.
+   */
+  ceoName?: string;
+  /**
    * 삐용 「내 메뉴」(`my-menus`)가 줄 **삐용** 화면코드(대문자) — `screens`(ERP 화면)와 다른 어휘다.
    * 법무 회사 정보 「받기」가 토큰을 확인할 때 본다(2026-10-23). 운영사 계정에만 단체관리(`S021100010`).
    */
@@ -113,6 +118,7 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     // ★ s030200090 내 청구서(앱 1단계 7-나 · 2026-11-08) — 입주사 전용 보기 화면. 운영사 계정에는 넣지 않는다.
     screens: ['s030000050', 's030200090', 's030600010', 's050100010', 's050100020', 's050200010', 's050300010', 's050300040', 's050300050', 's050300060', 's050400010', 's050400020', 's050500010'],
     orgCode: 'Z97',
+    ceoName: '최비앤',
   },
   {
     email: 'noaccess@test.com',
@@ -143,6 +149,7 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     scope: 'tenant',
     screens: ['s030000050', 's040100010', 's040100020', 's040200010', 's040200011', 's050100010', 's050100020', 's050200010', 's050300010', 's050300040', 's050300050', 's050300060', 's050400010', 's050400020', 's050500010'],
     orgCode: 'Z99',
+    ceoName: '정한빛',
     // ★ 화면 확인용(2026-10-25) — 「내 단체 정보」 수정 키가 있는 회사 사용자. 법무 회사 정보 칸이 열린다.
     bbiyongMenus: ['S021100021'],
     bbiyongMenuKeys: { S021100021: ['F002'] },

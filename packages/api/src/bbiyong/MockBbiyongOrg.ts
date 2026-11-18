@@ -53,8 +53,9 @@ function seededOrgs(): BbiyongOrgInfo[] {
     orgId: a.orgId,
     orgCode: a.orgCode as string,
     orgName: a.orgName,
-    // ★★ 대표자는 빈칸 — 계정 이름은 삐용 운영자(회원구분 C) 이름이라 대표자로 쓰지 않는다(2026-11-18, 실연동과 같게).
-    repName: null,
+    // ★★ 대표자 = 계정표의 `ceoName`(삐용 「대표자」 칸, 실연동과 같게, 2026-11-18) — 없으면 빈칸.
+    //    계정 이름(`memberName`)은 운영자 이름이라 대표자로 쓰지 않는다.
+    repName: a.ceoName ?? null,
     status: MOCK_ORG_STATUS,
   }));
 }
@@ -195,7 +196,7 @@ export class MockBbiyongOrg implements BbiyongOrg {
       orgId,
       orgCode: req.orgCode,
       orgName: req.orgName,
-      repName: null, // ★★ 실연동과 같게 빈칸(2026-11-18) — 삐용 단체 목록의 이름은 운영자 이름이다
+      repName: null, // ★★ 빈칸 — 등록 요청에 `ceoName` 칸이 없다. `memberName` 은 운영자 이름이라 쓰지 않는다(2026-11-18)
       status: MOCK_ORG_STATUS,
     });
     // ★ 등록은 OFFICE 를 켠 상태로 만든다 — moduleCodes 에 OFFICE 를 보내기 때문이다.
