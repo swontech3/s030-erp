@@ -120,7 +120,7 @@ function memberClient(row: MemberRow | null, emailTaken = false) {
 const REP: MemberRow = { member_id: 'M-rep', company_id: 'c-1', is_representative: 'C', status: 'active' };
 
 describe('applyMemberFromBbiyong', () => {
-  it('★★ 회원번호로 찾아 받은 칸만 UPDATE · 활성 대표면 회사 표 ceo_name 도', async () => {
+  it('★★ 회원번호로 찾아 받은 칸만 UPDATE · 활성 대표여도 회사 표 ceo_name 은 그대로(운영자 이름은 대표자가 아니다)', async () => {
     const db = memberClient(REP);
     expect(await applyMemberFromBbiyong(db.client, 851, { name: '최현수2', phone: '010-1234-5678' })).toBe('applied');
     expect(db.seen[0]!.params).toEqual([851]);
@@ -129,11 +129,11 @@ describe('applyMemberFromBbiyong', () => {
     expect(upd[0]!.sql).toContain('name = $3, phone = $4');
     expect(upd[0]!.sql).not.toMatch(/email|link_/);
     expect(upd[0]!.params).toEqual(['M-rep', 'bbiyong', '최현수2', '010-1234-5678']);
-    expect(upd[1]!.sql).toContain('tb_s080_companies SET ceo_name');
-    expect(upd[1]!.params).toEqual(['c-1', '최현수2', 'bbiyong']);
+    expect(upd).toHaveLength(1);
+    expect(db.seen.some((s) => /tb_s080_companies/.test(s.sql))).toBe(false);
   });
 
-  it('★ 직원이거나 · 비활성 옛 대표이거나 · 이름을 안 받았으면 ceo_name 은 그대로', async () => {
+  it('★ 직원 · 비활성 옛 대표 · 이름을 안 받음도 ceo_name 은 그대로', async () => {
     for (const [row, fields] of [
       [{ ...REP, is_representative: 'M' }, { name: '가' }],
       [{ ...REP, status: 'inactive' }, { name: '가' }],

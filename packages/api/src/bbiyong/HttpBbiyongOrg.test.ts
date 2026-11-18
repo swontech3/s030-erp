@@ -468,9 +468,9 @@ describe('parseMemberOp — 성공 게이트', () => {
     if (out.kind === 'rejected') expect(out.message).toContain('이미 사용중인 이메일');
   });
 
-  it('★ 대표 삭제 거절도 삐용 문구를 그대로 쓴다', () => {
-    const out = parseMemberOp({ result: 'fail', status: 400, massage: '대표는 삭제할 수 없습니다.' }, 'D');
-    if (out.kind === 'rejected') expect(out.message).toContain('대표는 삭제할 수 없습니다');
+  it('★ 운영자 삭제 거절도 삐용 문구를 그대로 쓴다', () => {
+    const out = parseMemberOp({ result: 'fail', status: 400, massage: '운영자는 삭제할 수 없습니다.' }, 'D');
+    if (out.kind === 'rejected') expect(out.message).toContain('운영자는 삭제할 수 없습니다');
   });
 
   it('403 은 등록과 같은 안내로 바꾼다', () => {
@@ -513,7 +513,7 @@ describe('HttpBbiyongOrg — 단체 목록(org-list)', () => {
     expect(calls[0]!.init.method).toBe('GET');
     expect((calls[0]!.init.headers as Record<string, string>).authorization).toBe('Bearer tok');
     // 삐용이 준 것 중 회사명에 「프렌」이 든 것만(모의 어댑터와 같은 규칙)
-    expect(out).toEqual({ kind: 'ok', value: [{ orgId: 5, orgCode: 'VHF', orgName: '해피프렌즈', repName: '홍대표', telNo: null, status: null }] });
+    expect(out).toEqual({ kind: 'ok', value: [{ orgId: 5, orgCode: 'VHF', orgName: '해피프렌즈', repName: null, telNo: null, status: null }] });
   });
 
   it('★ 전체 수(totCnt)만큼 쪽을 넘겨 끝까지 받는다', async () => {
