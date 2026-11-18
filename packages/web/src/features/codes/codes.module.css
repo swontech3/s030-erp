@@ -758,3 +758,12 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* 주인 걸러 보기(2026-11-18) — [분류코드 추가] 와 한 줄. 버튼과 같은 높이로 작게. */
+.ownerSelect {
+  width: auto;
+  margin-right: 6px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: var(--text-micro-size);
+}

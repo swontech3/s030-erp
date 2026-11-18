@@ -29,6 +29,7 @@ import { registerFileRoutes } from './routes/files.ts';
 import { registerOcrRoutes } from './routes/ocr.ts';
 import { registerFacilityRoutes } from './routes/facility.ts';
 import { registerCodeRoutes } from './routes/codes.ts';
+import { registerBbiyongCodeRoutes } from './routes/codesBbiyong.ts';
 import { registerFormTemplateRoutes } from './routes/formTemplates.ts';
 import { registerOrgLookupRoutes } from './routes/orgLookup.ts';
 import { registerCorpChangeRoutes } from './routes/corpChanges.ts';
@@ -157,6 +158,8 @@ registerFacilityRoutes(app);
 // ★★ 소비용 조회는 `registerLookupRoutes` 의 `GET /codes` 다 — 경로가 겹치지 않게 이쪽은
 //    `/codes-admin/**` 를 쓴다. 같은 접두사를 쓰면 `/codes/:category` 가 `/codes` 를 가린다.
 registerCodeRoutes(app);
+// ★ 코드 관리의 **삐용 주인 코드**(2026-11-18) — 삐용 화면 토큰 API 로 넘긴다. 권한은 삐용이 정한다(`routes/codesBbiyong.ts`).
+registerBbiyongCodeRoutes(app);
 // ★ 표양식 관리(s030100020) — 양식 등록·수정·삭제. **운영사 전용**. 등기 설정이 가리키는
 //   양식은 FK 가 없어 핸들러가 세어서 막는다(`db/formTemplates.ts` 머리말).
 registerFormTemplateRoutes(app);
