@@ -434,8 +434,8 @@ export interface BbiyongOrgInfo {
   orgCode: string;
   orgName: string;
   /**
-   * 대표자명. ★★ 지금은 늘 null(2026-11-18) — 삐용 단체 목록의 `memberName` 은 운영자(회원구분 C) 이름이라
-   *   대표자로 쓰지 않는다. 제대로 된 대표자명을 삐용이 주기 전에는 다른 값으로 채우지 않는다.
+   * 대표자명 — 삐용 단체 정보의 「대표자」 칸(`ceoName`, 2026-11-18). 칸이 없거나 비면 null(빈칸).
+   * ★★ 운영자(회원구분 C, `memberName`) 이름으로 채우지 않는다.
    */
   repName: string | null;
   /** 회사 전화(org-list 행의 `telNo`). 삐용이 안 주거나 비면 null — 모의 어댑터는 주지 않는다(2026-11-02). */

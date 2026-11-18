@@ -469,8 +469,8 @@ describe('parseMemberOp — 성공 게이트', () => {
   });
 
   it('★ 운영자 삭제 거절도 삐용 문구를 그대로 쓴다', () => {
-    const out = parseMemberOp({ result: 'fail', status: 400, massage: '운영자는 삭제할 수 없습니다.' }, 'D');
-    if (out.kind === 'rejected') expect(out.message).toContain('운영자는 삭제할 수 없습니다');
+    const out = parseMemberOp({ result: 'fail', status: 400, massage: '운영자는 지울 수 없습니다 — 직원만 삭제합니다.' }, 'D');
+    if (out.kind === 'rejected') expect(out.message).toBe('운영자는 지울 수 없습니다 — 직원만 삭제합니다.');
   });
 
   it('403 은 등록과 같은 안내로 바꾼다', () => {
@@ -501,6 +501,22 @@ describe('HttpBbiyongOrg — 단체 목록(org-list)', () => {
       ['SWT', null],
       ['VHF', '02-555-1234'],
     ]);
+  });
+
+  it('★★ 대표자(repName) = 행의 ceoName — 운영자 memberName 은 쓰지 않는다 · 없거나 비면 null(2026-11-18)', async () => {
+    const { org } = adapter(page([
+      { ...row(5, 'VHF', '해피프렌즈', 3), ceoName: ' 김대표자 ' },
+      { ...row(1, 'SWT', '에스원', 3), ceoName: '' },
+      row(2, 'TWO', '둘', 3),
+    ]));
+    const out = await org.listOrgs({ name: '' }, 'tok');
+    expect(out.kind === 'ok' ? out.value.map((o) => [o.orgCode, o.repName]) : out).toEqual([
+      ['SWT', null],
+      ['TWO', null],
+      ['VHF', '김대표자'],
+    ]);
+    const one = await org.getOrg({ orgId: 5 }, 'tok');
+    expect(one.kind === 'ok' ? one.value?.repName : one).toBe('김대표자');
   });
 
   it('★ GET · 토큰 · 회사명 일부 · 쪽 크기 100 · 1쪽 — 행을 다섯 칸으로, 코드 순', async () => {

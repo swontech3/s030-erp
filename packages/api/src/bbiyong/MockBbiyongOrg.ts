@@ -53,8 +53,9 @@ function seededOrgs(): BbiyongOrgInfo[] {
     orgId: a.orgId,
     orgCode: a.orgCode as string,
     orgName: a.orgName,
-    // ★★ 대표자는 빈칸 — 계정 이름은 삐용 운영자(회원구분 C) 이름이라 대표자로 쓰지 않는다(2026-11-18, 실연동과 같게).
-    repName: null,
+    // ★★ 대표자 = 계정표의 `ceoName`(삐용 「대표자」 칸, 실연동과 같게, 2026-11-18) — 없으면 빈칸.
+    //    계정 이름(`memberName`)은 운영자 이름이라 대표자로 쓰지 않는다.
+    repName: a.ceoName ?? null,
     status: MOCK_ORG_STATUS,
   }));
 }
@@ -195,7 +196,7 @@ export class MockBbiyongOrg implements BbiyongOrg {
       orgId,
       orgCode: req.orgCode,
       orgName: req.orgName,
-      repName: null, // ★★ 실연동과 같게 빈칸(2026-11-18) — 삐용 단체 목록의 이름은 운영자 이름이다
+      repName: null, // ★★ 빈칸 — 등록 요청에 `ceoName` 칸이 없다. `memberName` 은 운영자 이름이라 쓰지 않는다(2026-11-18)
       status: MOCK_ORG_STATUS,
     });
     // ★ 등록은 OFFICE 를 켠 상태로 만든다 — moduleCodes 에 OFFICE 를 보내기 때문이다.
@@ -311,7 +312,7 @@ export class MockBbiyongOrg implements BbiyongOrg {
 
     if (req.regTp === 'I') {
       if (req.repYn === 'Y') {
-        return { kind: 'rejected', message: '운영자는 회사 등록으로만 만들 수 있습니다', retryable: false };
+        return { kind: 'rejected', message: '운영자는 신규 등록할 수 없습니다 — 운영자는 회사 등록으로만 생깁니다. 직원만 등록합니다.', retryable: false };
       }
       // ★ 이메일 겹침 — 삐용은 이메일을 로그인 아이디로 쓴다. 이 프로세스가 아는 범위에서만 본다.
       const email = req.email ?? '';
@@ -336,11 +337,11 @@ export class MockBbiyongOrg implements BbiyongOrg {
 
     if (req.regTp === 'D') {
       // ★★ 대표는 지울 수 없다 — 삐용이 그렇게 받는다(규격). 회사 등록이 넣어 둔 번호로 본다.
-      for (const [code, repId] of this.#repByCode) {
+      for (const repId of this.#repByCode.values()) {
         if (repId === req.memberId) {
           return {
             kind: 'rejected',
-            message: `운영자는 삭제할 수 없습니다(단체 ${code})`,
+            message: '운영자는 지울 수 없습니다 — 직원만 삭제합니다.',
             retryable: false,
           };
         }

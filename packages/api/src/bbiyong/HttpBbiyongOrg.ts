@@ -647,9 +647,10 @@ export class HttpBbiyongOrg implements BbiyongOrg {
         const orgCode = str(r?.orgCode);
         const orgName = str(r?.orgName);
         if (orgId === null || !orgCode || !orgName) continue; // 모양이 다른 줄은 버린다(지어내지 않는다)
-        // ★★ 대표자는 빈칸(null) — 행의 `memberName` 은 삐용 운영자(회원구분 C) 이름이라 대표자로 쓰지 않는다(2026-11-18).
+        // ★★ 대표자 = 행의 `ceoName`(삐용 「대표자」 칸, 2026-11-18) — 없거나 비면 null(빈칸).
+        //    행의 `memberName` 은 운영자(회원구분 C) 이름이라 대표자로 쓰지 않는다.
         //    전화 = 행의 `telNo`(빈 글자는 null). 상태 칸은 행에 없다 → null
-        rows.push({ orgId, orgCode, orgName, repName: null, telNo: str(r?.telNo) || null, status: null });
+        rows.push({ orgId, orgCode, orgName, repName: str(r?.ceoName)?.trim() || null, telNo: str(r?.telNo) || null, status: null });
         if (total === null) total = toInt(r?.totCnt);
       }
       if (data.length < ORG_LIST_PAGE_SIZE || (total !== null && page * ORG_LIST_PAGE_SIZE >= total)) break;
