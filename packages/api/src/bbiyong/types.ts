@@ -433,7 +433,10 @@ export interface BbiyongOrgInfo {
   orgId: number;
   orgCode: string;
   orgName: string;
-  /** 대표자명. 삐용이 안 주면 null. */
+  /**
+   * 대표자명. ★★ 지금은 늘 null(2026-11-18) — 삐용 단체 목록의 `memberName` 은 운영자(회원구분 C) 이름이라
+   *   대표자로 쓰지 않는다. 제대로 된 대표자명을 삐용이 주기 전에는 다른 값으로 채우지 않는다.
+   */
   repName: string | null;
   /** 회사 전화(org-list 행의 `telNo`). 삐용이 안 주거나 비면 null — 모의 어댑터는 주지 않는다(2026-11-02). */
   telNo?: string | null;
@@ -522,7 +525,7 @@ export interface BbiyongMemberRequest {
   email?: string;
   /** 연락처. 선택 항목이고 **숫자만** 보낸다(회사 등록의 `hpNo` 와 같은 규칙). */
   hpNo?: string;
-  /** 대표여부. ★ `I` 에서만 쓴다. ERP 가 보내는 `I` 는 직원뿐이라 늘 `'N'` 이다. */
+  /** 운영자여부. ★ `I` 에서만 쓴다. ERP 가 보내는 `I` 는 직원뿐이라 늘 `'N'` 이다. */
   repYn?: 'Y' | 'N';
 }
 

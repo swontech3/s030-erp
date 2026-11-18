@@ -13,7 +13,8 @@
  *   · 직원 찾기: **삐용 회원번호**(`link_s020_member_id`)로 찾는다. 없으면 아무것도 안 하고 **성공**
  *   · 받는 칸: 이름 · 이메일 · 연락처. **받은 칸만** 바꾸고 빈 값은 「안 바꿈」. 연락처는 숫자로 받아
  *     ERP 저장 모양(하이픈)으로 저장한다
- *   · **활성 대표** 직원이고 이름을 받았으면 회사 표의 대표자명(`ceo_name`, 사본)도 맞춘다
+ *   · ★★ 회사 표의 대표자명(`ceo_name`)은 **바꾸지 않는다**(2026-11-18) — 삐용 운영자(회원구분 C) 이름은
+ *     대표자가 아니다. 활성 대표 직원의 이름을 받아도 직원 행의 이름만 바꾼다
  *   · 받은 이메일이 같은 회사의 다른 활성 직원과 겹치면 400 — 아무것도 쓰지 않는다
  *   · ★★ 받은 값을 삐용에 다시 보내지 않는다(되돌아가기 방지) — `syncMembersForCompany` 를 부르지 않는다.
  *     DB 값을 바꾸므로 다음 계약 폼 저장의 「바뀜」 판정(`replaceMembers` 가 DB 와 비교)에도 걸리지 않는다
@@ -94,7 +95,7 @@ export interface MemberReceiveDeps extends ReceiveCallerDeps {
   orgGrantName(): Promise<string | null>;
   /**
    * 운영사 스코프 트랜잭션 하나에서: 회원번호의 직원이 없으면 `not_found`, 이메일이 같은 회사 다른 활성
-   * 직원과 겹치면 `email_taken`(아무것도 쓰지 않는다), 바꿨으면 `applied`(활성 대표면 `ceo_name` 도).
+   * 직원과 겹치면 `email_taken`(아무것도 쓰지 않는다), 바꿨으면 `applied`(`ceo_name` 은 바꾸지 않는다).
    * ★ 삐용에 보내지 않는다.
    */
   apply(memberId: number, fields: MemberFromBbiyong): Promise<'applied' | 'not_found' | 'email_taken'>;

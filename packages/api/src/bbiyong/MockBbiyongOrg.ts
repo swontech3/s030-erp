@@ -53,7 +53,8 @@ function seededOrgs(): BbiyongOrgInfo[] {
     orgId: a.orgId,
     orgCode: a.orgCode as string,
     orgName: a.orgName,
-    repName: a.memberName,
+    // ★★ 대표자는 빈칸 — 계정 이름은 삐용 운영자(회원구분 C) 이름이라 대표자로 쓰지 않는다(2026-11-18, 실연동과 같게).
+    repName: null,
     status: MOCK_ORG_STATUS,
   }));
 }
@@ -194,7 +195,7 @@ export class MockBbiyongOrg implements BbiyongOrg {
       orgId,
       orgCode: req.orgCode,
       orgName: req.orgName,
-      repName: req.memberName,
+      repName: null, // ★★ 실연동과 같게 빈칸(2026-11-18) — 삐용 단체 목록의 이름은 운영자 이름이다
       status: MOCK_ORG_STATUS,
     });
     // ★ 등록은 OFFICE 를 켠 상태로 만든다 — moduleCodes 에 OFFICE 를 보내기 때문이다.
@@ -310,7 +311,7 @@ export class MockBbiyongOrg implements BbiyongOrg {
 
     if (req.regTp === 'I') {
       if (req.repYn === 'Y') {
-        return { kind: 'rejected', message: '대표는 회사 등록으로만 만들 수 있습니다', retryable: false };
+        return { kind: 'rejected', message: '운영자는 회사 등록으로만 만들 수 있습니다', retryable: false };
       }
       // ★ 이메일 겹침 — 삐용은 이메일을 로그인 아이디로 쓴다. 이 프로세스가 아는 범위에서만 본다.
       const email = req.email ?? '';
@@ -339,7 +340,7 @@ export class MockBbiyongOrg implements BbiyongOrg {
         if (repId === req.memberId) {
           return {
             kind: 'rejected',
-            message: `대표는 삭제할 수 없습니다(단체 ${code})`,
+            message: `운영자는 삭제할 수 없습니다(단체 ${code})`,
             retryable: false,
           };
         }

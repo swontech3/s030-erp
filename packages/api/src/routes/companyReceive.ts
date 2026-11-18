@@ -16,7 +16,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { CompanyScope, ScopedClient } from '../db/withCompanyScope.ts';
 import { bbiyongAuth } from '../bbiyong/index.ts';
-import { MEMBER_ROLE } from '@swonbiz/shared/domain/member-payload';
 import {
   findCompanyIdByOrgId,
   findMemberByLinkId,
@@ -24,7 +23,6 @@ import {
   isMemberEmailTaken,
   patchCompanyFromBbiyong,
   patchMemberFromBbiyong,
-  updateCompanyCeoName,
   type MemberFromBbiyong,
 } from '../db/companies.ts';
 import { withCompanyScope } from '../db/withCompanyScope.ts';
@@ -81,10 +79,7 @@ export async function applyMemberFromBbiyong(
     return 'email_taken' as const;
   }
   await patchMemberFromBbiyong(client, { memberId: member.member_id, fields, actor: RECEIVE_ACTOR });
-  // ★ 회사 표의 대표자명은 활성 대표 행의 **사본**이다 — 같이 맞춘다(비활성으로 내려간 옛 대표는 아니다).
-  if (fields.name !== undefined && member.status === 'active' && member.is_representative === MEMBER_ROLE.REPRESENTATIVE) {
-    await updateCompanyCeoName(client, { companyId: member.company_id, ceoName: fields.name, actor: RECEIVE_ACTOR });
-  }
+  // ★★ 회사 표의 대표자명(`ceo_name`)은 건드리지 않는다(2026-11-18) — 삐용 운영자(회원구분 C) 이름은 대표자가 아니다.
   return 'applied' as const;
 }
 

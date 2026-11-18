@@ -308,7 +308,7 @@ export function parseMemberOp(body: unknown, regTp: 'I' | 'U' | 'D'): MemberOpOu
 
   /*
    * 그 밖의 거절은 **삐용 문구를 그대로 쓴다.** 여기 오는 것은 거의 「이메일이 이미
-   * 사용 중」·「대표는 삭제할 수 없습니다」 같은 값 문제이고, 그 문장이 이미 사람 말이다
+   * 사용 중」·「운영자는 삭제할 수 없습니다」 같은 값 문제이고, 그 문장이 이미 사람 말이다
    * (`parseOrgOp` 와 같은 규칙). 번역하려 들면 삐용이 문구를 늘릴 때마다 뒤처진다.
    */
   const label = { I: '직원 등록', U: '직원 수정', D: '직원 삭제' }[regTp];
@@ -647,8 +647,9 @@ export class HttpBbiyongOrg implements BbiyongOrg {
         const orgCode = str(r?.orgCode);
         const orgName = str(r?.orgName);
         if (orgId === null || !orgCode || !orgName) continue; // 모양이 다른 줄은 버린다(지어내지 않는다)
-        // 대표자 = 행의 `memberName`(회사 등록 때 대표로 보낸 이름과 같은 칸). 전화 = 행의 `telNo`(빈 글자는 null). 상태 칸은 행에 없다 → null
-        rows.push({ orgId, orgCode, orgName, repName: str(r?.memberName) || null, telNo: str(r?.telNo) || null, status: null });
+        // ★★ 대표자는 빈칸(null) — 행의 `memberName` 은 삐용 운영자(회원구분 C) 이름이라 대표자로 쓰지 않는다(2026-11-18).
+        //    전화 = 행의 `telNo`(빈 글자는 null). 상태 칸은 행에 없다 → null
+        rows.push({ orgId, orgCode, orgName, repName: null, telNo: str(r?.telNo) || null, status: null });
         if (total === null) total = toInt(r?.totCnt);
       }
       if (data.length < ORG_LIST_PAGE_SIZE || (total !== null && page * ORG_LIST_PAGE_SIZE >= total)) break;
