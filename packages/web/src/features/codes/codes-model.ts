@@ -298,3 +298,96 @@ export function masterBlockReason(m: CodeMaster): string | null {
   }
   return null;
 }
+
+// =============================================================================
+// 주인 — 삐용 · ERP (통합 방 · 대표 결정 2026-11-18)
+// =============================================================================
+/*
+ * ★★ 주인은 **그 코드가 어느 표에서 왔는지**로 정한다 — 삐용 `tb_s020_code010` 이면 삐용,
+ *    ERP `tb_s080_code_*` 이면 ERP. 화면이 따로 적어 두는 표가 없다(근거 : s09-mail
+ *    `docs/코드주인_나누기_20261118.md`).
+ * ★ 삐용 주인 코드는 삐용 화면 API 로 보고 고친다(`/api/codes-admin/bbiyong/**` → 삐용 명세 118).
+ *   볼 수 있는지 · 고칠 수 있는지는 **삐용이** 정한다 — 거절하면 그 문구가 그대로 온다(409).
+ * ★ 삐용 코드에는 지우기 · 새 종류 만들기가 없다 — 지우는 대신 「사용 안 함」, 다시 켜는 「다시 사용」.
+ */
+
+export type CodeOwner = 'bbiyong' | 'erp';
+export const OWNER_LABEL: Readonly<Record<CodeOwner, string>> = { bbiyong: '삐용', erp: 'ERP' };
+
+/** 삐용 종류 한 줄(명세 118 의 1). `category` 는 삐용의 묶음(대개 `000`)이다. */
+export interface BbiyongCodeType {
+  category: string;
+  cdTp: string;
+  cdTpMeaning: string;
+  valueCnt: number;
+  useCnt: number;
+}
+
+/** 삐용 값 한 줄(명세 118 의 2) — 사용 안 함 줄도 온다. */
+export interface BbiyongCodeValue {
+  category: string;
+  cdTp: string;
+  cdTpMeaning: string;
+  cdV: string;
+  cdVMeaning: string;
+  sortSeq: number | null;
+  useYn: 'Y' | 'N';
+}
+
+/** 왼쪽 목록 한 줄 — 주인을 함께 든다. `key` 는 주인까지 넣어 겹치지 않게 한다(같은 이름이 두 표에 있을 수 있다). */
+export type CodeTypeRow =
+  | { owner: 'erp'; key: string; code: string; name: string; count: number; master: CodeMaster }
+  | { owner: 'bbiyong'; key: string; code: string; name: string; count: number; type: BbiyongCodeType };
+
+/** 삐용 묶음이 `000` 이 아니면 종류 옆에 적는다 — 같은 종류가 다른 묶음에 있을 수 있다. */
+export const bbiyongTypeLabel = (t: { category: string; cdTp: string }): string =>
+  t.category === '000' ? t.cdTp : `${t.cdTp} · 묶음 ${t.category}`;
+
+export function codeTypeRows(masters: readonly CodeMaster[], bbiyong: readonly BbiyongCodeType[]): CodeTypeRow[] {
+  const rows: CodeTypeRow[] = [
+    ...masters.map((m): CodeTypeRow => ({ owner: 'erp', key: `erp:${m.category}`, code: m.category, name: m.name, count: m.lineCount, master: m })),
+    ...bbiyong.map((t): CodeTypeRow => ({
+      owner: 'bbiyong',
+      key: `bbiyong:${t.category}:${t.cdTp}`,
+      code: bbiyongTypeLabel(t),
+      name: t.cdTpMeaning,
+      count: t.valueCnt,
+      type: t,
+    })),
+  ];
+  return rows.sort((a, b) => a.code.localeCompare(b.code) || a.owner.localeCompare(b.owner));
+}
+
+export const loadBbiyongTypes = (): Promise<{ types: BbiyongCodeType[] }> => call('/api/codes-admin/bbiyong/types');
+
+export const loadBbiyongValues = (t: { category: string; cdTp: string }): Promise<{ values: BbiyongCodeValue[] }> =>
+  call(`/api/codes-admin/bbiyong/values?${new URLSearchParams({ category: t.category, cdTp: t.cdTp }).toString()}`);
+
+export interface BbiyongValueInput {
+  category: string;
+  cdTp: string;
+  cdV: string;
+  cdVMeaning: string;
+  /** 비우면 삐용이 정한다(추가는 맨 뒤, 수정은 지금 순서 그대로). */
+  sortSeq: string;
+}
+
+const bbiyongWriteBody = (v: BbiyongValueInput) => ({
+  category: v.category,
+  cdTp: v.cdTp,
+  cdV: v.cdV.trim(),
+  cdVMeaning: v.cdVMeaning.trim(),
+  ...(v.sortSeq.trim() === '' ? {} : { sortSeq: v.sortSeq.trim() }),
+});
+
+export const addBbiyongValue = (v: BbiyongValueInput): Promise<{ message: string }> =>
+  call('/api/codes-admin/bbiyong/values', json('POST', bbiyongWriteBody(v)));
+
+export const saveBbiyongValue = (v: BbiyongValueInput): Promise<{ message: string }> =>
+  call('/api/codes-admin/bbiyong/values', json('PATCH', bbiyongWriteBody(v)));
+
+export const unuseBbiyongValue = (v: BbiyongCodeValue): Promise<{ message: string }> =>
+  call('/api/codes-admin/bbiyong/values/unuse', json('PATCH', { category: v.category, cdTp: v.cdTp, cdV: v.cdV }));
+
+export const reuseBbiyongValue = (v: BbiyongCodeValue): Promise<{ message: string }> =>
+  call('/api/codes-admin/bbiyong/values/reuse', json('PATCH', { category: v.category, cdTp: v.cdTp, cdV: v.cdV }));
