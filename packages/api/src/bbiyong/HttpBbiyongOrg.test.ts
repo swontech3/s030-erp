@@ -469,8 +469,8 @@ describe('parseMemberOp — 성공 게이트', () => {
   });
 
   it('★ 운영자 삭제 거절도 삐용 문구를 그대로 쓴다', () => {
-    const out = parseMemberOp({ result: 'fail', status: 400, massage: '운영자는 삭제할 수 없습니다.' }, 'D');
-    if (out.kind === 'rejected') expect(out.message).toContain('운영자는 삭제할 수 없습니다');
+    const out = parseMemberOp({ result: 'fail', status: 400, massage: '운영자는 지울 수 없습니다 — 직원만 삭제합니다.' }, 'D');
+    if (out.kind === 'rejected') expect(out.message).toBe('운영자는 지울 수 없습니다 — 직원만 삭제합니다.');
   });
 
   it('403 은 등록과 같은 안내로 바꾼다', () => {

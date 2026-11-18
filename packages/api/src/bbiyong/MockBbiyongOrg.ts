@@ -312,7 +312,7 @@ export class MockBbiyongOrg implements BbiyongOrg {
 
     if (req.regTp === 'I') {
       if (req.repYn === 'Y') {
-        return { kind: 'rejected', message: '운영자는 회사 등록으로만 만들 수 있습니다', retryable: false };
+        return { kind: 'rejected', message: '운영자는 신규 등록할 수 없습니다 — 운영자는 회사 등록으로만 생깁니다. 직원만 등록합니다.', retryable: false };
       }
       // ★ 이메일 겹침 — 삐용은 이메일을 로그인 아이디로 쓴다. 이 프로세스가 아는 범위에서만 본다.
       const email = req.email ?? '';
@@ -337,11 +337,11 @@ export class MockBbiyongOrg implements BbiyongOrg {
 
     if (req.regTp === 'D') {
       // ★★ 대표는 지울 수 없다 — 삐용이 그렇게 받는다(규격). 회사 등록이 넣어 둔 번호로 본다.
-      for (const [code, repId] of this.#repByCode) {
+      for (const repId of this.#repByCode.values()) {
         if (repId === req.memberId) {
           return {
             kind: 'rejected',
-            message: `운영자는 삭제할 수 없습니다(단체 ${code})`,
+            message: '운영자는 지울 수 없습니다 — 직원만 삭제합니다.',
             retryable: false,
           };
         }
