@@ -190,12 +190,12 @@ function fakes(over: { mailer?: Partial<Mailer>; prepared?: Awaited<ReturnType<H
 }
 
 describe('handoffCc — 참조(서버가 정한다)', () => {
-  it('★ 발송인이 대표자가 아니면 대표자 · 대표자면 없음(메일로 견줌, 큰 글자 무시)', () => {
+  it('★ 발송인이 운영자가 아니면 운영자 · 운영자면 없음(메일로 견줌, 큰 글자 무시)', () => {
     expect(handoffCc(STAFF)).toEqual({ name: '최대표', email: 'ceo@x.com' });
     expect(handoffCc({ ...STAFF, sender: { name: '최대표', email: 'CEO@x.com' } })).toBeNull();
   });
 
-  it('대표자를 모르거나 대표자 메일이 없으면 없음 · 발송인 메일을 모르면 대표자를 참조', () => {
+  it('운영자를 모르거나 운영자 메일이 없으면 없음 · 발송인 메일을 모르면 운영자를 참조', () => {
     expect(handoffCc({ ...STAFF, rep: null })).toBeNull();
     expect(handoffCc({ ...STAFF, rep: { name: '최대표', email: null } })).toBeNull();
     expect(handoffCc({ ...STAFF, sender: { name: '김사원', email: null } })).toEqual({ name: '최대표', email: 'ceo@x.com' });
@@ -216,7 +216,7 @@ describe('sendHandoff', () => {
     ]]);
   });
 
-  it('★ 발송인이 대표자가 아니면 대표자를 참조 · 보내는 이름 · 답장 주소는 발송인 — 최종 발송에도 참조', async () => {
+  it('★ 발송인이 운영자가 아니면 운영자를 참조 · 보내는 이름 · 답장 주소는 발송인 — 최종 발송에도 참조', async () => {
     const f = fakes({ people: STAFF });
     await sendHandoff(session('tenant'), BODY, f.mailer, f.parts);
     expect(f.mails[0]).toMatchObject({ fromName: '김사원', replyTo: 'staff@x.com', cc: 'ceo@x.com' });
@@ -365,7 +365,7 @@ describe('POST /tax/handoff/send', () => {
   });
 });
 
-/* ── 발송인 메일 · 대표자 참조를 삐용에서(2026-11-10) ───────────────────────────── */
+/* ── 발송인 메일 · 운영자 참조를 삐용에서(2026-11-10) ───────────────────────────── */
 
 const src = (over: Partial<HandoffPeopleSource> = {}): HandoffPeopleSource => ({
   senderName: async () => '김사원',
@@ -375,14 +375,14 @@ const src = (over: Partial<HandoffPeopleSource> = {}): HandoffPeopleSource => ({
 });
 const boom = async (): Promise<never> => { throw new Error('삐용 단체 정보이 HTTP 500 로 응답했다'); };
 
-describe('readHandoffPeople — 삐용 두 조회 → 발송인 · 대표자', () => {
-  it('★ 발송인 메일 있음 · 대표자 있음 → 참조 = 대표자', async () => {
+describe('readHandoffPeople — 삐용 두 조회 → 발송인 · 운영자', () => {
+  it('★ 발송인 메일 있음 · 운영자 있음 → 참조 = 운영자', async () => {
     const p = await readHandoffPeople(src());
     expect(p).toEqual(STAFF);
     expect(handoffCc(p)).toEqual({ name: '최대표', email: 'ceo@x.com' });
   });
 
-  it('발송인 메일 없음(빈 칸 · 실패) → 답장 주소 없음, 참조는 대표자', async () => {
+  it('발송인 메일 없음(빈 칸 · 실패) → 답장 주소 없음, 참조는 운영자', async () => {
     for (const senderEmail of [async () => null, boom]) {
       const p = await readHandoffPeople(src({ senderEmail }));
       expect(p.sender).toEqual({ name: '김사원', email: null });
@@ -390,7 +390,7 @@ describe('readHandoffPeople — 삐용 두 조회 → 발송인 · 대표자', (
     }
   });
 
-  it('★ 대표자 조회 403(어댑터가 null) · 실패 · 시간 초과 → 대표자 없음, 오류를 내지 않는다', async () => {
+  it('★ 운영자 조회 403(어댑터가 null) · 실패 · 시간 초과 → 운영자 없음, 오류를 내지 않는다', async () => {
     const timeout = async (): Promise<never> => { throw new DOMException('timeout', 'TimeoutError'); };
     for (const rep of [async () => null, boom, timeout]) {
       const p = await readHandoffPeople(src({ rep }));
@@ -399,19 +399,19 @@ describe('readHandoffPeople — 삐용 두 조회 → 발송인 · 대표자', (
     }
   });
 
-  it('대표자 메일 반쪽만(어댑터가 email null) → 참조 없음', async () => {
+  it('운영자 메일 반쪽만(어댑터가 email null) → 참조 없음', async () => {
     const p = await readHandoffPeople(src({ rep: async () => ({ name: '최대표', email: null }) }));
     expect(handoffCc(p)).toBeNull();
   });
 
-  it('★ 발송인 = 대표자(대소문자 무시) → 참조 없음', async () => {
+  it('★ 발송인 = 운영자(대소문자 무시) → 참조 없음', async () => {
     const p = await readHandoffPeople(src({ senderEmail: async () => 'CEO@X.com' }));
     expect(handoffCc(p)).toBeNull();
   });
 });
 
 describe('bbiyongPeopleSource — 로그인한 사람의 삐용 인증(callBbiyong)으로 부른다', () => {
-  it('★ 세션 sid 로 두 번 부르고, 대표자는 세션 단체 ID 로', async () => {
+  it('★ 세션 sid 로 두 번 부르고, 운영자는 세션 단체 ID 로', async () => {
     const calls: string[] = [];
     const s = bbiyongPeopleSource(session('tenant'), {
       profileName: async (id) => `이름${id}`,
@@ -431,7 +431,7 @@ describe('bbiyongPeopleSource — 로그인한 사람의 삐용 인증(callBbiyo
 });
 
 describe('sendHandoff — 삐용에서 읽은 사람으로 cc · replyTo(가짜 메일러)', () => {
-  it('★ 발송인 ≠ 대표자 → cc 대표자 · replyTo 발송인 · 최종 발송에 참조', async () => {
+  it('★ 발송인 ≠ 운영자 → cc 운영자 · replyTo 발송인 · 최종 발송에 참조', async () => {
     const f = fakes();
     const parts: HandoffSendParts = { ...f.parts, people: () => readHandoffPeople(src()) };
     await sendHandoff(session('tenant'), BODY, f.mailer, parts);
@@ -439,7 +439,7 @@ describe('sendHandoff — 삐용에서 읽은 사람으로 cc · replyTo(가짜 
     expect(f.saved[0]![1]).toMatchObject({ cc: 'ceo@x.com' });
   });
 
-  it('★ 대표자 조회 실패 → 참조 없이 그대로 보낸다', async () => {
+  it('★ 운영자 조회 실패 → 참조 없이 그대로 보낸다', async () => {
     const f = fakes();
     const parts: HandoffSendParts = { ...f.parts, people: () => readHandoffPeople(src({ rep: boom })) };
     const r = await sendHandoff(session('tenant'), BODY, f.mailer, parts);

@@ -56,7 +56,7 @@ const INPUT_GUIDE = '메일은 name@example.com 모양, 계좌번호는 숫자�
 /** 값이 없는 칸 — 회사 이름 · 사업자번호(2026-11-07 「삐용에서 아직 받지 못했습니다」 → 「—」). */
 const NOT_RECEIVED = '—';
 /** 삐용에서 회사 정보를 못 읽었을 때 회사 기본정보 옆 작은 글(2026-11-15). */
-const FROM_REP_NOTE = '대표자 계정에서 최신 정보로 보입니다';
+const FROM_REP_NOTE = '운영자 계정에서 최신 정보로 보입니다';
 /** 「사용 안 함」 줄의 흐림 — 꺼진 버튼(`.btn:disabled`)과 같은 값. */
 const OFF_OPACITY = 0.45;
 
