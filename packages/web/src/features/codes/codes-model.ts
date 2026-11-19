@@ -3,6 +3,7 @@
  *
  * ★ 화면 컴포넌트에 `fetch` 를 두지 않는다. 경로가 퍼지면 어느 화면이 무엇을 부르는지
  *   읽히지 않고, 409(쓰고 있어서 못 바꿈) 처리가 자리마다 달라진다(센터 관리와 같은 구조).
+ *   (업무구분 선택지만은 `/api/codes` 를 읽는다 — `loadBizTpOptions`)
  *
  * ★★ 모든 호출이 **같은 모양으로 실패**한다 — `CodesError` 하나다. 그 안에 `inUse` 가
  *    있어 화면이 「오류」와 「안내」를 가른다(409 는 요청이 틀린 것이 아니다).
@@ -10,6 +11,7 @@
  * ★ 경로가 `/api/codes-admin/**` 다. `/api/codes` 는 **소비용 조회**(계약 폼이 읽는
  *   `GET /codes`)라 겹치면 안 된다 — 이름을 가르는 이유가 그것뿐이다.
  */
+import { codeBizTpOptions, type CodeBizTp } from '@swonbiz/shared/domain/code-biz-tp';
 
 /** 분류(머리) — `tb_s080_code_masters`. */
 export interface CodeMaster {
@@ -311,8 +313,19 @@ export function masterBlockReason(m: CodeMaster): string | null {
  * ★ 삐용 코드에는 지우기 · 새 종류 만들기가 없다 — 지우는 대신 「사용 안 함」, 다시 켜는 「다시 사용」.
  */
 
-export type CodeOwner = 'bbiyong' | 'erp';
-export const OWNER_LABEL: Readonly<Record<CodeOwner, string>> = { bbiyong: '삐용', erp: 'ERP' };
+export type CodeOwner = CodeBizTp;
+
+/**
+ * ★ 화면 이름은 「업무구분」(2026-11-19). 선택지 · 딱지 글자는 화면에 두지 않고 ERP 공통 코드
+ *   `CODE_BIZ_TP`(파티션 000, 일회용 40)에서 읽는다 — `GET /codes`(소비용 조회). 못 읽으면 빈 목록이고
+ *   그때 걸러 보기는 「업무구분 전체」만, 딱지는 코드값(`codeBizTpLabel`)이다.
+ */
+export type BizTpOption = ReturnType<typeof codeBizTpOptions>[number];
+
+export async function loadBizTpOptions(): Promise<BizTpOption[]> {
+  const body = await call<{ codes?: { category: string; code: string; name: string | null }[] }>('/api/codes');
+  return codeBizTpOptions(body.codes ?? []);
+}
 
 /** 삐용 종류 한 줄(명세 118 의 1). `category` 는 삐용의 묶음(대개 `000`)이다. */
 export interface BbiyongCodeType {

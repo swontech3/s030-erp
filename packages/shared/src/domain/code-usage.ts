@@ -495,6 +495,14 @@ export const PINNED_CODES: readonly PinnedCodeRef[] = [
     source: 'packages/shared/src/domain/settlement-view.ts (SETTLE_STATUS_CODES)',
     label: '정산 탭 상태',
   },
+  /** 코드 관리 왼쪽 목록의 업무구분 — 앱이 그 줄이 온 표로 판정한다. 담는 칸은 없다. 2026-11-19 추가(일회용 40). */
+  {
+    category: 'CODE_BIZ_TP',
+    useTp: '000',
+    codes: ['BBIYONG', 'ERP'],
+    source: 'packages/shared/src/domain/code-biz-tp.ts (CODE_BIZ_TP_CODES)',
+    label: '코드 관리 업무구분',
+  },
 ] as const;
 
 /**
