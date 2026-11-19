@@ -39,6 +39,9 @@
  * 붙는다(주인 = 그 코드가 온 표). [주인] 고르기로 걸러 본다. 삐용 종류를 고르면 오른쪽은 `BbiyongPanel` —
  * 삐용 화면 API 로 보고 고친다. 삐용 종류에는 [수정] · [삭제] 가 없다(삐용 API 에 종류 고치기 · 지우기가 없다).
  * 삐용을 못 읽으면 ERP 코드는 그대로 보이고 그 사실만 적는다.
+ *
+ * ★ 2026-11-19: 화면 이름 「주인」 → 「업무구분」 · 선택지와 딱지 글자는 공통 코드 `CODE_BIZ_TP`(일회용 40)에서
+ *   읽는다 · 삐용 줄도 ERP 줄과 같은 칸 · 같은 배치(딱지 폭 고정 · 끝의 [수정] · [삭제] 자리는 잠가 둔다).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Icon, type IconName } from '@/components/ds';
@@ -46,9 +49,9 @@ import { LoadingBar } from '@/components/patterns/LoadingBar';
 import { cf } from '@/features/facility/ModalShell';
 import {
   CodesError,
-  OWNER_LABEL,
   codeTypeRows,
   loadBbiyongTypes,
+  loadBizTpOptions,
   loadMasterLines,
   loadTree,
   lineBlockReason,
@@ -56,11 +59,13 @@ import {
   masterBlockReason,
   usageText,
   type BbiyongCodeType,
+  type BizTpOption,
   type CodeLine,
   type CodeMaster,
   type CodeOwner,
   type CodePartition,
 } from './codes-model';
+import { codeBizTpLabel } from '@swonbiz/shared/domain/code-biz-tp';
 import { BbiyongPanel } from './BbiyongPanel';
 import { MasterDialog } from './MasterDialog';
 import { PartitionDialog } from './PartitionDialog';
@@ -73,6 +78,9 @@ type Dialog =
   | { kind: 'partition'; category: string; partition: CodePartition | null }
   | { kind: 'line'; category: string; line: CodeLine | null }
   | { kind: 'delete'; target: DeleteTarget };
+
+/** 삐용 종류 줄의 잠근 [수정] · [삭제] 안내 — 삐용 API 에 종류 고치기 · 지우기가 없다. */
+const BBIYONG_TYPE_LOCKED = '삐용 종류는 여기서 고치거나 지울 수 없습니다 — 코드값은 오른쪽에서 고칩니다';
 
 /** 오른쪽 검색 조건. */
 const EMPTY_FILTER = { useTp: '', code: '', name: '' };
@@ -87,8 +95,10 @@ export function CodesView() {
   const [bbiyongTypes, setBbiyongTypes] = useState<BbiyongCodeType[]>([]);
   const [bbiyongError, setBbiyongError] = useState<string | null>(null);
   const [bbiyongKey, setBbiyongKey] = useState<string | null>(null);
-  /** 왼쪽 [주인] 걸러 보기 — 빈 값은 전체. 고르면 바로 걸린다. */
+  /** 왼쪽 [업무구분] 걸러 보기 — 빈 값은 전체. 고르면 바로 걸린다. */
   const [owner, setOwner] = useState<'' | CodeOwner>('');
+  /** 업무구분 선택지 · 딱지 글자 — ERP 공통 코드 `CODE_BIZ_TP`(2026-11-19). 못 읽으면 빈 목록. */
+  const [bizTps, setBizTps] = useState<BizTpOption[]>([]);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -153,6 +163,19 @@ export function CodesView() {
   useEffect(() => {
     void refreshTree();
   }, [refreshTree]);
+
+  /* 업무구분은 한 번만 읽는다 — 못 읽어도 목록은 그대로 보인다(걸러 보기는 「전체」만). */
+  useEffect(() => {
+    let alive = true;
+    loadBizTpOptions()
+      .then((o) => {
+        if (alive) setBizTps(o);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     void refreshLines(category);
@@ -270,16 +293,19 @@ export function CodesView() {
                 이 패널에서 제일 큰 것이 되어 목록보다 먼저 읽힌다.
             */}
             <div className={styles.addRow}>
-              {/* ★ 주인 걸러 보기(2026-11-18) — 고르면 바로 걸린다. */}
+              {/* ★ 업무구분 걸러 보기(2026-11-18 · 이름 2026-11-19) — 고르면 바로 걸린다. 선택지는 공통 코드 CODE_BIZ_TP. */}
               <select
                 className={`${cf.input} ${styles.ownerSelect}`}
                 value={owner}
-                aria-label="주인"
+                aria-label="업무구분"
                 onChange={(e) => setOwner(e.target.value as '' | CodeOwner)}
               >
-                <option value="">주인 전체</option>
-                <option value="bbiyong">{OWNER_LABEL.bbiyong}</option>
-                <option value="erp">{OWNER_LABEL.erp}</option>
+                <option value="">업무구분 전체</option>
+                {bizTps.map((o) => (
+                  <option key={o.tp} value={o.tp}>
+                    {o.name}
+                  </option>
+                ))}
               </select>
               <button
                 type="button"
@@ -309,13 +335,20 @@ export function CodesView() {
                *    같은 이유로 같은 모양이다).
                */
               shownRows.map((r) => {
+                /* ★ 업무구분 딱지 — 폭을 맞춰 두 종류의 코드 · 이름이 같은 자리에서 시작한다(2026-11-19). */
                 const ownerTag = (
-                  <span className={`${styles.tag} ${r.owner === 'bbiyong' ? styles.tagOn : styles.tagOff}`}>
-                    {OWNER_LABEL[r.owner]}
+                  <span
+                    className={`${styles.tag} ${styles.bizTpTag} ${r.owner === 'bbiyong' ? styles.tagOn : styles.tagOff}`}
+                    title="업무구분"
+                  >
+                    {codeBizTpLabel(r.owner, bizTps)}
                   </span>
                 );
                 if (r.owner === 'bbiyong') {
-                  /* ★ 삐용 종류 — 고르기만. 종류 수정 · 삭제는 삐용 API 에 없다. */
+                  /*
+                   * ★ 삐용 종류 — 고르기만. 종류 수정 · 삭제는 삐용 API 에 없다.
+                   * ★ ERP 줄과 같은 칸 · 같은 배치(2026-11-19) — 끝의 [수정] · [삭제] 자리를 두고 잠근다.
+                   */
                   return (
                     <div key={r.key} className={`${styles.node} ${bbiyongKey === r.key ? styles.nodeOn : ''}`}>
                       <button
@@ -331,6 +364,14 @@ export function CodesView() {
                         <span className={styles.nodeLabel}>{r.name}</span>
                         <span className={styles.nodeCount}>{r.count}</span>
                       </button>
+                      <span className={styles.nodeActions}>
+                        <button type="button" className={styles.btnXs} disabled title={BBIYONG_TYPE_LOCKED}>
+                          수정
+                        </button>
+                        <button type="button" className={styles.btnXs} disabled title={BBIYONG_TYPE_LOCKED}>
+                          삭제
+                        </button>
+                      </span>
                     </div>
                   );
                 }

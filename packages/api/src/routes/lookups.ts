@@ -27,6 +27,7 @@ import { listCodes, listSpaces, type CodeSpec } from '../db/lookups.ts';
 import { sharedCodes } from '../bbiyong/index.ts';
 import { SHARED_CODE_TYPES } from '../bbiyong/sharedCodes.ts';
 import { DEPOSIT_ACCOUNT_CATEGORY, DEPOSIT_ACCOUNT_USE_TP } from '@swonbiz/shared/domain/deposit-account';
+import { CODE_BIZ_TP_CATEGORY, CODE_BIZ_TP_USE_TP } from '@swonbiz/shared/domain/code-biz-tp';
 import {
   SETTLE_CODE_USE_TP,
   SETTLE_STATUS_CATEGORY,
@@ -98,6 +99,11 @@ const CONTRACT_FORM_CODES: readonly CodeSpec[] = [
    */
   { category: SETTLE_TYPE_CATEGORY, useTp: SETTLE_CODE_USE_TP },
   { category: SETTLE_STATUS_CATEGORY, useTp: SETTLE_CODE_USE_TP },
+  /**
+   * 업무구분(코드 관리 s030100030 왼쪽 걸러 보기 · 딱지, 2026-11-19 · 일회용 40). 파티션 `000` — BBIYONG · ERP.
+   * ★ **이름만** 쓴다. 코드값은 화면이 그 줄이 온 표로 판정한다(shared `code-biz-tp.ts`).
+   */
+  { category: CODE_BIZ_TP_CATEGORY, useTp: CODE_BIZ_TP_USE_TP },
 ];
 
 const scopeOf = (session: { role: string; companyId: string | null }): CompanyScope => ({
