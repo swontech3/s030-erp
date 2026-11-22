@@ -272,7 +272,7 @@
 
 /* ── 상태 띠 더함 ── */
 .noteWarn { background: var(--color-warning-bg); border-color: rgba(217, 119, 6, .25); color: var(--color-warning-text); }
-.noteInfo { background: var(--color-accent-bg); border-color: rgba(79, 70, 229, .18); color: var(--color-primary-hover); }
+.noteInfo { background: var(--color-accent-bg); border-color: rgba(11, 147, 184, .18); color: var(--color-primary-hover); }
 .warnT { font-size: var(--fs-xs); color: var(--color-warning-text); }
 
 /* ── 팝업(기본 640 · 작은 것 480 · 큰 것 820) ── */
