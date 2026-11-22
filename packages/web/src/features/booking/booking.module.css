@@ -97,7 +97,7 @@
 .btnPrimary {
   background: var(--color-primary);
   color: var(--text-on-primary);
-  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.22);
+  box-shadow: 0 4px 16px rgba(11, 147, 184, 0.22);
 }
 
 .btnPrimary:hover {
@@ -184,7 +184,7 @@
 
 .roomPick select:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.32);
+  box-shadow: 0 0 0 3px rgba(11, 147, 184, 0.32);
 }
 
 .page[data-w='sm'] .roomPick,
@@ -368,7 +368,7 @@
 }
 
 .hToday {
-  background: rgba(79, 70, 229, 0.03);
+  background: rgba(11, 147, 184, 0.03);
 }
 
 .hToday .hDow,
@@ -417,7 +417,7 @@
 }
 
 .dToday {
-  background: rgba(79, 70, 229, 0.03);
+  background: rgba(11, 147, 184, 0.03);
 }
 
 .cell {
@@ -427,7 +427,7 @@
 }
 
 .cell:hover {
-  background: rgba(79, 70, 229, 0.05);
+  background: rgba(11, 147, 184, 0.05);
 }
 
 .cellPast {
@@ -457,7 +457,7 @@
   border: 0;
   border-left: 3px solid var(--color-primary);
   border-radius: 4px;
-  background: rgba(79, 70, 229, 0.08);
+  background: rgba(11, 147, 184, 0.08);
   overflow: hidden;
   text-align: left;
   line-height: 1.35;
@@ -470,7 +470,7 @@
 }
 
 .bkFull:hover {
-  background: rgba(79, 70, 229, 0.14);
+  background: rgba(11, 147, 184, 0.14);
 }
 
 .bkTime {
@@ -581,7 +581,7 @@
   justify-content: center;
   border: 1px dashed var(--color-primary);
   border-radius: 4px;
-  background: rgba(79, 70, 229, 0.1);
+  background: rgba(11, 147, 184, 0.1);
   pointer-events: none;
   overflow: hidden;
   line-height: 1.35;
@@ -635,7 +635,7 @@
   width: 12px;
   height: 12px;
   border-radius: 3px;
-  background: rgba(79, 70, 229, 0.08);
+  background: rgba(11, 147, 184, 0.08);
   border-left: 3px solid var(--color-primary);
 }
 
@@ -1069,7 +1069,7 @@
 .select:focus,
 .textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.32);
+  box-shadow: 0 0 0 3px rgba(11, 147, 184, 0.32);
 }
 
 .isError {

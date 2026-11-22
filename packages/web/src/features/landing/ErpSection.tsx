@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * 운영 시스템(다크) — 기능 4줄 + ERP 화면 목업 + 지표 4개.
+ * 운영 시스템(다크) — 기능 2줄 + ERP 화면 목업 + 지표 4개.
  *
  * ★★ 시안의 등장 연출을 그대로 옮겼다(`start` · `countUp`):
  *      기능 목록이 **절반쯤 보이면** 시작한다
@@ -110,12 +110,12 @@ export function ErpSection() {
         </span>
         <h2 className={styles.h2Inverse}>입주와 동시에, 경영 시스템이 켜집니다</h2>
         <p className={styles.erpLead}>
-          12년간 공유오피스를 운영하며 입주사들이 겪은 문제를 직접 보아왔습니다. 그 경험으로 만든
-          시스템이 입주 당일부터 청구·세무·경비를 대신 처리합니다.
+          13년째 공유오피스를 운영하며 입주사들이 겪은 문제를 직접 보아왔습니다. 그 경험으로 만든
+          시스템이 입주 당일부터 청구·세무·경비 업무를 돕습니다.
         </p>
 
         <div className={`${styles.erpGrid}${runCls}`}>
-          {/* ── 좌: 기능 4줄 ── */}
+          {/* ── 좌: 기능 2줄 ── */}
           <div>
             <div className={styles.erpList} ref={listRef}>
               <span className={styles.erpTrack} />
@@ -210,9 +210,9 @@ export function ErpSection() {
                           <Icon name="sparkles" size={14} />
                         </span>
                         <span className={styles.erpAiLabel}>
-                          경비 증빙 {count}/{ERP_CLASSIFIED_OF} 자동 분류
+                          경비 증빙 {count}/{ERP_CLASSIFIED_OF} AI 분류
                         </span>
-                        <span className={styles.erpAiChip}>AI 처리중</span>
+                        <span className={styles.erpAiChip}>AI 분류 중</span>
                       </div>
                       <div className={styles.erpAiBarWrap}>
                         <span className={styles.erpAiBar} />
@@ -237,14 +237,14 @@ export function ErpSection() {
                           <span className={styles.colAmt}>{r.amount}</span>
                           <span
                             className={`${styles.erpChip} ${
-                              r.state === '자동'
+                              r.state === 'AI 분류'
                                 ? styles.erpChipAuto
-                                : r.state === 'AI 분류중'
+                                : r.state === 'AI 분류 중'
                                   ? styles.erpChipAi
                                   : styles.erpChipNeed
                             }`}
                           >
-                            {r.state === 'AI 분류중' ? <span className={styles.erpPulse} /> : null}
+                            {r.state === 'AI 분류 중' ? <span className={styles.erpPulse} /> : null}
                             {r.state}
                           </span>
                         </div>

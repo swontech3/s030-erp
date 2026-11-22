@@ -129,22 +129,21 @@ export const SERVICES: ServiceCard[] = [
   {
     icon: 'scale',
     title: '법무',
-    lead: '법인설립·등기를 AI가 준비',
-    body: '관련 법령과 표준산업분류를 근거로 사업목적·업태·업종을 정하고, 정관과 의사록, 주주명부까지 자동 생성합니다.',
+    lead: '법인설립·등기 서류 준비를 돕는 AI',
+    body: '관련 법령과 표준산업분류를 근거로 사업목적·업태·업종을 정하고, 정관과 의사록, 주주명부 작성까지 돕습니다.',
     points: [
-      { text: '설립·변경 등기 서류 자동 작성' },
-      { text: '사업목적 자동 매핑' },
+      { text: '설립·변경 등기 서류 작성 지원' },
+      { text: '사업목적 추천' },
       { text: '제휴 법무사 연결' },
     ],
   },
   {
     icon: 'calculator',
     title: '세무',
-    lead: '세금 혜택까지 챙기는 세무 자동화',
-    body: '세금계산서 발행, 경비 증빙 분류, 부가세 신고 준비까지 AI가 처리하고, 기업부설연구소 설립으로 받을 수 있는 세액공제까지 안내합니다.',
+    lead: '세금 혜택까지 챙기는 세무 지원',
+    body: '경비 증빙 분류와 부가세 신고 준비를 AI가 돕고, 기업부설연구소 설립으로 받을 수 있는 세액공제까지 안내합니다.',
     points: [
-      { text: '세금계산서 자동 발행' },
-      { text: '경비 증빙 AI 자동 분류' },
+      { text: '경비 증빙 분류를 돕는 AI' },
       { text: '기업부설연구소 설립 지원', strong: true, badge: '세액공제' },
       { text: '제휴 세무사 연결' },
     ],
@@ -170,19 +169,9 @@ export const ERP_FEATURES: ErpFeature[] = [
     body: '계약 기간·요금이 등록되면 매달 청구서가 자동 생성되고 결제까지 이어집니다.',
   },
   {
-    icon: 'receipt',
-    title: '세금계산서 원클릭 발행',
-    body: '결제 완료 시 자동 발행. 입주사는 포털에서 언제든 내려받을 수 있습니다.',
-  },
-  {
     icon: 'credit-card',
-    title: '법인카드 경비 통합 관리',
+    title: '경비 관리',
     body: '카드 내역을 올리면 AI가 계정과목을 분류하고 증빙을 매칭합니다.',
-  },
-  {
-    icon: 'message-square-text',
-    title: 'AI 법무·세무 상담 무제한',
-    body: '등기·부가세·계약 관련 질문에 24시간 답변. 필요하면 전문가로 연결됩니다.',
   },
 ];
 
@@ -195,7 +184,7 @@ export interface ErpStat {
 }
 
 export const ERP_STATS: ErpStat[] = [
-  { icon: 'shield-check', title: '12년째 운영 중', note: '강남 삼성동에서 검증된 운영' },
+  { icon: 'shield-check', title: '13년째 운영 중', note: '강남 삼성동에서 검증된 운영' },
   { icon: 'infinity', title: '전 기능 무제한', note: '청구·세무·경비 제한 없이 이용' },
   { icon: 'headphones', title: '야간·주말 상담', note: '매니저 상주, 예약 없이 문의' },
   { icon: 'wallet', title: '추가 비용 0원', note: '모든 플랜에 운영 시스템 포함', accent: true },
@@ -206,11 +195,11 @@ export const ERP_MOCK_ROWS: {
   file: string;
   account: string;
   amount: string;
-  state: '자동' | 'AI 분류중' | '확인 필요';
+  state: 'AI 분류' | 'AI 분류 중' | '확인 필요';
 }[] = [
-  { file: '세금계산서_클라우드.pdf', account: '지급수수료', amount: '₩264,000', state: '자동' },
-  { file: '영수증_0812_카페.jpg', account: '복리후생비', amount: '₩18,000', state: '자동' },
-  { file: '카드내역_0814_주차.csv', account: '차량유지비', amount: '₩9,000', state: 'AI 분류중' },
+  { file: '세금계산서_클라우드.pdf', account: '지급수수료', amount: '₩264,000', state: 'AI 분류' },
+  { file: '영수증_0812_카페.jpg', account: '복리후생비', amount: '₩18,000', state: 'AI 분류' },
+  { file: '카드내역_0814_주차.csv', account: '차량유지비', amount: '₩9,000', state: 'AI 분류 중' },
   { file: '영수증_0815_택시.jpg', account: '여비교통비', amount: '₩12,400', state: '확인 필요' },
 ];
 
@@ -262,7 +251,7 @@ export const HERO_DOCS_DONE =
   '법인설립 등기 신청서류 준비가 끝났습니다. 셀프 등기 신청하거나 법무사에게 넘길 수 있습니다.';
 
 export const HERO_PROOF: { icon: IconName; text: string; strong?: true }[] = [
-  { icon: 'shield-check', text: '12년째 운영 중', strong: true },
+  { icon: 'shield-check', text: '13년째 운영 중', strong: true },
   { icon: 'circle-check', text: '사업자등록 전 입주 가능' },
   { icon: 'circle-check', text: '관리비 별도 없음' },
 ];
@@ -397,7 +386,7 @@ export const PLANS: Plan[] = [
       'TV · 냉장고 완비',
       '회의실 월 20시간 무료',
       '팀원 전원 운영 시스템 계정',
-      '법인카드 경비 통합 관리',
+      '경비 관리',
       '팀 단위 법무·세무 상담',
     ],
     cta: '팀 오피스 문의',
@@ -514,7 +503,7 @@ export const FAQS: Faq[] = [
   {
     q: 'SwonBiz는 언제부터 운영했나요?',
     a: [
-      '강남 삼성동에서 12년째 공유오피스를 운영하고 있습니다. 그동안 입주사들이 겪은 법무·세무 문제를 직접 보아왔고, 그 경험을 SwonBiz 운영 시스템으로 만들었습니다. 입주 중에 사무실이 사라질 걱정 없이 이용하실 수 있습니다.',
+      '강남 삼성동에서 13년째 공유오피스를 운영하고 있습니다. 그동안 입주사들이 겪은 법무·세무 문제를 직접 보아왔고, 그 경험을 SwonBiz 운영 시스템으로 만들었습니다. 입주 중에 사무실이 사라질 걱정 없이 이용하실 수 있습니다.',
     ],
   },
   {
@@ -599,7 +588,7 @@ export const FINAL_CTA_NOTES = ['최소 계약 1개월', '위약금 없음', '�
 /* ══ 푸터 ════════════════════════════════════════════════════════════════════ */
 
 export const FOOTER_BLURB =
-  '강남 삼성동에서 12년째 운영 중인 공유오피스입니다. 법인설립부터 세무 자동화까지, 입주와 동시에 시작됩니다.';
+  '강남 삼성동에서 13년째 운영 중인 공유오피스입니다. 법인설립부터 세무 지원까지, 입주와 동시에 시작됩니다.';
 export const FOOTER_BRAND_NOTE = 'SwonBiz는 주식회사 에스원테크가 운영하는 공유오피스 브랜드입니다.';
 
 export const BIZ_LINES = [

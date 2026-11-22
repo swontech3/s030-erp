@@ -17,7 +17,7 @@ export function ServicesSection() {
         <div className={`${styles.headCenter} ${styles.headCenterGap}`}>
           <span className={styles.eyebrow}>WHAT WE PROVIDE</span>
           <h2 className={styles.h2}>
-            공간을 빌리면, <span className={styles.h1Accent}>AI가</span> 법무·세무를 처리합니다
+            공간을 빌리면, <span className={styles.h1Accent}>AI가</span> 법무·세무 업무를 돕습니다
           </h2>
           <p className={styles.lead} style={{ maxWidth: 600 }}>
             담당자를 뽑거나 세무사를 따로 두지 않아도 됩니다. 가장 막히는 사업목적·업종·업태부터
@@ -59,7 +59,7 @@ export function ServicesSection() {
         <div className={styles.lab}>
           <span className={styles.labEdge} />
           <div>
-            <span className={styles.eyebrow}>ONLY AT SWONBIZ</span>
+            <span className={styles.eyebrow}>WITH SWONBIZ</span>
             <h3 className={styles.labH3}>기업부설연구소, 설립부터 인정까지</h3>
             <p className={styles.labLead}>
               연구원 인원과 연구비 규모에 따라 R&amp;D 세액공제를 받을 수 있습니다. 신청 서류
@@ -95,8 +95,7 @@ export function ServicesSection() {
             <span className={styles.aiNoteStrong}>AI 활용 지원</span>
             <span>
               {' '}
-              · 업무 자동화 AI 에이전트를 직접 개발하며, 입주사에는 AI 활용과 바이브 코딩 실무
-              교육을 지원합니다.
+              · 26년차 개발자가 AI 활용 교육 · 프로그램 제작 교육 · 개발을 지원합니다
             </span>
           </div>
         </div>

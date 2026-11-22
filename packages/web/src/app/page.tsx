@@ -37,7 +37,7 @@ import styles from '@/features/landing/landing.module.css';
 export const metadata: Metadata = {
   title: 'SwonBiz — 법인설립부터 세무까지 AI가 함께하는 공유오피스',
   description:
-    '강남 삼성동 12년째 공유오피스. 등기 서류 작성, 세금계산서 발행, 경비 관리까지 입주와 동시에 켜지는 운영 시스템을 제공합니다.',
+    '강남 삼성동 13년째 공유오피스. 등기 서류 작성, 세금계산서 발행, 경비 관리까지 입주와 동시에 켜지는 운영 시스템을 제공합니다.',
 };
 
 export default function LandingPage() {
