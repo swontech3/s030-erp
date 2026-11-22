@@ -7,8 +7,8 @@
 
   /* Shadows are used sparingly: brand shadow on primary buttons, a quiet lift
      for floating surfaces only. Cards have NO shadow. */
-  --shadow-primary:0 4px 16px rgba(79,70,229,.22);
-  --shadow-primary-hover:0 6px 20px rgba(79,70,229,.28);
+  --shadow-primary:0 4px 16px rgba(11,147,184,.22);
+  --shadow-primary-hover:0 6px 20px rgba(11,147,184,.28);
   --shadow-float:0 8px 24px rgba(11,17,32,.10);
   --shadow-overlay:0 20px 48px rgba(11,17,32,.18);
   --shadow-none:none;

@@ -9,7 +9,7 @@
  *    실제 `:hover` 로 다시 썼다.
  * ★★ 리터럴로 남긴 색은 **알파 조합이라 CSS 변수로 만들 수 없는 것들**이다
  *    (주의사항 2 「의도된 리터럴」): 다크 그라디언트 시작값 #131C33, rgba(255,255,255,.x),
- *    rgba(79,70,229,.x), rgba(34,211,238,.x), rgba(11,17,32,.x).
+ *    rgba(11,147,184,.x), rgba(34,211,238,.x), rgba(11,17,32,.x).
  * ★ 녹색은 쓰지 않는다(`npm run lint:green`). 시안도 인디고·시안뿐이다.
  *
  * ── 폭 ───────────────────────────────────────────────────────────────────────
@@ -239,7 +239,7 @@
   padding: 0 14px;
   border-radius: var(--radius-pill);
   background: var(--color-accent-bg);
-  color: #4338ca;
+  color: #06657f;
   font-size: var(--text-caption-size);
   font-weight: var(--weight-bold);
   white-space: nowrap;
@@ -271,7 +271,7 @@
   padding: 3px var(--space-2);
   border-radius: var(--radius-pill);
   background: var(--color-accent-bg);
-  color: #4338ca;
+  color: #06657f;
   font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   white-space: nowrap;
@@ -351,7 +351,7 @@
   width: 560px;
   height: 560px;
   border-radius: var(--radius-pill);
-  background: radial-gradient(circle, #4f46e5 0%, rgba(79, 70, 229, 0) 70%);
+  background: radial-gradient(circle, #087a99 0%, rgba(11, 147, 184, 0) 70%);
   opacity: 0.08;
 }
 
@@ -399,7 +399,7 @@
   padding: 0 14px;
   border-radius: var(--radius-pill);
   background: var(--color-accent-bg);
-  color: #4338ca;
+  color: #06657f;
   font-size: var(--text-caption-size);
   font-weight: var(--weight-bold);
   white-space: nowrap;
@@ -569,7 +569,7 @@
 }
 
 .docIconFlash {
-  box-shadow: 0 0 14px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 0 14px rgba(11, 147, 184, 0.3);
 }
 
 .docBody {
@@ -656,7 +656,7 @@
   height: 22px;
   padding: 0 9px;
   border-radius: var(--radius-pill);
-  background: rgba(79, 70, 229, 0.12);
+  background: rgba(11, 147, 184, 0.12);
   color: var(--color-primary);
   font-size: 11px;
   font-weight: var(--weight-bold);
@@ -839,7 +839,7 @@
   top: 0;
   bottom: 0;
   width: 4px;
-  background: linear-gradient(180deg, #4f46e5, #22d3ee);
+  background: linear-gradient(180deg, #087a99, #22d3ee);
   border-radius: var(--radius-lg) 0 0 var(--radius-lg);
 }
 
@@ -951,7 +951,7 @@
   width: 620px;
   height: 620px;
   border-radius: var(--radius-pill);
-  background: radial-gradient(circle, #4f46e5 0%, rgba(79, 70, 229, 0) 72%);
+  background: radial-gradient(circle, #087a99 0%, rgba(11, 147, 184, 0) 72%);
   opacity: 0.22;
   filter: blur(40px);
 }
@@ -993,7 +993,7 @@
   height: 26px;
   padding: 0 var(--space-3);
   border-radius: var(--radius-pill);
-  background: rgba(79, 70, 229, 0.18);
+  background: rgba(11, 147, 184, 0.18);
   border: 1px solid rgba(129, 140, 248, 0.35);
   color: var(--color-secondary);
   font-size: var(--text-micro-size);
@@ -1049,7 +1049,7 @@
 }
 
 .erpTrackFill {
-  background: linear-gradient(180deg, #4f46e5, #22d3ee);
+  background: linear-gradient(180deg, #087a99, #22d3ee);
   transform-origin: top;
   transform: scaleY(0);
   transition: transform 1100ms var(--ease-out);
@@ -1431,7 +1431,7 @@
 }
 
 .erpChipAuto {
-  background: rgba(79, 70, 229, 0.28);
+  background: rgba(11, 147, 184, 0.28);
   color: #c7d2fe;
 }
 
@@ -1835,7 +1835,7 @@
 .stepNoLast {
   background: var(--color-primary);
   border: 1px solid transparent;
-  box-shadow: 0 0 16px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 0 16px rgba(11, 147, 184, 0.25);
   color: var(--text-on-primary);
 }
 
@@ -2386,7 +2386,7 @@
   width: 700px;
   height: 700px;
   border-radius: var(--radius-pill);
-  background: radial-gradient(circle, #4f46e5 0%, rgba(79, 70, 229, 0) 70%);
+  background: radial-gradient(circle, #087a99 0%, rgba(11, 147, 184, 0) 70%);
   opacity: 0.18;
   filter: blur(40px);
   pointer-events: none;
@@ -2754,11 +2754,11 @@
 @keyframes swonFlash {
   0% {
     border-color: var(--color-secondary);
-    box-shadow: 0 0 16px rgba(79, 70, 229, 0.35);
+    box-shadow: 0 0 16px rgba(11, 147, 184, 0.35);
   }
   100% {
     border-color: rgba(255, 255, 255, 0.1);
-    box-shadow: 0 0 0 rgba(79, 70, 229, 0);
+    box-shadow: 0 0 0 rgba(11, 147, 184, 0);
   }
 }
 

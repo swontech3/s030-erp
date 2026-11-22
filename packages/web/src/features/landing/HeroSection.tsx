@@ -107,7 +107,7 @@ export function HeroSection() {
         <div>
           <span className={styles.heroBadge}>
             <Icon name="sparkles" size={16} />
-            AI 기반 법무·세무 자동화
+            당신의 사업을 돕는 AI 공유오피스
           </span>
           <h1 className={styles.h1}>
             법인설립부터 세무까지

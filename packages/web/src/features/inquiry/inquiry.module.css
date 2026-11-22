@@ -198,7 +198,7 @@
 .btnPrimary {
   background: var(--color-primary);
   color: #fff;
-  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.22);
+  box-shadow: 0 4px 16px rgba(11, 147, 184, 0.22);
 }
 
 .btnPrimary:hover {
@@ -351,7 +351,7 @@
 .select:focus,
 .textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--focus-ring, rgba(79, 70, 229, 0.32));
+  box-shadow: 0 0 0 3px var(--focus-ring, rgba(11, 147, 184, 0.32));
 }
 
 /*
