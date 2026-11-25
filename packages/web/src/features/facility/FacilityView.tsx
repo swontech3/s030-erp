@@ -36,7 +36,7 @@
  *    잠깐 떴다 — **거짓을 보여 준 것**이지 늦게 보여 준 것이 아니다.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Icon, type IconName } from '@/components/ds';
+import { Button, Icon, Table, TableHead, TableRow, tableCell, type IconName } from '@/components/ds';
 import { LoadingBar } from '@/components/patterns/LoadingBar';
 import {
   FacilityError,
@@ -184,7 +184,8 @@ export function FacilityView() {
       */}
       <div className={styles.head}>
         <h1 className={styles.title} data-page-title>센터 관리</h1>
-        <Button size="sm" variant="primary" onClick={() => setDialog({ kind: 'building', building: null })}>
+        {/* ★ 2026-11-25 센터·기준관리 일관성 — 등록 = 보통 단추(자리는 그대로 — 표가 아니라 트리라 「표 위 왼쪽」이 없다) */}
+        <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: 'building', building: null })}>
           <Icon name="plus" size={16} />
           건물 추가
         </Button>
@@ -505,15 +506,16 @@ function BuildingPanel({
             {building.address ?? '주소 없음'} · 층 {floorCount}개
           </p>
         </div>
+        {/* ★ 2026-11-25 센터·기준관리 일관성 — 등록 · 수정 = 보통, 삭제 = 지우기(상세 제목 줄 오른쪽 그대로) */}
         <div className={styles.actions}>
-          <Button size="sm" variant="primary" onClick={() => onAddFloor(building.buildId)}>
+          <Button size="sm" variant="ghost" onClick={() => onAddFloor(building.buildId)}>
             <Icon name="plus" size={16} />
             층 추가
           </Button>
           <Button size="sm" variant="ghost" onClick={() => onEdit(building)}>
             수정
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => onDelete(building)}>
+          <Button size="sm" variant="danger" onClick={() => onDelete(building)}>
             삭제
           </Button>
         </div>
@@ -565,7 +567,8 @@ function FloorPanel({
           <Button size="sm" variant="ghost" onClick={() => onEdit(floor)}>
             수정
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => onDelete(floor)}>
+          {/* ★ 2026-11-25 센터·기준관리 일관성 — 삭제 = 지우기 */}
+          <Button size="sm" variant="danger" onClick={() => onDelete(floor)}>
             삭제
           </Button>
         </div>
@@ -581,6 +584,20 @@ function FloorPanel({
     </>
   );
 }
+
+/**
+ * ★ 2026-11-25 센터·기준관리 일관성 — 공통 표(Table) 칸 폭.
+ *   종전 `<table>` 은 칸 폭을 적지 않고(브라우저 자동) 글자 길이대로 나눴다. 그 모양을 지키려고
+ *   글자 칸은 `minmax(최소, fr)` 로 늘고 줄게, 뱃지 · 단추 칸만 고정 폭으로 둔다.
+ *   주소제공 72 = 「주소제공」 머리글 · 사용 88 = 가장 긴 뱃지 「사용 안 함」 · 삭제 72 = 공통 단추 sm 「삭제」.
+ */
+const SPACE_COLS =
+  'minmax(80px, 1.2fr) minmax(72px, 1fr) minmax(64px, 0.8fr) 72px minmax(88px, 1fr) minmax(88px, 1fr) 88px 72px';
+
+/**
+ * 회의실 표 칸 폭 — 위와 같은 방식. 수용인원 80 · 예약 96 = 「받지 않음」 뱃지 · 걸린 예약 80 · 삭제 72.
+ */
+const ROOM_COLS = 'minmax(120px, 1.4fr) 80px minmax(96px, 1fr) minmax(112px, 1fr) 96px 80px 72px';
 
 function SpacePanel({
   floor,
@@ -616,28 +633,20 @@ function SpacePanel({
   const byStatus = status === null ? spaces : spaces.filter((s) => s.status === status);
   /* 둘 다 적용한 것 — 표가 그리는 줄이다. */
   const visible = byType.filter((s) => status === null || s.status === status);
-  const filtered = roomType !== null || status !== null;
-  const hint = filtered ? `${visible.length} / ${spaces.length}실` : `${spaces.length}실`;
 
   if (!floor) return <p className={styles.hint}>층을 찾을 수 없습니다.</p>;
   return (
     <>
       {/* ★ 받아 오는 동안 칸 맨 위에 막대(공통 로딩바 · 2026-11-15) */}
       {busy ? <LoadingBar /> : null}
+      {/*
+        ★ 2026-11-25 센터·기준관리 일관성 — 건수는 검색 줄(계약구분 줄) 오른쪽 끝 「n건」으로 옮겼다(입주사 목록과 같다).
+          [호실 추가] 는 표 위 왼쪽 단추 줄(보통 단추)로 옮겼다.
+      */}
       <div className={styles.panelHead}>
         <div>
           <h2 className={styles.panelTitle}>호실관리</h2>
-          <p className={styles.panelSub}>
-            {/* ★ 받아 오는 중에는 수를 적지 않는다 — 0 이라고 적으면 거짓이다. */}
-            {floorLabel(floor)}
-            {busy ? null : ` · ${hint}`}
-          </p>
-        </div>
-        <div className={styles.actions}>
-          <Button size="sm" variant="primary" onClick={() => onAdd(floor.floorId)}>
-            <Icon name="plus" size={16} />
-            호실 추가
-          </Button>
+          <p className={styles.panelSub}>{floorLabel(floor)}</p>
         </div>
       </div>
 
@@ -673,6 +682,8 @@ function SpacePanel({
                 </button>
               ))}
             </div>
+            {/* ★ 거르는 대로 바로 바뀐다(조회 단추 없음) — 「n건」만 오른쪽 끝. 받아 오는 중에는 이 줄이 없다 */}
+            <span className={styles.count}>{visible.length}건</span>
           </div>
           <div className={styles.filterRow}>
             <span className={styles.filterLabel}>호실상태</span>
@@ -699,6 +710,14 @@ function SpacePanel({
         </div>
       ) : null}
 
+      {/* 단추 줄 — 검색 줄과 표 사이 · 왼쪽(입주사 목록과 같다) */}
+      <div className={styles.listBar}>
+        <Button size="sm" variant="ghost" onClick={() => onAdd(floor.floorId)}>
+          <Icon name="plus" size={16} />
+          호실 추가
+        </Button>
+      </div>
+
       {busy ? null : spaces.length === 0 ? (
         <PanelEmpty icon="package-open" lead="등록된 호실이 없습니다" sub="[호실 추가] 로 만들어 주세요" />
       ) : visible.length === 0 ? (
@@ -706,16 +725,16 @@ function SpacePanel({
         <PanelEmpty icon="search" lead="조건에 맞는 호실이 없습니다" sub="위의 조건을 바꾸거나 [전체] 를 눌러 주세요" />
       ) : (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>호실명</th>
-                <th>계약구분</th>
-                <th>호실상태</th>
-                <th className={styles.center}>주소제공</th>
-                <th className={styles.num}>월임대료</th>
-                <th className={styles.num}>보증금</th>
-                <th className={styles.center}>사용</th>
+          {/* ★ 2026-11-25 센터·기준관리 일관성 — 공통 표(Table · 머리글 아쿠아). 칸 폭은 SPACE_COLS 주석 */}
+          <Table cols={SPACE_COLS}>
+            <TableHead sticky>
+                <span>호실명</span>
+                <span>계약구분</span>
+                <span>호실상태</span>
+                <span className={tableCell.center}>주소제공</span>
+                <span className={tableCell.right}>월임대료</span>
+                <span className={tableCell.right}>보증금</span>
+                <span className={tableCell.center}>사용</span>
                 {/*
                   ★★★ 계약 수를 적는 칸은 **없다**(결정 2026-10-03). 호실 관리는
                        **재실여부만** 다룬다 — 지금 이 방에 누가 들어 있는가는 위의
@@ -727,42 +746,39 @@ function SpacePanel({
 
                   ★ 「입주 가능 회사 수」도 여기 적지 않는다. p3 팝업의 칸이다.
                 */}
-                <th />
-              </tr>
-            </thead>
-            <tbody>
+                <span />
+            </TableHead>
               {visible.map((s) => (
-                <tr key={s.spaceId} className={s.isActive ? undefined : styles.rowOff}>
-                  <td>
+                <TableRow key={s.spaceId} muted={!s.isActive}>
+                  <span className={tableCell.ellipsis}>
                     <button type="button" className={styles.rowBtn} onClick={() => onEdit(s)}>
                       {s.roomName ?? '—'}
                     </button>
-                  </td>
-                  <td>{codeName(codes, 'ROOM_TP', s.roomType)}</td>
-                  <td>{codeName(codes, 'ROOM_ST', s.status)}</td>
-                  <td className={styles.center}>
+                  </span>
+                  <span className={tableCell.ellipsis}>{codeName(codes, 'ROOM_TP', s.roomType)}</span>
+                  <span className={tableCell.ellipsis}>{codeName(codes, 'ROOM_ST', s.status)}</span>
+                  <span className={tableCell.center}>
                     {/* ★ 날값 Y/N 이 아니다 — 같은 표의 「사용」과 같은 태그로 그린다. */}
                     <span className={`${styles.tag} ${s.bizAddrAvailable ? styles.tagOn : styles.tagOff}`}>
                       {s.bizAddrAvailable ? '제공' : '안 함'}
                     </span>
-                  </td>
-                  <td className={styles.num}>{money(s.standardFee)}</td>
-                  <td className={styles.num}>{money(s.deposit)}</td>
-                  <td className={styles.center}>
+                  </span>
+                  <span className={`${tableCell.right} ${styles.num}`}>{money(s.standardFee)}</span>
+                  <span className={`${tableCell.right} ${styles.num}`}>{money(s.deposit)}</span>
+                  <span className={tableCell.center}>
                     <span className={`${styles.tag} ${s.isActive ? styles.tagOn : styles.tagOff}`}>
                       {s.isActive ? '사용' : '사용 안 함'}
                     </span>
-                  </td>
-                  <td className={styles.center}>
-                    {/* ★ 표 안 버튼은 30px 다 — 청구 화면과 같은 값(`.btnXs`). */}
-                    <button type="button" className={styles.btnXs} onClick={() => onDelete(s)}>
+                  </span>
+                  <span className={tableCell.center}>
+                    {/* ★ 2026-11-25 일관성 — 줄 안 [삭제] = 공통 지우기 단추(sm). 종전 30px `.btnXs` 는 없앴다 */}
+                    <Button size="sm" variant="danger" onClick={() => onDelete(s)}>
                       삭제
-                    </button>
-                  </td>
-                </tr>
+                    </Button>
+                  </span>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+          </Table>
         </div>
       )}
     </>
@@ -789,6 +805,10 @@ function MeetingRoomPanel({
     <>
       {/* ★ 받아 오는 동안 칸 맨 위에 막대(공통 로딩바 · 2026-11-15) */}
       {busy ? <LoadingBar /> : null}
+      {/*
+        ★ 2026-11-25 센터·기준관리 일관성 — [회의실 추가] 는 표 위 왼쪽 단추 줄(보통 단추)로 옮겼다.
+          검색 줄이 없어 「n개」는 제목 아래 그대로 둔다.
+      */}
       <div className={styles.panelHead}>
         <div>
           <h2 className={styles.panelTitle}>회의실관리</h2>
@@ -797,62 +817,60 @@ function MeetingRoomPanel({
             {busy ? null : ` · ${rooms.length}개`}
           </p>
         </div>
-        <div className={styles.actions}>
-          <Button size="sm" variant="primary" onClick={() => onAdd(floor.floorId)}>
-            <Icon name="plus" size={16} />
-            회의실 추가
-          </Button>
-        </div>
+      </div>
+
+      <div className={styles.listBar}>
+        <Button size="sm" variant="ghost" onClick={() => onAdd(floor.floorId)}>
+          <Icon name="plus" size={16} />
+          회의실 추가
+        </Button>
       </div>
 
       {busy ? null : rooms.length === 0 ? (
         <PanelEmpty icon="door-open" lead="등록된 회의실이 없습니다" sub="[회의실 추가] 로 만들어 주세요" />
       ) : (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>회의실명</th>
-                <th className={styles.num}>수용인원</th>
-                <th className={styles.num}>30분당 요금</th>
-                <th>운영시간</th>
-                <th className={styles.center}>예약</th>
-                <th className={styles.center}>걸린 예약</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rooms.map((r) => (
-                <tr key={r.facilityId} className={r.isReservable ? undefined : styles.rowOff}>
-                  <td>
-                    <button type="button" className={styles.rowBtn} onClick={() => onEdit(r)}>
-                      {r.name}
-                    </button>
-                  </td>
-                  <td className={styles.num}>{r.capacity ?? '—'}</td>
-                  <td className={styles.num}>{money(r.halfHourFee)}</td>
-                  <td>{[r.openTime, r.closeTime].filter(Boolean).join(' ~ ') || '—'}</td>
-                  <td className={styles.center}>
-                    <span className={`${styles.tag} ${r.isReservable ? styles.tagOn : styles.tagOff}`}>
-                      {r.isReservable ? '받음' : '받지 않음'}
-                    </span>
-                  </td>
-                  <td className={styles.center}>
-                    {r.liveReservations > 0 ? (
-                      <span className={`${styles.tag} ${styles.tagWarn}`}>{r.liveReservations}건</span>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className={styles.center}>
-                    <button type="button" className={styles.btnXs} onClick={() => onDelete(r)}>
-                      삭제
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* ★ 2026-11-25 센터·기준관리 일관성 — 공통 표(Table · 머리글 아쿠아). 칸 폭은 ROOM_COLS 주석 */}
+          <Table cols={ROOM_COLS}>
+            <TableHead sticky>
+              <span>회의실명</span>
+              <span className={tableCell.right}>수용인원</span>
+              <span className={tableCell.right}>30분당 요금</span>
+              <span>운영시간</span>
+              <span className={tableCell.center}>예약</span>
+              <span className={tableCell.center}>걸린 예약</span>
+              <span />
+            </TableHead>
+            {rooms.map((r) => (
+              <TableRow key={r.facilityId} muted={!r.isReservable}>
+                <span className={tableCell.ellipsis}>
+                  <button type="button" className={styles.rowBtn} onClick={() => onEdit(r)}>
+                    {r.name}
+                  </button>
+                </span>
+                <span className={`${tableCell.right} ${styles.num}`}>{r.capacity ?? '—'}</span>
+                <span className={`${tableCell.right} ${styles.num}`}>{money(r.halfHourFee)}</span>
+                <span className={tableCell.ellipsis}>{[r.openTime, r.closeTime].filter(Boolean).join(' ~ ') || '—'}</span>
+                <span className={tableCell.center}>
+                  <span className={`${styles.tag} ${r.isReservable ? styles.tagOn : styles.tagOff}`}>
+                    {r.isReservable ? '받음' : '받지 않음'}
+                  </span>
+                </span>
+                <span className={tableCell.center}>
+                  {r.liveReservations > 0 ? (
+                    <span className={`${styles.tag} ${styles.tagWarn}`}>{r.liveReservations}건</span>
+                  ) : (
+                    '—'
+                  )}
+                </span>
+                <span className={tableCell.center}>
+                  <Button size="sm" variant="danger" onClick={() => onDelete(r)}>
+                    삭제
+                  </Button>
+                </span>
+              </TableRow>
+            ))}
+          </Table>
         </div>
       )}
     </>
