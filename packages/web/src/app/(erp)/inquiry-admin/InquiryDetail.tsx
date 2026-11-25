@@ -28,8 +28,8 @@ import {
   operatorReplyBlock,
   type MessageKind,
 } from '@swonbiz/shared/domain/inquiry';
-import { retentionDeleteHint } from '@swonbiz/shared/domain/inquiry-admin-layout';
-import { Icon } from '@/components/ds';
+import { inquiryRounds, retentionDeleteHint } from '@swonbiz/shared/domain/inquiry-admin-layout';
+import { Button, Icon } from '@/components/ds';
 import {
   codeName,
   dotDate,
@@ -50,9 +50,30 @@ interface Props {
   onAskDelete: () => void;
   /** [글 삭제] 를 그리는가 — 앱 안에서는 감춘다(PC 만 · 앱 1단계 5-나). 기본은 그린다 */
   showDelete?: boolean;
+  /**
+   * 문의-답변 묶음 모양(앱 안 · 3-마 덧붙임 3 · 대표 지시 2026-11-16) — shared `inquiryAdminLayout.detailRounds`.
+   * 처리 기능(답변 · 전화로 답변함 · 답변 수정)은 같고 **배치만** 다르다. 기본은 지금 스레드(PC).
+   */
+  rounds?: boolean;
+  /**
+   * [전화로 답변함] · [답변 등록] 을 상세 맨 아래에 고정(묶음만 스크롤 · 3-마 덧붙임 4) — shared `fixedReplyActions`.
+   * 묶음 모양(`rounds`)에서만 쓴다.
+   */
+  fixedActions?: boolean;
 }
 
-export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit, onAskDelete, showDelete = true }: Props) {
+export function InquiryDetail({
+  inquiry,
+  messages,
+  codes,
+  busy,
+  onReply,
+  onEdit,
+  onAskDelete,
+  showDelete = true,
+  rounds = false,
+  fixedActions = false,
+}: Props) {
   const [draft, setDraft] = useState('');
   const [draftErr, setDraftErr] = useState(false);
   /** 고치고 있는 답변. `null` 이면 아무것도 고치지 않는 중이다. */
@@ -95,50 +116,278 @@ export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit,
     }
   };
 
+  const head = (
+    <div className={styles.detailHead}>
+      <div className={styles.who}>
+        {/* 제목 칸이 없다 — 문의 유형이 제목이다 */}
+        <h2>{typeName}</h2>
+        <span className={styles.whoDivider} />
+        <span className={styles.whoSub}>{inquiry.name}</span>
+        <span className={`${styles.badge} ${inquiry.status === 'R' ? styles.badgeWait : styles.badgeDone}`}>
+          {statusName}
+        </span>
+        {/* ★ 운영자 화면에만 있는 표시다 — 고객 목록·글 보기에는 없다(04-data-model §5) */}
+        {inquiry.retentionPassed ? <span className={`${styles.badge} ${styles.badgeOld}`}>보관 기간 지남</span> : null}
+      </div>
+      {/*
+        ★ 삭제는 **글 전체**다(원글 + 스레드). 개인정보가 함께 지워지고 되돌릴 수 없어서
+          확인 창을 거친다. 보관 기간이 지나지 않은 글도 지울 수 있다(스팸 제거 —
+          2026-09-28 결정, 03-thread §5 가 운영 판단으로 남긴 자리다).
+      */}
+      {/* ★ 공통 Button 지우기(danger · 회색 테두리 빨간 글자 · 2026-11-25 입주관리 일관성). 자리는 그대로 */}
+      {showDelete ? (
+        <Button variant="danger" size="sm" data-delete="1" iconLeft={<Icon name="trash-2" size={16} />} onClick={onAskDelete}>
+          글 삭제
+        </Button>
+      ) : null}
+    </div>
+  );
+
+  const retention = inquiry.retentionPassed ? (
+    <div className={styles.retention} data-retention="1">
+      <Icon name="info" size={16} />
+      <span>
+        등록일부터 {inquiry.retentionMonths}개월이 지났습니다(보유 기간 「등록일로부터{' '}
+        {inquiry.retentionMonths}개월 보관 후 파기」). <b>자동으로 삭제되지 않습니다</b> — 상담이 끝난 글이면{' '}
+        {/* 앱 안은 [글 삭제] 를 감춘다 → 「PC 화면에서」 (앱 1단계 9-나) */}
+        {retentionDeleteHint(showDelete)} 고객 화면에는 이 안내가 보이지 않습니다.
+      </span>
+    </div>
+  ) : null;
+
+  /** 답변 고치기 칸 — 스레드(PC) · 묶음(앱) 둘 다 쓴다. `note` = 「수정됨」 안내(PC 만) */
+  const editBox = (messageId: string, body: string, note: boolean) => (
+    <>
+      <textarea
+        className={`${styles.textarea}${editErr ? ` ${styles.isErr}` : ''}`}
+        data-f="edit"
+        rows={5}
+        maxLength={BODY_MAX}
+        value={body}
+        onChange={(e) => {
+          setEditing({ messageId, body: e.target.value });
+          setEditErr(false);
+        }}
+      />
+      <span className={styles.countRow}>
+        <span className={styles.countErr}>{editErr ? '답변 내용을 입력해 주세요' : ''}</span>
+        <span className={styles.count2}>
+          {body.length} / {BODY_MAX}
+        </span>
+      </span>
+      <div className={styles.msgFoot}>
+        {note ? (
+          <span className={styles.composeNote} style={{ marginRight: 'auto' }}>
+            수정하면 고객 화면에 「수정됨」이 붙습니다. 등록 시각과 순서는 그대로입니다.
+          </span>
+        ) : null}
+        {/* ★ PC(note) = 공통 Button [취소](보통) [수정 저장](주) · 앱 안(묶음)은 종전 단추 그대로(폰 배치 유지) */}
+        {note ? (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                setEditing(null);
+                setEditErr(false);
+              }}
+            >
+              취소
+            </Button>
+            <Button variant="primary" size="sm" data-edit-save="1" disabled={busy} onClick={() => void submitEdit()}>
+              수정 저장
+            </Button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`}
+              disabled={busy}
+              onClick={() => {
+                setEditing(null);
+                setEditErr(false);
+              }}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`}
+              data-edit-save="1"
+              disabled={busy}
+              onClick={() => void submitEdit()}
+            >
+              수정 저장
+            </button>
+          </>
+        )}
+      </div>
+    </>
+  );
+
+  /*
+   * ══ 앱 안 — 문의-답변 묶음(3-마 덧붙임 3 · 대표 지시 2026-11-16) ══
+   *  1회 묶음 = 1행 이름 · 회사명 / 2행 연락처 · 등록일시 / 3행 이메일 / 4행 문의 내용 / 5행 답변(입력칸)
+   *  2회부터 = 고객 추가 질문 + 그 답변. 묶음 나누기는 shared `inquiryRounds` 하나다.
+   *  ★ 「답변」 소제목 · 답변 칸 안내 문구는 없다. [전화로 답변함] · [답변 등록] 은 묶음 밖 맨 아래.
+   *  ★ [전화로 답변함] 에 전화 그림을 넣지 않는다 — 누르면 전화가 걸리는 줄로 읽힌다. 전화 그림은 연락처 앞에만.
+   *  ★ 입력칸 · 단추를 그리는 판정은 PC 와 같다(`operatorReplyBlock` — 서버 409 와 같은 함수).
+   *  ★ 머리(유형 · 이름 · 상태)와 「보관 기간 지남」 안내는 PC 와 같은 것을 그린다.
+   */
+  if (rounds) {
+    const list = inquiryRounds(messages.map((m) => m.kind));
+    /* 단추 줄 — 고정이면 스크롤 칸(detailBody) 밖 맨 아래, 아니면 묶음 뒤 */
+    const replyActions = block ? null : (
+      <div className={styles.roundActions}>
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnGhost}`}
+          data-phone-reply="1"
+          disabled={busy}
+          onClick={() => void onReply('phone', '')}
+        >
+          전화로 답변함
+        </button>
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnPrimary}`}
+          data-reply-add="1"
+          disabled={busy}
+          onClick={() => void submitReply()}
+        >
+          답변 등록
+        </button>
+      </div>
+    );
+    return (
+      <>
+        {head}
+        <div className={styles.detailBody}>
+          {retention}
+          {list.map((r, ri) => {
+            const q = r.question === null ? null : (messages[r.question] ?? null);
+            const last = ri === list.length - 1;
+            return (
+              <section key={r.no} className={styles.round} data-round={r.no}>
+                <div className={styles.roundTitle}>{r.no}회 문의</div>
+                {q === null ? (
+                  /* ★ 명세에 있는 항목만(02-screens §3) · 회사명은 선택 항목이라 비면 「-」 — 줄 모양을 지킨다 */
+                  <div className={styles.roundInfo} data-origin="1">
+                    <div>
+                      <div className={styles.roundKey}>이름</div>
+                      <div className={styles.roundVal}>{inquiry.name}</div>
+                    </div>
+                    <div>
+                      <div className={styles.roundKey}>회사명</div>
+                      <div className={styles.roundVal}>{inquiry.companyName || '-'}</div>
+                    </div>
+                    <div>
+                      <div className={styles.roundKey}>연락처</div>
+                      <div className={`${styles.roundVal} ${styles.tabular}`}>
+                        <a className={styles.roundTel} href={`tel:${inquiry.phone.replace(/\D/g, '')}`}>
+                          <Icon name="phone" size={14} />
+                          {inquiry.phone}
+                        </a>
+                      </div>
+                    </div>
+                    <div>
+                      <div className={styles.roundKey}>등록일시</div>
+                      <div className={`${styles.roundVal} ${styles.tabular}`}>{dotDateTime(inquiry.createdAt)}</div>
+                    </div>
+                    <div className={styles.roundWide}>
+                      <div className={styles.roundKey}>이메일</div>
+                      <div className={styles.roundVal}>
+                        <a href={`mailto:${inquiry.email}`}>{inquiry.email}</a>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className={styles.roundPart} data-question={q ? 'customer' : 'origin'}>
+                  <div className={styles.roundKey}>{q ? `추가 문의 · ${dotDateTime(q.createdAt)}` : '문의 내용'}</div>
+                  <p className={styles.roundText}>{q ? q.body : inquiry.body}</p>
+                </div>
+
+                {r.answers.map((ai) => {
+                  const m = messages[ai];
+                  if (!m) return null;
+                  return (
+                    <div key={m.messageId} className={styles.roundPart} data-msg={m.kind}>
+                      <div className={styles.roundAnswerHead}>
+                        <div className={styles.roundKey}>
+                          답변 · {dotDateTime(m.createdAt)}
+                          {m.editedAt ? ` · ${dotDate(m.editedAt)} 수정됨` : ''}
+                        </div>
+                        {/* ★ 수정은 **글답변만** — 전화 기록 · 고객 글은 고치지 않는다 */}
+                        {m.kind === 'text' && editing?.messageId !== m.messageId ? (
+                          <button
+                            type="button"
+                            className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+                            data-edit={m.messageId}
+                            onClick={() => {
+                              setEditing({ messageId: m.messageId, body: m.body ?? '' });
+                              setEditErr(false);
+                            }}
+                          >
+                            수정
+                          </button>
+                        ) : null}
+                      </div>
+                      {m.kind === 'phone' ? (
+                        <p className={styles.roundText}>전화로 답변드렸습니다</p>
+                      ) : editing?.messageId === m.messageId ? (
+                        editBox(m.messageId, editing.body, false)
+                      ) : (
+                        <p className={styles.roundText}>{m.body}</p>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {last && !block ? (
+                  <div className={styles.roundPart} data-compose="1">
+                    <div className={styles.roundKey}>답변</div>
+                    <textarea
+                      id="reply-body"
+                      aria-label="답변"
+                      className={`${styles.textarea}${draftErr ? ` ${styles.isErr}` : ''}`}
+                      data-f="reply"
+                      rows={5}
+                      maxLength={BODY_MAX}
+                      value={draft}
+                      onChange={(e) => {
+                        setDraft(e.target.value);
+                        setDraftErr(false);
+                      }}
+                    />
+                    <span className={styles.countRow}>
+                      <span className={styles.countErr}>{draftErr ? '답변 내용을 입력해 주세요' : ''}</span>
+                      <span className={styles.count2}>
+                        {draft.length} / {BODY_MAX}
+                      </span>
+                    </span>
+                  </div>
+                ) : null}
+              </section>
+            );
+          })}
+
+          {fixedActions ? null : replyActions}
+        </div>
+        {/* ★ 고정 단추 — 스크롤 칸 밖이라 늘 보이고, 마지막 묶음을 덮지 않는다(같은 세로 줄의 다음 칸) */}
+        {fixedActions && replyActions ? <div className={styles.roundActionsFixed}>{replyActions}</div> : null}
+      </>
+    );
+  }
+
   return (
     <>
-      <div className={styles.detailHead}>
-        <div className={styles.who}>
-          {/* 제목 칸이 없다 — 문의 유형이 제목이다 */}
-          <h2>{typeName}</h2>
-          <span className={styles.whoDivider} />
-          <span className={styles.whoSub}>{inquiry.name}</span>
-          <span className={`${styles.badge} ${inquiry.status === 'R' ? styles.badgeWait : styles.badgeDone}`}>
-            {statusName}
-          </span>
-          {/* ★ 운영자 화면에만 있는 표시다 — 고객 목록·글 보기에는 없다(04-data-model §5) */}
-          {inquiry.retentionPassed ? <span className={`${styles.badge} ${styles.badgeOld}`}>보관 기간 지남</span> : null}
-        </div>
-        {/*
-          ★ 삭제는 **글 전체**다(원글 + 스레드). 개인정보가 함께 지워지고 되돌릴 수 없어서
-            확인 창을 거친다. 보관 기간이 지나지 않은 글도 지울 수 있다(스팸 제거 —
-            2026-09-28 결정, 03-thread §5 가 운영 판단으로 남긴 자리다).
-        */}
-        {showDelete ? (
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnDanger} ${styles.btnSm}`}
-            data-delete="1"
-            onClick={onAskDelete}
-          >
-            <Icon name="trash-2" size={16} />
-            글 삭제
-          </button>
-        ) : null}
-      </div>
+      {head}
 
       <div className={styles.detailBody}>
-        {inquiry.retentionPassed ? (
-          <div className={styles.retention} data-retention="1">
-            <Icon name="info" size={16} />
-            <span>
-              등록일부터 {inquiry.retentionMonths}개월이 지났습니다(보유 기간 「등록일로부터{' '}
-              {inquiry.retentionMonths}개월 보관 후 파기」). <b>자동으로 삭제되지 않습니다</b> — 상담이 끝난 글이면{' '}
-              {/* 앱 안은 [글 삭제] 를 감춘다 → 「PC 화면에서」 (앱 1단계 9-나) */}
-              {retentionDeleteHint(showDelete)} 고객 화면에는 이 안내가 보이지 않습니다.
-            </span>
-          </div>
-        ) : null}
+        {retention}
 
         {/* ── 원글 ── ★ 명세에 있는 항목만 보인다(02-screens §3 의 폼 항목 그대로) ── */}
         <div className={styles.card2} data-origin="1">
@@ -218,66 +467,23 @@ export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit,
                   </div>
                   {/* ★ 수정은 **글답변만**. 고객 글에는 버튼이 없다 — 남의 말을 고치지 않는다 */}
                   {m.kind === 'text' && editing?.messageId !== m.messageId ? (
-                    <button
-                      type="button"
-                      className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       data-edit={m.messageId}
+                      iconLeft={<Icon name="pencil-line" size={14} />}
                       onClick={() => {
                         setEditing({ messageId: m.messageId, body: m.body ?? '' });
                         setEditErr(false);
                       }}
                     >
-                      <Icon name="pencil-line" size={14} />
                       수정
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
 
                 {editing?.messageId === m.messageId ? (
-                  <>
-                    <textarea
-                      className={`${styles.textarea}${editErr ? ` ${styles.isErr}` : ''}`}
-                      data-f="edit"
-                      rows={5}
-                      maxLength={BODY_MAX}
-                      value={editing.body}
-                      onChange={(e) => {
-                        setEditing({ messageId: m.messageId, body: e.target.value });
-                        setEditErr(false);
-                      }}
-                    />
-                    <span className={styles.countRow}>
-                      <span className={styles.countErr}>{editErr ? '답변 내용을 입력해 주세요' : ''}</span>
-                      <span className={styles.count2}>
-                        {editing.body.length} / {BODY_MAX}
-                      </span>
-                    </span>
-                    <div className={styles.msgFoot}>
-                      <span className={styles.composeNote} style={{ marginRight: 'auto' }}>
-                        수정하면 고객 화면에 「수정됨」이 붙습니다. 등록 시각과 순서는 그대로입니다.
-                      </span>
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`}
-                        disabled={busy}
-                        onClick={() => {
-                          setEditing(null);
-                          setEditErr(false);
-                        }}
-                      >
-                        취소
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`}
-                        data-edit-save="1"
-                        disabled={busy}
-                        onClick={() => void submitEdit()}
-                      >
-                        수정 저장
-                      </button>
-                    </div>
-                  </>
+                  editBox(m.messageId, editing.body, true)
                 ) : (
                   <p className={styles.bodyText}>{m.body}</p>
                 )}
@@ -326,25 +532,19 @@ export function InquiryDetail({ inquiry, messages, codes, busy, onReply, onEdit,
                 ★ 전화로 답변한 경우의 기록. 본문이 없고 **지울 수 없다**(개별 글 삭제가
                   없다) — 그래서 무엇이 남는지 버튼 옆에 적는다.
               */}
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnGhost}`}
+              <Button
+                variant="ghost"
+                size="sm"
                 data-phone-reply="1"
                 disabled={busy}
+                iconLeft={<Icon name="phone" size={16} />}
                 onClick={() => void onReply('phone', '')}
               >
-                <Icon name="phone" size={16} />
                 전화로 답변함
-              </button>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                data-reply-add="1"
-                disabled={busy}
-                onClick={() => void submitReply()}
-              >
+              </Button>
+              <Button variant="primary" size="sm" data-reply-add="1" disabled={busy} onClick={() => void submitReply()}>
                 답변 등록
-              </button>
+              </Button>
             </div>
           </div>
           <p className={styles.composeNote} style={{ marginTop: 10 }}>

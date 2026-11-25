@@ -44,16 +44,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DUE_RANGE_TOO_LONG, isDueRangeTooLong } from '@swonbiz/shared/domain/billing-due-range';
-import { Icon } from '@/components/ds';
+import { Button, Icon } from '@/components/ds';
 import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
 import { ListFrame, ListNote, ListScroll, ListSpacer } from '@/components/patterns/ListFrame';
-import { BillingEmpty, BillingTable } from '@/features/billing/BillingTable';
+import { BTN_XS, BillingEmpty, BillingTable } from '@/features/billing/BillingTable';
 import { InvoiceDetailPane } from '@/features/billing/InvoiceDetailPane';
 import { PaymentDialog } from '@/features/billing/PaymentDialog';
 import { SettlementQueue } from '@/features/billing/SettlementQueue';
 import styles from '@/features/billing/billing.module.css';
-// ★ 검색 상자 칸은 법인변경 목록과 같은 모양 · 같은 클래스(.field · .label · .range · .input · .select) — 대표 지시 2026-11-15.
-import cs from '@/features/legal/corp-changes.module.css';
+// ★ 검색 칸 모양(.boxInput · .boxSelect)은 법인변경 목록의 .input · .select 규칙을 청구 css 로 옮긴 것이다(2026-11-25 대표 지시).
 import {
   PAY_ST_CATEGORY,
   currentMonthRange,
@@ -343,9 +342,9 @@ export function BillingView() {
       <span className={`${styles.chip} ${styles.chipOn}`} data-company-filter={company}>
         입주사 · {companyName ?? '…'}
       </span>
-      <button
-        type="button"
-        className={`${styles.btn} ${styles.btnGhost}`}
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => {
           setCompany(null);
           setContract(null);
@@ -358,7 +357,7 @@ export function BillingView() {
         }}
       >
         거르기 해제
-      </button>
+      </Button>
     </>
   ) : null;
 
@@ -419,7 +418,7 @@ export function BillingView() {
                   <span className={styles.searchRangeName}>납부기한</span>
                   <input
                     type="date"
-                    className={`${cs.input} ${styles.searchDate}`}
+                    className={`${styles.boxInput} ${styles.searchDate}`}
                     aria-label="납부기한 시작일"
                     value={draft.from}
                     onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
@@ -427,14 +426,14 @@ export function BillingView() {
                   ~
                   <input
                     type="date"
-                    className={`${cs.input} ${styles.searchDate}`}
+                    className={`${styles.boxInput} ${styles.searchDate}`}
                     aria-label="납부기한 끝일"
                     value={draft.to}
                     onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
                   />
                 </span>
                 <input
-                  className={`${cs.input} ${styles.searchText}`}
+                  className={`${styles.boxInput} ${styles.searchText}`}
                   placeholder="입주사, 호실"
                   aria-label="입주사, 호실"
                   value={draft.name}
@@ -444,7 +443,7 @@ export function BillingView() {
                   }}
                 />
                 <select
-                  className={`${cs.select} ${styles.searchSelect}`}
+                  className={`${styles.boxSelect} ${styles.searchSelect}`}
                   aria-label="상태"
                   value={draft.st ?? ''}
                   onChange={(e) => setDraft((d) => ({ ...d, st: e.target.value || null }))}
@@ -456,35 +455,35 @@ export function BillingView() {
                     </option>
                   ))}
                 </select>
-                <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.searchBtn}`} onClick={search}>
-                  조회
-                </button>
-                <button type="button" className={`${styles.btn} ${styles.btnGhost} ${styles.searchBtn}`} onClick={reset}>
-                  <Icon name="rotate-ccw" size={16} />
-                  초기화
-                </button>
-                {/* ★ 2026-11-15 — 건수는 [초기화] 오른쪽. */}
-                <ListNote>{items === null || error ? '' : `${visible.length}건`}</ListNote>
                 {formError ? (
                   <span className={styles.searchError} role="alert">
                     {formError}
                   </span>
                 ) : null}
+                {/* ★ 2026-11-25 입주관리 일관성 — 삐용 검색 줄: 오른쪽 끝 [초기화][조회](보통 단추) 다음 「n건」. */}
+                <ListSpacer />
+                <Button variant="ghost" size="sm" iconLeft={<Icon name="rotate-ccw" size={16} />} onClick={reset}>
+                  초기화
+                </Button>
+                <Button variant="ghost" size="sm" onClick={search}>
+                  조회
+                </Button>
+                <ListNote>{items === null || error ? '' : `${visible.length}건`}</ListNote>
               </>
             }
             actions={
               <>
                 {/* ★ 2026-11-16 — 고른 줄을 수납(전에 줄마다 있던 [수납] 단추). 안 골랐으면 누를 수 없다. */}
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.btnPrimary}`}
+                <Button
+                  variant="ghost"
+                  size="sm"
                   disabled={!canPay}
                   onClick={() => {
                     if (selectedItem) setPaying(selectedItem);
                   }}
                 >
                   수납
-                </button>
+                </Button>
                 {companyChip}
                 <ListSpacer />
                 {/* ★ 지금 검색 결과 전체 · 목록 칸 그대로 — 파일은 API 가 ERP 공통 부품으로 만든다. */}
@@ -545,13 +544,9 @@ export function BillingView() {
                       <span className={styles.moreText}>
                         {visible.length}건 중 {drawn.length}건 표시 · 스크롤하면 더 나옵니다
                       </span>
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
-                        onClick={() => setShown((n) => n + PAGE)}
-                      >
+                      <Button variant="ghost" size="sm" style={BTN_XS} onClick={() => setShown((n) => n + PAGE)}>
                         {Math.min(PAGE, rest)}건 더 보기
-                      </button>
+                      </Button>
                     </div>
                   ) : null}
                 </>

@@ -22,7 +22,7 @@
 import { useState } from 'react';
 import { settlementDirection } from '@swonbiz/shared/domain/settlement-view';
 import { usedPeriodLabel } from '@swonbiz/shared/domain/usage-period';
-import { Icon } from '@/components/ds';
+import { Button, Dialog, Icon } from '@/components/ds';
 import cf from '@/features/contracts/contract-form.module.css';
 import styles from './billing.module.css';
 import {
@@ -55,7 +55,7 @@ export function SettlementCard({ s, onProcessed }: { s: Settlement; onProcessed:
     <div className={styles.settleCard} data-settlement-card={s.contractId}>
       <div className={styles.settleHead}>
         <span className={styles.settleTitle}>
-          중도해지 정산
+          <span className={styles.sectionBar}>중도해지 정산</span>
           <span className={styles.settleMeta}>{s.roomNames || '—'}</span>
         </span>
         {s.processed ? (
@@ -104,14 +104,13 @@ export function SettlementCard({ s, onProcessed }: { s: Settlement; onProcessed:
           </div>
         </div>
         <span className={styles.actions}>
-          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => setDoc(true)}>
-            <Icon name="file-text" size={16} />
+          <Button variant="ghost" size="sm" iconLeft={<Icon name="file-text" size={16} />} onClick={() => setDoc(true)}>
             정산서
-          </button>
+          </Button>
           {s.processed ? null : (
-            <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setOpen(true)}>
+            <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
               정산 처리
-            </button>
+            </Button>
           )}
         </span>
       </div>
@@ -237,92 +236,86 @@ export function SettleDialog({ s, onClose, onDone }: { s: Settlement; onClose: (
     }
   };
 
+  // ★ 2026-11-25 입주관리 일관성 — 공통 팝업(아쿠아 제목줄 · 아래 가운데 [정산 처리](주) [취소](보통)). 둥근 아이콘 · 반반 단추 없앰.
   return (
-    <div
-      className={cf.overlay}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !busy) onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && !busy) onClose();
-      }}
-    >
-      <div className={cf.modal} role="dialog" aria-modal="true" aria-label="정산 처리">
-        <div className={cf.modalIconWrap}>
-          <span className={`${cf.modalIcon} ${cf.modalIconConfirm}`}>
-            <Icon name="receipt" size={24} />
-          </span>
-        </div>
-        <h3 className={cf.modalTitle}>정산을 처리하시겠습니까?</h3>
-        <p className={cf.modalDesc}>
+    <Dialog
+      open
+      onClose={onClose}
+      closeDisabled={busy}
+      /* ★ 2026-11-25 정한 것 2 — 팝업 제목 = 짧은 이름, 묻는 문장은 본문 첫 줄 */
+      title="정산 처리"
+      description={
+        <>
+          <strong>정산을 처리하시겠습니까?</strong>
+          <br />
           {s.companyName} · {dir.label} {dir.kind === 'none' ? '' : won(dir.amount)}
-        </p>
-
-        <div className={cf.modalExtra}>
-          <p className={styles.note}>
-            {s.rentNet === 0 ? (
-              <>이용료 차액이 없어 청구서는 바뀌지 않습니다.</>
-            ) : (
-              <>
-                이용료 차액 <b>{won(Math.abs(s.rentNet))}</b>을 청구서마다 남은 금액만큼{' '}
-                {s.rentNet > 0 ? '환불(음수 수납)' : '수납'}으로 넣습니다. 처리 후 청구서는 전부 납부완료가 됩니다.
-              </>
-            )}
-            <br />
-            예치금은 장부에 반환·차감으로 남기고, 환수는 정산 원장에만 기록합니다.
-          </p>
-          <div className={styles.formGrid}>
-            <label className={cf.field}>
-              <span className={cf.label}>처리일</span>
-              <input type="date" className={cf.input} value={processedOn} onChange={(e) => setProcessedOn(e.target.value)} />
-            </label>
-            <label className={cf.field}>
-              <span className={cf.label}>{amountLabel}</span>
-              <input
-                className={`${cf.input} ${cf.inputMoney}`}
-                inputMode="numeric"
-                value={amount}
-                onChange={(e) => setAmount(formatMoneyInput(e.target.value.replace('-', '')))}
-              />
-            </label>
-            {/* ★ 환불일 때만 — 돌려줄 곳을 모르는 환불은 처리된 것이 아니다(서버도 400 으로 막는다). */}
-            {dir.kind === 'refund' ? <RefundAccountFields value={account} onChange={setAccount} /> : null}
-            <div className={cf.field}>
-              <span className={cf.label}>방법</span>
-              <div className={styles.segment}>
-                {(['B', 'C'] as const).map((code) => (
-                  <button
-                    key={code}
-                    type="button"
-                    className={`${styles.segBtn}${payMethod === code ? ` ${styles.segOn}` : ''}`}
-                    onClick={() => setPayMethod(code)}
-                  >
-                    {PAY_METHOD_LABEL[code]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <textarea
-              className={cf.textarea}
-              rows={2}
-              placeholder="비고 (선택)"
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-            />
-            {error ? <p className={styles.formError}>{error}</p> : null}
+        </>
+      }
+      footer={
+        <>
+          <Button variant="primary" size="sm" disabled={busy} onClick={submit}>
+            정산 처리
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            취소
+          </Button>
+        </>
+      }
+    >
+      <div className={styles.dialogStack}>
+      <p className={styles.note}>
+        {s.rentNet === 0 ? (
+          <>이용료 차액이 없어 청구서는 바뀌지 않습니다.</>
+        ) : (
+          <>
+            이용료 차액 <b>{won(Math.abs(s.rentNet))}</b>을 청구서마다 남은 금액만큼{' '}
+            {s.rentNet > 0 ? '환불(음수 수납)' : '수납'}으로 넣습니다. 처리 후 청구서는 전부 납부완료가 됩니다.
+          </>
+        )}
+        <br />
+        예치금은 장부에 반환·차감으로 남기고, 환수는 정산 원장에만 기록합니다.
+      </p>
+      <div className={styles.formGrid}>
+        <label className={cf.field}>
+          <span className={cf.label}>처리일</span>
+          <input type="date" className={cf.input} value={processedOn} onChange={(e) => setProcessedOn(e.target.value)} />
+        </label>
+        <label className={cf.field}>
+          <span className={cf.label}>{amountLabel}</span>
+          <input
+            className={`${cf.input} ${cf.inputMoney}`}
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => setAmount(formatMoneyInput(e.target.value.replace('-', '')))}
+          />
+        </label>
+        {/* ★ 환불일 때만 — 돌려줄 곳을 모르는 환불은 처리된 것이 아니다(서버도 400 으로 막는다). */}
+        {dir.kind === 'refund' ? <RefundAccountFields value={account} onChange={setAccount} /> : null}
+        <div className={cf.field}>
+          <span className={cf.label}>방법</span>
+          <div className={styles.segment}>
+            {(['B', 'C'] as const).map((code) => (
+              <button
+                key={code}
+                type="button"
+                className={`${styles.segBtn}${payMethod === code ? ` ${styles.segOn}` : ''}`}
+                onClick={() => setPayMethod(code)}
+              >
+                {PAY_METHOD_LABEL[code]}
+              </button>
+            ))}
           </div>
         </div>
-
-        <div className={cf.modalFoot}>
-          <button type="button" className={`${cf.btn} ${cf.btnGhost}`} disabled={busy} onClick={onClose}>
-            취소
-          </button>
-          <button type="button" className={`${cf.btn} ${cf.btnPrimary}`} disabled={busy} onClick={submit}>
-            정산 처리
-          </button>
-        </div>
+        <textarea
+          className={cf.textarea}
+          rows={2}
+          placeholder="비고 (선택)"
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+        />
+        {error ? <p className={styles.formError}>{error}</p> : null}
       </div>
-    </div>
+      </div>
+    </Dialog>
   );
 }

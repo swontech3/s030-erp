@@ -268,6 +268,23 @@ describe('applyCompanyDefaults — 삐용 값으로 빈 칸만', () => {
     expect(r).toMatchObject({ legalName: '등기 상호', ceoName: '김대표', defaultedFields: ['ceoName'] });
   });
 
+  it('★★ 대표자는 삐용 「대표자」(repName = ceoName)가 저장된 값보다 우선 — 비면 빈칸(2026-11-19)', () => {
+    const saved = { ...blank, legalName: '(주)에스원테크', ceoName: '최현수' };
+    expect(applyCompanyDefaults(saved, { orgName: '에스원테크', repName: ' 이정희 ' }, org, [])).toMatchObject({
+      legalName: '(주)에스원테크',
+      ceoName: '이정희',
+      defaultedFields: ['ceoName'],
+    });
+    expect(applyCompanyDefaults(saved, { orgName: '에스원테크', repName: null }, org, [])).toMatchObject({ ceoName: null, defaultedFields: [] });
+    expect(applyCompanyDefaults(saved, { orgName: '에스원테크', repName: '  ' }, org, [])).toMatchObject({ ceoName: null, defaultedFields: [] });
+  });
+
+  it('★ 삐용 대표자를 읽지 못했으면(조회 실패 · 회사 세션 — repName 칸 없음) 저장된 대표자 그대로', () => {
+    const saved = { ...blank, ceoName: '홍대표' };
+    expect(applyCompanyDefaults(saved, null, org, []).ceoName).toBe('홍대표');
+    expect(applyCompanyDefaults(saved, { orgName: '삐용' }, org, []).ceoName).toBe('홍대표');
+  });
+
   it('★ 입주사 · 값 없음 · 빈 글자는 그대로', () => {
     const tenant = { ...blank, isTenant: true };
     expect(applyCompanyDefaults(tenant, { orgName: '삐용' }, org, [])).toBe(tenant);

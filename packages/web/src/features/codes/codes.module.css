@@ -641,6 +641,15 @@
   white-space: nowrap;
 }
 
+/* 왼쪽 목록의 업무구분 딱지(2026-11-19) — 폭을 고정해 삐용 · ERP 줄의 코드 · 이름이 같은 자리에서 시작한다. */
+.bizTpTag {
+  flex: 0 0 auto;
+  width: 4.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
 .tagOn {
   background: var(--color-accent-bg);
   color: var(--color-primary);
@@ -757,4 +766,13 @@
   .grid2 {
     grid-template-columns: 1fr;
   }
+}
+
+/* 주인 걸러 보기(2026-11-18) — [분류코드 추가] 와 한 줄. 버튼과 같은 높이로 작게. */
+.ownerSelect {
+  width: auto;
+  margin-right: 6px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: var(--text-micro-size);
 }

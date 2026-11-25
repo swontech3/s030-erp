@@ -9,6 +9,7 @@
  *
  * 사용: node scripts/verify-010.js .env packages/api/.env
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const { Client } = require('pg');
 
@@ -24,8 +25,8 @@ const readEnv = (p) =>
       }),
   );
 
-const admin = readEnv(process.argv[2] || '.env');
-const app = readEnv(process.argv[3] || 'packages/api/.env');
+const admin = (process.argv[2] ? readEnv(process.argv[2]) : readEnvFiles(['common', 'admin'], { legacy: ['.env'] }));
+const app = (process.argv[3] ? readEnv(process.argv[3]) : readEnvFiles(['common', 'erp-api'], { legacy: ['packages/api/.env'] }));
 
 const TABLE = 'public.tb_s080_contract_status_history';
 const { itemCountGate } = require('./verify-count.js');

@@ -83,16 +83,7 @@
   background: var(--surface-alt);
 }
 
-/* 되돌릴 수 없는 처리 — 삭제. 계약취소 버튼과 같은 규칙이다(테두리·글씨만 붉다) */
-.btnDanger {
-  background: var(--surface);
-  color: var(--color-danger);
-  border-color: var(--color-danger);
-}
-
-.btnDanger:hover:not(:disabled) {
-  background: var(--color-danger-bg);
-}
+/* .btnDanger 는 지웠다(2026-11-25) — [글 삭제] · 삭제 확인 창 [삭제] 는 공통 Button danger(회색 테두리 · 빨간 글자) */
 
 .btnSm {
   height: 36px;
@@ -306,39 +297,48 @@
   gap: 10px;
 }
 
-.cardType {
-  min-width: 0;
-  font-size: var(--text-body-size);
+/* ── PC 목록 표(공통 Table) 칸 안 글자 — 2026-11-25 입주관리 일관성(카드 → 표) ──
+   ★ 머리글 · 줄 · 고른 줄의 색과 선은 Table 부품이 정한다. 여기는 칸 안 글자 모양만. */
+.rowType {
   font-weight: 700;
   color: var(--text-heading);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.cardSelected .cardType {
-  color: var(--color-primary);
-}
-
-.cardMeta {
-  margin-top: 6px;
-  display: block;
-  font-size: var(--text-body-size);
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cardLast {
-  margin-top: 3px;
-  display: block;
+/* 카드 셋째 줄(마지막 글 · 보관 기간 지남) — 줄 아래 표 폭 전체 */
+.rowLast {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--text-micro-size);
   color: var(--text-caption);
-  white-space: nowrap;
+}
+
+.rowLastText {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+/* 빈 목록 · 불러오는 중(TableEmpty 안) — 글자 색 · 크기는 종전 빈 상태 그대로 */
+.tableEmptyLead {
+  display: block;
+  color: var(--text-muted);
+}
+
+.tableEmptySub {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-caption);
+}
+
+.tableEmptyAct {
+  display: block;
+  margin-top: 20px;
 }
 
 /* ── 뱃지 ── */
@@ -502,10 +502,14 @@
   color: var(--text-muted);
 }
 
+/* 구역 제목 — 삐용 구역 제목 모양(왼쪽 4px 아쿠아 막대 · 글자에만 · 2026-11-25 입주관리 일관성) */
 .secTitle {
   margin: 24px 0 12px;
+  padding-left: 8px;
+  border-left: 4px solid var(--color-primary);
   font-size: var(--text-body-size);
   font-weight: 700;
+  line-height: 1.2;
   color: var(--text-heading);
 }
 
@@ -747,49 +751,11 @@
   margin-top: 20px;
 }
 
-/* ── 확인 창 (삭제) ── 상태 전이 확인 창(s030200040p2)과 같은 모양 ── */
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(11, 17, 32, 0.45);
-}
-
-.modal {
-  width: 460px;
-  max-width: 100%;
-  padding: 32px 28px 24px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-overlay);
-  text-align: center;
-}
-
-.modalIcon {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-
-.modalTitle {
-  margin: 16px 0 0;
-  font-size: var(--text-h2-size);
-  font-weight: 700;
-  color: var(--text-heading);
-}
-
+/* ── 확인 창 (삭제) ── 공통 팝업 Dialog 안의 글(2026-11-25 입주관리 일관성)
+   ★ 가림막 · 창 · 원형 아이콘 · 제목 · 50:50 단추 줄(.overlay · .modal · .modalIcon · .modalTitle · .modalFoot)은
+     지웠다 — Dialog 가 그린다(아쿠아 제목줄 · 아래 가운데 단추). */
 .modalDesc {
-  margin: 10px 0 0;
+  margin: 0;
   font-size: var(--text-body-size);
   line-height: 1.7;
   color: var(--text-body);
@@ -805,18 +771,6 @@
   line-height: 1.7;
   color: var(--text-body);
   text-align: left;
-}
-
-.modalFoot {
-  margin-top: 24px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.modalFoot .btn {
-  width: 100%;
-  height: 48px;
 }
 
 .modalErr {
@@ -963,18 +917,6 @@
   font-size: 12px;
 }
 
-.phone .cardType {
-  font-size: 16px;
-}
-
-.phone .cardMeta {
-  font-size: 14px;
-}
-
-.phone .cardLast {
-  font-size: 12px;
-}
-
 .phone .badge {
   font-size: 12px;
 }
@@ -1051,10 +993,6 @@
   font-size: 14px;
 }
 
-.phone .modalTitle {
-  font-size: 22px;
-}
-
 .phone .modalDesc {
   font-size: 14px;
 }
@@ -1069,4 +1007,246 @@
 
 .phone .toastMsg {
   font-size: 14px;
+}
+
+/* =============================================================================
+ * 앱 안 상세 — 문의-답변 묶음(3-마 덧붙임 3 · 대표 지시 2026-11-16) · InquiryDetail `rounds`
+ * =============================================================================
+ * 1회 묶음 = 1행 이름 · 회사명 / 2행 연락처 · 등록일시 / 3행 이메일 / 문의 내용 / 답변(입력칸)
+ * 2회부터 = 고객 추가 질문 + 답변. [전화로 답변함] · [답변 등록] 은 묶음 밖 맨 아래(.roundActions).
+ * ★ 앱 안에서만 그린다. 글자 크기 · 굵기는 앱 s02-app theme.js TYPE 단계 그대로(오른쪽 주석이 그 이름) —
+ *   웹뷰 글꼴 자체(Noto Sans CJK)는 기기 글꼴(삼성 등)을 쓸 수 없어 앱과 같아지지 않는다(2026-11-16 폰에서 확인).
+ * ============================================================================= */
+.round {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.round + .round {
+  margin-top: 12px;
+}
+
+.roundTitle {
+  margin-bottom: 12px;
+  font-size: 14px;                     /* H3 */
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.roundInfo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  row-gap: 12px;
+  column-gap: 12px;
+}
+
+.roundWide {
+  grid-column: 1 / -1;
+}
+
+.roundKey {
+  font-size: 13px;                     /* LABEL */
+  color: var(--text-muted);
+}
+
+.roundVal {
+  margin-top: 2px;
+  font-size: 14px;                     /* BODY */
+  color: var(--text-heading);
+  word-break: break-all;
+}
+
+/* 전화 그림은 연락처 앞에만 — 누르면 전화가 열린다(tel:) */
+.roundTel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.roundPart {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.roundInfo + .roundPart,
+.roundTitle + .roundPart {
+  margin-top: 14px;
+}
+
+.roundTitle + .roundPart {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.roundText {
+  margin: 4px 0 0;
+  font-size: 14px;                     /* BODY */
+  line-height: 1.7;
+  color: var(--text-heading);
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.roundAnswerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.round .textarea {
+  font-size: 14px;                     /* BODY */
+}
+
+.roundActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.roundActions .btn {
+  flex: 1;
+  font-size: 15px;                     /* H2 — 단추 */
+}
+
+/* 앱 안 상세 — 단추 줄 고정(3-마 덧붙임 4 · 대표 지시 2026-11-16) · InquiryDetail `fixedActions`
+ * ★ 스크롤 칸(.detailBody) 밖 · 같은 세로 줄(.detail = flex 세로)의 맨 아래 칸이다 — 늘 보이고,
+ *   묶음 위에 겹쳐 뜨지 않으므로 마지막 묶음이 가려지지 않는다(스크롤 칸의 아래 여백 16px 그대로). */
+.roundActionsFixed {
+  flex: 0 0 auto;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.roundActionsFixed .roundActions {
+  margin-top: 0;
+}
+
+/* =============================================================================
+ * 앱 안 문의 목록 — 결재함 목록과 같은 배치 · 모양 (2026-11-17 대표 지시)
+ * =============================================================================
+ * 앱 s02-app 결재함(pages/s0221a3000) 목록 값을 옮긴다: 검색 줄(글자 34 · 고르기 상자) · 카드(여백 12 · 사이 8 · 모서리 8) · 2행.
+ * 색은 변수만 쓴다 — 앱 안은 AppShell `.inApp` 이 변수를 앱 값(아쿠아 · 회색)으로 덮는다.
+ *   유형 꼬리표 = 회색 바탕 · 회색 글자 / 접수(진행) = 옅은 아쿠아 · 진한 아쿠아 / 그 밖(끝남) = 회색
+ * ★ `.phone` 아래에만 건다 — PC 는 그대로.
+ * ============================================================================= */
+.phone .listHead {
+  padding: 8px 12px;
+}
+
+.typeField {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.typeLabel {
+  flex: 0 0 34px;
+  font-size: 12px;
+  color: var(--text-caption);
+}
+
+.typeBoxWrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.typeBox {
+  width: 100%;
+  padding: 6px 28px 6px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-heading);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.typeArrow {
+  position: absolute;
+  right: 10px;
+  font-size: 12px;
+  color: var(--text-caption);
+  pointer-events: none;
+}
+
+.phone .cards {
+  padding-bottom: 8px;
+  background: var(--surface-alt);
+}
+
+.phone .card {
+  width: calc(100% - 24px);
+  margin: 8px 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.appTag {
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.appState {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.appStateIng {
+  color: var(--color-primary-hover);
+  background: var(--color-accent-bg);
+}
+
+.appStateEnd {
+  color: var(--text-muted);
+  background: var(--surface-alt);
+}
+
+.appRow2 {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.appName {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.appDate {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--text-caption);
+  white-space: nowrap;
 }

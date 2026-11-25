@@ -24,14 +24,14 @@
  *   다만 중복으로는 보지 않는다(`findRoomConflict` 의 `selfContractIds`). 재계약이면
  *   **이전 계약도** 그 목록에 있다 — 이어받은 번호가 자기 자신과 부딪히면 안 된다.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   ROOM_TAKEN_MESSAGE,
   findRoomConflict,
   normalizeRoom,
   type RoomHolder,
 } from '@swonbiz/shared/domain/contract-room';
-import { Icon } from '@/components/ds';
+import { Button, Dialog, Table, TableHead, TableRow } from '@/components/ds';
 import styles from './contract-form.module.css';
 
 interface Props {
@@ -51,6 +51,13 @@ interface Props {
 
 /** 한 줄에 회사/호실 세 쌍 = 6열. 시안의 표 구조다. */
 const PAIRS_PER_ROW = 3;
+
+/**
+ * 6열 칸 폭 — 회사(22%) · 호실(11.33%) 세 쌍. ★ 2026-11-25 입주관리 일관성 — 종전 <table> 의 칸 폭을
+ * 공통 Table 의 cols 로 옮겼다. ★★ 호실 칸은 `min-content` 아래로 줄지 않는다 — 번호는 잘리지 않는다.
+ */
+const ROOM_PAIR_COLS = 'minmax(0, 22fr) minmax(min-content, 11.33fr)';
+const ROOM_COLS = `${ROOM_PAIR_COLS} ${ROOM_PAIR_COLS} ${ROOM_PAIR_COLS}`;
 
 export function RoomPickerModal({ current, selfContractIds, onClose, onPick }: Props) {
   const [rooms, setRooms] = useState<RoomHolder[] | null>(null);
@@ -98,76 +105,79 @@ export function RoomPickerModal({ current, selfContractIds, onClose, onPick }: P
   }, [rooms]);
 
   return (
-    <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="계약호실 확인">
-      <div className={`${styles.modal} ${styles.roomModal}`}>
-        <h2 className={styles.modalTitle} style={{ textAlign: 'left', marginBottom: 4 }}>
-          계약호실 확인
-        </h2>
-        <p className={styles.modalDesc} style={{ textAlign: 'left', marginBottom: 16 }}>
-          국세청 신고용 대표 호실입니다. 계약중·계약대기 계약이 쓰고 있는 번호는 다시 쓸 수 없습니다.
-        </p>
-
-        {/* ── 번호 입력 + 중복 여부 ─────────────────────────────────────── */}
-        <div className={styles.inlineRow}>
-          <input
-            className={`${styles.input} ${styles.flex1}`}
-            placeholder="예: 6-1"
-            value={value}
-            autoFocus
-            onChange={(e) => setValue(e.target.value)}
-          />
-          <span className={styles.roomVerdict} style={{ color: verdictTone(rooms, typed, conflict) }}>
-            {verdictText(rooms, typed, conflict)}
-          </span>
-        </div>
-
-        {/* ── 쓰이고 있는 번호들 ────────────────────────────────────────── */}
-        <div className={styles.roomList}>
-          {error ? (
-            <p className={styles.sectionNote}>{error}</p>
-          ) : rooms === null ? (
-            <p className={styles.sectionNote}>불러오는 중…</p>
-          ) : rooms.length === 0 ? (
-            <p className={styles.sectionNote}>사용 중인 계약호실이 없습니다.</p>
-          ) : (
-            <table className={styles.roomTable}>
-              <tbody>
-                {chunks.map((row, i) => (
-                  <tr key={i}>
-                    {row.map((h) => (
-                      <RoomCells
-                        key={h.contractId}
-                        holder={h}
-                        picked={normalizeRoom(h.room) === typed}
-                        onPick={() => setValue(h.room)}
-                      />
-                    ))}
-                    {/* 마지막 줄이 짧으면 빈 칸으로 채운다 — 열 너비가 흔들리지 않게. */}
-                    {Array.from({ length: PAIRS_PER_ROW - row.length }).map((_, k) => (
-                      <td key={`pad-${k}`} colSpan={2} />
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className={styles.modalFoot}>
-          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={onClose}>
-            취소
-          </button>
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnPrimary}`}
-            disabled={!canConfirm}
-            onClick={() => onPick(typed)}
-          >
+    <Dialog
+      open
+      onClose={onClose}
+      title="계약호실 확인"
+      description="국세청 신고용 대표 호실입니다. 계약중·계약대기 계약이 쓰고 있는 번호는 다시 쓸 수 없습니다."
+      width={720}
+      footer={
+        <>
+          <Button type="button" variant="primary" size="sm" disabled={!canConfirm} onClick={() => onPick(typed)}>
             확인
-          </button>
-        </div>
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+            취소
+          </Button>
+        </>
+      }
+    >
+      {/* ── 번호 입력 + 중복 여부 ─────────────────────────────────────── */}
+      <div className={styles.inlineRow}>
+        <input
+          className={`${styles.input} ${styles.flex1}`}
+          placeholder="예: 6-1"
+          value={value}
+          autoFocus
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <span className={styles.roomVerdict} style={{ color: verdictTone(rooms, typed, conflict) }}>
+          {verdictText(rooms, typed, conflict)}
+        </span>
       </div>
-    </div>
+
+      {/* ── 쓰이고 있는 번호들 ────────────────────────────────────────── */}
+      <div className={styles.roomList}>
+        {error ? (
+          <p className={styles.sectionNote}>{error}</p>
+        ) : rooms === null ? (
+          <p className={styles.sectionNote}>불러오는 중…</p>
+        ) : rooms.length === 0 ? (
+          <p className={styles.sectionNote}>사용 중인 계약호실이 없습니다.</p>
+        ) : (
+          <Table cols={ROOM_COLS} dense>
+            {/* ★ 2026-11-25 정한 것 10 — 호실 표 머리글(아쿠아) : 「회사 · 호실」 한 쌍 × PAIRS_PER_ROW */}
+            <TableHead sticky>
+              {Array.from({ length: PAIRS_PER_ROW }).map((_, k) => (
+                <Fragment key={`h-${k}`}>
+                  <span>회사</span>
+                  <span>호실</span>
+                </Fragment>
+              ))}
+            </TableHead>
+            {chunks.map((row, i) => (
+              <TableRow key={i}>
+                {row.map((h) => (
+                  <RoomCells
+                    key={h.contractId}
+                    holder={h}
+                    picked={normalizeRoom(h.room) === typed}
+                    onPick={() => setValue(h.room)}
+                  />
+                ))}
+                {/* 마지막 줄이 짧으면 빈 칸으로 채운다 — 열 너비가 흔들리지 않게. */}
+                {Array.from({ length: PAIRS_PER_ROW - row.length }).map((_, k) => (
+                  <Fragment key={`pad-${k}`}>
+                    <span />
+                    <span />
+                  </Fragment>
+                ))}
+              </TableRow>
+            ))}
+          </Table>
+        )}
+      </div>
+    </Dialog>
   );
 }
 
@@ -188,16 +198,16 @@ function RoomCells({
 }) {
   return (
     <>
-      <td className={styles.roomCompany} title={holder.companyName}>
+      <span className={styles.roomCompany} title={holder.companyName}>
         <button type="button" className={styles.roomPick} onClick={onPick}>
           {holder.companyName}
         </button>
-      </td>
-      <td className={`${styles.roomNo}${picked ? ` ${styles.roomNoOn}` : ''}`}>
+      </span>
+      <span className={`${styles.roomNo}${picked ? ` ${styles.roomNoOn}` : ''}`}>
         <button type="button" className={styles.roomPick} onClick={onPick}>
           {holder.room}
         </button>
-      </td>
+      </span>
     </>
   );
 }
@@ -216,5 +226,6 @@ function verdictText(
 
 function verdictTone(rooms: RoomHolder[] | null, typed: string, conflict: RoomHolder | null): string {
   if (rooms === null || typed === '') return 'var(--text-muted)';
-  return conflict ? 'var(--color-danger, #d33)' : 'var(--color-success, green)';
+  // ★ 2026-11-25 정한 것 8 — 「사용할 수 있습니다」 녹색(없는 토큰의 예비값 green) → 진한 아쿠아 토큰
+  return conflict ? 'var(--color-danger)' : 'var(--color-primary-hover)';
 }

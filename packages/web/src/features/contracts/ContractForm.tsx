@@ -34,7 +34,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { editableSections } from '@swonbiz/shared/domain/contract-status';
-import { Icon, type IconName } from '@/components/ds';
+import { Button, Icon, type ButtonProps, type IconName } from '@/components/ds';
 import styles from './contract-form.module.css';
 import { ConfirmDialog, localToday, type ConfirmKind, type ConfirmResult } from './ConfirmDialog';
 import { contractStatusName, contractStatusNamesOf } from './contract-status-name';
@@ -271,14 +271,21 @@ type ActionKey = 'back' | 'cancel' | 'draftSave' | 'confirm' | 'docs' | 'termina
  *   그것은 **상태를 가리키는 이름이지 동작이 아니다** — 버튼에 「계약중」이라고 적으면
  *   무엇을 하는 버튼인지 읽히지 않는다. 넷 중 이 하나만 이름과 동작이 어긋난다.
  */
-const ACTION_DEFS: Record<ActionKey, { label: string; cls: string; icon?: IconName; status?: string }> = {
-  back: { label: '이전', cls: styles.btnGhost ?? '' },
-  cancel: { label: '계약취소', cls: styles.btnDanger ?? '', status: 'cancelled' },
-  draftSave: { label: '임시저장', cls: styles.btnGhost ?? '', icon: 'save' },
-  confirm: { label: '계약확정', cls: styles.btnPrimary ?? '', icon: 'circle-check' },
-  docs: { label: '계약서 출력', cls: styles.btnGhost ?? '', icon: 'file-text' },
-  terminate: { label: '종료', cls: styles.btnDanger ?? '', status: 'terminated' },
-  save: { label: '저장', cls: styles.btnPrimary ?? '' },
+/*
+ * ★ 2026-11-25 입주관리 일관성 — 단추 = 공통 Button. 저장 = 주(primary) · 계약취소 · 종료 = 지우기(danger) ·
+ *   그 밖 = 보통(ghost). [계약확정] 은 종전대로 주(primary)다(보고 「정할 것」).
+ */
+const ACTION_DEFS: Record<
+  ActionKey,
+  { label: string; variant: NonNullable<ButtonProps['variant']>; icon?: IconName; status?: string }
+> = {
+  back: { label: '이전', variant: 'ghost' },
+  cancel: { label: '계약취소', variant: 'danger', status: 'cancelled' },
+  draftSave: { label: '임시저장', variant: 'ghost', icon: 'save' },
+  confirm: { label: '계약확정', variant: 'primary', icon: 'circle-check' },
+  docs: { label: '계약서 출력', variant: 'ghost', icon: 'file-text' },
+  terminate: { label: '종료', variant: 'danger', status: 'terminated' },
+  save: { label: '저장', variant: 'primary' },
 };
 
 export function ContractForm({
@@ -1056,16 +1063,17 @@ export function ContractForm({
             {(renewal ? RENEWAL_ACTIONS : ACTIONS[mode]).map((key) => {
               const def = ACTION_DEFS[key];
               return (
-                <button
+                <Button
                   key={key}
                   type="button"
-                  className={`${styles.btn} ${def.cls}`}
+                  variant={def.variant}
+                  size="sm"
+                  iconLeft={def.icon ? <Icon name={def.icon} size={16} /> : undefined}
                   disabled={busy}
                   onClick={() => onAction(key)}
                 >
-                  {def.icon ? <Icon name={def.icon} size={16} /> : null}
                   {def.status ? contractStatusName(statusNames, def.status) : def.label}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -1101,14 +1109,17 @@ export function ContractForm({
               <span>
                 <b>삐용 연동 대기</b> — 계약은 확정됐습니다. {link.reason ?? '삐용에 회사를 만들지 못했습니다.'}
               </span>
-              <button
+              {/* 배너 안의 단추는 한 줄 높이(32px)에 맞춘다 — 머리 단추(40px)는 여기서 너무 크다. */}
+              <Button
                 type="button"
-                className={`${styles.btn} ${styles.btnGhost}`}
+                variant="ghost"
+                size="sm"
+                style={{ height: 32, padding: '0 12px', fontSize: 'var(--text-micro-size)', flex: '0 0 auto' }}
                 disabled={busy}
                 onClick={() => retryLink(linkCompanyId)}
               >
                 다시 시도
-              </button>
+              </Button>
             </div>
           ) : null}
 

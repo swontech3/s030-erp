@@ -128,8 +128,8 @@ export interface CorpChangeDeps {
 
 /**
  * 삐용 기본값 읽기.
- *   · 운영사 — 단체 단건 조회(`getOrg`)의 회사명 · 대표자명. 실연동은 삐용 규격이 아직 없어
- *     `unsupported` 다(`HttpBbiyongOrg`) → null
+ *   · 운영사 — 단체 단건 조회(`getOrg`)의 회사명 · 대표자명(삐용 「대표자」 `ceoName` · 없으면 빈칸, 2026-11-18).
+ *     대표자는 저장된 값보다 이 값이 우선이다(2026-11-19, `applyCompanyDefaults`). 조회 실패 → null
  *   · 회사 사용자 — 단체 조회 권한이 없다. 로그인 프로필(`/auth/me` 와 같은 `getProfile`)의
  *     회사명만 쓴다. ★ 다음 단계: 삐용이 로그인 응답에 대표자명을 더하면 `repName` 으로 붙인다
  * ★ 조회 실패는 화면을 깨뜨리지 않는다 — null 이면 칸을 비워 두고 회사명은 단체코드로 보인다.

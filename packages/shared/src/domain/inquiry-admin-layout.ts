@@ -37,6 +37,38 @@ export interface InquiryAdminLayout {
    * ★ 앱 안은 감춘다 — 첫 줄 「접수 문의가 없습니다」와 뜻이 겹친다. 거른 뒤의 「필터나 검색어를 바꿔 보세요」는 그대로.
    */
   receivedEmptySub: boolean;
+  /**
+   * 상세를 보고 있을 때 제목 아래 안내 줄(「접수 N건」)을 보이는가 — 3-마 덧붙임 3(2026-11-16 대표 폰 확인)
+   * ★ 앱 안은 감춘다 — 한 건의 상세를 보고 있는데 접수 건수는 뜻이 없다. 목록일 때는 그대로 보인다.
+   */
+  detailHeadNote: boolean;
+  /**
+   * 상세를 문의-답변 묶음(1회 · 2회)으로 그리는가 — 3-마 덧붙임 3(2026-11-16 대표 지시)
+   * ★ 앱 안 : 접수 칸(1행 이름 · 회사명 / 2행 연락처 · 등록일시 / 3행 이메일)과 문의 내용 · 답변 입력을 한 묶음에,
+   *   추가 질문이 오면 그 질문과 답변이 다음 묶음. 「답변」 소제목 · 안내 문구는 없고 [전화로 답변함] · [답변 등록] 은 묶음 밖 아래.
+   * ★ PC 는 지금 스레드 그대로다.
+   */
+  detailRounds: boolean;
+  /**
+   * [전화로 답변함] · [답변 등록] 을 상세 맨 아래에 고정하는가 — 3-마 덧붙임 4(2026-11-16 대표 지시)
+   * ★ 앱 안 : 문의 · 답변 묶음만 스크롤되고 단추는 늘 보인다. PC 는 지금 그대로.
+   */
+  fixedReplyActions: boolean;
+  /**
+   * 목록일 때 제목 아래 안내 줄(「접수 N건」)을 보이는가 — 문의 목록 앱 모양(2026-11-17 대표 지시)
+   * ★ 앱 안은 감춘다(목록 · 상세 모두). PC 는 그대로.
+   */
+  listHeadNote: boolean;
+  /**
+   * 이름 · 연락처 검색칸을 보이는가 — 문의 목록 앱 모양(2026-11-17)
+   * ★ 앱 안 검색 조건은 유형 하나다(결재함 목록과 같은 배치). PC 는 그대로.
+   */
+  keywordSearch: boolean;
+  /**
+   * 유형 고르기를 결재함 「구분」 모양(「유형」 글자 + 「전체 ▾」 상자)으로 그리는가 — 문의 목록 앱 모양(2026-11-17)
+   * ★ 상자는 기본 select 를 꾸민 것이다 — 누르면 폰 기본 고르기 창(대표 답 2026-11-17). PC 는 그대로.
+   */
+  typeBox: boolean;
 }
 
 export function inquiryAdminLayout(inApp: boolean): InquiryAdminLayout {
@@ -50,6 +82,12 @@ export function inquiryAdminLayout(inApp: boolean): InquiryAdminLayout {
         typeInSearchRow: true,
         searchCount: false,
         receivedEmptySub: false,
+        detailHeadNote: false,
+        detailRounds: true,
+        fixedReplyActions: true,
+        listHeadNote: false,
+        keywordSearch: false,
+        typeBox: true,
       }
     : {
         phone: false,
@@ -60,6 +98,12 @@ export function inquiryAdminLayout(inApp: boolean): InquiryAdminLayout {
         typeInSearchRow: false,
         searchCount: true,
         receivedEmptySub: true,
+        detailHeadNote: true,
+        detailRounds: false,
+        fixedReplyActions: false,
+        listHeadNote: true,
+        keywordSearch: true,
+        typeBox: false,
       };
 }
 
@@ -93,4 +137,50 @@ export function detailHistory(
  */
 export function retentionDeleteHint(deleteButtonShown: boolean): string {
   return `${deleteButtonShown ? '' : 'PC 화면에서 '}[글 삭제]로 개인정보를 지워 주세요.`;
+}
+
+/** 제목 아래 안내 줄(「접수 N건」)을 보이는가 — 앱 안은 상세(3-마 덧붙임 3) · 목록(2026-11-17) 모두 감춘다 */
+export function showHeadNote(layout: InquiryAdminLayout, selectedId: string | null): boolean {
+  return selectedId ? layout.detailHeadNote : layout.listHeadNote;
+}
+
+/**
+ * 앱 안 목록 2행 오른쪽 — 문의일자 뒤에 붙는 글(2026-11-17 대표 답)
+ *   - 답글이 없으면(`lastKind` 없음) 「원글만」 · 고객 추가 질문이 마지막이면 「추가 질문」
+ *   - 답변(글 · 전화)이 마지막이면 붙이지 않는다 — 앱 안 목록은 접수만(`fixedStatus`)이라 오지 않는다
+ * ★ 「답변 없음」은 붙이지 않는다. PC 셋째 줄(`lastLine`)은 그대로다.
+ */
+export function cardTail(lastKind: string | null): string {
+  if (!lastKind) return '원글만';
+  return lastKind === 'customer' ? '추가 질문' : '';
+}
+
+/**
+ * 문의-답변 묶음 — 3-마 덧붙임 3 (대표 지시 2026-11-16 · 앱 안 상세)
+ *
+ * 스레드(시간순 글 목록)를 「질문 하나 + 그 뒤 답변들」 묶음으로 나눈다.
+ *   - 1회 = 원글(질문 자리 `question: null`) + 첫 고객 추가 질문 전까지의 답변(글답변 · 전화)
+ *   - 2회부터 = 고객 추가 질문 하나(`question` = 그 글의 자리) + 다음 추가 질문 전까지의 답변
+ * ★ 글 순서는 서버가 준 그대로(시간순)다 — 여기서 다시 정렬하지 않는다.
+ * ★ 돌려주는 것은 자리(index)뿐이다 — 글 내용은 화면이 들고 있는 목록에서 꺼낸다.
+ */
+export interface InquiryRound {
+  /** 1부터 */
+  no: number;
+  /** 고객 추가 질문의 자리 · `null` 이면 원글 */
+  question: number | null;
+  /** 답변(글답변 · 전화)의 자리들 */
+  answers: number[];
+}
+
+export function inquiryRounds(kinds: readonly string[]): InquiryRound[] {
+  const rounds: InquiryRound[] = [{ no: 1, question: null, answers: [] }];
+  let cur = rounds[0]!;
+  kinds.forEach((kind, i) => {
+    if (kind === 'customer') {
+      cur = { no: rounds.length + 1, question: i, answers: [] };
+      rounds.push(cur);
+    } else cur.answers.push(i);
+  });
+  return rounds;
 }

@@ -14,6 +14,7 @@
  *
  * 종료코드: 0 = 전부 통과 / 1 = 실패 있음 / 2 = 실행 실패
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const { Client } = require('pg');
 
@@ -24,7 +25,7 @@ const readEnv = (file) =>
       .map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^"|"$/g, '')]; }),
   );
 
-const apiEnv = readEnv(process.argv[3] || 'packages/api/.env');
+const apiEnv = (process.argv[3] ? readEnv(process.argv[3]) : readEnvFiles(['common', 'erp-api'], { legacy: ['packages/api/.env'] }));
 
 const CASH_MAP = 'TAX_CASH_STD';
 const CASH_SIG = ['날짜', '구분', '품명', '거래처', '항목', '금액', '결제방법', '증빙'];

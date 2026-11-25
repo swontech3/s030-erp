@@ -8,7 +8,16 @@
  *   - 목록 ↔ 상세는 한 장씩. 상세를 열 때 방문 기록을 남긴다 — 폰 [뒤로] = 목록으로
  */
 import { describe, expect, it } from 'vitest';
-import { detailHistory, initialStatus, inquiryAdminLayout, resetStatus, retentionDeleteHint } from './inquiry-admin-layout';
+import {
+  cardTail,
+  detailHistory,
+  initialStatus,
+  inquiryAdminLayout,
+  inquiryRounds,
+  resetStatus,
+  retentionDeleteHint,
+  showHeadNote,
+} from './inquiry-admin-layout';
 
 const APP = inquiryAdminLayout(true);
 const PC = inquiryAdminLayout(false);
@@ -24,6 +33,12 @@ describe('inquiryAdminLayout', () => {
       typeInSearchRow: true,
       searchCount: false,
       receivedEmptySub: false,
+      detailHeadNote: false,
+      detailRounds: true,
+      fixedReplyActions: true,
+      listHeadNote: false,
+      keywordSearch: false,
+      typeBox: true,
     });
   });
   it('앱 아님(PC) — 지금 그대로', () => {
@@ -36,6 +51,12 @@ describe('inquiryAdminLayout', () => {
       typeInSearchRow: false,
       searchCount: true,
       receivedEmptySub: true,
+      detailHeadNote: true,
+      detailRounds: false,
+      fixedReplyActions: false,
+      listHeadNote: true,
+      keywordSearch: true,
+      typeBox: false,
     });
   });
   it('접수 빈 목록 둘째 줄 「답변을 기다리는 문의가 없습니다」 — 앱 안은 감춘다(첫 줄 「접수 문의가 없습니다」와 뜻이 겹친다 · 5-나 덧붙임 2026-11-12) · PC 는 보인다', () => {
@@ -100,5 +121,67 @@ describe('retentionDeleteHint — 「보관 기간 지남」 안내의 지우는
   });
   it('앱 안(삭제 단추 감춤) — PC 화면에서 지우라고 알린다', () => {
     expect(retentionDeleteHint(APP.deleteButton)).toBe('PC 화면에서 [글 삭제]로 개인정보를 지워 주세요.');
+  });
+});
+
+describe('showHeadNote — 3-마 덧붙임 3', () => {
+  it('앱 안 — 목록에서도 상세에서도 감춘다(목록 「접수 N건」 지움 · 문의 목록 앱 모양 2026-11-17)', () => {
+    expect(showHeadNote(APP, null)).toBe(false);
+    expect(showHeadNote(APP, 'q-1')).toBe(false);
+  });
+  it('PC — 늘 보인다(지금 그대로)', () => {
+    expect(showHeadNote(PC, null)).toBe(true);
+    expect(showHeadNote(PC, 'q-1')).toBe(true);
+  });
+});
+
+describe('문의 목록 앱 모양 — 2026-11-17 대표 지시(결재함 목록과 같은 배치)', () => {
+  it('검색 조건은 유형 하나 — 앱 안은 이름 · 연락처 검색칸을 감춘다 · PC 는 그대로', () => {
+    expect(APP.keywordSearch).toBe(false);
+    expect(PC.keywordSearch).toBe(true);
+  });
+  it('유형 고르기 = 결재함 「구분」 모양(「유형」 글자 + 「전체 ▾」 상자) — 앱 안만', () => {
+    expect(APP.typeBox).toBe(true);
+    expect(PC.typeBox).toBe(false);
+  });
+});
+
+describe('cardTail — 앱 안 목록 2행 오른쪽 일자 뒤 글(2026-11-17)', () => {
+  it('답글이 없으면 「원글만」(「답변 없음」은 붙이지 않는다)', () => {
+    expect(cardTail(null)).toBe('원글만');
+  });
+  it('고객 추가 질문이 마지막이면 「추가 질문」', () => {
+    expect(cardTail('customer')).toBe('추가 질문');
+  });
+  it.each([['text'], ['phone']])('답변이 마지막(%p)이면 붙이지 않는다 — 앱 안 목록은 접수만이라 오지 않는다', (k) => {
+    expect(cardTail(k)).toBe('');
+  });
+});
+
+describe('inquiryRounds — 문의-답변 묶음(3-마 덧붙임 3)', () => {
+  it('글이 없으면 원글 묶음 하나(답변 없음)', () => {
+    expect(inquiryRounds([])).toEqual([{ no: 1, question: null, answers: [] }]);
+  });
+  it('원글 + 답변 → 1회에 답변', () => {
+    expect(inquiryRounds(['text'])).toEqual([{ no: 1, question: null, answers: [0] }]);
+    expect(inquiryRounds(['phone'])).toEqual([{ no: 1, question: null, answers: [0] }]);
+  });
+  it('추가 질문이 오면 2회 — 그 질문과 뒤 답변이 한 묶음', () => {
+    expect(inquiryRounds(['text', 'customer', 'phone'])).toEqual([
+      { no: 1, question: null, answers: [0] },
+      { no: 2, question: 1, answers: [2] },
+    ]);
+  });
+  it('답 없는 추가 질문 — 마지막 묶음의 답변이 비어 있다(입력칸 자리)', () => {
+    expect(inquiryRounds(['text', 'customer'])).toEqual([
+      { no: 1, question: null, answers: [0] },
+      { no: 2, question: 1, answers: [] },
+    ]);
+  });
+  it('답 전에 고객이 또 물으면 원글 묶음은 답변 없이 남는다 · 순서는 서버 그대로', () => {
+    expect(inquiryRounds(['customer', 'text', 'text'])).toEqual([
+      { no: 1, question: null, answers: [] },
+      { no: 2, question: 0, answers: [1, 2] },
+    ]);
   });
 });

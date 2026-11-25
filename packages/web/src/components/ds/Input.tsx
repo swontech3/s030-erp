@@ -8,9 +8,10 @@
  * size="sm". — Input.prompt.md
  *
  * ★ 'use client' 가 필요한 이유: 포커스 상태를 쓴다.
- * ★ 에러 색 #DC2626 은 원본 그대로 리터럴로 둔다 — 토큰(--color-danger)이 있지만
- *   원본이 리터럴을 쓰고 있고, 개발이 임의로 토큰으로 바꾸면 다음 전달분과 어긋난다
- *   (지시서 2-3-3 "개발이 토큰을 새로 만들지 않는다"의 같은 취지).
+ * ★ 에러 색은 빨강 토큰(--color-danger · 같은 값 #DC2626)을 쓴다 — 2026-11-25 대표 결정(정한 것 9).
+ *   원본은 리터럴이라 다음 전달분을 받을 때 이 두 곳(테두리 · 안내 글)을 다시 맞춘다
+ *   (종전 주석 : 원본 그대로 리터럴로 두었다 — 개발이 임의로 토큰으로 바꾸면 다음 전달분과 어긋난다
+ *   — 지시서 2-3-3 "개발이 토큰을 새로 만들지 않는다"의 같은 취지).
  */
 import { useId, useState, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react';
 
@@ -29,7 +30,7 @@ export function Input({ label, hint, error, size = 'md', iconLeft, id, style, ..
   const reactId = useId();
   const uid = id || reactId;
   const h = size === 'sm' ? 'var(--control-h-sm)' : 'var(--control-h)';
-  const border = error ? '#DC2626' : focus ? 'var(--color-primary)' : 'var(--border)';
+  const border = error ? 'var(--color-danger)' : focus ? 'var(--color-primary)' : 'var(--border)';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', ...style }}>
@@ -75,7 +76,7 @@ export function Input({ label, hint, error, size = 'md', iconLeft, id, style, ..
       </div>
 
       {error || hint ? (
-        <span style={{ fontSize: 'var(--text-caption-size)', color: error ? '#DC2626' : 'var(--text-muted)' }}>
+        <span style={{ fontSize: 'var(--text-caption-size)', color: error ? 'var(--color-danger)' : 'var(--text-muted)' }}>
           {error || hint}
         </span>
       ) : null}

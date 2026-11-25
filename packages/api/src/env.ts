@@ -144,7 +144,7 @@ function assertServiceRole(token: string): void {
  *    순간 OCR 이 죽었다. 상대경로를 그대로 두면 이번에는 **프로세스의 cwd** 에
  *    따라 죽는다(`npm --prefix` 로 띄우면 cwd 가 저장소 루트다). 그래서 읽는
  *    자리에서 한 번 확정한다.
- * ★ 2026-10-24 부터 키 파일은 환경 폴더(C:\workspace\env\)에 두고 **절대경로**로 적는다.
+ * ★ 2026-10-24 부터 키 파일은 환경 폴더(SWONBIZ_ENV_DIR)에 두고 **절대경로**로 적는다.
  *    절대경로는 아래 resolve 가 그대로 둔다. 상대경로 처리는 옛 `.env` 용으로 남긴다.
  */
 const credentialsRaw = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -181,6 +181,14 @@ const smtp = smtpConfigOf(process.env);
  * ★ **없어도 기동한다.** 없으면 [AI 추천]만 「쓸 수 없습니다」 — 일반 추천은 그대로 나온다.
  */
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim() || null;
+
+/**
+ * 삐용 서버끼리 비밀 키 — 새 문의 알림(앱 1단계 3-마, 2026-11-16 · `bbiyong/notifyInquiry.ts`).
+ *
+ * ★ **없어도 기동한다.** 없으면 문의 알림만 건너뛴다(기록 한 줄) — 문의 접수는 그대로 된다.
+ * ★ 삐용 yml `inbound.erp-server-key` 와 **같은 값**이어야 한다. 개발계 · 테스트계 · 가동계는 서로 다른 값.
+ */
+const bbiyongServerKey = process.env.BBIYONG_SERVER_KEY?.trim() || null;
 
 const key = Buffer.from(required('ERP_ENCRYPTION_KEY'), 'base64');
 if (key.length !== 32) {
@@ -226,6 +234,8 @@ export const env = {
   smtp,
   /** Claude API 키. `null` 이면 [AI 추천]만 꺼진다. */
   anthropicApiKey,
+  /** 삐용 서버끼리 비밀 키. `null` 이면 새 문의 알림만 꺼진다. */
+  bbiyongServerKey,
   port: Number(process.env.PORT ?? 3001),
   /**
    * 세션 유효기간 — 삐용 refresh 만료를 넘지 않아야 한다.

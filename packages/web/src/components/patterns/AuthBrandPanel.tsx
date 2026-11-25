@@ -11,8 +11,8 @@
 import { Icon, type IconName } from '@/components/ds';
 
 const FEATURES: ReadonlyArray<{ icon: IconName; title: string; desc: string }> = [
-  { icon: 'file-pen-line', title: '법무 서류 자동 생성', desc: '정관·의사록·주주명부까지' },
-  { icon: 'receipt', title: '세금계산서 자동 발행', desc: '결제 완료 시 즉시 처리' },
+  { icon: 'file-pen-line', title: '법무 서류 작성 지원', desc: '정관·의사록·주주명부까지' },
+  { icon: 'receipt', title: '경비 증빙 분류를 돕는 AI', desc: '계정과목 분류 · 증빙 매칭' },
   { icon: 'calendar-check', title: '회의실 실시간 예약', desc: '월 무료 시간 자동 차감' },
 ];
 
@@ -44,7 +44,7 @@ export function AuthBrandPanel() {
           width: 520,
           height: 520,
           borderRadius: 999,
-          background: 'radial-gradient(circle,var(--color-primary) 0%,rgba(79,70,229,0) 72%)',
+          background: 'radial-gradient(circle,var(--color-primary) 0%,rgba(11,147,184,0) 72%)',
           opacity: 0.16,
           filter: 'blur(40px)',
           pointerEvents: 'none',
@@ -84,7 +84,7 @@ export function AuthBrandPanel() {
             height: 26,
             padding: '0 12px',
             borderRadius: 'var(--radius-pill)',
-            background: 'rgba(79,70,229,.18)',
+            background: 'rgba(11,147,184,.18)',
             border: '1px solid rgba(129,140,248,.35)',
             color: 'var(--color-secondary)',
             fontSize: 12,
@@ -93,7 +93,7 @@ export function AuthBrandPanel() {
           }}
         >
           <Icon name="sparkles" size={14} />
-          12년째 운영 중
+          13년째 운영 중
         </span>
 
         <h2
@@ -108,7 +108,7 @@ export function AuthBrandPanel() {
         >
           공간을 빌리면
           <br />
-          AI가 법무·세무를 처리합니다
+          AI가 법무·세무 업무를 돕습니다
         </h2>
 
         <p

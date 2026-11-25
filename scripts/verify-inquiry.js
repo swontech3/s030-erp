@@ -26,6 +26,7 @@
  *
  * 사용: npx tsx scripts/verify-inquiry.js
  */
+import { readEnvFiles } from '../packages/shared/src/envFiles.js';
 import fs from 'node:fs';
 import Fastify from 'fastify';
 import { Client } from 'pg';
@@ -48,7 +49,7 @@ const readEnv = (p) =>
       .filter((l) => l.includes('=') && !l.trim().startsWith('#'))
       .map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }),
   );
-const env = readEnv('.env');
+const env = readEnvFiles(['common', 'admin'], { legacy: ['.env'] });
 
 /** 기대 항목 수 — 모자라면 **실패**다(`verify-count.js` 머리말). */
 const EXPECTED_ITEMS = 167;

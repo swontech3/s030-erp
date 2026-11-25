@@ -1,85 +1,40 @@
 /** @screen s040100020 법인설립 상세 · 010 법인설립 · 법무 서비스(s04) */
 
 /**
- * 법인설립 상세 — 회사 · 자본·주식 · 설립 정보 · 사람 · 사업목적 · 상태 전이 · 삭제(10-4, 2026-10-11).
- * 서류 출력은 10-5 다.
+ * 법인설립 상세 — ★ 2026-11-16 부터 목록 화면(s040100010)의 **오른쪽 칸**에 그린다(대표 지시: 왼쪽 목록 · 오른쪽 상세).
  *
- * 라우트는 `/legal/incorporations/[id]` 하나이고, **새 건은 `/legal/incorporations/new`** 다(법인변경과 같다):
+ * 이 주소는 옛 바로가기 · 다른 화면의 링크를 위해 남긴다 — 목록 화면에서 그 건을 고른 채로 넘긴다:
  *
- *   `/legal/incorporations/new?orgId=&orgCode=`   임시 모드 — 건이 아직 없다(회사 사용자는 조건 없이)
- *   `/legal/incorporations/{id}`                  저장된 건
+ *   `/legal/incorporations/new?orgId=&orgCode=`       →  `/legal/incorporations?sel=new&draft=…`
+ *   `/legal/incorporations/{id}`                      →  `/legal/incorporations?sel={id}`
+ *   `/legal/incorporations/{id}?print=articles`       →  `/legal/incorporations?sel={id}&print=articles` (정관 보기 바로가기)
  *
- * ★★ 임시 모드는 DB 의 건을 읽지 않는다 — 단체 · 상태 · 위치 선택지만 읽고, 입력은 화면이 들고 있다가
- *    첫 [저장] 에 한꺼번에 보낸다. 주소의 단체는 화면이 믿지 않는다 — Fastify 가 세션과 대조한다(403).
- * ★ 사이드바에 없고 목록에서 들어온다. 그래도 `requireScreen` 은 반드시 거친다.
- * ★ 남의 건은 없는 건과 같이 404 다(RLS 042).
- * ★ `?print=articles` — [서류 출력]을 열고 정관을 골라 둔다(법인변경 「설립 건 정관 보기」, 결정 2026-11-07). 저장된 건만.
+ * ★ 화면코드(s040100020)는 그대로다 — 오른쪽 칸은 이 코드를 받은 사람에게만 그린다(`IncorporationsView` 의 `canOpenDetail`).
+ *   이 주소도 `requireScreen` 을 먼저 거친다.
+ * ★ 상세의 내용 · 입력 · 저장 · 상태 바꾸기 · 서류 출력 · 정관은 `IncorporationDetail` 그대로다(자리만 옮겼다).
  */
-import { notFound } from 'next/navigation';
-import type {
-  IncorporationDetailResponse,
-  IncorporationDraftResponse,
-} from '@swonbiz/shared/domain/incorporation-detail';
-import type { OrgInfo } from '@swonbiz/shared/domain/org-lookup';
-import { callApi } from '@/lib/api';
-import { readSid, requireScreen } from '@/lib/session';
-import { IncorporationDetail } from '@/features/legal/IncorporationDetail';
-import { INCORP_PRINT_ARTICLES } from '@swonbiz/shared/domain/legal-articles-file';
-
-/** 임시 모드를 가리키는 세그먼트. 실제 건 ID 는 UUID 라 겹치지 않는다. */
-const NEW = 'new';
-
-/**
- * 새 건에서 고른 회사(삐용 단체 조회) — 회사명은 상호 칸에, 대표자 · 전화는 사람 한 줄 · 대표이사 전화에 미리 넣는다(결정 2026-11-02).
- * ★ 회사명은 주소에 싣지 않는다(목록 화면의 「복사 금지」) — 서버끼리 공용 회사 조회 단건(`/org-lookup/one`, 운영사 전용)으로 읽는다.
- * ★ 못 읽으면(삐용 장애 · 권한 · 없음) null — 미리 넣지 않을 뿐 작성은 막지 않는다.
- */
-async function pickedOrg(orgId: number, sid: string | null): Promise<OrgInfo | null> {
-  try {
-    const res = await callApi<{ org: OrgInfo | null }>(`/org-lookup/one?orgId=${encodeURIComponent(String(orgId))}`, { erpSid: sid });
-    return res.ok ? (res.body.org ?? null) : null;
-  } catch {
-    return null;
-  }
-}
+import { redirect } from 'next/navigation';
+import { requireScreen } from '@/lib/session';
+import { NEW_SEL, selHref } from '@/features/legal/legal-split';
 
 export default async function IncorporationDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ orgId?: string; orgCode?: string; print?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requireScreen('s040100020', '/legal/incorporations/[id]');
   const { id } = await params;
-  const sid = await readSid();
-
-  if (id === NEW) {
-    const { orgId, orgCode } = await searchParams;
-    const qs = new URLSearchParams();
-    if (orgId) qs.set('orgId', orgId);
-    if (orgCode) qs.set('orgCode', orgCode);
-    const res = await callApi<IncorporationDraftResponse>(`/legal/incorporations/draft?${qs.toString()}`, { erpSid: sid });
-    // ★ 틀린 주소(단체 없음)와 남의 단체(403)는 열 것이 없다 — 「없는 화면」으로 본다.
-    if (res.status === 400 || res.status === 403) notFound();
-    if (!res.ok) throw new Error(`법인설립 작성 준비 실패(${res.status})`);
-    return (
-      <IncorporationDetail
-        key={`new:${qs.toString()}`}
-        draft={res.body}
-        saved={null}
-        picked={orgId ? await pickedOrg(res.body.orgId, sid) : null}
-      />
-    );
+  const sp = await searchParams;
+  if (id === NEW_SEL) {
+    const draft = new URLSearchParams();
+    for (const key of ['orgId', 'orgCode']) {
+      const v = sp[key];
+      if (typeof v === 'string' && v !== '') draft.set(key, v);
+    }
+    redirect(selHref('/legal/incorporations', { kind: 'new', draft: draft.toString() }));
   }
-
-  const res = await callApi<IncorporationDetailResponse>(`/legal/incorporations/${encodeURIComponent(id)}`, { erpSid: sid });
-  if (res.status === 404) notFound();
-  if (!res.ok) throw new Error(`법인설립 조회 실패(${res.status})`);
-
-  // ★ 다른 건으로 옮겨 갈 때 입력 중이던 값이 남지 않게 다시 마운트한다.
-  const { print } = await searchParams;
-  return (
-    <IncorporationDetail key={id} draft={res.body} saved={res.body} openArticlesPrint={print === INCORP_PRINT_ARTICLES} />
-  );
+  const print = typeof sp.print === 'string' && sp.print !== '' ? sp.print : null;
+  redirect(selHref('/legal/incorporations', { kind: 'saved', id, print }));
 }

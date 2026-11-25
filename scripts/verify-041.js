@@ -9,6 +9,7 @@
  *    바뀌는가 + NULL 업종코드가 여럿 들어가는가」까지만 본다.
  * ★ 시험 행은 **트랜잭션 안에서 넣고 ROLLBACK 한다.** 남는 것이 없다.
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
@@ -20,8 +21,8 @@ const readEnv = (file) =>
       .map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^"|"$/g, '')]; }),
   );
 
-const rootEnv = readEnv(process.argv[2] || '.env');
-const apiEnv = readEnv(process.argv[3] || 'packages/api/.env');
+const rootEnv = (process.argv[2] ? readEnv(process.argv[2]) : readEnvFiles(['common', 'admin'], { legacy: ['.env'] }));
+const apiEnv = (process.argv[3] ? readEnv(process.argv[3]) : readEnvFiles(['common', 'erp-api'], { legacy: ['packages/api/.env'] }));
 const DRY = process.argv.includes('--dry-run');
 const T = 'tb_s080_biz_purpose_catalog';
 /** 레거시 샘플 4줄 — 041 은 자료를 바꾸지 않는다. */

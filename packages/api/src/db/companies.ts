@@ -1107,15 +1107,3 @@ export async function patchMemberFromBbiyong(
   );
   return rowCount ?? 0;
 }
-
-/** 회사 표의 대표자명(사본) — 활성 대표 직원의 이름을 삐용에서 받았을 때 맞춘다. */
-export async function updateCompanyCeoName(
-  client: ScopedClient,
-  args: { companyId: string; ceoName: string; actor: string },
-): Promise<void> {
-  await q(
-    client,
-    `UPDATE public.tb_s080_companies SET ceo_name = $2, updated_at = now(), updated_by = $3 WHERE company_id = $1`,
-    [args.companyId, args.ceoName, args.actor],
-  );
-}

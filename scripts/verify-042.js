@@ -7,6 +7,7 @@
  * ★★ RLS 는 erp_app 으로 접속해서만 잰다(postgres 는 BYPASSRLS — verify-037 머리말).
  * ★ 시험 행은 트랜잭션 안에서 넣고 ROLLBACK 한다. 시험 단체 990001 · 990002(다른 검증과 같은 대역).
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
@@ -18,8 +19,8 @@ const readEnv = (file) =>
       .map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^"|"$/g, '')]; }),
   );
 
-const rootEnv = readEnv(process.argv[2] || '.env');
-const apiEnv = readEnv(process.argv[3] || 'packages/api/.env');
+const rootEnv = (process.argv[2] ? readEnv(process.argv[2]) : readEnvFiles(['common', 'admin'], { legacy: ['.env'] }));
+const apiEnv = (process.argv[3] ? readEnv(process.argv[3]) : readEnvFiles(['common', 'erp-api'], { legacy: ['packages/api/.env'] }));
 const DRY = process.argv.includes('--dry-run');
 const INC = 'tb_s080_incorporations';
 const PER = 'tb_s080_incorp_persons';

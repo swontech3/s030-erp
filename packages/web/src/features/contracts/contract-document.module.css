@@ -17,7 +17,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(11, 17, 32, 0.55);
+  background: color-mix(in srgb, var(--surface-inverse) 55%, transparent);   /* ★ 2026-11-25 ⑦ 직접 색 값 → 토큰(같은 색 · 정산서 미리보기도 같이 씀) */
 }
 
 .modal {
@@ -46,6 +46,49 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/*
+ * ── 제목줄 · 아래 단추 줄 ── ★ 2026-11-25 입주관리 일관성 — 공통 팝업(components/ds/Dialog.module.css
+ *    .title · .foot)과 같은 값. 계약서 미리보기만 쓴다(청구 정산서는 .head 를 그대로 쓴다).
+ *    둘 다 `data-print-hide` 라 종이에 나오지 않는다.
+ */
+.titleBar {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 20px;
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  font-size: var(--fs-4xl);
+  font-weight: var(--weight-semibold);
+  line-height: 52px;
+}
+
+.foot {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 24px 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* [인쇄] 단추 위 말풍선 — 아래 단추 줄이라 위로 띄운다 */
+.tipHost {
+  position: relative;
+  display: inline-flex;
+}
+
+.tipHost .tip {
+  top: auto;
+  bottom: calc(100% + 8px);
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tipHost:hover .tip {
+  display: flex;
 }
 
 /* ── 문서 탭 (segmented) ── */
@@ -113,7 +156,7 @@
   padding: 0 10px;
   border-radius: var(--radius-sm);
   background: var(--surface-inverse);
-  color: #ffffff;
+  color: var(--text-on-inverse);
   font-size: 14px;
   font-weight: 400;
   white-space: nowrap;

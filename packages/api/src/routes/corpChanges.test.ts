@@ -755,6 +755,14 @@ describe('비입주사 회사 정보의 기본값 — 삐용 값으로 빈 칸�
     expect(body.company).toMatchObject({ legalName: '등기 상호', ceoName: '김대표', defaultedFields: ['ceoName'] });
   });
 
+  it('★★ 대표자는 삐용 「대표자」가 저장된 값보다 우선 — 저장값은 고치지 않는다(2026-11-19)', async () => {
+    const db = fakeDb([LEGAL_ROW({ legal_name: '(주)에스원테크', ceo_name: '최현수' })], { orgName: '에스원테크', repName: '이정희' });
+    const a = await build(session('operator', 1), db.deps);
+    const body = (await a.inject({ method: 'GET', url: draftUrl })).json();
+    expect(body.company).toMatchObject({ legalName: '(주)에스원테크', ceoName: '이정희', defaultedFields: ['ceoName'] });
+    expect(db.seen.some((s) => /^\s*(INSERT|UPDATE)/.test(s.sql))).toBe(false);
+  });
+
   it('★ 완료된 법인설립 건의 상호 위치를 함께 준다(「서류에 쓰이는 상호」, 결정 2026-11-06) — 없으면 null', async () => {
     const withPos = fakeDb([LEGAL_ROW({ legal_name: '시험', member_type: 'A' }), { match: /company_type_position FROM public.tb_s080_incorporations/, rows: [{ company_type_position: 'B' }] }]);
     const a = await build(session('operator', 1), withPos.deps);

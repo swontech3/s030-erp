@@ -10,7 +10,7 @@
  * 패밀리 이름과 CSS 변수 130개는 원본 그대로다 — 대조로 확인한다.
  *
  * 원본:  design\_ds\swonbiz\tokens/{fonts,colors,typography,spacing,shape,base}.css
- * 생성:  2026-11-16 02:15
+ * 생성:  2026-11-22 08:42
  * ============================================================================= */
 /* ---- fonts.css ------------------------------------------------------------- */
 /* SwonBiz webfonts. Pretendard Variable (Korean + Latin) is the core family;
@@ -23,11 +23,11 @@
 /* Fixed palette. These ten values are the entire SwonBiz color system —
    no other hues, and no green under any circumstance. */
 :root{
-  --indigo-600:#4F46E5;
-  --indigo-700:#4338CA;
-  --indigo-400:#818CF8;
+  --indigo-600:#087A99;
+  --indigo-700:#06657F;
+  --indigo-400:#5CC6DE;
   --cyan-400:#22D3EE;
-  --indigo-50:#EEF2FF;
+  --indigo-50:#E3F3F7;
 
   --slate-950:#0B1120;
   --slate-600:#475569;
@@ -43,6 +43,9 @@
   --color-secondary:var(--indigo-400);
   --color-accent:var(--cyan-400);
   --color-accent-bg:var(--indigo-50);
+  /* 앱 기본색 — 삐용 앱 공통 테마색(아쿠아 블루). 2026-11-16 대표 결정: 법무 두 상세(법인설립 · 법인변경)의
+     섹션 막대에만 쓴다. ERP 기본색(--color-primary)도 2026-11-22 부터 아쿠아(#087A99)다(--indigo-* 값을 아쿠아로 바꿈). */
+  --color-app-primary:#0B93B8;
 
   --surface:var(--white);
   --surface-alt:var(--slate-50);
@@ -77,9 +80,9 @@
   --color-danger-bg:var(--red-100);
   --color-danger-text:var(--red-800);
 
-  --focus-ring:rgba(79,70,229,.32);
-  --gradient-brand:linear-gradient(120deg,rgba(79,70,229,.18),rgba(34,211,238,.18)); /* @kind color */
-  --gradient-brand-line:linear-gradient(90deg,#4F46E5,#22D3EE); /* @kind color */
+  --focus-ring:rgba(11,147,184,.32);
+  --gradient-brand:linear-gradient(120deg,rgba(11,147,184,.18),rgba(34,211,238,.18)); /* @kind color */
+  --gradient-brand-line:linear-gradient(90deg,#087A99,#22D3EE); /* @kind color */
 }
 
 /* ---- typography.css ------------------------------------------------------------- */
@@ -152,8 +155,8 @@ html{font-family:var(--font-core);-webkit-font-smoothing:antialiased;text-render
 
   /* Shadows are used sparingly: brand shadow on primary buttons, a quiet lift
      for floating surfaces only. Cards have NO shadow. */
-  --shadow-primary:0 4px 16px rgba(79,70,229,.22);
-  --shadow-primary-hover:0 6px 20px rgba(79,70,229,.28);
+  --shadow-primary:0 4px 16px rgba(11,147,184,.22);
+  --shadow-primary-hover:0 6px 20px rgba(11,147,184,.28);
   --shadow-float:0 8px 24px rgba(11,17,32,.10);
   --shadow-overlay:0 20px 48px rgba(11,17,32,.18);
   --shadow-none:none;

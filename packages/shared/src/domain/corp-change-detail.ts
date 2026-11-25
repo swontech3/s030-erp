@@ -542,7 +542,7 @@ export interface CorpChangeCompanyInfo {
 
 /**
  * 삐용이 주는 회사 정보 — 지금은 회사명 · 대표자명.
- *   · 운영사: 단체 단건 조회(`getOrg`)의 `orgName` · `repName`
+ *   · 운영사: 단체 단건 조회(`getOrg`)의 `orgName` · `repName`(= 삐용 「대표자」 `ceoName` · 없으면 빈칸 — 운영자 이름은 쓰지 않는다, 2026-11-18)
  *   · 회사 사용자(비입주사): 로그인 프로필의 `orgName` 만(단체 조회 권한이 없다)
  *     ★ 다음 단계 — 삐용이 로그인 응답에 대표자명을 더하면 `repName` 으로 붙인다
  */
@@ -560,7 +560,7 @@ export type CompanyDefaultField = 'legalName' | 'corpNumber' | 'bizNumber' | 'ce
  */
 export const COMPANY_DEFAULT_PAIRS: readonly { from: keyof BbiyongCompanyDefaults; to: Exclude<CompanyDefaultField, 'memberType'> }[] = [
   { from: 'orgName', to: 'legalName' },
-  { from: 'repName', to: 'ceoName' },
+  // 대표자(`repName` → `ceoName`)는 여기 두지 않는다 — 빈 칸만이 아니라 삐용 값이 우선이다(`applyCompanyDefaults`)
 ];
 
 /**
@@ -583,7 +583,12 @@ export function guessMemberType(legalName: string | null, memberTypes: readonly 
 
 /**
  * 비입주사 회사 정보의 **빈 칸만** 기본값으로 채워 보여 준다 — 저장된 값이 우선이다.
- *   · 삐용 값(`COMPANY_DEFAULT_PAIRS`) — 회사명 · 대표자명
+ *   · 삐용 값(`COMPANY_DEFAULT_PAIRS`) — 회사명
+ *   · ★★ 대표자만은 거꾸로 — 삐용 「대표자」(`repName` = 단체 정보 `ceoName`)가 저장된 값보다 우선이다.
+ *     비어 있으면 빈칸이다(법인설립 상세와 같다, 2026-11-19). 저장된 대표자에 삐용 운영자 이름이 들어가
+ *     있던 일(에스원테크 「최현수」)이 있어서다. 저장값은 고치지 않는다 — 사람이 [저장] 하면 그때 바뀐다.
+ *     삐용 대표자를 읽지 못했으면(조회 실패 · 회사 세션 — `repName` 칸이 없다) 저장된 값 그대로다.
+ *     저장된 값과 다른 이름을 보일 때만 「저장 전」 칸(`defaultedFields`)으로 알린다.
  *   · 회사유형 — 등기상 상호(저장된 값이든 위에서 채운 값이든)에서 추정(`guessMemberType`)
  *
  * ★ 복사해 두지 않는다 — 응답에만 채운다. 사람이 [저장] 해야 법무 회사 정보에 남는다.
@@ -605,6 +610,11 @@ export function applyCompanyDefaults(
     if (!value || next[to]?.trim()) continue;
     next[to] = value;
     next.defaultedFields.push(to);
+  }
+  if (source && source.repName !== undefined) {
+    const rep = source.repName?.trim() || null;
+    if (rep && rep !== next.ceoName?.trim()) next.defaultedFields.push('ceoName');
+    next.ceoName = rep;
   }
   if (!next.memberType) {
     const guessed = guessMemberType(next.legalName, memberTypes);

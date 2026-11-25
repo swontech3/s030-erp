@@ -31,6 +31,17 @@
  *
  * ★ 불러오는 중과 「없음」을 가른다 — 분류를 옮기는 동안 이전 분류의 코드값이 그대로
  *   보이면 **거짓을 보여 주는 것**이다(센터 관리에서 겪은 그대로).
+ *
+ * =============================================================================
+ * ★★ 2026-11-18 (통합 방 · 대표 결정) — 「주인」(삐용 · ERP)
+ * =============================================================================
+ * 코드 관리 화면이 하나다. 왼쪽 목록에 **ERP 표의 분류**와 **삐용 표의 종류**가 함께 나오고, 줄마다 주인 딱지가
+ * 붙는다(주인 = 그 코드가 온 표). [주인] 고르기로 걸러 본다. 삐용 종류를 고르면 오른쪽은 `BbiyongPanel` —
+ * 삐용 화면 API 로 보고 고친다. 삐용 종류에는 [수정] · [삭제] 가 없다(삐용 API 에 종류 고치기 · 지우기가 없다).
+ * 삐용을 못 읽으면 ERP 코드는 그대로 보이고 그 사실만 적는다.
+ *
+ * ★ 2026-11-19: 화면 이름 「주인」 → 「업무구분」 · 선택지와 딱지 글자는 공통 코드 `CODE_BIZ_TP`(일회용 40)에서
+ *   읽는다 · 삐용 줄도 ERP 줄과 같은 칸 · 같은 배치(딱지 폭 고정 · 끝의 [수정] · [삭제] 자리는 잠가 둔다).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Icon, type IconName } from '@/components/ds';
@@ -38,16 +49,24 @@ import { LoadingBar } from '@/components/patterns/LoadingBar';
 import { cf } from '@/features/facility/ModalShell';
 import {
   CodesError,
+  codeTypeRows,
+  loadBbiyongTypes,
+  loadBizTpOptions,
   loadMasterLines,
   loadTree,
   lineBlockReason,
   lineUseTpLabel,
   masterBlockReason,
   usageText,
+  type BbiyongCodeType,
+  type BizTpOption,
   type CodeLine,
   type CodeMaster,
+  type CodeOwner,
   type CodePartition,
 } from './codes-model';
+import { codeBizTpLabel } from '@swonbiz/shared/domain/code-biz-tp';
+import { BbiyongPanel } from './BbiyongPanel';
 import { MasterDialog } from './MasterDialog';
 import { PartitionDialog } from './PartitionDialog';
 import { LineDialog } from './LineDialog';
@@ -60,6 +79,9 @@ type Dialog =
   | { kind: 'line'; category: string; line: CodeLine | null }
   | { kind: 'delete'; target: DeleteTarget };
 
+/** 삐용 종류 줄의 잠근 [수정] · [삭제] 안내 — 삐용 API 에 종류 고치기 · 지우기가 없다. */
+const BBIYONG_TYPE_LOCKED = '삐용 종류는 여기서 고치거나 지울 수 없습니다 — 코드값은 오른쪽에서 고칩니다';
+
 /** 오른쪽 검색 조건. */
 const EMPTY_FILTER = { useTp: '', code: '', name: '' };
 
@@ -67,8 +89,16 @@ export function CodesView() {
   const [masters, setMasters] = useState<CodeMaster[]>([]);
   const [partitions, setPartitions] = useState<CodePartition[]>([]);
   const [lines, setLines] = useState<CodeLine[]>([]);
-  /** 고른 분류코드. `null` 이면 오른쪽은 빈 상태다. */
+  /** 고른 분류코드(ERP 주인). `null` 이면 오른쪽은 빈 상태다. */
   const [category, setCategory] = useState<string | null>(null);
+  /** 삐용 주인 종류(2026-11-18). 고른 것은 ERP 분류(`category`)와 둘 중 하나뿐이다. */
+  const [bbiyongTypes, setBbiyongTypes] = useState<BbiyongCodeType[]>([]);
+  const [bbiyongError, setBbiyongError] = useState<string | null>(null);
+  const [bbiyongKey, setBbiyongKey] = useState<string | null>(null);
+  /** 왼쪽 [업무구분] 걸러 보기 — 빈 값은 전체. 고르면 바로 걸린다. */
+  const [owner, setOwner] = useState<'' | CodeOwner>('');
+  /** 업무구분 선택지 · 딱지 글자 — ERP 공통 코드 `CODE_BIZ_TP`(2026-11-19). 못 읽으면 빈 목록. */
+  const [bizTps, setBizTps] = useState<BizTpOption[]>([]);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,9 +115,21 @@ export function CodesView() {
   const [filterInput, setFilterInput] = useState(EMPTY_FILTER);
   const [filter, setFilter] = useState(EMPTY_FILTER);
 
+  /** ★ 삐용 종류는 따로 받는다 — 삐용을 못 읽어도 ERP 코드는 보여야 한다. */
+  const refreshBbiyong = useCallback(async () => {
+    try {
+      const b = await loadBbiyongTypes();
+      setBbiyongTypes(b.types);
+      setBbiyongError(null);
+    } catch (err) {
+      setBbiyongTypes([]);
+      setBbiyongError(`삐용 코드를 불러오지 못했습니다 — ${err instanceof CodesError ? err.message : '연결 오류'}`);
+    }
+  }, []);
+
   const refreshTree = useCallback(async () => {
     try {
-      const t = await loadTree();
+      const [t] = await Promise.all([loadTree(), refreshBbiyong()]);
       setMasters(t.masters);
       setError(null);
     } catch (err) {
@@ -95,7 +137,7 @@ export function CodesView() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshBbiyong]);
 
   const refreshLines = useCallback(async (cat: string | null) => {
     if (!cat) {
@@ -122,6 +164,19 @@ export function CodesView() {
     void refreshTree();
   }, [refreshTree]);
 
+  /* 업무구분은 한 번만 읽는다 — 못 읽어도 목록은 그대로 보인다(걸러 보기는 「전체」만). */
+  useEffect(() => {
+    let alive = true;
+    loadBizTpOptions()
+      .then((o) => {
+        if (alive) setBizTps(o);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   useEffect(() => {
     void refreshLines(category);
     /* 분류를 옮기면 오른쪽 검색 조건을 비운다 — 이전 분류의 사용타입이 남으면 0건이 된다. */
@@ -139,16 +194,22 @@ export function CodesView() {
   const masterOf = (cat: string) => masters.find((m) => m.category === cat) ?? null;
   const partitionOf = (useTp: string) => partitions.find((p) => p.useTp === useTp) ?? null;
 
-  /** 왼쪽 — 조회 조건이 걸린 분류코드들. 키는 대소문자 무시, 이름은 그대로. */
-  const shownMasters = useMemo(
+  /** 왼쪽 — ERP 분류 + 삐용 종류에 조회 조건 · 주인을 건 것. 키는 대소문자 무시, 이름은 그대로. */
+  const allRows = useMemo(() => codeTypeRows(masters, bbiyongTypes), [masters, bbiyongTypes]);
+  const shownRows = useMemo(
     () =>
-      masters.filter((m) => {
-        if (appliedKey && !m.category.toLowerCase().includes(appliedKey.toLowerCase())) return false;
-        if (appliedName && !m.name.includes(appliedName)) return false;
+      allRows.filter((r) => {
+        if (owner && r.owner !== owner) return false;
+        if (appliedKey && !r.code.toLowerCase().includes(appliedKey.toLowerCase())) return false;
+        if (appliedName && !r.name.includes(appliedName)) return false;
         return true;
       }),
-    [masters, appliedKey, appliedName],
+    [allRows, owner, appliedKey, appliedName],
   );
+  const bbiyongType = useMemo(() => {
+    for (const r of allRows) if (r.owner === 'bbiyong' && r.key === bbiyongKey) return r.type;
+    return null;
+  }, [allRows, bbiyongKey]);
 
   /** 오른쪽 — 조회 조건이 걸린 코드값들. */
   const shownLines = useMemo(
@@ -232,6 +293,20 @@ export function CodesView() {
                 이 패널에서 제일 큰 것이 되어 목록보다 먼저 읽힌다.
             */}
             <div className={styles.addRow}>
+              {/* ★ 업무구분 걸러 보기(2026-11-18 · 이름 2026-11-19) — 고르면 바로 걸린다. 선택지는 공통 코드 CODE_BIZ_TP. */}
+              <select
+                className={`${cf.input} ${styles.ownerSelect}`}
+                value={owner}
+                aria-label="업무구분"
+                onChange={(e) => setOwner(e.target.value as '' | CodeOwner)}
+              >
+                <option value="">업무구분 전체</option>
+                {bizTps.map((o) => (
+                  <option key={o.tp} value={o.tp}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 className={`${styles.btnXs} ${styles.searchBtn}`}
@@ -244,11 +319,12 @@ export function CodesView() {
           </div>
 
           <div className={styles.treeBody}>
+            {bbiyongError ? <p className={styles.error}>{bbiyongError}</p> : null}
             {loading ? (
               <p className={styles.empty}>불러오는 중…</p>
-            ) : shownMasters.length === 0 ? (
+            ) : shownRows.length === 0 ? (
               <p className={styles.empty}>
-                {masters.length === 0 ? '분류코드가 없습니다' : '조회 결과가 없습니다'}
+                {allRows.length === 0 ? '분류코드가 없습니다' : '조회 결과가 없습니다'}
               </p>
             ) : (
               /*
@@ -258,18 +334,63 @@ export function CodesView() {
                *    고르는 것은 이름 쪽 버튼이 맡고, 행은 `<div>` 다(센터 관리의 호실 표가
                *    같은 이유로 같은 모양이다).
                */
-              shownMasters.map((m) => {
+              shownRows.map((r) => {
+                /* ★ 업무구분 딱지 — 폭을 맞춰 두 종류의 코드 · 이름이 같은 자리에서 시작한다(2026-11-19). */
+                const ownerTag = (
+                  <span
+                    className={`${styles.tag} ${styles.bizTpTag} ${r.owner === 'bbiyong' ? styles.tagOn : styles.tagOff}`}
+                    title="업무구분"
+                  >
+                    {codeBizTpLabel(r.owner, bizTps)}
+                  </span>
+                );
+                if (r.owner === 'bbiyong') {
+                  /*
+                   * ★ 삐용 종류 — 고르기만. 종류 수정 · 삭제는 삐용 API 에 없다.
+                   * ★ ERP 줄과 같은 칸 · 같은 배치(2026-11-19) — 끝의 [수정] · [삭제] 자리를 두고 잠근다.
+                   */
+                  return (
+                    <div key={r.key} className={`${styles.node} ${bbiyongKey === r.key ? styles.nodeOn : ''}`}>
+                      <button
+                        type="button"
+                        className={styles.nodePick}
+                        onClick={() => {
+                          setCategory(null);
+                          setBbiyongKey(r.key);
+                        }}
+                      >
+                        {ownerTag}
+                        <span className={styles.nodeKey}>{r.code}</span>
+                        <span className={styles.nodeLabel}>{r.name}</span>
+                        <span className={styles.nodeCount}>{r.count}</span>
+                      </button>
+                      <span className={styles.nodeActions}>
+                        <button type="button" className={styles.btnXs} disabled title={BBIYONG_TYPE_LOCKED}>
+                          수정
+                        </button>
+                        <button type="button" className={styles.btnXs} disabled title={BBIYONG_TYPE_LOCKED}>
+                          삭제
+                        </button>
+                      </span>
+                    </div>
+                  );
+                }
+                const m = r.master;
                 const why = masterBlockReason(m);
                 return (
                   <div
-                    key={m.category}
+                    key={r.key}
                     className={`${styles.node} ${category === m.category ? styles.nodeOn : ''}`}
                   >
                     <button
                       type="button"
                       className={styles.nodePick}
-                      onClick={() => setCategory(m.category)}
+                      onClick={() => {
+                        setBbiyongKey(null);
+                        setCategory(m.category);
+                      }}
                     >
+                      {ownerTag}
                       <span className={styles.nodeKey}>{m.category}</span>
                       <span className={styles.nodeLabel}>{m.name}</span>
                       <span className={styles.nodeCount}>{m.lineCount}</span>
@@ -305,7 +426,7 @@ export function CodesView() {
                대상이 있는 쪽에 붙어 있어야 읽힌다.
           */}
           <div className={styles.treeFoot}>
-            <span>분류 {shownMasters.length}개</span>
+            <span>분류 {shownRows.length}개</span>
           </div>
         </aside>
 
@@ -315,7 +436,9 @@ export function CodesView() {
           {master !== null && linesBusy ? <LoadingBar /> : null}
           {error ? <p className={styles.error}>{error}</p> : null}
 
-          {master === null ? (
+          {bbiyongType !== null ? (
+            <BbiyongPanel type={bbiyongType} onChanged={() => void refreshBbiyong()} />
+          ) : master === null ? (
             <PanelEmpty
               icon="settings"
               lead="분류코드를 고르세요"

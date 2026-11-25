@@ -24,7 +24,10 @@ import type { FastifyInstance } from 'fastify';
 import { requireSession } from '../session/hook.ts';
 import { withCompanyScope, type CompanyScope } from '../db/withCompanyScope.ts';
 import { listCodes, listSpaces, type CodeSpec } from '../db/lookups.ts';
+import { sharedCodes } from '../bbiyong/index.ts';
+import { SHARED_CODE_TYPES } from '../bbiyong/sharedCodes.ts';
 import { DEPOSIT_ACCOUNT_CATEGORY, DEPOSIT_ACCOUNT_USE_TP } from '@swonbiz/shared/domain/deposit-account';
+import { CODE_BIZ_TP_CATEGORY, CODE_BIZ_TP_USE_TP } from '@swonbiz/shared/domain/code-biz-tp';
 import {
   SETTLE_CODE_USE_TP,
   SETTLE_STATUS_CATEGORY,
@@ -58,8 +61,10 @@ const CONTRACT_FORM_CODES: readonly CodeSpec[] = [
   { category: 'ROOM_TP', useTp: '000' },
   { category: 'PAYMENT_METHOD', useTp: '000' },
   { category: 'ACCESS_ROUTE', useTp: '000' },
-  /** 대표자·입주자 사용자 이메일(섹션 1·3). 016 이전에는 화면 상수였다. */
-  { category: 'EMAIL_DOMAIN', useTp: '000' },
+  /*
+   * ★ 이메일 도메인(EMAIL_DOMAIN)은 **여기 없다**(2026-11-18) — 주인이 삐용이라 ERP 표가 아니라 삐용에서 받는다.
+   *   아래 `SHARED_CODE_TYPES`(이메일 도메인 · 국가 · 시간대)가 같은 응답 모양으로 붙인다.
+   */
   /**
    * 회원구분(섹션 1). **공통 파티션 `000` 의 법인 형태 5종이다** — 표기위치(앞/뒤)는
    * 여기 없다. 014 가 그것을 `NAME_POSITION` 으로 떼어냈다.
@@ -94,6 +99,11 @@ const CONTRACT_FORM_CODES: readonly CodeSpec[] = [
    */
   { category: SETTLE_TYPE_CATEGORY, useTp: SETTLE_CODE_USE_TP },
   { category: SETTLE_STATUS_CATEGORY, useTp: SETTLE_CODE_USE_TP },
+  /**
+   * 업무구분(코드 관리 s030100030 왼쪽 걸러 보기 · 딱지, 2026-11-19 · 일회용 40). 파티션 `000` — BBIYONG · ERP.
+   * ★ **이름만** 쓴다. 코드값은 화면이 그 줄이 온 표로 판정한다(shared `code-biz-tp.ts`).
+   */
+  { category: CODE_BIZ_TP_CATEGORY, useTp: CODE_BIZ_TP_USE_TP },
 ];
 
 const scopeOf = (session: { role: string; companyId: string | null }): CompanyScope => ({
@@ -148,8 +158,20 @@ export function registerLookupRoutes(app: FastifyInstance): void {
     const rows = await withCompanyScope(scopeOf(session), (client) =>
       listCodes(client, CONTRACT_FORM_CODES),
     );
+    /*
+     * ★★ 같이 쓰는 코드(주인 삐용, 2026-11-18) — 삐용 서버 키 주소로 받은 것. 못 받으면 마지막으로 받은 값,
+     *    그것도 없으면 빈 목록이다(`bbiyong/sharedCodes.ts`) — 삐용이 멈춰도 이 응답은 나간다.
+     *    모양은 ERP 코드와 같다: 분류 = 삐용 종류(cd_tp) · 코드 = 코드값 · 이름 = 코드값 이름 · 설명 없음.
+     */
+    const shared = (
+      await Promise.all(
+        SHARED_CODE_TYPES.map(async (cdTp) =>
+          (await sharedCodes.values(cdTp, req.log)).map((v) => ({ category: cdTp, code: v.cdV, name: v.cdVMeaning, description: null })),
+        ),
+      )
+    ).flat();
     return reply.send({
-      codes: rows.map((c) => ({ category: c.category, code: c.code, name: c.name, description: c.description })),
+      codes: [...rows.map((c) => ({ category: c.category, code: c.code, name: c.name, description: c.description })), ...shared],
     });
   });
 }

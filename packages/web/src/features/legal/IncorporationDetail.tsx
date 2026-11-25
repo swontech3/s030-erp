@@ -31,7 +31,7 @@
  * ★★ 서버는 주민번호 평문을 돌려주지 않는다(마스킹만). 임시 모드의 평문은 첫 저장 때까지 화면이 들고 있는
  *    것뿐이고, 표에는 마스킹해서 보인다.
  */
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -74,12 +74,13 @@ import type { OrgInfo } from '@swonbiz/shared/domain/org-lookup';
 import { incorpArticlesFormName } from '@swonbiz/shared/domain/legal-articles-file';
 import { formatMoneyInput, maskInput } from '@/features/contracts/form-model';
 import { Icon } from '@/components/ds';
-import { AddressInput, StatusActions, type Address } from './CorpChangeDetail';
+import { AddressInput, PaneAddressCompact, StatusActions, type Address } from './CorpChangeDetail';
 import { CorpChangeConfirmDialog, type CorpChangeConfirmKind } from './CorpChangeConfirmDialog';
 import { BizPurposePickerDialog } from './BizPurposePickerDialog';
 import { IncorporationPrintDialog } from './IncorporationPrintDialog';
 import { IncorporationPrintHistory } from './IncorporationPrintHistory';
 import styles from './corp-change-detail.module.css';
+import type { LegalDetailPane } from './CorpChangeDetail';
 
 interface Props {
   /** 머리 · 선택지 — 임시 모드는 임시 모드 읽기 응답, 저장된 건은 상세 응답 그대로. */
@@ -89,7 +90,7 @@ interface Props {
   /**
    * 새 건에서 고른 회사(삐용 단체 조회, 결정 2026-11-02) — 미리 넣는다, 모두 고칠 수 있다:
    *   · 회사명 → 상호 칸(형태 표기는 떼고, `incorpBareName`)
-   *   · 대표자(`repName` = 삐용 memberName) → 사람 한 줄(대표이사 · 이사 · 발기인/사원 체크, 주민번호 · 주소는 비움)
+   *   · 대표자(`repName` = 삐용 단체 정보 「대표자」 `ceoName`, 2026-11-18 · 운영자 memberName 은 아니다) → 사람 한 줄(대표이사 · 이사 · 발기인/사원 체크, 주민번호 · 주소는 비움)
    *   · 전화(`telNo`) → 「대표이사 전화」 칸(사람 줄에는 전화 칸이 없다)
    * 저장된 건 · 회사를 고르지 않은 새 건 · 조회 실패는 null(넣지 않음).
    */
@@ -99,6 +100,8 @@ interface Props {
    * 서류를 출력할 수 있는 건(작성완료 · 완료)일 때만. 처음 한 번만 — 닫으면 지금과 같다.
    */
   openArticlesPrint?: boolean;
+  /** 목록 화면 오른쪽 칸(2026-11-16) — 없으면 옛 단독 화면처럼 주소를 옮긴다. */
+  pane?: LegalDetailPane;
 }
 
 /**
@@ -155,7 +158,9 @@ const defsByName = (entity: IncorpEntityType): Partial<Record<InfoName, IncorpFi
 
 /** 묶음 — 배치만 정한다(칸 정의는 shared). 상호(국문) · 본점은 회사 묶음이 따로 그린다. */
 const CAPITAL_FIELDS: InfoName[] = ['capitalAmount', 'parValue', 'unitsAuthorized', 'unitsIssued'];
-const SETUP_FIELDS: InfoName[] = ['publicNoticeMethod', 'fiscalStart', 'fiscalEnd', 'plannedDate', 'meetingTime', 'paymentBank', 'ceoPhone', 'metroSurcharge'];
+/** 화면 이름표만 바꾼다(2026-11-16 대표 지시 — 오른쪽 칸에서 두 줄로 꺾이던 이름). 서류 문구 · 검증 문구는 그대로. */
+const SCREEN_LABELS: Partial<Record<InfoName, string>> = { unitsIssued: '설립시 발행주식 총수' };
+const SETUP_FIELDS: InfoName[] =['publicNoticeMethod', 'fiscalStart', 'fiscalEnd', 'plannedDate', 'meetingTime', 'paymentBank', 'ceoPhone', 'metroSurcharge'];
 
 /** 화면이 들고 있는 설립 정보 — 글자 칸은 문자열(숫자 칸은 콤마 붙은 문자열), 본점은 세 칸. */
 interface InfoForm {
@@ -320,7 +325,7 @@ const personBody = (p: {
   rrn: p.rrn === '' ? null : p.rrn,
 });
 
-export function IncorporationDetail({ draft, saved: initialSaved, picked = null, openArticlesPrint = false }: Props) {
+export function IncorporationDetail({ draft, saved: initialSaved, picked = null, openArticlesPrint = false, pane }: Props) {
   const router = useRouter();
   /** ★ 저장된 건은 **상태로** 든다 — 전이 · 저장이 돌려준 새 상세, 409 뒤에 다시 읽은 상세로 다시 그린다. */
   const [saved, setSaved] = useState<IncorporationDetailResponse | null>(initialSaved);
@@ -419,6 +424,12 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
       document.removeEventListener('click', onClick, true);
     };
   }, [hasInput]);
+  // ★ 오른쪽 칸 — 목록의 [새 건] 은 링크가 아니라 위 확인이 못 잡는다. 목록이 보고 확인을 띄운다.
+  const onGuard = pane?.onGuard;
+  useEffect(() => {
+    onGuard?.(hasInput);
+    return () => onGuard?.(false);
+  }, [hasInput, onGuard]);
 
   // ── 저장 ────────────────────────────────────────────────────────────────
   /** 새 상세로 다시 그린다 — 상태 · 버튼 · 설립 정보 · 사람 모두 서버 값으로. */
@@ -470,7 +481,8 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
   /** 건의 주소로 옮겨 간다 — 나가기 확인을 풀고, 뒤로 가기에 임시 모드가 남지 않게 replace. */
   const goToSaved = (id: string) => {
     leaving.current = true;
-    router.replace(`/legal/incorporations/${encodeURIComponent(id)}`);
+    if (pane) pane.onOpen(id);
+    else router.replace(`/legal/incorporations/${encodeURIComponent(id)}`);
   };
 
   /** [저장] — 검증 없이 임시 저장. */
@@ -482,7 +494,10 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
       return;
     }
     setBusy(false);
-    if (done) notify('저장했습니다');
+    if (done) {
+      pane?.onChanged();
+      notify('저장했습니다');
+    }
   };
 
   /**
@@ -589,6 +604,7 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
     setConfirm(null);
     const res = await send<IncorporationDetailResponse>('GET', base!);
     if (res.ok) applyDetail(res.body);
+    pane?.onChanged();
     setFieldErrors({});
     setSaveError(res.ok ? message : res.status === 404 ? '이 건을 찾을 수 없습니다 — 다른 사용자가 지웠을 수 있습니다' : message);
   };
@@ -605,6 +621,7 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
       setConfirm(null);
       setFieldErrors({});
       applyDetail(res.body);
+      pane?.onChanged();
       setTypeNotice(res.body.companyTypeNotice ?? null);
       notify(`「${res.body.statusName}」 상태로 바꿨습니다`);
       return null;
@@ -633,7 +650,8 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
     const res = await send<unknown>('DELETE', `${base}?from=${encodeURIComponent(saved.status)}`);
     if (res.ok) {
       leaving.current = true;
-      router.replace('/legal/incorporations');
+      if (pane) pane.onRemoved();
+      else router.replace('/legal/incorporations');
       return null;
     }
     if (res.status === 409) {
@@ -679,8 +697,10 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
 
   /** 글자 · 숫자 · 날짜 칸 하나 — 정의(shared)대로 이름 · 필수 · 안내를 그린다. */
   const field = (name: Exclude<InfoName, 'hq' | 'purposes'>, wide = false) => {
-    const d = DEF[name];
-    if (!d) return null; // 이 회사 형태에 없는 칸
+    const def = DEF[name];
+    if (!def) return null; // 이 회사 형태에 없는 칸
+    // ★ 화면 이름표만 바꾸는 칸(2026-11-16 대표 지시) — 정의(shared)의 이름 · 서류 문구는 그대로
+    const d = SCREEN_LABELS[name] ? { ...def, label: SCREEN_LABELS[name] } : def;
     const value = form.text[name];
     const error = errorFor(name);
     const numeric = d.type === 'amount' || d.type === 'count';
@@ -764,7 +784,7 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
   );
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${styles.detailBars}${pane ? ` ${styles.inPane}` : ''}`}>
       <div className={styles.pageHead}>
         <div className={styles.pageHeadInner}>
           <div className={styles.headTitle}>
@@ -801,10 +821,13 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
                 onConfirm={setConfirm}
               />
             ) : null}
-            <Link href="/legal/incorporations" className={`${styles.btn} ${styles.btnGhost}`}>
-              <Icon name="chevron-left" size={16} />
-              법인설립 목록
-            </Link>
+            {/* ★ 오른쪽 칸에서는 목록이 바로 왼쪽에 있다 — 「목록」 단추는 단독 화면에만. */}
+            {pane ? null : (
+              <Link href="/legal/incorporations" className={`${styles.btn} ${styles.btnGhost}`}>
+                <Icon name="chevron-left" size={16} />
+                법인설립 목록
+              </Link>
+            )}
             {editable ? (
               <button
                 type="button"
@@ -831,6 +854,8 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
         </div>
       </div>
 
+      {/* ★ 2026-11-16 대표 지시 — 오른쪽 칸에서는 주소 칸이 모두 「반 줄」 크기로 한 줄(법인변경과 같다) */}
+      <PaneAddressCompact.Provider value={pane !== undefined}>
       <div className={styles.formScroll}>
         <div className={styles.formWrap}>
           {saveError ? (
@@ -866,13 +891,18 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
             </div>
           ) : null}
 
-          {/* ── 회사 ── */}
+          {/*
+            ── 회사 기본정보 ──
+            ★ 2026-11-16 대표 지시 — 섹션 순서 회사 → 발기인(사원) → 자본 → 설립 → 사업목적, 행은 정한 그대로
+              (1행 국문 상호 · 위치 · 회사 형태 / 2행 서류에 쓰이는 상호 · 영문 상호 / 3행 본점). 칸 · 동작은 그대로.
+          */}
           <section className={styles.section}>
             <div className={styles.sectionHeader}>
-              <h2>회사</h2>
+              <h2>회사 기본정보</h2>
             </div>
             <div className={styles.sectionRule} />
-            <div className={styles.grid4}>
+            <div className={styles.formRows}>
+            <div className={styles.formRow}>
               {field('nameKo', true)}
               {/* 위치 칸은 하나다 — 이름표만 회사 형태 낱말로(「주식회사」 위치 · 「유한회사」 위치, 결정 2026-11-02) */}
               <label className={styles.field}>
@@ -893,11 +923,6 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
                   <span className={styles.fieldError}>{errorFor('companyTypePosition')}</span>
                 ) : null}
               </label>
-              <div className={styles.field}>
-                <span className={styles.label}>서류에 쓰이는 상호</span>
-                <span className={`${styles.readValue}${composed ? '' : ` ${styles.readEmpty}`}`}>{composed || '—'}</span>
-              </div>
-              {field('nameEn', true)}
               <label className={styles.field}>
                 <span className={styles.label}>
                   회사 형태 <span className={styles.req}>*</span>
@@ -924,7 +949,15 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
                   <span className={styles.hint}>저장한 뒤에는 바꿀 수 없습니다</span>
                 ) : null}
               </label>
-              <div className={styles.field} />
+            </div>
+            <div className={styles.formRow}>
+              <div className={`${styles.field} ${styles.span2}`}>
+                <span className={styles.label}>서류에 쓰이는 상호</span>
+                <span className={`${styles.readValue}${composed ? '' : ` ${styles.readEmpty}`}`}>{composed || '—'}</span>
+              </div>
+              {field('nameEn', true)}
+            </div>
+            <div className={styles.formRow}>
               <div className={`${styles.field} ${styles.span4}`}>
                 <span className={styles.label}>
                   {DEF.hq?.label} {DEF.hq?.required ? <span className={styles.req}>*</span> : null}
@@ -938,37 +971,10 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
                 {errorFor('hq') ? <span className={styles.fieldError}>{errorFor('hq')}</span> : null}
               </div>
             </div>
-          </section>
-
-          {/* ── 자본·주식(유한회사는 자본·출자) ── */}
-          <section className={styles.section}>
-            <div className={styles.sectionHeader}>
-              <h2>{terms.capitalSection}</h2>
-            </div>
-            <div className={styles.sectionRule} />
-            <div className={styles.grid4}>
-              {CAPITAL_FIELDS.map((n) =>
-                n === 'capitalAmount' ? (
-                  <Fragment key={n}>
-                    {field(n)}
-                    {personsCapitalField}
-                  </Fragment>
-                ) : (
-                  field(n as Exclude<InfoName, 'hq' | 'purposes'>)
-                ),
-              )}
             </div>
           </section>
 
-          {/* ── 설립 정보 ── */}
-          <section className={styles.section}>
-            <div className={styles.sectionHeader}>
-              <h2>설립 정보</h2>
-            </div>
-            <div className={styles.sectionRule} />
-            <div className={styles.grid4}>{SETUP_FIELDS.map((n) => field(n as Exclude<InfoName, 'hq' | 'purposes'>))}</div>
-          </section>
-
+          {/* ── 발기인 정보(유한회사는 사원 정보) — 2026-11-16 회사 바로 아래로 ── */}
           <PersonsSection
             persons={persons}
             editable={editable}
@@ -984,6 +990,37 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
             onRemove={removePerson}
           />
 
+          {/*
+            ── 자본 · 주식 정보(유한회사는 자본 · 출자 정보) ──
+            ★ 1행 자본금 · 1주의 금액 · 발행할 주식의 총수 · 설립시 발행주식 총수(화면 이름표만, `SCREEN_LABELS`)(유한회사에 없는 칸은 비운다).
+              「사람별 합계」(표시만, 결정 2026-11-02)는 행을 정하지 않아 2행에 둔다.
+          */}
+          <section className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <h2>{terms.capitalSection.replace('·', ' · ')} 정보</h2>
+            </div>
+            <div className={styles.sectionRule} />
+            <div className={styles.formRows}>
+              <div className={styles.formRow}>{CAPITAL_FIELDS.map((n) => field(n as Exclude<InfoName, 'hq' | 'purposes'>))}</div>
+              <div className={styles.formRow}>{personsCapitalField}</div>
+            </div>
+          </section>
+
+          {/*
+            ── 설립 정보 ──
+            ★ 1행 공고방법 · 사업연도 시작 · 끝 · 설립예정일 / 2행 개회시간 · 납입은행(지점) · 대표이사 전화 · 대도시 중과.
+          */}
+          <section className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <h2>설립 정보</h2>
+            </div>
+            <div className={styles.sectionRule} />
+            <div className={styles.formRows}>
+              <div className={styles.formRow}>{SETUP_FIELDS.slice(0, 4).map((n) => field(n as Exclude<InfoName, 'hq' | 'purposes'>))}</div>
+              <div className={styles.formRow}>{SETUP_FIELDS.slice(4).map((n) => field(n as Exclude<InfoName, 'hq' | 'purposes'>))}</div>
+            </div>
+          </section>
+
           <PurposesSection
             def={DEF.purposes!}
             value={form.text.purposes}
@@ -997,6 +1034,7 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
           {saved && saved.status !== 'P' ? <IncorporationPrintHistory id={saved.id} reloadKey={printLogKey} /> : null}
         </div>
       </div>
+      </PaneAddressCompact.Provider>
 
       {confirm && saved ? (
         <CorpChangeConfirmDialog
@@ -1212,7 +1250,8 @@ function PersonsSection({
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
         <div className={styles.sectionTitle}>
-          <h2>사람</h2>
+          {/* ★ 2026-11-16 대표 지시 — 섹션 안 「사람」 낱말은 발기인(유한회사는 사원)으로 */}
+          <h2>{terms.founder} 정보</h2>
           <span className={styles.muted}>{persons.length}명</span>
         </div>
         {editable ? (
@@ -1226,7 +1265,7 @@ function PersonsSection({
             }}
           >
             <Icon name="plus" size={16} />
-            사람 추가
+            {terms.founder} 추가
           </button>
         ) : null}
       </div>
@@ -1240,7 +1279,7 @@ function PersonsSection({
           : unitsIssued !== null
             ? ` / 설립 때 발행하는 주식의 총수 ${unitsIssued.toLocaleString('ko-KR')}주`
             : ''}
-        {isNew ? ' · 사람은 위의 [저장] 을 누를 때 건과 함께 저장됩니다.' : ''}
+        {isNew ? ` · ${terms.founder}은 위의 [저장] 을 누를 때 건과 함께 저장됩니다.` : ''}
       </p>
 
       {error || listError ? (
@@ -1261,7 +1300,7 @@ function PersonsSection({
           <span />
         </div>
         {persons.length === 0 ? (
-          <div className={styles.empty}>등록된 사람이 없습니다</div>
+          <div className={styles.empty}>등록된 {terms.founder}이 없습니다</div>
         ) : (
           persons.map((p, i) => (
             <div key={p.id} className={styles.oItem}>
@@ -1313,7 +1352,7 @@ function PersonsSection({
                           type="button"
                           className={`${styles.btn} ${styles.btnDanger} ${styles.btnXs}`}
                           disabled={busy}
-                          aria-label={`${p.name || '사람'} 삭제`}
+                          aria-label={`${p.name || terms.founder} 삭제`}
                           onClick={() => setConfirmDelete(p.id)}
                         >
                           <Icon name="trash-2" size={14} />
@@ -1335,8 +1374,10 @@ function PersonsSection({
 
       {draft && editable ? (
         <div className={styles.editor}>
-          <p className={styles.editorHead}>{draft.id ? '사람 수정' : '사람 추가'}</p>
-          <div className={styles.grid4}>
+          <p className={styles.editorHead}>{draft.id ? `${terms.founder} 수정` : `${terms.founder} 추가`}</p>
+          {/* ★ 2026-11-16 — 1행 성명 · 인수 주식 수(출자좌수) · 취임일 · 주민등록번호(칸 간격 8px) / 2행 역할 / 3행 주소(한 행 통째로) */}
+          <div className={styles.formRows}>
+          <div className={`${styles.formRow} ${styles.formRowTight}`}>
             <label className={styles.field}>
               <span className={styles.label}>
                 성명 <span className={styles.req}>*</span>
@@ -1348,24 +1389,6 @@ function PersonsSection({
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               />
             </label>
-            <div className={`${styles.field} ${styles.span2}`}>
-              <span className={styles.label}>
-                역할 <span className={styles.req}>*</span>
-              </span>
-              <div className={styles.checkRow}>
-                {rolesFor(terms).map(([key, label]) => (
-                  <label key={key} className={styles.checkItem}>
-                    <input
-                      type="checkbox"
-                      checked={draft[key]}
-                      disabled={busy}
-                      onChange={(e) => setDraft({ ...draft, [key]: e.target.checked })}
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            </div>
             <label className={styles.field}>
               <span className={styles.label}>{terms.units}</span>
               <input
@@ -1389,7 +1412,7 @@ function PersonsSection({
                 onChange={(e) => setDraft({ ...draft, appointmentDate: e.target.value })}
               />
             </label>
-            <label className={`${styles.field} ${styles.span2}`}>
+            <label className={styles.field}>
               <span className={styles.label}>주민등록번호</span>
               <input
                 className={`${styles.input} ${styles.tabular}${rrnBad ? ` ${styles.inputInvalid}` : ''}`}
@@ -1406,6 +1429,28 @@ function PersonsSection({
                 <span className={styles.hint}>비워 두면 저장된 번호를 그대로 둡니다</span>
               ) : null}
             </label>
+          </div>
+          <div className={styles.formRow}>
+            <div className={`${styles.field} ${styles.span4}`}>
+              <span className={styles.label}>
+                역할 <span className={styles.req}>*</span>
+              </span>
+              <div className={styles.checkRow}>
+                {rolesFor(terms).map(([key, label]) => (
+                  <label key={key} className={styles.checkItem}>
+                    <input
+                      type="checkbox"
+                      checked={draft[key]}
+                      disabled={busy}
+                      onChange={(e) => setDraft({ ...draft, [key]: e.target.checked })}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className={styles.formRow}>
             <div className={`${styles.field} ${styles.span4}`}>
               <span className={styles.label}>주소</span>
               <AddressInput
@@ -1415,6 +1460,7 @@ function PersonsSection({
                 onError={setError}
               />
             </div>
+          </div>
           </div>
           <div className={styles.editorActions}>
             <button type="button" className={`${styles.btn} ${styles.btnGhost}`} disabled={busy} onClick={() => setDraft(null)}>
@@ -1427,7 +1473,7 @@ function PersonsSection({
               onClick={() => void save()}
             >
               <Icon name="save" size={16} />
-              {isNew ? (draft.id ? '목록에 반영' : '목록에 추가') : draft.id ? '사람 저장' : '사람 추가'}
+              {isNew ? (draft.id ? '목록에 반영' : '목록에 추가') : draft.id ? `${terms.founder} 저장` : `${terms.founder} 추가`}
             </button>
           </div>
         </div>

@@ -9,6 +9,7 @@
  *
  * 사용: node scripts/verify-cont17.js .env
  */
+const { readEnvFiles } = require('../packages/shared/src/envFiles.js');
 const fs = require('fs');
 const { Client } = require('pg');
 
@@ -24,8 +25,8 @@ const readEnvFile = (p) =>
       }),
   );
 
-const env = readEnvFile(process.argv[2] || '.env');
-const apiEnv = readEnvFile('packages/api/.env');
+const env = (process.argv[2] ? readEnvFile(process.argv[2]) : readEnvFiles(['common', 'admin'], { legacy: ['.env'] }));
+const apiEnv = readEnvFiles(['common', 'erp-api'], { legacy: ['packages/api/.env'] });
 
 const API = 'http://127.0.0.1:3001';
 const STORAGE = apiEnv.SUPABASE_URL;

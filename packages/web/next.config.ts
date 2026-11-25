@@ -1,4 +1,18 @@
 import type { NextConfig } from 'next';
+import { envDir, loadEnvFiles } from '@swonbiz/shared/envFiles';
+
+/**
+ * 환경 파일 — 저장소 밖 한 폴더의 **common.env + erp-web.env**(결정 2026-10-24 · 통합 방 2026-11-16).
+ *   폴더는 SWONBIZ_ENV_DIR (없으면 C:\workspace\env\). 읽는 함수는 API(`packages/api/src/env.ts`)와 같은
+ *   `@swonbiz/shared/envFiles` 다. 관리자(postgres) 접속이 든 admin.env 는 **읽지 않는다.** 칸 설명은 env.example/.
+ *
+ * ★ 이 파일은 `next dev` · `next build` · `next start` 가 모두 먼저 읽는다 — 여기서 `process.env` 에 넣으면
+ *   `NEXT_PUBLIC_*` 은 그 뒤 컴파일 때 화면 코드에 박히고, 서버 쪽 칸(API_BASE_URL 등)은 실행 중에 읽힌다.
+ * ★ 이미 있는 칸은 덮어쓰지 않는다(`loadEnvFiles`). Next 는 이 파일보다 먼저 옛 `packages/web/.env` 를
+ *   읽으므로, **옛 파일이 남아 있으면 그 칸은 옛 값이 이긴다** — 옛 파일은 대표가 정리한다.
+ * ★ 옮기는 동안만: 새 폴더가 없으면 옛 `packages/web/.env` 를 읽는다(API 와 같은 장치).
+ */
+loadEnvFiles(['common', 'erp-web'], { legacy: ['packages/web/.env'] });
 
 /**
  * 로그인이 필요한 화면 — `src/proxy.ts` 의 `matcher` 와 **같은 목록이다.**
@@ -26,8 +40,8 @@ const PROTECTED_PATHS = [
  */
 if (!process.env.NEXT_PUBLIC_BBIYONG_API_URL?.trim()) {
   throw new Error(
-    'NEXT_PUBLIC_BBIYONG_API_URL 이 없다 — 로그인 화면이 부를 삐용 API 주소다. packages/web/.env 에 넣을 것 ' +
-      '(개발계 http://192.168.0.22:8082 · .env.example 참고).',
+    `NEXT_PUBLIC_BBIYONG_API_URL 이 없다 — 로그인 화면이 부를 삐용 API 주소다. ${envDir()} 의 erp-web.env 에 넣을 것 ` +
+      '(개발계 http://192.168.0.22:8082 · env.example/erp-web.env 참고).',
   );
 }
 

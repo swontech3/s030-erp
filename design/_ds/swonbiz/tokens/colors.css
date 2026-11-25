@@ -1,11 +1,11 @@
 /* Fixed palette. These ten values are the entire SwonBiz color system —
    no other hues, and no green under any circumstance. */
 :root{
-  --indigo-600:#4F46E5;
-  --indigo-700:#4338CA;
-  --indigo-400:#818CF8;
+  --indigo-600:#087A99;
+  --indigo-700:#06657F;
+  --indigo-400:#5CC6DE;
   --cyan-400:#22D3EE;
-  --indigo-50:#EEF2FF;
+  --indigo-50:#E3F3F7;
 
   --slate-950:#0B1120;
   --slate-600:#475569;
@@ -21,6 +21,9 @@
   --color-secondary:var(--indigo-400);
   --color-accent:var(--cyan-400);
   --color-accent-bg:var(--indigo-50);
+  /* 앱 기본색 — 삐용 앱 공통 테마색(아쿠아 블루). 2026-11-16 대표 결정: 법무 두 상세(법인설립 · 법인변경)의
+     섹션 막대에만 쓴다. ERP 기본색(--color-primary)도 2026-11-22 부터 아쿠아(#087A99)다(--indigo-* 값을 아쿠아로 바꿈). */
+  --color-app-primary:#0B93B8;
 
   --surface:var(--white);
   --surface-alt:var(--slate-50);
@@ -55,7 +58,7 @@
   --color-danger-bg:var(--red-100);
   --color-danger-text:var(--red-800);
 
-  --focus-ring:rgba(79,70,229,.32);
-  --gradient-brand:linear-gradient(120deg,rgba(79,70,229,.18),rgba(34,211,238,.18)); /* @kind color */
-  --gradient-brand-line:linear-gradient(90deg,#4F46E5,#22D3EE); /* @kind color */
+  --focus-ring:rgba(11,147,184,.32);
+  --gradient-brand:linear-gradient(120deg,rgba(11,147,184,.18),rgba(34,211,238,.18)); /* @kind color */
+  --gradient-brand-line:linear-gradient(90deg,#087A99,#22D3EE); /* @kind color */
 }

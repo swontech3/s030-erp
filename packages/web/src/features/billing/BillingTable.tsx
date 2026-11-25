@@ -11,9 +11,8 @@
  * ★ 합계 줄은 `summarize` 가 낸다 — 요약 카드와 **같은 함수**다. 그래서 카드 합계와
  *   표 합계가 다를 수 없다.
  */
-import type { KeyboardEvent } from 'react';
 import type { DisplayStatus } from '@swonbiz/shared/domain/invoice-status';
-import { Icon } from '@/components/ds';
+import { Icon, Table, TableHead, TableRow } from '@/components/ds';
 import styles from './billing.module.css';
 import {
   STATUS_LABEL,
@@ -45,49 +44,61 @@ interface Props {
   total?: readonly BillingItem[];
 }
 
+/**
+ * 표 안 작은 단추(30px) — 공통 Button 의 색 · 테두리에 전 `.btnXs` 크기만 얹는다(2026-11-25 입주관리 일관성).
+ * 오른쪽 상세 수납 줄(약 430px 칸)에 [수정][삭제 확인]이 들게 잰 크기다.
+ */
+export const BTN_XS = { height: 30, padding: '0 10px', fontSize: 'var(--text-micro-size)' } as const;
+
+/*
+ * ★ 2026-11-25 입주관리 일관성 — 표는 공통 Table(머리글 색 · 줄 선은 그 부품). 칸 폭은 전의 grid-template-columns 값 그대로(cols).
+ *   청구 · 수납 탭(왼쪽 60%)은 칸 사이 8 · 좌우 10 을 그대로 둔다(.gridTight) — 1500px 창에서 넘치지 않게 잰 값이다.
+ */
+const SPLIT_COLS = {
+  month: 'minmax(88px, 1.2fr) minmax(96px, 1fr) 104px 74px 74px 140px',
+  company: '56px minmax(96px, 1fr) 104px 74px 74px 140px',
+} as const;
+const READONLY_COLS = {
+  month: 'minmax(150px, 1.3fr) minmax(140px, 1.2fr) minmax(120px, 0.9fr) 84px 92px',
+  company: '72px minmax(140px, 1.3fr) minmax(120px, 0.9fr) 84px 92px',
+} as const;
+
 export function BillingTable({ items, mode, asOf, readOnly = false, selectedId = null, onSelect, total }: Props) {
   const sum = summarize(total ?? items, asOf);
-  const grid = `${mode === 'company' ? styles.tCompany : ''}${readOnly ? ` ${styles.tReadOnly}` : ''}`;
 
   if (!readOnly) {
     return (
-      <>
+      <Table cols={SPLIT_COLS[mode]} dense>
         {/*
           ★ 2026-11-16 — 왼쪽 60% 목록. 칸: 입주사(청구 월) · 항목 · 청구액 · 납부기한 · 납부일 · 상태.
             액션 칸은 없다(줄을 누르면 오른쪽 상세). 계약의 값 셋(예치금 · 이용 시작일 · 이용 종료일)은
             1500px 창에서 넘쳐 오른쪽 상세 머리로 옮겼다(엑셀에는 그대로 있다).
         */}
-        <div className={`${styles.tHead} ${styles.tSplit} ${grid} ${styles.tHeadSticky} ${styles.tHeadDense}`}>
+        <TableHead sticky className={styles.gridTight}>
           <span>{mode === 'month' ? '입주사' : '청구 월'}</span>
           <span>항목</span>
           <span className={styles.right}>청구액</span>
           <span>납부기한</span>
           <span>납부일</span>
           <span>상태</span>
-        </div>
+        </TableHead>
 
         {items.map((item) => {
           const st: DisplayStatus = statusOf(item, asOf);
           const canceled = st === 'canceled';
-          const on = selectedId === item.invoiceId;
-          const pick = () => onSelect?.(item);
           return (
-            <div
+            <TableRow
               key={item.invoiceId}
-              data-invoice-row={item.invoiceId}
-              role="button"
-              tabIndex={0}
-              aria-selected={on}
-              onClick={pick}
-              onKeyDown={(e: KeyboardEvent) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  pick();
-                }
-              }}
-              className={`${styles.tRow} ${styles.tSplit} ${grid} ${styles.tRowDense} ${styles.qRowClickable}${on ? ` ${styles.qRowOn}` : ''}${canceled ? ` ${styles.tRowCanceled}` : ''}`}
+              onClick={() => onSelect?.(item)}
+              selected={selectedId === item.invoiceId}
+              muted={canceled}
+              className={`${styles.gridTight}${canceled ? ` ${styles.tRowCanceled}` : ''}`}
             >
-              <span className={`${styles.ellipsis} ${styles.strong}`} title={mode === 'month' ? item.companyName : ''}>
+              <span
+                data-invoice-row={item.invoiceId}
+                className={`${styles.ellipsis} ${styles.strong}`}
+                title={mode === 'month' ? item.companyName : ''}
+              >
                 {mode === 'month' ? item.companyName : yearMonthDot(item.yearMonth)}
               </span>
               {/* ★ 「종류(호실)」 — 예: 이용료(FREE03). 엑셀과 같은 함수. */}
@@ -108,34 +119,34 @@ export function BillingTable({ items, mode, asOf, readOnly = false, selectedId =
                 <span className={`${styles.badge} ${styles[`st_${st}`]}`}>{STATUS_LABEL[st]}</span>
                 {item.terminated ? <span className={styles.endMark}>해지</span> : null}
               </span>
-            </div>
+            </TableRow>
           );
         })}
-      </>
+      </Table>
     );
   }
 
-  /* ── 조회 전용(입주사 청구 탭) — 모양 그대로 ── */
+  /* ── 조회 전용(입주사 청구 탭) — 칸 · 값 그대로 ── */
   return (
-    <>
-      <div className={`${styles.tHead} ${grid}`}>
+    <Table cols={READONLY_COLS[mode]}>
+      <TableHead>
         <span>{mode === 'month' ? '입주사' : '청구 월'}</span>
         <span>항목(호실)</span>
         <span className={styles.right}>청구액</span>
         <span className={styles.right}>납부기한</span>
         <span className={styles.center}>상태</span>
-      </div>
+      </TableHead>
 
       {items.map((item) => {
         const st: DisplayStatus = statusOf(item, asOf);
         const canceled = st === 'canceled';
         return (
-          <div
-            key={item.invoiceId}
-            data-invoice-row={item.invoiceId}
-            className={`${styles.tRow} ${grid}${canceled ? ` ${styles.tRowCanceled}` : ''}`}
-          >
-            <span className={`${styles.ellipsis} ${styles.strong}`} title={mode === 'month' ? item.companyName : ''}>
+          <TableRow key={item.invoiceId} muted={canceled} className={canceled ? styles.tRowCanceled : undefined}>
+            <span
+              data-invoice-row={item.invoiceId}
+              className={`${styles.ellipsis} ${styles.strong}`}
+              title={mode === 'month' ? item.companyName : ''}
+            >
               {mode === 'month' ? item.companyName : yearMonthDot(item.yearMonth)}
             </span>
             <span className={styles.ellipsis} title={item.roomNames}>
@@ -173,12 +184,13 @@ export function BillingTable({ items, mode, asOf, readOnly = false, selectedId =
             <span className={styles.center}>
               <span className={`${styles.badge} ${styles[`st_${st}`]}`}>{STATUS_LABEL[st]}</span>
             </span>
-          </div>
+          </TableRow>
         );
       })}
 
+      {/* 합계 줄 — 표와 같은 칸(--table-cols)을 쓴다(.tableFoot) */}
       {items.length > 0 ? (
-        <div className={`${styles.tFoot} ${grid}`}>
+        <div className={`${styles.tFoot} ${styles.tableFoot}`}>
           <span>합계 {sum.count}건</span>
           <span className={styles.muted} style={{ fontWeight: 400, fontSize: 12 }}>
             취소 제외
@@ -196,7 +208,7 @@ export function BillingTable({ items, mode, asOf, readOnly = false, selectedId =
           </span>
         </div>
       ) : null}
-    </>
+    </Table>
   );
 }
 

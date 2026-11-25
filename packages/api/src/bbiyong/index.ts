@@ -13,6 +13,9 @@ import { MockBbiyongAcl } from './MockBbiyongAcl.ts';
 import { MockBbiyongOrg } from './MockBbiyongOrg.ts';
 import { HttpBbiyongAuth } from './HttpBbiyongAuth.ts';
 import { HttpBbiyongOrg } from './HttpBbiyongOrg.ts';
+import { HttpBbiyongCodes, serverReaderOf, type BbiyongCodeAdmin } from './codes.ts';
+import { MockBbiyongCodes, mockServerReaderOf } from './MockBbiyongCodes.ts';
+import { createSharedCodes, type SharedCodes } from './sharedCodes.ts';
 import type { BbiyongAcl, BbiyongAuth, BbiyongOrg, BbiyongPeopleLookup } from './types.ts';
 import type { BbiyongOrgCompanyLookup } from './types.ts';
 
@@ -60,6 +63,21 @@ export const bbiyongOrg: BbiyongOrg = (() => {
   if (!env.bbiyongBaseUrl) throw new Error('BBIYONG_BASE_URL 이 없다 — 삐용 실연동으로 기동할 수 없다.');
   return new HttpBbiyongOrg({ baseUrl: env.bbiyongBaseUrl });
 })();
+
+/**
+ * 삐용 공통 코드(통합 방 · 대표 결정 2026-11-18) — 코드 관리 화면(s030100030)의 삐용 주인 코드 · 같이 쓰는 코드.
+ *   `bbiyongCodes`  화면 토큰 갈래(부를 때는 `callBbiyong`) — 볼 수 있는지 · 고칠 수 있는지는 삐용이 정한다
+ *   `sharedCodes`   서버 키 갈래 + 마지막 값 보관(이메일 도메인 · 국가 · 시간대) — `sharedCodes.ts`
+ * ★ 모의에서는 두 갈래가 **같은 모의 저장소**를 본다(코드 관리에서 고친 값이 계약 폼에 나온다).
+ */
+const codesHttp = env.bbiyongMock
+  ? null
+  : new HttpBbiyongCodes({ baseUrl: env.bbiyongBaseUrl ?? '', serverKey: env.bbiyongServerKey });
+const codesMock = codesHttp ? null : new MockBbiyongCodes();
+export const bbiyongCodes: BbiyongCodeAdmin = codesHttp ?? (codesMock as MockBbiyongCodes);
+export const sharedCodes: SharedCodes = createSharedCodes(
+  codesHttp ? serverReaderOf(codesHttp) : mockServerReaderOf(codesMock as MockBbiyongCodes),
+);
 
 export const bbiyongAcl: BbiyongAcl = (() => {
   if (env.aclMode === 'mock') return new MockBbiyongAcl();
