@@ -4,6 +4,8 @@
  * 탭 줄 · 체크 칸 · 「추가됨」 딱지 · 고른 수.
  * ★ 탭 모양은 청구 화면 탭(`billing.module.css` 의 `.tabs`/`.tab`/`.tabOn`)과 같은 숫자다.
  * ★ 녹색 금지(lint-no-green) — 「추가됨」도 인디고 계열이다.
+ * ★ 2026-11-25 법무 일관성 — 덮개 · 상자 · 제목 · 아래 단추는 공통 Dialog, 표는 공통 Table(머리 · 줄 색 · 선은 부품).
+ *   여기는 칸 사이 · 좌우 여백(.pickGrid) · 체크 칸 · 「추가됨」 줄 글자색만.
  */
 
 .tabs {
@@ -39,6 +41,18 @@
   background: var(--color-primary);
 }
 
+/* 표 칸 사이 · 좌우 12px = 종전 <table> 칸 안 여백(좌우 12). `div.` = 공통 Table .head/.row 보다 앞서게 */
+div.pickGrid {
+  column-gap: 12px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* 머리 한 칸이 표 폭 전체(고른 업종 표 — 종전 colSpan=2) */
+.spanAll {
+  grid-column: 1 / -1;
+}
+
 .checkCell {
   width: 40px;
   text-align: center;
@@ -50,7 +64,7 @@
   cursor: pointer;
 }
 
-.rowDone td {
+div.rowDone {
   color: var(--text-muted);
   cursor: default;
 }

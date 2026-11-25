@@ -12,6 +12,7 @@
  * ★ 고른 문구는 팝업의 고른 목록(`checked`)에 같이 담긴다 — 넘기는 것은 문구 배열 그대로다.
  * ★ 팝업 틀의 바로 아래 자식으로 그린다(조각) — 목록이 상자 높이에 맞춰 줄고 스크롤되게(전체 탭과 같다).
  * ★ 새 스타일 없음 — 팝업 틀(`org-lookup.module.css`)과 팝업 파일(`biz-purpose-picker.module.css`)만 쓴다.
+ *   (2026-11-25 일관성 — 표 · 단추는 공통 Table · Button)
  * ★ [AI 추천](2026-10-27) — 누를 때만 부른다. AI 가 후보 안에서 고른 업종만 그 순서로 보이고 줄마다 「AI 이유」.
  *   고른 뒤 상세 · 인허가(「검토됨」만) · 문구(서버 문구)는 일반 추천과 같다. AI 가 안 되면 일반 추천 그대로 + 안내.
  *   버튼은 일반 추천 응답의 `aiEnabled` 가 true 일 때만 보인다(공통 코드 `AI_SETTING` 의 `ENABLED` = Y, 2026-10-27 — 이번 이행은 끔).
@@ -26,6 +27,7 @@ import {
   type BizRecommendCandidate,
   type BizRecommendDetail,
 } from './biz-purposes-model';
+import { Button, Table, TableHead, TableRow } from '@/components/ds';
 import base from '@/components/org-lookup/org-lookup.module.css';
 import styles from './biz-purpose-picker.module.css';
 
@@ -59,6 +61,16 @@ type Detail =
   | { state: 'loading'; bizCode: string }
   | { state: 'ok'; item: BizRecommendDetail }
   | { state: 'error'; bizCode: string; message: string };
+
+/*
+ * ★ 2026-11-25 법무 일관성(삐용 기준) — 표 둘을 공통 표(Table)로. 종전 <table> 은 자동 폭이라 정한 값이 없었다 —
+ *   체크 칸 40px(종전 .checkCell) 말고는 이번에 정한 값이다(보고 「정할 것」). 칸 안 여백 12 는 종전 칸과 같게(.pickGrid).
+ *   후보 표 : 고르기 40 | 업종코드 7em | 업태 · 종목 | 맞은 것 (| AI 이유)
+ *   고른 업종 표 : 이름 6em | 값
+ */
+const CAND_COLS = '40px 7em minmax(0, 1fr) minmax(0, 1fr)';
+const CAND_COLS_AI = '40px 7em minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)';
+const DETAIL_COLS = '6em minmax(0, 1fr)';
 
 const errMessage = (err: unknown, fallback: string) => (err instanceof BizPurposeError ? err.message : fallback);
 
@@ -154,22 +166,19 @@ export function BizPurposeRecommendTab({ have, checked, onToggle }: Props) {
           maxLength={200}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <button
-          type="submit"
-          className={`${base.btn} ${base.btnGhost} ${base.btnSearch}`}
-          disabled={query.trim() === ''}
-        >
+        <Button type="submit" variant="ghost" size="sm" disabled={query.trim() === ''}>
           검색
-        </button>
+        </Button>
         {aiEnabled ? (
-          <button
+          <Button
             type="button"
-            className={`${base.btn} ${base.btnGhost} ${base.btnSearch}`}
+            variant="ghost"
+            size="sm"
             disabled={query.trim() === '' || cands.state === 'loading'}
             onClick={() => void search(query, true)}
           >
             AI 추천
-          </button>
+          </Button>
         ) : null}
       </form>
 
@@ -196,47 +205,44 @@ export function BizPurposeRecommendTab({ have, checked, onToggle }: Props) {
             ) : reasons ? (
               <p className={base.note}>AI 가 업종 후보 안에서 고른 것입니다 — 전체 후보는 [검색]으로 봅니다.</p>
             ) : null}
-            <table className={base.table}>
-              <thead>
-                <tr>
-                  <th className={styles.checkCell} aria-label="고르기" />
-                  <th>업종코드</th>
-                  <th>업태 · 종목</th>
-                  <th>맞은 것</th>
-                  {reasons ? <th>AI 이유</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((c) => (
-                  <tr
-                    key={c.bizCode}
-                    className={`${base.row}${picked === c.bizCode ? ` ${base.rowOn}` : ''}`}
-                    onClick={() => void pick(c.bizCode)}
-                  >
-                    <td className={styles.checkCell}>
-                      <input
-                        type="radio"
-                        name="biz-recommend"
-                        checked={picked === c.bizCode}
-                        onChange={() => void pick(c.bizCode)}
-                        onClick={(e) => e.stopPropagation()}
-                        aria-label={`${c.bizCode} ${c.itemName}`}
-                      />
-                    </td>
-                    <td className={base.code}>{c.bizCode}</td>
-                    <td>
-                      {c.bizType} · {c.itemName}
-                    </td>
-                    <td>
-                      <span className={`${base.badge} ${base.badgeOther}`}>
-                        {c.matchedBy.map(matchLabel).join(' · ')}
-                      </span>
-                    </td>
-                    {reasons ? <td>{reasons.get(c.bizCode)}</td> : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <Table cols={reasons ? CAND_COLS_AI : CAND_COLS}>
+              <TableHead sticky className={styles.pickGrid}>
+                <span className={styles.checkCell} aria-label="고르기" />
+                <span>업종코드</span>
+                <span>업태 · 종목</span>
+                <span>맞은 것</span>
+                {reasons ? <span>AI 이유</span> : null}
+              </TableHead>
+              {rows.map((c) => (
+                <TableRow
+                  key={c.bizCode}
+                  selected={picked === c.bizCode}
+                  className={styles.pickGrid}
+                  onClick={() => void pick(c.bizCode)}
+                >
+                  <span className={styles.checkCell}>
+                    <input
+                      type="radio"
+                      name="biz-recommend"
+                      checked={picked === c.bizCode}
+                      onChange={() => void pick(c.bizCode)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`${c.bizCode} ${c.itemName}`}
+                    />
+                  </span>
+                  <span className={base.code}>{c.bizCode}</span>
+                  <span>
+                    {c.bizType} · {c.itemName}
+                  </span>
+                  <span>
+                    <span className={`${base.badge} ${base.badgeOther}`}>
+                      {c.matchedBy.map(matchLabel).join(' · ')}
+                    </span>
+                  </span>
+                  {reasons ? <span>{reasons.get(c.bizCode)}</span> : null}
+                </TableRow>
+              ))}
+            </Table>
             {cands.truncated && !reasons ? (
               <p className={base.note}>앞의 {cands.items.length}개만 보입니다 — 설명을 더 자세히 적으세요</p>
             ) : null}
@@ -276,69 +282,66 @@ function DetailView({
   const key = recommendKey(text);
   const done = have.has(text.trim());
   return (
-    <table className={base.table}>
-      <thead>
-        <tr>
-          <th colSpan={2}>고른 업종 — {d.bizCode}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td className={base.code}>업태</td>
-          <td>{d.bizType}</td>
-        </tr>
-        <tr>
-          <td className={base.code}>종목</td>
-          <td>{d.itemName}</td>
-        </tr>
-        <tr>
-          <td className={base.code}>KSIC</td>
-          <td>{d.ksic.length === 0 ? '—' : d.ksic.map((k) => `${k.code} ${k.name}`).join(' · ')}</td>
-        </tr>
-        <tr>
-          <td className={base.code}>인허가</td>
-          <td>
-            {d.licenses.length === 0
-              ? '검토된 인허가 정보가 없습니다'
-              : d.licenses.map((l, i) => (
-                  <div key={i}>
-                    <div>
-                      {l.kind}
-                      {l.name ? ` — ${l.name}` : ''}
-                    </div>
-                    {l.basis.map((b, j) => (
-                      <div key={j}>
-                        {b.lawName} {b.article}
-                      </div>
-                    ))}
-                    {l.note ? <div>예외: {l.note}</div> : null}
+    <Table cols={DETAIL_COLS}>
+      <TableHead className={styles.pickGrid}>
+        <span className={styles.spanAll}>고른 업종 — {d.bizCode}</span>
+      </TableHead>
+      <TableRow className={styles.pickGrid}>
+        <span className={base.code}>업태</span>
+        <span>{d.bizType}</span>
+      </TableRow>
+      <TableRow className={styles.pickGrid}>
+        <span className={base.code}>종목</span>
+        <span>{d.itemName}</span>
+      </TableRow>
+      <TableRow className={styles.pickGrid}>
+        <span className={base.code}>KSIC</span>
+        <span>{d.ksic.length === 0 ? '—' : d.ksic.map((k) => `${k.code} ${k.name}`).join(' · ')}</span>
+      </TableRow>
+      <TableRow className={styles.pickGrid}>
+        <span className={base.code}>인허가</span>
+        <span>
+          {d.licenses.length === 0
+            ? '검토된 인허가 정보가 없습니다'
+            : d.licenses.map((l, i) => (
+                <div key={i}>
+                  <div>
+                    {l.kind}
+                    {l.name ? ` — ${l.name}` : ''}
                   </div>
-                ))}
-          </td>
-        </tr>
-        <tr
-          className={done ? styles.rowDone : `${base.row}${checked.has(key) ? ` ${base.rowOn}` : ''}`}
-          onClick={() => !done && onToggle(key, text)}
-        >
-          <td className={base.code}>사업목적</td>
-          <td>
-            {done ? null : (
-              <input
-                type="checkbox"
-                checked={checked.has(key)}
-                onChange={() => onToggle(key, text)}
-                onClick={(e) => e.stopPropagation()}
-                aria-label={text}
-              />
-            )}{' '}
-            {text}{' '}
-            <span className={`${base.badge} ${base.badgeOther}`}>
-              {d.purpose.source === 'catalog' ? '카탈로그' : '종목 이름'}
-            </span>{' '}
-            {done ? <span className={styles.done}>추가됨</span> : null}
-          </td>
-        </tr>
-      </tbody>
-    </table>
+                  {l.basis.map((b, j) => (
+                    <div key={j}>
+                      {b.lawName} {b.article}
+                    </div>
+                  ))}
+                  {l.note ? <div>예외: {l.note}</div> : null}
+                </div>
+              ))}
+        </span>
+      </TableRow>
+      <TableRow
+        selected={!done && checked.has(key)}
+        className={`${styles.pickGrid}${done ? ` ${styles.rowDone}` : ''}`}
+        onClick={done ? undefined : () => onToggle(key, text)}
+      >
+        <span className={base.code}>사업목적</span>
+        <span>
+          {done ? null : (
+            <input
+              type="checkbox"
+              checked={checked.has(key)}
+              onChange={() => onToggle(key, text)}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={text}
+            />
+          )}{' '}
+          {text}{' '}
+          <span className={`${base.badge} ${base.badgeOther}`}>
+            {d.purpose.source === 'catalog' ? '카탈로그' : '종목 이름'}
+          </span>{' '}
+          {done ? <span className={styles.done}>추가됨</span> : null}
+        </span>
+      </TableRow>
+    </Table>
   );
 }
