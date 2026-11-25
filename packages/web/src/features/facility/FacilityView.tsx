@@ -37,6 +37,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Icon, Table, TableHead, TableRow, tableCell, type IconName } from '@/components/ds';
+import { BTN_XS } from '@/features/billing/BillingTable';   // ★ 2026-11-25 정한 것 5 — 줄 안 작은 단추 30px(코드 관리와 같은 방식)
 import { LoadingBar } from '@/components/patterns/LoadingBar';
 import {
   FacilityError,
@@ -771,8 +772,8 @@ function SpacePanel({
                     </span>
                   </span>
                   <span className={tableCell.center}>
-                    {/* ★ 2026-11-25 일관성 — 줄 안 [삭제] = 공통 지우기 단추(sm). 종전 30px `.btnXs` 는 없앴다 */}
-                    <Button size="sm" variant="danger" onClick={() => onDelete(s)}>
+                    {/* ★ 2026-11-25 일관성 — 줄 안 [삭제] = 공통 지우기 단추 · 30px(BTN_XS · 정한 것 5) */}
+                    <Button size="sm" variant="danger" style={BTN_XS} onClick={() => onDelete(s)}>
                       삭제
                     </Button>
                   </span>
@@ -864,7 +865,7 @@ function MeetingRoomPanel({
                   )}
                 </span>
                 <span className={tableCell.center}>
-                  <Button size="sm" variant="danger" onClick={() => onDelete(r)}>
+                  <Button size="sm" variant="danger" style={BTN_XS} onClick={() => onDelete(r)}>
                     삭제
                   </Button>
                 </span>

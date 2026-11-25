@@ -83,7 +83,8 @@ export function DeleteFacilityDialog({ kind, label, blocked, onClose, onDelete }
       title={`${what} 삭제`}
       description={
         <>
-          <strong>{label} 을(를) 지우시겠습니까?</strong>
+          {/* ★ 2026-11-25 대표 결정(정한 것 8) — 묻는 문장 = 입주관리와 같은 「…삭제하시겠습니까?」 */}
+          <strong>{label} 을(를) 삭제하시겠습니까?</strong>
           {stop ? null : (
             <>
               <br />
