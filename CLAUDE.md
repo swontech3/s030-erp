@@ -18,3 +18,15 @@
 
 청구 화면으로 보내는 주소는 `billingHref`(`packages/web/src/features/billing/billing-model.ts`)로 만든다.
 `?company=` 는 그 입주사의 전 기간, `?tab=settle&contract=` 는 정산 탭의 그 계약 상세다.
+
+## 입주관리 화면 일관성 — 삐용 기준 (2026-11-25 · 가지 feature/design-tenant ← origin/master 8f703d5)
+
+- 받은 커밋 : 8f703d5(ERP 기본 색 아쿠아 합침)
+- 대상 : 입주사·계약 `/tenants/contracts` · 계약 폼 `/contracts/[id]`(+ 팝업) · 청구 `/billing`(+ 팝업) ·
+  문의상담관리 `/inquiry-admin`(+ 팝업) · 내 청구서 `/billing/mine` — `/tenants` · `/tenants/[id]` 는 화면 파일이 없어 뺀다
+- 기준 = 삐용 단체관리 · 구성원관리 모양. ERP 시안과 다르면 삐용 쪽
+- 공통 부품(ds) : Button `danger`(지우기) · 공통 팝업 `Dialog` · 공통 표 `Table` 을 만들고 대상 화면에서 쓴다
+- 맞출 것 : 표 머리글 아쿠아 · 구역 제목 왼쪽 4px 아쿠아 막대 · 단추 주/보통/지우기와 자리 · 즉시 거르는 검색은 「n건」만 오른쪽 끝 ·
+  카드형 목록(입주사·계약 · 문의) → 공통 표 · 팝업 아쿠아 제목줄 + 아래 가운데 [저장/확인][취소] · 직접 색 값 → 토큰(계약서 인쇄면 검정은 그대로)
+- 그대로 둠 : 미납 · 미수 · 음수 금액 빨간 글자 / 법무 · 세무 소스(청구가 쓰는 corp-changes.module.css 규칙은 청구 쪽으로 옮겨 쓴다)
+- 기능 · 데이터 · API 는 손대지 않는다 · 다르게 할 이유가 있으면 고치지 않고 「정할 것」

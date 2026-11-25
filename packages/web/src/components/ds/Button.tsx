@@ -8,6 +8,11 @@
  * - 한 화면에 primary 는 하나. primary 둘을 나란히 두지 않고 primary + ghost 로 짝짓는다
  * - inverse 는 --surface-inverse(#0B1120) 섹션에서만
  * - size="sm"(40px)는 툴바·표·대시보드. 그 외는 54px
+ * - danger 는 삭제 · 계약취소 · 글 삭제 같은 지우는 동작(시안 03-components.md 「Button」 danger 줄)
+ *
+ * ★ 2026-11-25 입주관리 일관성 — `danger`(지우기)를 더했다. 원본 Button.d.ts 에는 없고 시안 표에만 있다.
+ *   모양 = 삐용 지우기 단추와 같다 : 흰 바탕 · 회색 테두리(--border) · 빨간 글자(--color-danger) ·
+ *   올리면 옅은 빨강(--color-danger-bg). 원본에 돌려줄 때는 이 한 줄(Variant)과 variants.danger 만 보면 된다.
  *
  * ★ hover 는 원본대로 JS 상태로 둔다. 템플릿(.dc.html)의 `style-hover` 속성과는 다른
  *   이야기다 — 그건 디자인 도구 전용 속성이라 브라우저가 무시하므로 화면 이관(2-5)에서
@@ -17,7 +22,7 @@
  */
 import { useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react';
 
-type Variant = 'primary' | 'ghost' | 'subtle' | 'inverse' | 'link';
+type Variant = 'primary' | 'ghost' | 'subtle' | 'inverse' | 'link' | 'danger';
 type Size = 'md' | 'sm';
 
 export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'style'> {
@@ -89,6 +94,12 @@ export function Button({
       background: h ? '#FFFFFF' : 'rgba(255,255,255,.10)',
       color: h ? 'var(--slate-950)' : '#FFFFFF',
       border: '1px solid rgba(255,255,255,.22)',
+      boxShadow: 'none',
+    },
+    danger: {
+      background: h ? 'var(--color-danger-bg)' : 'var(--surface)',
+      color: 'var(--color-danger)',
+      border: '1px solid var(--border)',
       boxShadow: 'none',
     },
     link: {

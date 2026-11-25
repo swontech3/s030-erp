@@ -1,0 +1,102 @@
+/*
+ * Table — Table.tsx 머리 주석. 시안 03-components 「Table」 + 머리글 색은 삐용 목록 표 머리글.
+ * ★ 색은 토큰만.
+ */
+.table {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.head,
+.row {
+  display: grid;
+  grid-template-columns: var(--table-cols);
+  align-items: center;
+  column-gap: 12px;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+.head {
+  min-height: 44px;
+  background: var(--color-accent-bg);
+  color: var(--color-primary-hover);
+  box-shadow: inset 0 -1px 0 var(--color-primary);
+  font-size: var(--fs-xs);
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+}
+
+.sticky {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.row {
+  min-height: 52px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-body-size);
+  color: var(--text-body);
+  transition: background var(--dur) var(--ease-out);
+}
+
+.dense .row {
+  min-height: 44px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  background: var(--surface-alt);
+}
+
+.clickable:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
+}
+
+.selected,
+.selected:hover {
+  background: var(--color-accent-bg);
+}
+
+.muted {
+  color: var(--text-caption);
+}
+
+.empty {
+  padding: 48px 16px;
+  text-align: center;
+  font-size: var(--text-body-size);
+  color: var(--text-muted);
+}
+
+.left {
+  text-align: left;
+  justify-self: start;
+}
+
+.center {
+  text-align: center;
+  justify-self: center;
+}
+
+.right {
+  text-align: right;
+  justify-self: end;
+}
+
+.ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

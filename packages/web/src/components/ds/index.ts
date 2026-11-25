@@ -8,3 +8,9 @@ export { Icon, type IconProps, type IconName } from './Icon';
 export { Button, type ButtonProps } from './Button';
 export { Input, type InputProps } from './Input';
 export { Checkbox, type CheckboxProps } from './Checkbox';
+/* ★ 2026-11-25 입주관리 일관성 — 공통 팝업 · 공통 표(대표 지시). 모양은 삐용 기준(각 파일 머리 주석) */
+export { Dialog, type DialogProps } from './Dialog';
+export {
+  Table, TableHead, TableRow, TableEmpty, tableCell,
+  type TableProps, type TableHeadProps, type TableRowProps,
+} from './Table';
