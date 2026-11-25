@@ -10,7 +10,7 @@
  * ★ 중도해지 정산이 처리 전이면 서버가 409 로 막는다 — 그 예치금은 [정산 처리]가 나눈다.
  */
 import { useState } from 'react';
-import { Icon } from '@/components/ds';
+import { Button, Dialog } from '@/components/ds';
 import cf from '@/features/contracts/contract-form.module.css';
 import styles from './billing.module.css';
 import { PAY_METHOD_LABEL, localTodayIso, won } from './billing-model';
@@ -59,68 +59,59 @@ export function DepositReturnDialog(props: {
     }
   };
 
+  // ★ 2026-11-25 입주관리 일관성 — 공통 팝업(아쿠아 제목줄 · 아래 가운데 [반환 처리](주) [취소](보통)). 둥근 아이콘 · 반반 단추 없앰.
   return (
-    <div
-      className={cf.overlay}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !busy) props.onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && !busy) props.onClose();
-      }}
-    >
-      <div className={cf.modal} role="dialog" aria-modal="true" aria-label="예치금 반환">
-        <div className={cf.modalIconWrap}>
-          <span className={`${cf.modalIcon} ${cf.modalIconConfirm}`}>
-            <Icon name="receipt" size={24} />
-          </span>
-        </div>
-        <h3 className={cf.modalTitle}>예치금을 반환하시겠습니까?</h3>
-        <p className={cf.modalDesc}>
+    <Dialog
+      open
+      onClose={props.onClose}
+      closeDisabled={busy}
+      title="예치금을 반환하시겠습니까?"
+      description={
+        <>
           {props.companyName} · 환불할 금액 {won(props.amount)}
-        </p>
-        <div className={cf.modalExtra}>
-          <div className={styles.formGrid}>
-            <label className={cf.field}>
-              <span className={cf.label}>반환일</span>
-              <input type="date" className={cf.input} value={returnedOn} onChange={(e) => setReturnedOn(e.target.value)} />
-            </label>
-            <RefundAccountFields value={account} onChange={setAccount} />
-            <div className={cf.field}>
-              <span className={cf.label}>방법</span>
-              <div className={styles.segment}>
-                {(['B', 'C'] as const).map((code) => (
-                  <button
-                    key={code}
-                    type="button"
-                    className={`${styles.segBtn}${payMethod === code ? ` ${styles.segOn}` : ''}`}
-                    onClick={() => setPayMethod(code)}
-                  >
-                    {PAY_METHOD_LABEL[code]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <textarea
-              className={cf.textarea}
-              rows={2}
-              placeholder="비고 (선택)"
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-            />
-            {error ? <p className={styles.formError}>{error}</p> : null}
+        </>
+      }
+      footer={
+        <>
+          <Button variant="primary" size="sm" disabled={busy} onClick={submit}>
+            반환 처리
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={props.onClose}>
+            취소
+          </Button>
+        </>
+      }
+    >
+      <div className={styles.formGrid}>
+        <label className={cf.field}>
+          <span className={cf.label}>반환일</span>
+          <input type="date" className={cf.input} value={returnedOn} onChange={(e) => setReturnedOn(e.target.value)} />
+        </label>
+        <RefundAccountFields value={account} onChange={setAccount} />
+        <div className={cf.field}>
+          <span className={cf.label}>방법</span>
+          <div className={styles.segment}>
+            {(['B', 'C'] as const).map((code) => (
+              <button
+                key={code}
+                type="button"
+                className={`${styles.segBtn}${payMethod === code ? ` ${styles.segOn}` : ''}`}
+                onClick={() => setPayMethod(code)}
+              >
+                {PAY_METHOD_LABEL[code]}
+              </button>
+            ))}
           </div>
         </div>
-        <div className={cf.modalFoot}>
-          <button type="button" className={`${cf.btn} ${cf.btnGhost}`} disabled={busy} onClick={props.onClose}>
-            취소
-          </button>
-          <button type="button" className={`${cf.btn} ${cf.btnPrimary}`} disabled={busy} onClick={submit}>
-            반환 처리
-          </button>
-        </div>
+        <textarea
+          className={cf.textarea}
+          rows={2}
+          placeholder="비고 (선택)"
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+        />
+        {error ? <p className={styles.formError}>{error}</p> : null}
       </div>
-    </div>
+    </Dialog>
   );
 }

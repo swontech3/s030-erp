@@ -14,7 +14,7 @@
  * ★ 부르는 쪽이 따로 수납을 넣으면(버튼 줄 [수납]) `reloadKey` 를 올려 다시 받게 한다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Icon } from '@/components/ds';
+import { Button, Icon, Table, TableHead, TableRow } from '@/components/ds';
 import { LoadingBar } from '@/components/patterns/LoadingBar';
 import styles from './billing.module.css';
 import {
@@ -27,6 +27,7 @@ import {
   type InvoiceDetail,
   type Payment,
 } from './billing-model';
+import { BTN_XS } from './BillingTable';
 import { PaymentDialog, type PaymentTarget } from './PaymentDialog';
 
 interface Props {
@@ -129,7 +130,7 @@ export function InvoiceDetailPane({ invoiceId, companyName, roomNames, contract,
       <div className={styles.settleCard} data-invoice-detail={invoiceId}>
         <div className={styles.settleHead}>
           <span className={styles.settleTitle}>
-            {title}
+            <span className={styles.sectionBar}>{title}</span>
             <span className={styles.settleMeta}>
               {companyName}
               {roomNames ? ` · ${roomNames}` : ''}
@@ -192,16 +193,18 @@ export function InvoiceDetailPane({ invoiceId, companyName, roomNames, contract,
               <div className={styles.sectionHead}>
                 <h4 className={styles.sectionTitle}>청구 항목</h4>
               </div>
+              {/* ★ 2026-11-25 — 공통 Table(머리글 색은 그 부품). 칸 폭 · 칸 사이 10 · 좌우 14 · 13px 는 전 값 그대로(.miniGrid). */}
               <div className={styles.miniTable}>
-                <div className={`${styles.miniRow} ${styles.miniHead} ${styles.linesGrid}`}>
+                <Table cols="minmax(0, 1.4fr) 56px 1fr 1fr 1fr" dense>
+                <TableHead className={styles.miniGrid}>
                   <span>호실</span>
                   <span className={styles.right}>수량</span>
                   <span className={styles.right}>공급가</span>
                   <span className={styles.right}>부가세</span>
                   <span className={styles.right}>합계</span>
-                </div>
+                </TableHead>
                 {detail.lines.map((line) => (
-                  <div key={line.invoiceLineId} className={`${styles.miniRow} ${styles.linesGrid}`}>
+                  <TableRow key={line.invoiceLineId} className={styles.miniGrid}>
                     <span className={styles.ellipsis}>{line.roomName || '—'}</span>
                     <span className={`${styles.right} ${styles.mono}`}>{line.quantity}</span>
                     {line.isFree ? (
@@ -222,36 +225,38 @@ export function InvoiceDetailPane({ invoiceId, companyName, roomNames, contract,
                         </span>
                       </>
                     )}
-                  </div>
+                  </TableRow>
                 ))}
+                </Table>
               </div>
             </div>
 
             <div className={styles.section}>
               <div className={styles.sectionHead}>
                 <h4 className={styles.sectionTitle}>수납 {detail.payments.length}건</h4>
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  style={BTN_XS}
+                  iconLeft={<Icon name="plus" size={14} />}
                   disabled={detail.status === 'C' || busy}
                   onClick={() => setPaying('new')}
                 >
-                  <Icon name="plus" size={14} />
                   수납
-                </button>
+                </Button>
               </div>
               <div className={styles.miniTable}>
                 {detail.payments.length === 0 ? (
                   <div className={styles.miniEmpty}>들어온 수납이 없습니다</div>
                 ) : (
-                  <>
-                    <div className={`${styles.miniRow} ${styles.miniHead} ${styles.paysGrid}`}>
+                  <Table cols="80px 96px 56px minmax(0, 1fr) 124px" dense>
+                    <TableHead className={`${styles.miniGrid} ${styles.paysGrid}`}>
                       <span>입금일</span>
                       <span className={styles.right}>금액</span>
                       <span>수단</span>
                       <span />
                       <span />
-                    </div>
+                    </TableHead>
                     {detail.payments.map((p) => {
                       /*
                        * ★ 2026-11-16 — 비고는 칸이 아니라 **그 줄 아래 한 줄**(말줄임 없이). 비고가 있는 줄만.
@@ -260,7 +265,7 @@ export function InvoiceDetailPane({ invoiceId, companyName, roomNames, contract,
                        */
                       const memo = p.amount < 0 && !p.memo ? '환불' : p.memo;
                       return (
-                      <div key={p.paymentId} className={`${styles.miniRow} ${styles.paysGrid}`}>
+                      <TableRow key={p.paymentId} className={`${styles.miniGrid} ${styles.paysGrid}`}>
                         <span className={styles.mono}>{dotDate(p.paidOn)}</span>
                         <span
                           className={`${styles.right} ${styles.mono} ${styles.strong}${p.amount < 0 ? ` ${styles.negative}` : ''}`}
@@ -270,28 +275,19 @@ export function InvoiceDetailPane({ invoiceId, companyName, roomNames, contract,
                         <span>{PAY_METHOD_LABEL[p.payMethod] ?? p.payMethod}</span>
                         <span />
                         <span className={styles.actions}>
-                          <button
-                            type="button"
-                            className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
-                            disabled={busy}
-                            onClick={() => setPaying(p)}
-                          >
+                          <Button variant="ghost" size="sm" style={BTN_XS} disabled={busy} onClick={() => setPaying(p)}>
                             수정
-                          </button>
-                          <button
-                            type="button"
-                            className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
-                            disabled={busy}
-                            onClick={() => void remove(p)}
-                          >
+                          </Button>
+                          {/* ★ 2026-11-25 — 지우는 동작은 지우기 단추(danger). 두 번 눌러 지우는 동작은 그대로. */}
+                          <Button variant="danger" size="sm" style={BTN_XS} disabled={busy} onClick={() => void remove(p)}>
                             {confirmDelete === p.paymentId ? '삭제 확인' : '삭제'}
-                          </button>
+                          </Button>
                         </span>
                         {memo ? <span className={`${styles.muted} ${styles.paysMemo}`}>{memo}</span> : null}
-                      </div>
+                      </TableRow>
                       );
                     })}
-                  </>
+                  </Table>
                 )}
               </div>
             </div>
