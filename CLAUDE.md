@@ -43,3 +43,18 @@
 - 맞출 것 : 표 = 공통 Table(카드형 목록도) · 구역 제목 4px 아쿠아 막대 · 단추 주/보통/지우기와 자리 · 즉시 거르는 검색은 「n건」만 오른쪽 끝 ·
   팝업 = 공통 Dialog(제목 짧은 이름 · 질문은 본문) · 직접 색 값 → 토큰 · px 글자 → 글자 크기 토큰
 - 기준에 없는 것 · 다르게 할 이유가 있는 것은 고치지 않고 「정할 것」 · 기능 · 데이터 · API 는 손대지 않는다
+
+## 법무 화면 일관성 — 삐용 기준 (2026-11-25 · 가지 feature/design-legal ← origin/feature/design-center d1f5d63)
+
+- 받은 커밋 : d1f5d63(센터·기준관리 정한 것 끝) · origin/master da03a13 merge — 이미 들어 있음(새 커밋 없음)
+- 대상 = screens.ts s04 법무 : 법인설립 `/legal/incorporations`(s040100010) · 법인설립 상세(s040100020) ·
+  법인변경 `/legal/corp-changes`(s040200010) · 법인변경 상세(s040200011) · 사업목적 `/legal/biz-purposes`(s040300010) ·
+  설정 `/legal/doc-form-settings`(s040900010) — 각 팝업 · 상세 포함
+- 기준 = 입주관리 · 센터·기준관리 결과. 공통 부품 Button(지우기) · Dialog · Table. 공통 부품을 고쳐야 하면 멈추고 묻는다
+- 고치지 않는 같이 쓰는 파일 : codes.module.css · forms.module.css · facility/ModalShell · forms/FormDocument · FormPrintPortal ·
+  billing.module.css · contracts/form-model — 필요하면 법무 화면 전용 css 에 둔다
+- 인쇄 동작 · 인쇄 면(종이 면 검정 · 흰색)은 그대로 · 미리보기는 바깥 틀만
+- 맞출 것 : 표 = 공통 Table(카드형 목록도) · 구역 제목 4px 아쿠아 막대 · 단추 주(저장 · 팝업 확인)/보통(등록 · 조회 · 인쇄 · 취소)/지우기 ·
+  줄 안 작은 단추 30px · 자리(조회 검색 줄 오른쪽 끝 [초기화][조회] + 「n건」 · 등록 표 위 왼쪽 · 저장 · 삭제 상세 제목 줄 오른쪽) ·
+  즉시 거르는 검색은 「n건」만 · 팝업 = 공통 Dialog(제목 짧은 이름 · 질문 「…삭제하시겠습니까?」는 본문) · 직접 색 값 → 토큰 · px 글자 → 글자 크기 토큰
+- 기준에 없는 것 · 다르게 할 이유가 있는 것은 고치지 않고 「정할 것」
