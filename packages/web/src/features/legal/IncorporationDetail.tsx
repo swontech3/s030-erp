@@ -73,8 +73,9 @@ import { maskValue, type DigitMaskKind } from '@swonbiz/shared/domain/masked-car
 import type { OrgInfo } from '@swonbiz/shared/domain/org-lookup';
 import { incorpArticlesFormName } from '@swonbiz/shared/domain/legal-articles-file';
 import { formatMoneyInput, maskInput } from '@/features/contracts/form-model';
-import { Icon } from '@/components/ds';
-import { AddressInput, PaneAddressCompact, StatusActions, type Address } from './CorpChangeDetail';
+import { Button, Icon, Table, TableEmpty, TableHead, TableRow } from '@/components/ds';
+import { BTN_XS } from '@/features/billing/BillingTable';
+import { AddressInput, PaneAddressCompact, PEOPLE_COLS, StatusActions, type Address } from './CorpChangeDetail';
 import { CorpChangeConfirmDialog, type CorpChangeConfirmKind } from './CorpChangeConfirmDialog';
 import { BizPurposePickerDialog } from './BizPurposePickerDialog';
 import { IncorporationPrintDialog } from './IncorporationPrintDialog';
@@ -807,10 +808,9 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
           </div>
           <div className={styles.headActions}>
             {saved && canPrintCorpChange(saved.status) ? (
-              <button type="button" className={`${styles.btn} ${styles.btnGhost}`} disabled={busy} onClick={() => setPrinting(true)}>
-                <Icon name="printer" size={16} />
+              <Button type="button" variant="ghost" size="sm" iconLeft={<Icon name="printer" size={16} />} disabled={busy} onClick={() => setPrinting(true)}>
                 서류 출력
-              </button>
+              </Button>
             ) : null}
             {saved ? (
               <StatusActions
@@ -828,24 +828,25 @@ export function IncorporationDetail({ draft, saved: initialSaved, picked = null,
                 법인설립 목록
               </Link>
             )}
+            {/* ★ 2026-11-25 법무 일관성 — [저장] = 주 단추(종전 보통). [작성완료] 는 상태를 넘기는 단추라 종전대로 주(보고 「정할 것」) */}
             {editable ? (
-              <button
+              <Button
                 type="button"
-                className={`${styles.btn} ${styles.btnGhost}`}
+                variant="primary"
+                size="sm"
+                iconLeft={<Icon name="save" size={16} />}
                 // ★ 임시 모드는 늘 누를 수 있다 — 빈 채로 저장하는 것도 사람이 고른 일이다.
                 disabled={busy || (!isNew && !dirty)}
                 onClick={() => void save()}
               >
-                <Icon name="save" size={16} />
                 저장
-              </button>
+              </Button>
             ) : null}
             {/* [작성완료] — 저장 + 검증 + P→E 한 번에. 임시 모드에도 있다. */}
             {isNew || (saved.status === 'P' && saved.availableTransitions.includes('E')) ? (
-              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} disabled={busy} onClick={() => void complete()}>
-                <Icon name="check" size={16} />
+              <Button type="button" variant="primary" size="sm" iconLeft={<Icon name="check" size={16} />} disabled={busy} onClick={() => void complete()}>
                 작성완료
-              </button>
+              </Button>
             ) : null}
             {saved && dirty && (saved.canDelete || saved.availableTransitions.some((t) => t !== 'E')) ? (
               <span className={styles.headHint}>저장하지 않은 입력이 있습니다 — 저장한 뒤 다른 처리를 할 수 있습니다</span>
@@ -1099,15 +1100,17 @@ function PurposesSection({
           <span className={styles.muted}>{lines}줄</span>
         </div>
         {/* ★ 고른 문구를 끝에 줄로 덧붙인다(이미 있는 줄은 건너뜀). 카탈로그를 고치는 버튼은 두지 않는다. */}
-        <button
+        <Button
           type="button"
-          className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+          variant="ghost"
+          size="sm"
+          style={BTN_XS}
+          iconLeft={<Icon name="search" size={14} />}
           disabled={disabled}
           onClick={() => setPicking(true)}
         >
-          <Icon name="search" size={14} />
           목록에서 고르기
-        </button>
+        </Button>
       </div>
       <div className={styles.sectionRule} />
       <div className={styles.field}>
@@ -1255,18 +1258,19 @@ function PersonsSection({
           <span className={styles.muted}>{persons.length}명</span>
         </div>
         {editable ? (
-          <button
+          <Button
             type="button"
-            className={`${styles.btn} ${styles.btnGhost}`}
+            variant="ghost"
+            size="sm"
+            iconLeft={<Icon name="plus" size={16} />}
             disabled={busy || (draft !== null && draft.id === null)}
             onClick={() => {
               setError(null);
               setDraft(blankDraft());
             }}
           >
-            <Icon name="plus" size={16} />
             {terms.founder} 추가
-          </button>
+          </Button>
         ) : null}
       </div>
       <div className={styles.sectionRule} />
@@ -1289,8 +1293,10 @@ function PersonsSection({
         </div>
       ) : null}
 
+      {/* ★ 2026-11-25 법무 일관성 — 표 = 공통 Table(머리글 아쿠아). 칸 폭은 종전 그대로(`PEOPLE_COLS`) · 줄 안 단추 30px(BTN_XS) */}
       <div className={styles.oTable}>
-        <div className={styles.oHead}>
+        <Table cols={PEOPLE_COLS} dense>
+        <TableHead className={styles.oHead}>
           <span>성명</span>
           <span>역할</span>
           <span>{terms.units}</span>
@@ -1298,13 +1304,13 @@ function PersonsSection({
           <span>주민등록번호</span>
           <span>주소</span>
           <span />
-        </div>
+        </TableHead>
         {persons.length === 0 ? (
-          <div className={styles.empty}>등록된 {terms.founder}이 없습니다</div>
+          <TableEmpty>등록된 {terms.founder}이 없습니다</TableEmpty>
         ) : (
           persons.map((p, i) => (
             <div key={p.id} className={styles.oItem}>
-              <div className={`${styles.oRow}${draft?.id === p.id ? ` ${styles.oRowEditing}` : ''}`}>
+              <TableRow className={`${styles.oRow}${draft?.id === p.id ? ` ${styles.oRowEditing}` : ''}`}>
                 <span className={p.name ? styles.ellipsis : styles.muted}>{p.name || '(성명 없음)'}</span>
                 <span className={rolesOf(p, terms).length > 0 ? styles.ellipsis : styles.muted}>{rolesOf(p, terms).join(' · ') || '—'}</span>
                 <span className={styles.tabular}>{p.unitsSubscribed.toLocaleString('ko-KR')}</span>
@@ -1317,51 +1323,52 @@ function PersonsSection({
                   {editable ? (
                     confirmDelete === p.id ? (
                       <>
-                        <button
+                        <Button
                           type="button"
-                          className={`${styles.btn} ${styles.btnDanger} ${styles.btnXs}`}
+                          variant="danger"
+                          size="sm"
+                          style={BTN_XS}
                           disabled={busy}
                           onClick={() => void remove(p.id)}
                         >
                           삭제 확인
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
-                          disabled={busy}
-                          onClick={() => setConfirmDelete(null)}
-                        >
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" style={BTN_XS} disabled={busy} onClick={() => setConfirmDelete(null)}>
                           취소
-                        </button>
+                        </Button>
                       </>
                     ) : (
                       <>
-                        <button
+                        <Button
                           type="button"
-                          className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+                          variant="ghost"
+                          size="sm"
+                          style={BTN_XS}
+                          iconLeft={<Icon name="pencil-line" size={14} />}
                           disabled={busy}
                           onClick={() => {
                             setError(null);
                             setDraft(draftOf(p));
                           }}
                         >
-                          <Icon name="pencil-line" size={14} />
                           수정
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          className={`${styles.btn} ${styles.btnDanger} ${styles.btnXs}`}
+                          variant="danger"
+                          size="sm"
+                          style={BTN_XS}
                           disabled={busy}
                           aria-label={`${p.name || terms.founder} 삭제`}
                           onClick={() => setConfirmDelete(p.id)}
                         >
                           <Icon name="trash-2" size={14} />
-                        </button>
+                        </Button>
                       </>
                     )
                   ) : null}
                 </span>
-              </div>
+              </TableRow>
               {rowErrors[i] ? (
                 <div className={styles.oRowError} role="alert">
                   {rowErrors[i].join(' · ')}
@@ -1370,6 +1377,7 @@ function PersonsSection({
             </div>
           ))
         )}
+        </Table>
       </div>
 
       {draft && editable ? (
@@ -1463,18 +1471,19 @@ function PersonsSection({
           </div>
           </div>
           <div className={styles.editorActions}>
-            <button type="button" className={`${styles.btn} ${styles.btnGhost}`} disabled={busy} onClick={() => setDraft(null)}>
+            <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setDraft(null)}>
               취소
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className={`${styles.btn} ${styles.btnPrimary}`}
+              variant="primary"
+              size="sm"
+              iconLeft={<Icon name="save" size={16} />}
               disabled={busy || rrnBad}
               onClick={() => void save()}
             >
-              <Icon name="save" size={16} />
               {isNew ? (draft.id ? '목록에 반영' : '목록에 추가') : draft.id ? `${terms.founder} 저장` : `${terms.founder} 추가`}
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
