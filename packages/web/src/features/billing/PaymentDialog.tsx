@@ -5,8 +5,8 @@
 /**
  * 수납 입력·수정 창.
  *
- * ★ 디자인이 없다 — **상태 전이 확인 창(s030200040p2)과 같은 모양**으로 만들었다
- *   (가운데 원형 아이콘 · 가운데 제목 · 50:50 버튼). 뼈대 클래스도 그 창의 것을 쓴다.
+ * ★ 2026-11-25 입주관리 일관성 — 공통 팝업(`Dialog` · 아쿠아 제목줄 · 아래 가운데 [수납/수정](주) [취소](보통)).
+ *   전의 원형 아이콘 · 50:50 버튼은 없앴다. 입력 칸은 계약 폼의 것(cf.field · cf.input …) 그대로.
  *
  * ★★ 일반 수납은 **양수만** 받는다. 환불(음수)은 정산 결과의 [정산 처리] 에서만
  *    생긴다 — 거기서 이용료 과납분이 음수 수납으로 들어간다(023). 여기서 음수를 열어
@@ -14,7 +14,7 @@
  *    이미 들어간 환불 수납을 **고칠 때**만 음수를 유지한다(부호는 바꿀 수 없다).
  */
 import { useState } from 'react';
-import { Icon } from '@/components/ds';
+import { Button, Dialog } from '@/components/ds';
 import cf from '@/features/contracts/contract-form.module.css';
 import styles from './billing.module.css';
 import {
@@ -99,82 +99,71 @@ export function PaymentDialog({ target, editing = null, onClose, onSaved }: Prop
 
   const title = editing ? (refund ? '환불 수납 수정' : '수납 수정') : '수납 입력';
 
+  // ★ 2026-11-25 입주관리 일관성 — 공통 팝업(아쿠아 제목줄 · 아래 가운데 [수납/수정](주) [취소](보통)). 둥근 아이콘 · 반반 단추 없앰.
   return (
-    <div
-      className={cf.overlay}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !busy) onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && !busy) onClose();
-      }}
-    >
-      <div className={cf.modal} role="dialog" aria-modal="true" aria-label={title}>
-        <div className={cf.modalIconWrap}>
-          <span className={`${cf.modalIcon} ${cf.modalIconConfirm}`}>
-            <Icon name="receipt" size={24} />
-          </span>
-        </div>
-        <h3 className={cf.modalTitle}>{title}</h3>
-        <p className={cf.modalDesc}>
+    <Dialog
+      open
+      onClose={onClose}
+      closeDisabled={busy}
+      title={title}
+      description={
+        <>
           {target.companyName} · {yearMonthDot(target.yearMonth)}
           {target.roomNames ? ` · ${target.roomNames}` : ''}
           <br />
           청구 {won(target.totalAmount)} · 남은 금액 {won(target.outstanding)}
-        </p>
-
-        <div className={cf.modalExtra}>
-          <div className={styles.formGrid}>
-            <label className={cf.field}>
-              <span className={cf.label}>입금일</span>
-              <input type="date" className={cf.input} value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
-            </label>
-            <label className={cf.field}>
-              <span className={cf.label}>금액</span>
-              <input
-                className={`${cf.input} ${cf.inputMoney}`}
-                inputMode="numeric"
-                value={amount}
-                placeholder="0"
-                onChange={(e) => setAmount(formatMoneyInput(e.target.value))}
-              />
-            </label>
-            <div className={cf.field}>
-              <span className={cf.label}>결제수단</span>
-              <div className={styles.segment}>
-                {(['B', 'C'] as const).map((code) => (
-                  <button
-                    key={code}
-                    type="button"
-                    className={`${styles.segBtn}${payMethod === code ? ` ${styles.segOn}` : ''}`}
-                    onClick={() => setPayMethod(code)}
-                  >
-                    {PAY_METHOD_LABEL[code]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <textarea
-              className={cf.textarea}
-              rows={2}
-              placeholder="비고 (선택)"
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-            />
-            {error ? <p className={styles.formError}>{error}</p> : null}
+        </>
+      }
+      footer={
+        <>
+          <Button variant="primary" size="sm" disabled={busy} onClick={submit}>
+            {editing ? '수정' : '수납'}
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            취소
+          </Button>
+        </>
+      }
+    >
+      <div className={styles.formGrid}>
+        <label className={cf.field}>
+          <span className={cf.label}>입금일</span>
+          <input type="date" className={cf.input} value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
+        </label>
+        <label className={cf.field}>
+          <span className={cf.label}>금액</span>
+          <input
+            className={`${cf.input} ${cf.inputMoney}`}
+            inputMode="numeric"
+            value={amount}
+            placeholder="0"
+            onChange={(e) => setAmount(formatMoneyInput(e.target.value))}
+          />
+        </label>
+        <div className={cf.field}>
+          <span className={cf.label}>결제수단</span>
+          <div className={styles.segment}>
+            {(['B', 'C'] as const).map((code) => (
+              <button
+                key={code}
+                type="button"
+                className={`${styles.segBtn}${payMethod === code ? ` ${styles.segOn}` : ''}`}
+                onClick={() => setPayMethod(code)}
+              >
+                {PAY_METHOD_LABEL[code]}
+              </button>
+            ))}
           </div>
         </div>
-
-        <div className={cf.modalFoot}>
-          <button type="button" className={`${cf.btn} ${cf.btnGhost}`} disabled={busy} onClick={onClose}>
-            취소
-          </button>
-          <button type="button" className={`${cf.btn} ${cf.btnPrimary}`} disabled={busy} onClick={submit}>
-            {editing ? '수정' : '수납'}
-          </button>
-        </div>
+        <textarea
+          className={cf.textarea}
+          rows={2}
+          placeholder="비고 (선택)"
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+        />
+        {error ? <p className={styles.formError}>{error}</p> : null}
       </div>
-    </div>
+    </Dialog>
   );
 }

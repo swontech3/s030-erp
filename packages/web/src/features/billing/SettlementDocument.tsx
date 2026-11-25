@@ -33,7 +33,7 @@ import { createPortal } from 'react-dom';
 import { DEPOSIT_ACCOUNT_MISSING, depositAccountOf, type DepositAccount } from '@swonbiz/shared/domain/deposit-account';
 import { settlementDirection } from '@swonbiz/shared/domain/settlement-view';
 import { usageChargeBreakdown, usedPeriodLabel } from '@swonbiz/shared/domain/usage-period';
-import { Icon } from '@/components/ds';
+import { Button, Icon } from '@/components/ds';
 import docStyles from '@/features/contracts/contract-document.module.css';
 import styles from './billing.module.css';
 import { dotDate, localTodayIso, type Settlement } from './billing-model';
@@ -124,10 +124,16 @@ export function SettlementDocument({ s, onClose }: { s: Settlement; onClose: () 
         <div data-print-hide="1" className={docStyles.head}>
           <strong className={styles.docHeadTitle}>중도해지 정산서</strong>
           <div className={docStyles.headRight}>
-            <button type="button" className={`${docStyles.btn} ${docStyles.btnGhost}`} onClick={doPrint} disabled={depositAccount === undefined}>
-              <Icon name="file-text" size={16} />
+            {/* ★ 2026-11-25 입주관리 일관성 — [인쇄] = 공통 보통 단추. 창 껍데기는 인쇄 규칙(data-print-*) 때문에 그대로다. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              iconLeft={<Icon name="file-text" size={16} />}
+              onClick={doPrint}
+              disabled={depositAccount === undefined}
+            >
               인쇄
-            </button>
+            </Button>
             <button type="button" className={docStyles.iconBtn} aria-label="닫기" onClick={onClose}>
               <Icon name="x" size={20} />
             </button>

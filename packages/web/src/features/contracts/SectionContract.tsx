@@ -30,7 +30,7 @@ import {
   spaceOptionLabel,
   type SpaceHolder,
 } from '@swonbiz/shared/domain/space-occupancy';
-import { Icon } from '@/components/ds';
+import { Button, Icon, Table, TableHead, TableRow, tableCell } from '@/components/ds';
 import styles from './contract-form.module.css';
 import {
   comma,
@@ -102,6 +102,15 @@ const codesOf = (codes: readonly CodeOption[], category: string) =>
  */
 const floorsOf = (spaces: readonly SpaceOption[], buildId: string) =>
   dedupe(spaces.filter((s) => s.buildId === buildId).map((s) => ({ id: s.floorId, name: s.floorName })));
+
+/**
+ * 계약 항목 표의 칸 폭 — No · 계약구분 · 호실 · 월회비 · 예치금 · 월이용료 · 계산서 · 부가세액 · 납부액 · 삭제.
+ * ★ 2026-11-25 입주관리 일관성 — 종전 `.itemHead/.itemRow` 의 grid-template-columns 를 그대로 옮겼다.
+ *   머리 · 줄이 이 값 하나를 함께 쓴다(공통 Table). 확정 이후에는 삭제 열 트랙 자체를 없앤다.
+ */
+const ITEM_COLS_LOCKED =
+  '40px minmax(120px, 0.8fr) minmax(130px, 0.9fr) minmax(110px, 0.75fr) minmax(110px, 0.75fr) minmax(110px, 0.75fr) 70px minmax(100px, 0.7fr) minmax(110px, 0.8fr)';
+const ITEM_COLS = `${ITEM_COLS_LOCKED} 48px`;
 
 export function SectionContract({
   items,
@@ -243,15 +252,16 @@ export function SectionContract({
         </div>
         {locked ? null : (
           <span className={styles.tipWrap}>
-            <button
+            <Button
               type="button"
-              className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+              variant="ghost"
+              size="sm"
+              iconLeft={<Icon name="plus" size={14} />}
               disabled={full}
               onClick={() => onItems([...items, { ...ROW_TEMPLATE }])}
             >
-              <Icon name="plus" size={14} />
               항목 추가
-            </button>
+            </Button>
             <span className={`${styles.tip}${full ? '' : ` ${styles.tipHidden}`}`}>
               최대 {MAX_CONTRACT_SPACES}개까지 등록 가능합니다
             </span>
@@ -259,19 +269,19 @@ export function SectionContract({
         )}
       </div>
 
-      <div className={`${styles.itemTable}${locked ? ` ${styles.itemTableLocked}` : ''}`}>
-        <div className={styles.itemHead}>
-          <span>No</span>
-          <span>계약구분</span>
-          <span>호실</span>
-          <span>월회비</span>
-          <span>예치금</span>
-          <span>월이용료</span>
-          <span>계산서</span>
-          <span>부가세액</span>
-          <span>납부액</span>
-          {locked ? null : <span>삭제</span>}
-        </div>
+      <Table cols={locked ? ITEM_COLS_LOCKED : ITEM_COLS} className={`${styles.itemTable} ${styles.itemGrid}`}>
+        <TableHead>
+          <span className={tableCell.center}>No</span>
+          <span className={tableCell.center}>계약구분</span>
+          <span className={tableCell.center}>호실</span>
+          <span className={tableCell.center}>월회비</span>
+          <span className={tableCell.center}>예치금</span>
+          <span className={tableCell.center}>월이용료</span>
+          <span className={tableCell.center}>계산서</span>
+          <span className={tableCell.center}>부가세액</span>
+          <span className={tableCell.center}>납부액</span>
+          {locked ? null : <span className={tableCell.center}>삭제</span>}
+        </TableHead>
 
         {items.length === 0 ? (
           // 0건이어도 헤더는 남기고 본문 자리만 안내로 채운다 — 열 구성이 보여야 한다.
@@ -291,7 +301,7 @@ export function SectionContract({
               const roomName = spaces.find((s) => s.spaceId === row.spaceId)?.roomName ?? row.spaceId;
               const typeName = roomTypes.find((c) => c.code === row.roomType)?.name ?? row.roomType;
               return (
-                <div className={styles.itemRow} key={`${row.spaceId}-${i}`}>
+                <TableRow key={`${row.spaceId}-${i}`}>
                   <span className={styles.no}>{i + 1}</span>
                   <ReadCell value={typeName} />
                   <ReadCell value={roomName} />
@@ -305,7 +315,7 @@ export function SectionContract({
                   </span>
                   <ReadCell value={comma(vatAmount)} right />
                   <ReadCell value={comma(paymentAmount)} right bold />
-                </div>
+                </TableRow>
               );
             }
 
@@ -319,7 +329,7 @@ export function SectionContract({
             );
 
             return (
-              <div className={styles.itemRow} key={i}>
+              <TableRow key={i}>
                 <span className={styles.no}>{i + 1}</span>
 
                 {/* 계약구분 — 코드 ROOM_TP. 같은 구분을 여러 줄에 골라도 된다. */}
@@ -446,11 +456,11 @@ export function SectionContract({
                     <Icon name="trash-2" size={16} />
                   </button>
                 </span>
-              </div>
+              </TableRow>
             );
           })
         )}
-      </div>
+      </Table>
 
       {/* ─ 2블록 · 금액 합계 ─ 각 줄의 합이다. 합계에 0.1 을 곱하지 않는다 ─ */}
       <div className={styles.summaryBar}>
@@ -498,16 +508,17 @@ export function SectionContract({
               onClick={locked ? undefined : onOpenRoomPicker}
               style={locked ? undefined : { cursor: 'pointer' }}
             />
-            <button
+            <Button
               type="button"
-              className={`${styles.btn} ${styles.btnGhost}`}
+              variant="ghost"
+              size="sm"
               aria-label="계약호실 확인"
               style={{ width: 44, height: 44, padding: 0 }}
               disabled={locked}
               onClick={onOpenRoomPicker}
             >
               <Icon name="search" size={16} />
-            </button>
+            </Button>
           </div>
         </div>
 

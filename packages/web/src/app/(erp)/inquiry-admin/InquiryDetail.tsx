@@ -29,7 +29,7 @@ import {
   type MessageKind,
 } from '@swonbiz/shared/domain/inquiry';
 import { inquiryRounds, retentionDeleteHint } from '@swonbiz/shared/domain/inquiry-admin-layout';
-import { Icon } from '@/components/ds';
+import { Button, Icon } from '@/components/ds';
 import {
   codeName,
   dotDate,
@@ -134,16 +134,11 @@ export function InquiryDetail({
           확인 창을 거친다. 보관 기간이 지나지 않은 글도 지울 수 있다(스팸 제거 —
           2026-09-28 결정, 03-thread §5 가 운영 판단으로 남긴 자리다).
       */}
+      {/* ★ 공통 Button 지우기(danger · 회색 테두리 빨간 글자 · 2026-11-25 입주관리 일관성). 자리는 그대로 */}
       {showDelete ? (
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnDanger} ${styles.btnSm}`}
-          data-delete="1"
-          onClick={onAskDelete}
-        >
-          <Icon name="trash-2" size={16} />
+        <Button variant="danger" size="sm" data-delete="1" iconLeft={<Icon name="trash-2" size={16} />} onClick={onAskDelete}>
           글 삭제
-        </button>
+        </Button>
       ) : null}
     </div>
   );
@@ -186,26 +181,48 @@ export function InquiryDetail({
             수정하면 고객 화면에 「수정됨」이 붙습니다. 등록 시각과 순서는 그대로입니다.
           </span>
         ) : null}
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`}
-          disabled={busy}
-          onClick={() => {
-            setEditing(null);
-            setEditErr(false);
-          }}
-        >
-          취소
-        </button>
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`}
-          data-edit-save="1"
-          disabled={busy}
-          onClick={() => void submitEdit()}
-        >
-          수정 저장
-        </button>
+        {/* ★ PC(note) = 공통 Button [취소](보통) [수정 저장](주) · 앱 안(묶음)은 종전 단추 그대로(폰 배치 유지) */}
+        {note ? (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                setEditing(null);
+                setEditErr(false);
+              }}
+            >
+              취소
+            </Button>
+            <Button variant="primary" size="sm" data-edit-save="1" disabled={busy} onClick={() => void submitEdit()}>
+              수정 저장
+            </Button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`}
+              disabled={busy}
+              onClick={() => {
+                setEditing(null);
+                setEditErr(false);
+              }}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`}
+              data-edit-save="1"
+              disabled={busy}
+              onClick={() => void submitEdit()}
+            >
+              수정 저장
+            </button>
+          </>
+        )}
       </div>
     </>
   );
@@ -450,18 +467,18 @@ export function InquiryDetail({
                   </div>
                   {/* ★ 수정은 **글답변만**. 고객 글에는 버튼이 없다 — 남의 말을 고치지 않는다 */}
                   {m.kind === 'text' && editing?.messageId !== m.messageId ? (
-                    <button
-                      type="button"
-                      className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       data-edit={m.messageId}
+                      iconLeft={<Icon name="pencil-line" size={14} />}
                       onClick={() => {
                         setEditing({ messageId: m.messageId, body: m.body ?? '' });
                         setEditErr(false);
                       }}
                     >
-                      <Icon name="pencil-line" size={14} />
                       수정
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
 
@@ -515,25 +532,19 @@ export function InquiryDetail({
                 ★ 전화로 답변한 경우의 기록. 본문이 없고 **지울 수 없다**(개별 글 삭제가
                   없다) — 그래서 무엇이 남는지 버튼 옆에 적는다.
               */}
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnGhost}`}
+              <Button
+                variant="ghost"
+                size="sm"
                 data-phone-reply="1"
                 disabled={busy}
+                iconLeft={<Icon name="phone" size={16} />}
                 onClick={() => void onReply('phone', '')}
               >
-                <Icon name="phone" size={16} />
                 전화로 답변함
-              </button>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                data-reply-add="1"
-                disabled={busy}
-                onClick={() => void submitReply()}
-              >
+              </Button>
+              <Button variant="primary" size="sm" data-reply-add="1" disabled={busy} onClick={() => void submitReply()}>
                 답변 등록
-              </button>
+              </Button>
             </div>
           </div>
           <p className={styles.composeNote} style={{ marginTop: 10 }}>

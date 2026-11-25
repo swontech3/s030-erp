@@ -28,7 +28,16 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Icon, type IconName } from '@/components/ds';
+import {
+  Button,
+  Icon,
+  Table,
+  TableEmpty,
+  TableHead,
+  TableRow,
+  tableCell,
+  type IconName,
+} from '@/components/ds';
 import { LoadingBar } from '@/components/patterns/LoadingBar';
 import { codeName, dotDate, type InquiryCodes } from '@/features/inquiry/inquiry-model';
 import type { ThreadMessage } from '@/features/inquiry/inquiry-model';
@@ -52,6 +61,13 @@ import {
 
 /** 검색어를 한 자 칠 때마다 서버를 부르지 않는다. 멈추면 한 번 부른다. */
 const SEARCH_DEBOUNCE_MS = 250;
+
+/**
+ * PC 목록 표 칸 — 유형 · 이름 · 등록일 · 상태(2026-11-25 입주관리 일관성 · 카드 → 공통 Table).
+ * ★ 카드 셋째 줄(마지막 글 · 보관 기간 지남)은 420px 목록에 칸을 더 둘 자리가 없어
+ *   줄 아래 한 줄(표 폭 전체 · .rowLast)로 둔다.
+ */
+const LIST_COLS = 'minmax(0,1fr) 76px 92px 76px';
 
 interface Props {
   codes: InquiryCodes;
@@ -344,6 +360,65 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- codeName 은 props 파생이라 안정적이다
   }, [items, listError, status, type, query, total, codes]);
 
+  /*
+   * 목록이 비었을 때의 안내 — 앱 안(카드 · PanelEmpty)과 PC(표 · TableEmpty)가 같은 문구를 쓴다.
+   * ★ 걸러서 0건인 것과 아예 0건인 것은 다른 상태다 — 문구도 액션도 다르다.
+   *   「접수」가 비는 것은 좋은 소식이라(답할 것이 없다) 고장처럼 보이지 않게 적는다.
+   */
+  const emptyInfo: { icon: IconName; lead: string; sub?: string; action?: { label: string; onClick: () => void } } | null =
+    items === null
+      ? { icon: 'message-square-text', lead: '문의를 불러오는 중입니다' }
+      : listError
+        ? { icon: 'circle-alert', lead: listError }
+        : items.length > 0
+          ? null
+          : filtered
+            ? {
+                icon: 'circle-check',
+                lead:
+                  status !== null && !type && !query ? `${statusName(status)} 문의가 없습니다` : '조건에 맞는 문의가 없습니다',
+                /* ★ 앱 안은 접수 빈 목록 둘째 줄을 감춘다 — 첫 줄과 뜻이 겹친다(5-나 덧붙임 2026-11-12) */
+                sub:
+                  status === 'R' && !type && !query
+                    ? layout.receivedEmptySub
+                      ? '답변을 기다리는 문의가 없습니다'
+                      : undefined
+                    : '필터나 검색어를 바꿔 보세요',
+                action: {
+                  label: '전체 보기',
+                  onClick: () => {
+                    // ★ 앱 안은 접수를 놓지 않는다 — 유형 · 검색어만 비운다(5-나)
+                    setStatus(resetStatus(layout));
+                    setType(null);
+                    setKeyword('');
+                  },
+                },
+              }
+            : { icon: 'message-square-text', lead: '등록된 문의가 없습니다', sub: '고객이 남긴 문의가 여기에 쌓입니다' };
+
+  /* [더 보기] — 목록 맨 아래. 앱 안은 종전 단추 그대로 · PC 는 공통 Button(보통) */
+  const moreRow =
+    rest > 0 ? (
+      <div className={styles.more}>
+        <span className={styles.moreText}>
+          {total}건 중 {shown}건 표시
+        </span>
+        {layout.phone ? (
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+            onClick={() => void loadList(page + 1, true)}
+          >
+            {Math.min(pageSize, rest)}건 더 보기
+          </button>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={() => void loadList(page + 1, true)}>
+            {Math.min(pageSize, rest)}건 더 보기
+          </Button>
+        )}
+      </div>
+    ) : null;
+
   /* 유형은 5종이라 칩으로 두면 줄이 넘친다 — 420px 목록 머리에는 선택이 맞다 */
   const typeSelect = layout.typeBox ? (
     /* ★ 앱 안 — 결재함 「구분」 모양: 「유형」 글자 + 「전체 ▾」 상자. 상자는 기본 select 라 누르면 폰 기본 고르기 창(2026-11-17) */
@@ -463,106 +538,92 @@ export function InquiryAdminView({ codes, inApp = false }: Props) {
           </div>
 
           <div className={styles.cards}>
-            {items === null ? (
-              <PanelEmpty icon="message-square-text" lead="문의를 불러오는 중입니다" />
-            ) : listError ? (
-              <PanelEmpty icon="circle-alert" lead={listError} />
-            ) : items.length === 0 ? (
-              /* ★ 걸러서 0건인 것과 아예 0건인 것은 다른 상태다 — 문구도 액션도 다르다.
-                 「접수」가 비는 것은 좋은 소식이라(답할 것이 없다) 고장처럼 보이지 않게 적는다. */
-              filtered ? (
-                <PanelEmpty
-                  icon="circle-check"
-                  lead={
-                    status !== null && !type && !query
-                      ? `${statusName(status)} 문의가 없습니다`
-                      : '조건에 맞는 문의가 없습니다'
-                  }
-                  /* ★ 앱 안은 접수 빈 목록 둘째 줄을 감춘다 — 첫 줄과 뜻이 겹친다(5-나 덧붙임 2026-11-12) */
-                  sub={
-                    status === 'R' && !type && !query
-                      ? layout.receivedEmptySub
-                        ? '답변을 기다리는 문의가 없습니다'
-                        : undefined
-                      : '필터나 검색어를 바꿔 보세요'
-                  }
-                  action={{
-                    label: '전체 보기',
-                    onClick: () => {
-                      // ★ 앱 안은 접수를 놓지 않는다 — 유형 · 검색어만 비운다(5-나)
-                      setStatus(resetStatus(layout));
-                      setType(null);
-                      setKeyword('');
-                    },
-                  }}
-                />
+            {layout.phone ? (
+              /* ★ 앱 안(폰 배치)은 카드 목록 그대로 — 결재함 목록과 같은 2행(2026-11-17) */
+              emptyInfo ? (
+                <PanelEmpty icon={emptyInfo.icon} lead={emptyInfo.lead} sub={emptyInfo.sub} action={emptyInfo.action} />
               ) : (
-                <PanelEmpty icon="message-square-text" lead="등록된 문의가 없습니다" sub="고객이 남긴 문의가 여기에 쌓입니다" />
+                <>
+                  {(items ?? []).map((it) => (
+                    <button
+                      key={it.inquiryId}
+                      type="button"
+                      data-inquiry-row={it.inquiryId}
+                      className={`${styles.card}${it.inquiryId === selectedId ? ` ${styles.cardSelected}` : ''}`}
+                      onClick={() => setSelectedId(it.inquiryId)}
+                    >
+                      {/* 1행 유형 꼬리표 · 상태 / 2행 문의자 이름 · 문의일자 · 원글만(추가 질문) */}
+                      <span className={styles.cardRow1}>
+                        <span className={styles.appTag}>{typeName(it.type)}</span>
+                        <span className={`${styles.appState} ${it.status === 'R' ? styles.appStateIng : styles.appStateEnd}`}>
+                          {statusName(it.status)}
+                        </span>
+                      </span>
+                      <span className={styles.appRow2}>
+                        <span className={styles.appName}>
+                          {it.name}
+                          {it.retentionPassed ? <span className={styles.badgeOld} style={{ marginLeft: 6 }}>보관 기간 지남</span> : null}
+                        </span>
+                        <span className={styles.appDate}>
+                          {dotDate(it.day)}
+                          {cardTail(it.lastKind) ? ` · ${cardTail(it.lastKind)}` : ''}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                  {moreRow}
+                </>
               )
             ) : (
+              /* ★ PC — 공통 표(2026-11-25 입주관리 일관성). 머리글 색 · 고른 줄 바탕은 Table 부품이 정한다 */
               <>
-                {items.map((it) => (
-                  <button
-                    key={it.inquiryId}
-                    type="button"
-                    data-inquiry-row={it.inquiryId}
-                    className={`${styles.card}${it.inquiryId === selectedId ? ` ${styles.cardSelected}` : ''}`}
-                    onClick={() => setSelectedId(it.inquiryId)}
-                  >
-                    {layout.phone ? (
-                      /* ★ 앱 안 — 결재함 목록과 같은 2행(2026-11-17)
-                         1행 유형 꼬리표 · 상태 / 2행 문의자 이름 · 문의일자 · 원글만(추가 질문) */
-                      <>
-                        <span className={styles.cardRow1}>
-                          <span className={styles.appTag}>{typeName(it.type)}</span>
-                          <span className={`${styles.appState} ${it.status === 'R' ? styles.appStateIng : styles.appStateEnd}`}>
+                <Table cols={LIST_COLS}>
+                  <TableHead sticky>
+                    <span>유형</span>
+                    <span>이름</span>
+                    <span>등록일</span>
+                    <span className={tableCell.center}>상태</span>
+                  </TableHead>
+                  {emptyInfo ? (
+                    <TableEmpty>
+                      <span className={styles.tableEmptyLead}>{emptyInfo.lead}</span>
+                      {emptyInfo.sub ? <span className={styles.tableEmptySub}>{emptyInfo.sub}</span> : null}
+                      {emptyInfo.action ? (
+                        <span className={styles.tableEmptyAct}>
+                          <Button variant="ghost" size="sm" onClick={emptyInfo.action.onClick}>
+                            {emptyInfo.action.label}
+                          </Button>
+                        </span>
+                      ) : null}
+                    </TableEmpty>
+                  ) : (
+                    (items ?? []).map((it) => (
+                      <TableRow
+                        key={it.inquiryId}
+                        selected={it.inquiryId === selectedId}
+                        onClick={() => setSelectedId(it.inquiryId)}
+                      >
+                        {/* 제목 칸이 없다 — **문의 유형이 제목**이다(02-screens §2) */}
+                        <span className={`${tableCell.ellipsis} ${styles.rowType}`} data-inquiry-row={it.inquiryId}>
+                          {typeName(it.type)}
+                        </span>
+                        <span className={tableCell.ellipsis}>{it.name}</span>
+                        <span className={styles.tabular}>{dotDate(it.day)}</span>
+                        <span className={tableCell.center}>
+                          <span className={`${styles.badge} ${it.status === 'R' ? styles.badgeWait : styles.badgeDone}`}>
                             {statusName(it.status)}
                           </span>
                         </span>
-                        <span className={styles.appRow2}>
-                          <span className={styles.appName}>
-                            {it.name}
-                            {it.retentionPassed ? <span className={styles.badgeOld} style={{ marginLeft: 6 }}>보관 기간 지남</span> : null}
-                          </span>
-                          <span className={styles.appDate}>
-                            {dotDate(it.day)}
-                            {cardTail(it.lastKind) ? ` · ${cardTail(it.lastKind)}` : ''}
-                          </span>
+                        {/* 카드 셋째 줄 그대로 — 마지막 글 · 「보관 기간 지남」(운영자 화면에만 있는 표시) */}
+                        <span className={styles.rowLast}>
+                          <span className={styles.rowLastText}>{lastLine(it)}</span>
+                          {it.retentionPassed ? <span className={`${styles.badge} ${styles.badgeOld}`}>보관 기간 지남</span> : null}
                         </span>
-                      </>
-                    ) : (
-                    <>
-                    <span className={styles.cardRow1}>
-                      {/* 제목 칸이 없다 — **문의 유형이 제목**이다(02-screens §2) */}
-                      <span className={styles.cardType}>{typeName(it.type)}</span>
-                      <span className={`${styles.badge} ${it.status === 'R' ? styles.badgeWait : styles.badgeDone}`}>
-                        {statusName(it.status)}
-                      </span>
-                    </span>
-                    <span className={styles.cardMeta}>
-                      {it.name} · {dotDate(it.day)}
-                      {/* ★ 「보관 기간 지남」 — 운영자 화면에만 있는 표시다 */}
-                      {it.retentionPassed ? <span className={styles.badgeOld} style={{ marginLeft: 6 }}>보관 기간 지남</span> : null}
-                    </span>
-                    <span className={styles.cardLast}>{lastLine(it)}</span>
-                    </>
-                    )}
-                  </button>
-                ))}
-                {rest > 0 ? (
-                  <div className={styles.more}>
-                    <span className={styles.moreText}>
-                      {total}건 중 {shown}건 표시
-                    </span>
-                    <button
-                      type="button"
-                      className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
-                      onClick={() => void loadList(page + 1, true)}
-                    >
-                      {Math.min(pageSize, rest)}건 더 보기
-                    </button>
-                  </div>
-                ) : null}
+                      </TableRow>
+                    ))
+                  )}
+                </Table>
+                {emptyInfo ? null : moreRow}
               </>
             )}
           </div>

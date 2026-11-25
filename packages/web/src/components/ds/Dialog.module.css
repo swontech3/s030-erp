@@ -1,0 +1,62 @@
+/*
+ * Dialog — Dialog.tsx 머리 주석. 모양 = 삐용 팝업(아쿠아 제목줄 · 아래 가운데 단추).
+ * ★ 색은 토큰만.
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: color-mix(in srgb, var(--surface-inverse) 45%, transparent);
+}
+
+.panel {
+  width: 100%;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+}
+
+/* 제목줄 — 삐용 회원 조회 팝업(.modalTitle)과 같은 값 */
+.title {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 20px;
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  font-size: var(--fs-4xl);
+  font-weight: var(--weight-semibold);
+  line-height: 52px;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 24px;
+}
+
+.desc {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-body-size);
+  line-height: 1.6;
+  color: var(--text-body);
+}
+
+.desc:last-child {
+  margin-bottom: 0;
+}
+
+/* 아래 단추 줄 — 가운데 · 사이 12px(삐용 .btnWrap) */
+.foot {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 4px 24px 20px;
+}

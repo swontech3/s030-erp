@@ -74,7 +74,7 @@ import {
   subleaseTargetLabel,
   vatSuffix,
 } from '@swonbiz/shared/domain/contract-document';
-import { Icon } from '@/components/ds';
+import { Button, Icon } from '@/components/ds';
 import styles from './contract-document.module.css';
 import { firstPaymentOf, totalsOf, type CodeOption, type ItemRow, type SpaceOption } from './form-model';
 
@@ -243,7 +243,16 @@ export function ContractDocumentModal({ company, terms, items, spaces, codes, on
         aria-modal="true"
         aria-label="계약서 미리보기"
       >
-        {/* ★ 탭·인쇄 버튼은 종이에 찍히면 안 된다 — 인쇄 규칙이 이 표시를 본다. */}
+        {/*
+          ★ 2026-11-25 입주관리 일관성 — 바깥 틀만 공통 팝업(Dialog) 모양으로 맞췄다 : 아쿠아 제목줄 ·
+            아래 가운데 [인쇄] [닫기]. 공통 Dialog 부품 자체는 쓰지 않는다 — body 포털 · data-print-* 표시가
+            인쇄를 지탱하는데(아래 ★★★) Dialog 는 그 둘을 받지 않는다. 종이(문서 면)는 그대로다.
+          ★ 제목줄 · 아래 단추 줄도 종이에 찍히면 안 된다 — `data-print-hide`.
+        */}
+        <h3 data-print-hide="1" className={styles.titleBar}>
+          계약서 미리보기
+        </h3>
+        {/* ★ 탭은 종이에 찍히면 안 된다 — 인쇄 규칙이 이 표시를 본다. */}
         <div data-print-hide="1" className={styles.head}>
           <div className={styles.tabs} role="tablist">
             {TABS.map((t) => (
@@ -258,16 +267,6 @@ export function ContractDocumentModal({ company, terms, items, spaces, codes, on
                 {t.label}
               </button>
             ))}
-          </div>
-          <div className={styles.headRight}>
-            <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={doPrint}>
-              <Icon name="file-text" size={16} />
-              인쇄
-              <span className={styles.tip}>인쇄 창에서 PDF로 저장할 수 있습니다</span>
-            </button>
-            <button type="button" className={styles.iconBtn} aria-label="닫기" onClick={onClose}>
-              <Icon name="x" size={20} />
-            </button>
           </div>
         </div>
 
@@ -315,6 +314,25 @@ export function ContractDocumentModal({ company, terms, items, spaces, codes, on
               deposit={totals.deposit}
             />
           )}
+        </div>
+
+        {/* 아래 단추 줄 — 가운데. [인쇄](보통) [닫기](보통) */}
+        <div data-print-hide="1" className={styles.foot}>
+          <span className={styles.tipHost}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              iconLeft={<Icon name="file-text" size={16} />}
+              onClick={doPrint}
+            >
+              인쇄
+            </Button>
+            <span className={styles.tip}>인쇄 창에서 PDF로 저장할 수 있습니다</span>
+          </span>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+            닫기
+          </Button>
         </div>
       </div>
     </div>,

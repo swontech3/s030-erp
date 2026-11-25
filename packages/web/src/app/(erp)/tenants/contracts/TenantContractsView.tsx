@@ -37,7 +37,7 @@ import {
   type TenantListState,
 } from '@swonbiz/shared/domain/tenant-list-params';
 import { compareTenants, matchesChips, type TenantFilterKey } from '@swonbiz/shared/domain/tenant-status';
-import { Icon, type IconName } from '@/components/ds';
+import { Button, Icon, Table, TableEmpty, TableHead, TableRow, tableCell, type IconName } from '@/components/ds';
 import { LoadingBar } from '@/components/patterns/LoadingBar';
 import { CompanyBillingTab } from '@/features/billing/CompanyBillingTab';
 import {
@@ -114,6 +114,23 @@ const DEFAULT_CHIPS: TenantFilterKey[] = ['soon', 'expired'];
  *   그려져야 하므로 전부 try/catch 로 감싼다.
  */
 const CARDS_SCROLL_KEY = 'swonbiz:tenants:cards-scroll';
+
+/**
+ * ★ 2026-11-25 입주관리 일관성 — 왼쪽 카드 목록 → 공통 표(Table). 칸 폭.
+ *   목록 칸(420px)이 그대로라 칸은 넷이다 : 회사명 | 대표자 | 연락처 | 상태.
+ *   카드 둘째 줄에 있던 사업자번호(또는 「사업자등록 신청 중」) · 「삐용 미연동」은 회사명 칸 둘째 줄에 둔다.
+ *   상태 96 = 가장 긴 뱃지 「계약중(만료)」가 들어가는 폭 · 연락처 108 = 「010-0000-0000」.
+ *   회사명 칸은 약 80px 이라 이름 · 둘째 줄은 줄을 넘긴다(잘라 숨기지 않는다).
+ */
+const TENANT_COLS = 'minmax(0, 1fr) 64px 108px 96px';
+
+/**
+ * ★ 계약 표 칸 폭 — 공통 표는 칸 사이 12px · 좌우 16px 를 준다(종전 칸 안 여백 12px 대신).
+ *   창 1440px(셸 최소 폭)에서 오른쪽 칸 686px 안에 들어가도록 칸 최소 합 568px + 사이 60 + 좌우 32 = 660px.
+ *   [재계약] 칸 104 = 공통 단추 sm(40px) 「재계약」 + 아이콘 폭.
+ */
+const CONTRACT_COLS =
+  '64px minmax(136px, 1.2fr) minmax(112px, 1fr) minmax(80px, 0.8fr) minmax(72px, 0.7fr) 104px';
 
 /**
  * 켜진 칩 때문에 목록이 빈 경우의 안내 문구.
@@ -295,26 +312,15 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
     <div className={styles.page}>
       <div className={styles.head}>
         <h1 className={styles.title} data-page-title>입주사 · 계약 관리</h1>
-        {/*
-          ★ **계약 폼을 빈 값으로 연다**(`?companyId=` 없이). 새 원본이 계약 등록 모달
-            3종을 없애고 폼 한 장으로 일원화했고(02-master-detail.md 최종 문단),
-            ROADMAP 페이즈 4 작업 15 가 그 이관이다.
-
-          ★ 회사는 **폼의 첫 저장에서 만들어진다**(`POST /companies`). 예전 모달은
-            저장 경로가 없어 입력해도 아무것도 남지 않았다.
-
-          ★ 삐용 조직 등록·단체코드 발급은 아직 붙지 않았다 — 3-2 에서 저장 경로에 얹는다.
-        */}
-        <Link className={`${styles.btn} ${styles.btnPrimary}`} href={NEW_TENANT_HREF}>
-          <Icon name="plus" size={16} />
-          신규 입주사 등록
-        </Link>
       </div>
 
       <div className={styles.body}>
         {/* ══════════ 좌측 · 입주사 리스트 ══════════ */}
         <div className={styles.list}>
           <div className={styles.listHead}>
+            {/*
+              ★ 2026-11-25 입주관리 일관성 — 검색은 치는 대로 걸러진다(그대로). 건수만 검색 줄 오른쪽 끝으로 옮겼다.
+            */}
             <div className={styles.searchRow}>
               <span className={styles.searchWrap}>
                 <span className={styles.searchIcon}>
@@ -327,11 +333,12 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                   onChange={(e) => patch({ keyword: e.target.value })}
                 />
               </span>
-              <span className={styles.count}>{total}곳</span>
               {/* 칩 전체 해제 — 목록을 비우는 버튼이 아니라 필터를 끄는 버튼이다. */}
               <button type="button" className={styles.reset} onClick={() => patch({ chips: [] })}>
                 전체
               </button>
+              {/* ★ 2026-11-25 정한 것 6 — 건수 글자 「곳」 → 「건」(삐용 「n건」) */}
+              <span className={styles.count}>{total}건</span>
             </div>
 
             <div className={styles.chipRow}>
@@ -358,68 +365,99 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
             </div>
           </div>
 
+          {/*
+            ★ 단추 줄 — 검색 줄과 표 사이 · 왼쪽(삐용 목록 화면 단추 줄 · 2026-11-25 일관성).
+            ★ **계약 폼을 빈 값으로 연다**(`?companyId=` 없이). 새 원본이 계약 등록 모달
+              3종을 없애고 폼 한 장으로 일원화했고(02-master-detail.md 최종 문단),
+              ROADMAP 페이즈 4 작업 15 가 그 이관이다.
+            ★ 회사는 **폼의 첫 저장에서 만들어진다**(`POST /companies`). 예전 모달은
+              저장 경로가 없어 입력해도 아무것도 남지 않았다.
+            ★ 삐용 조직 등록·단체코드 발급은 아직 붙지 않았다 — 3-2 에서 저장 경로에 얹는다.
+            ★ 링크(`<Link>`)라 공통 Button 으로 감싸지 못한다 — 모양만 공통 보통(ghost · sm) 단추와 같게(.btn .btnGhost).
+          */}
+          <div className={styles.listBar}>
+            <Link className={`${styles.btn} ${styles.btnGhost}`} href={NEW_TENANT_HREF}>
+              <Icon name="plus" size={16} />
+              신규 입주사 등록
+            </Link>
+          </div>
+
           <div className={styles.cards} ref={cardsRef}>
-            {tenants.length === 0 ? (
-              <PanelEmpty
-                icon="building-2"
-                lead="등록된 입주사가 없습니다"
-                sub="신규 입주사를 등록해 주세요"
-                action={{ label: '신규 입주사 등록', kind: 'primary', href: NEW_TENANT_HREF }}
-              />
-            ) : searching && visible.length === 0 ? (
-              // ★ 검색 0건과 목록 0건은 다른 상태다 — 문구도 액션도 다르다.
-              <PanelEmpty
-                icon="search-x"
-                lead="검색 결과가 없습니다"
-                sub="다른 검색어를 입력해 보세요"
-                action={{ label: '검색 초기화', kind: 'ghost', onClick: () => patch({ keyword: '' }) }}
-              />
-            ) : visible.length === 0 && chips.length > 0 ? (
-              /*
-               * ★★ 칩 때문에 빈 목록. 「등록된 입주사가 없습니다」와 **다른 상태**다 —
-               *    저쪽은 신규 등록을 권하지만 여기서는 걸러졌을 뿐이라 필터를 풀면 된다.
-               *    기본 칩이 「만기 임박·기간 만료」라 이 화면은 **평소에 자주 보인다**
-               *    (할 일이 없다는 좋은 소식이다). 고장처럼 보이지 않게 말로 적는다.
-               */
-              <PanelEmpty
-                icon="circle-check"
-                lead={chipEmptyLead(chips)}
-                sub="지금 처리할 계약이 없습니다"
-                action={{ label: '전체 보기', kind: 'ghost', onClick: () => patch({ chips: [] }) }}
-              />
-            ) : (
-              visible.map((t) => (
-                <button
-                  key={t.companyId}
-                  type="button"
-                  className={`${styles.card}${t.companyId === selectedId ? ` ${styles.cardSelected}` : ''}`}
-                  onClick={() => patch({ companyId: t.companyId })}
-                >
-                  <span className={styles.cardRow1}>
-                    <span className={styles.cardName}>
-                      {t.provisional ? <span className={styles.cardPre}>(가등록)</span> : null}
-                      <b>{t.companyName}</b>
-                    </span>
-                    <span className={`${styles.badge} ${badgeClass(t.statusLabel)}`}>{t.statusLabel}</span>
-                  </span>
-                  <span className={styles.cardMeta}>
-                    {[
-                      t.ceoName,
-                      t.tel,
-                      t.provisional ? '사업자등록 신청 중' : t.bizNumber,
-                      /*
-                       * ★ 삐용 미연동(3-2) — 계약은 확정됐는데 그 회사 대표가 아직
-                       *   로그인할 수 없는 상태다. **표시만 한다** — 처리([다시 시도])는
-                       *   계약 폼 한 곳이다(`CLAUDE.md`). 계약 행을 누르면 그 화면으로 간다.
-                       */
-                      t.bbiyongPending ? '삐용 미연동' : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
-                </button>
-              ))
-            )}
+            <Table cols={TENANT_COLS}>
+              <TableHead sticky>
+                <span>회사명</span>
+                <span>대표자</span>
+                <span>연락처</span>
+                <span className={tableCell.center}>상태</span>
+              </TableHead>
+              {tenants.length === 0 ? (
+                <TableEmpty>
+                  <EmptyBody
+                    icon="building-2"
+                    lead="등록된 입주사가 없습니다"
+                    sub="신규 입주사를 등록해 주세요"
+                    action={{ label: '신규 입주사 등록', href: NEW_TENANT_HREF }}
+                  />
+                </TableEmpty>
+              ) : searching && visible.length === 0 ? (
+                // ★ 검색 0건과 목록 0건은 다른 상태다 — 문구도 액션도 다르다.
+                <TableEmpty>
+                  <EmptyBody
+                    icon="search-x"
+                    lead="검색 결과가 없습니다"
+                    sub="다른 검색어를 입력해 보세요"
+                    action={{ label: '검색 초기화', onClick: () => patch({ keyword: '' }) }}
+                  />
+                </TableEmpty>
+              ) : visible.length === 0 && chips.length > 0 ? (
+                /*
+                 * ★★ 칩 때문에 빈 목록. 「등록된 입주사가 없습니다」와 **다른 상태**다 —
+                 *    저쪽은 신규 등록을 권하지만 여기서는 걸러졌을 뿐이라 필터를 풀면 된다.
+                 *    기본 칩이 「만기 임박·기간 만료」라 이 화면은 **평소에 자주 보인다**
+                 *    (할 일이 없다는 좋은 소식이다). 고장처럼 보이지 않게 말로 적는다.
+                 */
+                <TableEmpty>
+                  <EmptyBody
+                    icon="circle-check"
+                    lead={chipEmptyLead(chips)}
+                    sub="지금 처리할 계약이 없습니다"
+                    action={{ label: '전체 보기', onClick: () => patch({ chips: [] }) }}
+                  />
+                </TableEmpty>
+              ) : (
+                visible.map((t) => {
+                  /*
+                   * ★ 회사명 칸 둘째 줄 — 카드 둘째 줄에서 대표자 · 연락처를 칸으로 뺀 나머지.
+                   * ★ 삐용 미연동(3-2) — 계약은 확정됐는데 그 회사 대표가 아직
+                   *   로그인할 수 없는 상태다. **표시만 한다** — 처리([다시 시도])는
+                   *   계약 폼 한 곳이다(`CLAUDE.md`). 계약 행을 누르면 그 화면으로 간다.
+                   */
+                  const sub = [t.provisional ? '사업자등록 신청 중' : t.bizNumber, t.bbiyongPending ? '삐용 미연동' : null]
+                    .filter(Boolean)
+                    .join(' · ');
+                  return (
+                    <TableRow
+                      key={t.companyId}
+                      selected={t.companyId === selectedId}
+                      onClick={() => patch({ companyId: t.companyId })}
+                    >
+                      <span className={styles.nameCell}>
+                        <span className={styles.cardName}>
+                          {t.provisional ? <span className={styles.cardPre}>(가등록)</span> : null}
+                          <b>{t.companyName}</b>
+                        </span>
+                        {sub ? <span className={styles.cardMeta}>{sub}</span> : null}
+                      </span>
+                      <span className={`${tableCell.ellipsis} ${styles.metaCell}`}>{t.ceoName}</span>
+                      <span className={`${tableCell.ellipsis} ${styles.metaCell}`}>{t.tel}</span>
+                      <span className={tableCell.center}>
+                        <span className={`${styles.badge} ${badgeClass(t.statusLabel)}`}>{t.statusLabel}</span>
+                      </span>
+                    </TableRow>
+                  );
+                })
+              )}
+            </Table>
           </div>
         </div>
 
@@ -448,8 +486,9 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                     {selected.statusLabel.startsWith('D-') ? '계약중' : selected.statusLabel}
                   </span>
                 </div>
+                {/* ★ 등록 = 보통 단추(2026-11-25 일관성). 링크라 모양만 공통 ghost · sm 과 같게 */}
                 <Link
-                  className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`}
+                  className={`${styles.btn} ${styles.btnGhost}`}
                   href={`/contracts/new?companyId=${encodeURIComponent(selected.companyId)}`}
                 >
                   <Icon name="plus" size={16} />
@@ -487,92 +526,96 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
                 <div className={styles.detailBody}>
                   <CompanyBillingTab companyId={selected.companyId} />
                 </div>
-              ) : loadingContracts ? null : contracts && contracts.length === 0 ? (
-                <div className={styles.detailBody}>
-                  <PanelEmpty
-                    icon="file-text"
-                    lead="등록된 계약이 없습니다"
-                    action={{
-                      label: '첫 계약 등록',
-                      kind: 'primary',
-                      href: `/contracts/new?companyId=${encodeURIComponent(selected.companyId)}`,
-                    }}
-                  />
-                </div>
               ) : (
                 <div className={styles.detailBody}>
-                  <div className={styles.tableHead}>
-                    {['기간', '계약일자', '플랜·호실', '월 이용료', '상태', '액션'].map((label) => (
-                      <span key={label}>{label}</span>
-                    ))}
-                  </div>
-                  {(contracts ?? []).map((c, i) => {
-                    const soon = isExpiringSoon(c, today, soonDays);
-                    const live = c.status === 'confirmed';
-                    return (
-                      /*
-                       * ★ 행을 누르면 **계약 폼으로 바로 간다.** 상세 모달을 거치지 않는다
-                       *   (2026-09-19 · `doc/DESIGN_HANDOFF_DIFF.md` §H-7).
-                       *
-                       * ★ `<button>` 이 아니라 `<Link>` 다. 버튼 안에 링크를 넣을 수 없고,
-                       *   링크여야 새 탭·가운데 클릭·주소 복사가 된다 — 목록에서 계약을
-                       *   여러 개 비교하는 자리라 그게 실제로 쓰인다.
-                       */
-                      <Link
-                        key={c.contractId}
-                        href={`/contracts/${c.contractId}`}
-                        className={`${styles.row}${live ? ` ${styles.rowActive}` : ''}`}
-                      >
-                        <span className={`${styles.cell} ${styles.term}`}>
-                          {c.periodMonths ? `${c.periodMonths}개월` : '—'}
+                  {/* ★ 2026-11-25 일관성 — 공통 표(Table). 머리글 색은 부품이 그린다 */}
+                  <Table cols={CONTRACT_COLS}>
+                    <TableHead sticky>
+                      {['기간', '계약일자', '플랜·호실', '월 이용료', '상태', '액션'].map((label) => (
+                        <span key={label} className={tableCell.center}>
+                          {label}
                         </span>
-                        <span className={styles.cell}>
-                          <span className={styles.dates}>
-                            {formatDate(c.startDate)} ~ {formatDate(c.endDate)}
-                          </span>
-                          <span className={`${styles.remain}${soon ? ` ${styles.remainSoon}` : ''}`}>
-                            {remainingLabel(c, today)}
-                          </span>
-                        </span>
-                        <span className={`${styles.cell} ${styles.plan}`}>
-                          {[c.planLabel, c.roomNames].filter(Boolean).join(' · ')}
-                        </span>
-                        <span className={`${styles.cell} ${styles.fee}`}>{formatWon(c.monthlyPayment)}</span>
-                        <span className={`${styles.cell} ${styles.status}`}>
-                          <span className={`${styles.badge} ${live ? styles.badgeIndigo : styles.badgeNeutral}`}>
-                            {c.statusLabel}
-                          </span>
-                          {soon ? <span className={styles.statusSoon}>만기 임박</span> : null}
-                        </span>
-                        <span className={`${styles.cell} ${styles.action}`}>
-                          {/*
-                            ★ 액션 버튼은 행 클릭과 **분리한다.** 행이 링크가 된 뒤로는
-                              `stopPropagation` 만으로 부족하다 — 링크의 기본 이동도 막아야
-                              [재계약] 을 눌렀을 때 계약 폼으로 새지 않는다.
-                          */}
-                          {/*
-                            ★ `<Link>` 안이라 링크를 또 넣을 수 없다(중첩 링크는 무효
-                              HTML 이고 브라우저마다 다르게 고친다). 그래서 이동은
-                              `router.push` 로 하고, 바깥 링크의 기본 이동은 막는다.
-                          */}
-                          <span
-                            role="presentation"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              router.push(`/contracts/new?renewFrom=${encodeURIComponent(c.contractId)}`);
-                            }}
+                      ))}
+                    </TableHead>
+                    {loadingContracts ? (
+                      <TableEmpty>계약을 불러오는 중입니다</TableEmpty>
+                    ) : contracts && contracts.length === 0 ? (
+                      <TableEmpty>
+                        <EmptyBody
+                          icon="file-text"
+                          lead="등록된 계약이 없습니다"
+                          action={{
+                            label: '첫 계약 등록',
+                            href: `/contracts/new?companyId=${encodeURIComponent(selected.companyId)}`,
+                          }}
+                        />
+                      </TableEmpty>
+                    ) : (
+                      (contracts ?? []).map((c) => {
+                        const soon = isExpiringSoon(c, today, soonDays);
+                        const live = c.status === 'confirmed';
+                        return (
+                          /*
+                           * ★ 행을 누르면 **계약 폼으로 바로 간다.** 상세 모달을 거치지 않는다
+                           *   (2026-09-19 · `doc/DESIGN_HANDOFF_DIFF.md` §H-7).
+                           *
+                           * ★ 링크여야 새 탭·가운데 클릭·주소 복사가 된다 — 목록에서 계약을
+                           *   여러 개 비교하는 자리라 그게 실제로 쓰인다.
+                           * ★ 2026-11-25 일관성 — 줄은 공통 TableRow, 링크는 첫 칸의 `<Link>` 가
+                           *   줄 전체를 덮는다(.rowLink::after). 그래서 누르는 자리 · 새 탭은 종전과 같다.
+                           */
+                          <TableRow
+                            key={c.contractId}
+                            className={`${styles.contractRow}${live ? ` ${styles.rowActive}` : ''}`}
                           >
-                            <span className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}>
-                              <Icon name="copy-plus" size={14} />
-                              재계약
-                              <span className={styles.tip}>이 계약 조건으로 재계약합니다</span>
+                            <span className={styles.term}>
+                              <Link href={`/contracts/${c.contractId}`} className={styles.rowLink}>
+                                {c.periodMonths ? `${c.periodMonths}개월` : '—'}
+                              </Link>
                             </span>
-                          </span>
-                        </span>
-                      </Link>
-                    );
-                  })}
+                            <span className={styles.cell}>
+                              <span className={styles.dates}>
+                                {formatDate(c.startDate)} ~ {formatDate(c.endDate)}
+                              </span>
+                              <span className={`${styles.remain}${soon ? ` ${styles.remainSoon}` : ''}`}>
+                                {remainingLabel(c, today)}
+                              </span>
+                            </span>
+                            <span className={`${styles.cell} ${styles.plan}`}>
+                              {[c.planLabel, c.roomNames].filter(Boolean).join(' · ')}
+                            </span>
+                            <span className={`${styles.cell} ${styles.fee}`}>{formatWon(c.monthlyPayment)}</span>
+                            <span className={`${styles.cell} ${styles.status}`}>
+                              <span className={`${styles.badge} ${live ? styles.badgeIndigo : styles.badgeNeutral}`}>
+                                {c.statusLabel}
+                              </span>
+                              {soon ? <span className={styles.statusSoon}>만기 임박</span> : null}
+                            </span>
+                            <span className={`${styles.cell} ${styles.action}`}>
+                              {/*
+                                ★ 액션 버튼은 행 클릭과 **분리한다.** 줄 링크(.rowLink::after) 위로
+                                  올려 두고(.actionHost), 바깥으로 새는 이동은 막는다.
+                              */}
+                              <span
+                                role="presentation"
+                                className={styles.actionHost}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  router.push(`/contracts/new?renewFrom=${encodeURIComponent(c.contractId)}`);
+                                }}
+                              >
+                                <Button variant="ghost" size="sm" iconLeft={<Icon name="copy-plus" size={14} />}>
+                                  재계약
+                                </Button>
+                                <span className={styles.tip}>이 계약 조건으로 재계약합니다</span>
+                              </span>
+                            </span>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </Table>
                 </div>
               )}
             </>
@@ -589,6 +632,7 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
           하루 동안 「자리일 수 있다」는 이유로 남겨 뒀지만, 그 자리는 결국 폼의 섹션이
           됐다(첨부는 섹션 4, 상태는 헤더 뱃지). 열리지 않는 화면이 남아 있으면 다음
           사람이 그 파일을 고치고 반영이 안 된다고 헤맨다.
+        ★ 2026-11-25 — 그 모달 css(.overlay · .modal*)도 지웠다. 이 화면에 팝업은 없다.
       */}
 
       {toast ? (
@@ -613,7 +657,12 @@ function badgeClass(status: string): string {
   return styles.badgeIndigo ?? '';
 }
 
-function PanelEmpty({
+/**
+ * 빈 상태 안내(아이콘 · 문구 · 단추 하나).
+ * ★ 2026-11-25 일관성 — 단추는 모두 보통(등록 · 초기화 · 전체 보기). 링크는 공통 Button 으로
+ *   감싸지 못해 모양만 같게(.btn .btnGhost), 누르는 단추는 공통 Button ghost · sm.
+ */
+function EmptyBody({
   icon,
   lead,
   sub,
@@ -622,11 +671,10 @@ function PanelEmpty({
   icon: IconName;
   lead: string;
   sub?: string;
-  action?: { label: string; kind: 'primary' | 'ghost'; onClick?: () => void; href?: string };
+  action?: { label: string; onClick?: () => void; href?: string };
 }) {
-  const cls = `${styles.btn} ${action?.kind === 'primary' ? styles.btnPrimary : styles.btnGhost}`;
   return (
-    <div className={styles.empty}>
+    <div className={styles.emptyInner}>
       <span className={styles.emptyIcon}>
         <Icon name={icon} size={40} />
       </span>
@@ -635,16 +683,25 @@ function PanelEmpty({
       {action ? (
         <div className={styles.emptyAct}>
           {action.href ? (
-            <Link className={cls} href={action.href}>
+            <Link className={`${styles.btn} ${styles.btnGhost}`} href={action.href}>
               {action.label}
             </Link>
           ) : (
-            <button type="button" className={cls} onClick={action.onClick}>
+            <Button variant="ghost" size="sm" onClick={action.onClick}>
               {action.label}
-            </button>
+            </Button>
           )}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** 표가 아닌 칸(오른쪽 「입주사를 선택하세요」)의 빈 상태 */
+function PanelEmpty(props: { icon: IconName; lead: string; sub?: string }) {
+  return (
+    <div className={styles.empty}>
+      <EmptyBody {...props} />
     </div>
   );
 }

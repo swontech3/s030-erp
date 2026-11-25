@@ -55,7 +55,8 @@
   background: var(--surface-alt);
 }
 
-/* ── 버튼 (s030200030 과 같은 규격) ── */
+/* ── 버튼 (s030200030 과 같은 규격) ── 2026-11-25: 남은 것은 [엑셀 내려받기](공통 ExcelDownloadButton 의 className)뿐.
+   주 · 작은 단추(.btnPrimary · .btnXs)는 공통 Button 으로 바꾸며 지웠다. */
 .btn {
   position: relative;
   height: 40px;
@@ -75,16 +76,6 @@
   text-decoration: none;
 }
 
-.btnPrimary {
-  background: var(--color-primary);
-  color: var(--text-on-primary);
-  box-shadow: var(--shadow-primary);
-}
-
-.btnPrimary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
 .btnGhost {
   background: var(--surface);
   color: var(--text-heading);
@@ -93,12 +84,6 @@
 
 .btnGhost:hover:not(:disabled) {
   background: var(--surface-alt);
-}
-
-.btnXs {
-  height: 30px;
-  padding: 0 10px;
-  font-size: var(--text-micro-size);
 }
 
 .btn:disabled {
@@ -239,70 +224,37 @@
   font-weight: 700;
 }
 
-/* 표 — 헤더·행·합계가 같은 열 정의를 쓴다 */
-/* 입주사 · 항목 · 청구액 · 예치금 · 이용 시작일 · 이용 종료일 · 납부기한 · 납부일 · 상태 · 액션
-   ★ 2026-11-15 — 납부기한(내야 하는 날) 열을 더하고 납부일은 실제로 낸 날. 둘 다 「2026.11.25」라 88px.
-   ★ 2026-11-15 — 1500px 창(사이드바 펼침)에서 가로 스크롤 없이 [수납][내역]이 보이게 칸 너비만 줄였다(칸은 그대로):
-     입주사 최소 120→110 · 상태 92→80 · 액션 150→112. 최소 합(칸 사이 · 좌우 여백 포함) 1,188→1,128px. */
-.tHead,
-.tRow,
-.tFoot {
+/*
+ * 표 — 2026-11-25 입주관리 일관성: 공통 Table(components/ds) 로 바꿨다. 머리글 색 · 줄 선 · 칸 폭(cols)은 그 부품이 정한다.
+ *   전의 .tHead · .tRow · .tSplit · .tCompany · .tReadOnly · .sHead · .sRow · .miniRow · .miniHead · .linesGrid ·
+ *   .tHeadDense · .tRowDense · .tHeadSticky · .qRowClickable · .qRowOn 은 지웠다(청구 화면만 썼다).
+ *   칸 폭 값은 BillingTable(SPLIT_COLS · READONLY_COLS) · SettlementQueue · InvoiceDetailPane 의 cols 로 옮겼다.
+ *
+ * ★ 아래 셋은 공통 Table 의 머리 · 줄(.head · .row, 0-1-0)에 얹는다 — `div.` 를 붙여 우선한다(css 실리는 순서와 무관).
+ *   색 · 선은 건드리지 않고 칸 사이 · 좌우 여백 · 글자 크기만 전 값 그대로 둔다.
+ */
+/* 청구 · 수납 탭 · 정산 탭 왼쪽 60% 목록 — 칸 사이 8 · 좌우 10(1500px 창에서 넘치지 않게 잰 값) */
+div.gridTight {
+  column-gap: 8px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+/* 청구 상세 안 작은 표(청구 항목 · 수납) — 칸 사이 10 · 좌우 14 · 13px */
+div.miniGrid {
+  column-gap: 10px;
+  padding-left: 14px;
+  padding-right: 14px;
+  font-size: var(--text-micro-size);
+}
+
+/* 입주사 청구 탭 합계 줄 — 표와 같은 칸(--table-cols · Table 이 준다) · 같은 칸 사이 · 좌우 여백 */
+.tFoot.tableFoot {
   display: grid;
-  grid-template-columns:
-    minmax(110px, 1.2fr) minmax(110px, 1fr) minmax(104px, 0.9fr)
-    96px 88px 104px 88px 88px 80px 112px;
+  grid-template-columns: var(--table-cols);
   align-items: center;
   column-gap: 12px;
-  padding: 0 20px;
-}
-
-/* 입주사로 거른 청구(?company=) — 첫 열이 입주사가 아니라 청구 월이다 */
-.tCompany {
-  grid-template-columns:
-    72px minmax(110px, 1.2fr) minmax(104px, 0.9fr)
-    96px 88px 104px 88px 88px 80px 112px;
-}
-
-/*
- * 조회 전용(입주사 화면 청구 탭) — [수납][내역] 칸이 없고, **계약의 값 세 열도 없다**.
- * 420px 목록 옆의 좁은 패널이라 열이 가로로 넘친다(`contractCols`, BillingTable).
- */
-.tHead.tReadOnly,
-.tRow.tReadOnly,
-.tFoot.tReadOnly {
-  grid-template-columns:
-    minmax(150px, 1.3fr) minmax(140px, 1.2fr) minmax(120px, 0.9fr)
-    84px 92px;
-}
-
-.tHead.tCompany.tReadOnly,
-.tRow.tCompany.tReadOnly,
-.tFoot.tCompany.tReadOnly {
-  grid-template-columns:
-    72px minmax(140px, 1.3fr) minmax(120px, 0.9fr)
-    84px 92px;
-}
-
-/*
- * 청구 · 수납 탭 — 왼쪽 60% 목록(2026-11-16). 액션 칸 없음(줄을 누르면 오른쪽 상세).
- *   입주사 · 항목 · 청구액 · 납부기한 · 납부일 · 상태 (예치금 · 이용 기간은 오른쪽 상세 머리로)
- * ★ 날짜 둘은 정산 목록과 같은 13px(.sDate) — 「2026.11.25」 폭에 여유를 둬 날짜끼리 붙지 않게.
- * ★ 입주사 · 항목만 남는 폭을 나눠 받는다(넘치면 말줄임). 1500px 창에서 가로로 넘치지 않는지 잰 값이다.
- */
-.tHead.tSplit,
-.tRow.tSplit {
-  grid-template-columns:
-    minmax(88px, 1.2fr) minmax(96px, 1fr) 104px
-    74px 74px 140px;
-  column-gap: 8px;
-  padding: 0 10px;
-}
-
-.tHead.tSplit.tCompany,
-.tRow.tSplit.tCompany {
-  grid-template-columns:
-    56px minmax(96px, 1fr) 104px
-    74px 74px 140px;
+  padding: 0 16px;
 }
 
 /* 상태 칸 — 납부 상태 뱃지 옆에 작은 「해지」(중도해지 계약) */
@@ -317,12 +269,6 @@
   margin-left: 0;
   flex: 0 0 auto;
   white-space: nowrap;
-}
-
-.tHead {
-  height: 44px;
-  background: var(--surface-alt);
-  border-bottom: 1px solid var(--border);
 }
 
 /* ── 청구 화면 촘촘하게(2026-11-15) — 공통 목록 틀은 그대로, 이 감싸개 안에서만 ──
@@ -388,53 +334,35 @@
   font-size: var(--text-micro-size);
 }
 
-.dense .searchBtn {
-  flex: 0 0 auto;
-  padding: 0 8px;
+/* 검색 칸 상자 — 법인변경 목록(features/legal/corp-changes.module.css)의 .input · .select 규칙을 그대로 옮겼다
+ *   (2026-11-25 대표 지시 「법무 css 는 그대로 두고 필요한 규칙만 청구 쪽으로」). 폭 · 글자는 위 .dense 규칙이 덮는다. */
+.boxInput,
+.boxSelect {
+  height: 40px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: var(--text-body-size);
+  color: var(--text-heading);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
 }
 
-/* 머리 줄 · 목록 줄 — 글자 크기는 그대로, 위아래 여백만 줄였다. 줄 높이는 내용(단추 30px · 「무상」 · 「해지」)이 정한다. */
-.tHead.tHeadDense {
-  height: 34px;
+.boxSelect {
+  min-width: 150px;
 }
 
-.tRow.tRowDense {
-  min-height: 0;
-  padding-top: 4px;
-  padding-bottom: 4px;
-}
-
-/* 청구 화면 — 공통 목록 틀의 목록 상자 안에서 스크롤해도 머리 줄은 위에 남는다(2026-11-15) */
-.tHeadSticky {
-  position: sticky;
-  top: 0;
-  z-index: 1;
+.boxInput:focus,
+.boxSelect:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .searchError {
   align-self: center;
   font-size: var(--text-micro-size);
   color: var(--color-danger);
-}
-
-.tHead span {
-  font-size: var(--text-micro-size);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--text-caption);
-}
-
-.tRow {
-  min-height: 60px;
-  padding-top: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
-  font-size: var(--text-body-size);
-  color: var(--text-heading);
-}
-
-.tRow:hover {
-  background: var(--surface-alt);
 }
 
 .tRowCanceled {
@@ -697,6 +625,18 @@ div.wideModal {
   font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--text-heading);
+  /* ★ 2026-11-25 입주관리 일관성 — 구역 제목 = 왼쪽 4px 아쿠아 막대(글자에만 · 삐용 「단체 정보」) */
+  border-left: 4px solid var(--color-primary);
+  padding-left: 8px;
+  line-height: 1.2;
+}
+
+/* 구역 제목 막대 — 제목 줄 안의 제목 글자에만(청구 상세 · 정산 카드 · 예치금 반환 머리) */
+.sectionBar {
+  border-left: 4px solid var(--color-primary);
+  padding-left: 8px;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .miniTable {
@@ -705,35 +645,9 @@ div.wideModal {
   overflow: hidden;
 }
 
-.miniRow {
-  display: grid;
-  align-items: center;
-  column-gap: 10px;
-  padding: 10px 14px;
-  font-size: var(--text-micro-size);
-  color: var(--text-heading);
-  border-bottom: 1px solid var(--border);
-}
-
-.miniRow:last-child {
-  border-bottom: 0;
-}
-
-.miniHead {
-  background: var(--surface-alt);
-  font-size: var(--text-micro-size);
-  font-weight: 700;
-  color: var(--text-caption);
-}
-
-.linesGrid {
-  grid-template-columns: minmax(0, 1.4fr) 56px 1fr 1fr 1fr;
-}
-
 /* ★ 2026-11-16 글자 크기 키우기 — 오른쪽 상세(약 430px) 안에서 [수정][삭제 확인]이 칸을 넘지 않게 칸 너비를 다시 맞춤.
      금액은 한 줄(「−」와 숫자가 갈라지지 않게). 넷째 칸은 빈 칸(남는 폭) — 비고는 줄 아래 한 줄(.paysMemo). */
-.paysGrid {
-  grid-template-columns: 80px 96px 56px minmax(0, 1fr) 124px;
+div.paysGrid {
   column-gap: 8px;
 }
 
@@ -783,6 +697,13 @@ div.wideModal {
   background: var(--color-accent-bg);
   color: var(--color-primary-hover);
   font-weight: 700;
+}
+
+/* 정산 처리 창 — 안내 글과 입력 칸 사이(전 확인 창 .modalExtra 의 12px) */
+.dialogStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .formGrid {
@@ -1050,54 +971,7 @@ div.wideModal {
   border-radius: var(--radius-lg);
 }
 
-/* 정산 목록 — 왼쪽 60% 안에 들게. 1500px 창(사이드바 펼침)에서 가로로 넘치지 않는지 잰 값이다. */
-.sHead,
-.sRow {
-  display: grid;
-  /* ★ 2026-11-16 — 칸 순서 구분 · 입주사 · 상태 · 시작일 · 종료일 · 중도해지일 · 환불일자 · 정산금액(호실 칸은 뺌 — 오른쪽 상세에 있다).
-       날짜 넷은 74px + 칸 사이 8 로 붙어 보이지 않게. 남는 폭은 입주사가 받는다. */
-  grid-template-columns:
-    52px minmax(46px, 1fr) 68px
-    74px 74px 74px 74px 100px;
-  align-items: center;
-  column-gap: 8px;
-  padding: 0 10px;
-}
-
-.sHead {
-  height: 44px;
-  background: var(--surface-alt);
-  border-bottom: 1px solid var(--border);
-  font-size: var(--text-micro-size);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--text-caption);
-}
-
 /* 정산 목록 날짜 칸(시작일 · 종료일 · 중도해지일 · 환불일자) — 72px 에 들게 13px */
 .sDate {
   font-size: var(--text-micro-size);
 }
-
-.sRow {
-  min-height: 52px;
-  border-bottom: 1px solid var(--border);
-  font-size: var(--text-body-size);
-  color: var(--text-heading);
-}
-
-/* 정산 행 — 눌러서 오른쪽에 상세를 연다 */
-.qRowClickable {
-  cursor: pointer;
-}
-
-.qRowClickable:hover,
-.qRowOn {
-  background: var(--surface-alt);
-}
-
-.qRowClickable:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
-}
-

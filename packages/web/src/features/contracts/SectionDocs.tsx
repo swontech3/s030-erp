@@ -42,7 +42,7 @@ import {
   type FilePurpose,
 } from '@swonbiz/shared/domain/contract-files';
 import type { BizRegFields } from '@swonbiz/shared/domain/biz-reg-ocr';
-import { Icon } from '@/components/ds';
+import { Button, Icon } from '@/components/ds';
 import styles from './contract-form.module.css';
 
 /** `GET /api/companies/:id/files` 의 한 줄. */
@@ -407,41 +407,44 @@ export function SectionDocs({
               <div className={styles.docActions}>
                 {file ? (
                   <>
-                    <button
+                    <Button
                       type="button"
-                      className={`${styles.btn} ${styles.btnGhost}`}
+                      variant="ghost"
+                      size="sm"
+                      iconLeft={<Icon name="eye" size={16} />}
                       disabled={working}
                       onClick={() => void open(def.purpose)}
                     >
-                      <Icon name="eye" size={16} />
                       보기
-                    </button>
+                    </Button>
                     {/* ★ 종료·취소된 계약에서도 **보기는 열어 둔다.** 못 보게 할 이유가 없다. */}
                     {!frozen ? (
-                      <button
+                      <Button
                         type="button"
-                        className={`${styles.btn} ${styles.btnGhost}`}
+                        variant="danger"
+                        size="sm"
+                        iconLeft={<Icon name="trash-2" size={16} />}
                         disabled={locked}
                         onClick={() => void remove(file)}
                       >
-                        <Icon name="trash-2" size={16} />
                         삭제
-                      </button>
+                      </Button>
                     ) : null}
                   </>
                 ) : null}
 
                 {/* 붙들고 있는 파일은 저장 전이라 「삭제」가 아니라 「취소」다 — 지울 것이 아직 없다. */}
                 {!file && waiting && !frozen ? (
-                  <button
+                  <Button
                     type="button"
-                    className={`${styles.btn} ${styles.btnGhost}`}
+                    variant="ghost"
+                    size="sm"
+                    iconLeft={<Icon name="x" size={16} />}
                     disabled={working}
                     onClick={() => onPending(def.purpose, null)}
                   >
-                    <Icon name="x" size={16} />
                     취소
-                  </button>
+                  </Button>
                 ) : null}
 
                 {/*
@@ -466,15 +469,16 @@ export function SectionDocs({
                         if (picked) void upload(def.purpose, picked);
                       }}
                     />
-                    <button
+                    <Button
                       type="button"
-                      className={`${styles.btn} ${styles.btnGhost}`}
+                      variant="ghost"
+                      size="sm"
+                      iconLeft={<Icon name="upload" size={16} />}
                       disabled={locked}
                       onClick={() => inputs.current[def.purpose]?.click()}
                     >
-                      <Icon name="upload" size={16} />
                       {working ? '처리 중…' : file || waiting ? '교체' : '파일 선택'}
-                    </button>
+                    </Button>
                   </>
                 ) : null}
               </div>
