@@ -18,9 +18,13 @@
  *
  * ★★ 2026-10-03 — **「시스템이라서 못 지운다」가 없어졌다**(사용자 결정). 남은 차단은
  *    자료가 바로 깨지는 둘뿐이다: 쓰고 있는 코드값 · 앱이 직접 쓰는 코드값.
+ *
+ * ★ 2026-11-25 센터·기준관리 일관성 — 공통 팝업(`Dialog` · 아쿠아 제목줄 · 아래 가운데 [삭제](지우기 · danger) [취소](보통)).
+ *   종전 껍데기(facility ModalShell)의 [닫기] 는 [취소] 로 · 순서는 확인 먼저. 안내(blocked) · 오류는 본문 맨 위
+ *   (codes.module.css 의 .blocked · .error). 바탕 누름 · ESC 로 닫힌다(저장 중에는 막는다 — closeDisabled).
  */
 import { useState } from 'react';
-import { ModalShell } from '@/features/facility/ModalShell';
+import { Button, Dialog } from '@/components/ds';
 import {
   CodesError,
   lineBlockReason,
@@ -104,18 +108,38 @@ export function DeleteCodeDialog({ target, onClose, onDeleted }: Props) {
   const why = blocked ?? known;
 
   return (
-    <ModalShell
-      title={title}
-      desc={ask}
-      busy={busy}
-      error={error}
-      blocked={why}
-      okLabel="삭제"
-      okDanger
-      okDisabled={why !== null}
+    <Dialog
+      open
       onClose={onClose}
-      onOk={submit}
+      closeDisabled={busy}
+      /* ★ 2026-11-25 일관성 — 제목 = 짧은 이름(「분류코드 삭제」 등), 묻는 문장은 본문 첫 줄 굵게 */
+      title={title}
+      description={<strong>{ask}</strong>}
+      footer={
+        <>
+          <Button variant="danger" size="sm" disabled={busy || why !== null} onClick={() => void submit()}>
+            삭제
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            취소
+          </Button>
+        </>
+      }
     >
+      {/*
+        ★ 안내와 오류를 **가른다.** 「쓰고 있어서 못 지웁니다」는 운영자가 잘못한 것이
+          아니라 지금 상태가 그런 것이다 — 붉은 오류로 그리면 고장처럼 읽힌다.
+      */}
+      {why ? (
+        <p className={styles.blocked} role="status" data-facility-blocked="1">
+          {why}
+        </p>
+      ) : null}
+      {error ? (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      ) : null}
       {why === null ? (
         <p className={styles.formNote}>
           지우면 되돌릴 수 없습니다.
@@ -124,6 +148,6 @@ export function DeleteCodeDialog({ target, onClose, onDeleted }: Props) {
             : ''}
         </p>
       ) : null}
-    </ModalShell>
+    </Dialog>
   );
 }

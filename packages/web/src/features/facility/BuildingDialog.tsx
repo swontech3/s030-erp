@@ -21,9 +21,10 @@
  *   없어서 **글 칸**으로 둔다. 멤버 관리(s030200050)가 생기면 셀렉트로 바꾼다.
  */
 import { useState } from 'react';
+import { Button, Dialog } from '@/components/ds';
 import { FacilityError, saveBuilding, uploadFacilityFile, type Building } from './facility-model';
 import { AttachField } from './AttachField';
-import { Field, ModalShell, cf } from './ModalShell';
+import { Field, cf } from './ModalShell';
 import styles from './facility.module.css';
 
 interface Props {
@@ -92,22 +93,44 @@ export function BuildingDialog({ building, onClose, onSaved }: Props) {
     }
   }
 
+  /*
+   * ★ 이미 저장된 뒤에 닫으면 **목록을 새로 받아야 한다**(`onSaved`). 첨부만 실패해
+   *   창이 열려 있는 경우가 그렇다 — `onClose` 로 닫으면 방금 만든 건물이 트리에
+   *   나타나지 않는다.
+   */
+  const close = savedId ? onSaved : onClose;
+
+  // ★ 2026-11-25 센터·기준관리 일관성 — 공통 팝업 Dialog(아쿠아 제목줄 · 아래 가운데 [저장](주) [취소](보통)).
   return (
-    <ModalShell
+    <Dialog
+      open
+      onClose={close}
+      closeDisabled={busy}
       title={building ? '건물 수정' : '건물 등록'}
-      busy={busy}
-      error={error}
-      okLabel="저장"
-      /* ★ 건물명이 비면 저장을 막는다 — 서버도 400 으로 막지만 눌러 보게 하지 않는다. */
-      okDisabled={form.name.trim() === ''}
-      /*
-       * ★ 이미 저장된 뒤에 닫으면 **목록을 새로 받아야 한다**(`onSaved`). 첨부만 실패해
-       *   창이 열려 있는 경우가 그렇다 — `onClose` 로 닫으면 방금 만든 건물이 트리에
-       *   나타나지 않는다.
-       */
-      onClose={savedId ? onSaved : onClose}
-      onOk={submit}
+      footer={
+        <>
+          {/* ★ 건물명이 비면 저장을 막는다 — 서버도 400 으로 막지만 눌러 보게 하지 않는다. */}
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={busy || form.name.trim() === ''}
+            onClick={() => void submit()}
+          >
+            저장
+          </Button>
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={close}>
+            취소
+          </Button>
+        </>
+      }
     >
+      <div className={styles.dlgBody}>
+      {error ? (
+        <p className={cf.fieldError} role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className={styles.grid2}>
         <Field label="건물명" full>
           <input className={cf.input} value={form.name} onChange={set('name')} autoFocus />
@@ -158,6 +181,7 @@ export function BuildingDialog({ building, onClose, onSaved }: Props) {
 
       {/* 레거시 `BuildingForm` 의 파일 칸. ★ 화면코드는 늘지 않는다 — p1 안의 칸이다. */}
       <AttachField kind="buildings" targetId={targetId} pending={doc} onPending={setDoc} />
-    </ModalShell>
+      </div>
+    </Dialog>
   );
 }

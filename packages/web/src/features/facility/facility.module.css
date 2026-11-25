@@ -216,9 +216,12 @@
 /* ★ 패널 제목은 **화면 제목이 아니다** — 화면 제목은 `.title`(30px) 하나뿐이다. */
 .panelTitle {
   margin: 0;
+  /* ★ 2026-11-25 센터·기준관리 일관성 — 구역 제목 = 왼쪽 4px 아쿠아 막대(글자에만 · 입주관리와 같다) */
+  border-left: 4px solid var(--color-primary);
+  padding-left: 8px;
   font-size: var(--text-button-lg-size);
   font-weight: 700;
-  line-height: 1.4;
+  line-height: 1.2;
   letter-spacing: -0.012em;
   color: var(--text-heading);
 }
@@ -232,6 +235,25 @@
 .actions {
   display: flex;
   gap: 8px;
+}
+
+/* ★ 2026-11-25 센터·기준관리 일관성 — 단추 줄(검색 줄과 표 사이 · 왼쪽 · 입주사 목록 `.listBar` 와 같은 자리) */
+.listBar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* 「n건」 — 검색 줄 오른쪽 끝(입주사 목록 `.count` 와 같은 값) */
+.count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: var(--text-body-size);
+  font-weight: 700;
+  color: var(--text-heading);
+  white-space: nowrap;
 }
 
 /* 「불러오는 중…」 한 줄. ★ 빈 상태와 다르다 — 아이콘을 띄우지 않는다. */
@@ -378,7 +400,7 @@
  * ★★ 표는 **패널 안에서 구른다.** 72실이 한 번에 그려져도 화면이 밀려 올라가지 않는다 —
  *    입주사 목록(`.cards`)과 같은 수법이다.
  * ★ 좌우로 `-20px` 빼내 **머리말 띠를 카드 끝까지** 깐다(청구의 `.tHead` 가 그렇다).
- *   그만큼 첫·끝 칸에 패딩을 되돌려 준다.
+ *   첫·끝 칸 안쪽 여백은 공통 Table 이 준다(좌우 16px).
  */
 .tableWrap {
   flex: 1;
@@ -402,110 +424,13 @@
   background: var(--text-caption);
 }
 
-.table {
-  width: 100%;
-  /* ★ `collapse` 면 sticky 머리말의 아래 테두리가 함께 굴러 사라진다. */
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: var(--text-body-size);
-}
-
-.table th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  height: 44px;
-  padding: 0 10px;
-  background: var(--surface-alt);
-  border-bottom: 1px solid var(--border);
-  font-size: var(--text-micro-size);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--text-caption);
-  text-align: left;
-  white-space: nowrap;
-}
-
-.table td {
-  height: 60px;
-  padding: 10px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text-body);
-  vertical-align: middle;
-}
-
-.table th:first-child,
-.table td:first-child {
-  padding-left: 20px;
-}
-
-.table th:last-child,
-.table td:last-child {
-  padding-right: 20px;
-}
-
-.table tbody tr:hover td {
-  background: var(--surface-alt);
-}
-
 /*
- * 표 안 버튼 — **30px**. 청구의 `.btnXs` 와 같은 값이다.
- *
- * ★ DS `<Button>` 을 쓰지 않는다. 제일 작은 것이 40px(`size="sm"`)라 60px 행에 넣으면
- *   행이 버튼으로 꽉 찬다. 청구·입주사도 같은 이유로 각자 `.btnXs` 를 두고 있다.
+ * ★ 2026-11-25 센터·기준관리 일관성 — 표는 공통 Table(`components/ds/Table`)이 그린다.
+ *   머리글 색 · 줄 선 · 칸 사이는 부품이 정하므로 종전 `.table` · `th` · `td` · `.btnXs`(30px 표 안 단추)는 없앴다.
+ *   정렬은 `tableCell` 로 준다. 금액 · 수 칸의 숫자 폭만 여기서 맞춘다.
  */
-.btnXs {
-  height: 30px;
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--text-heading);
-  font: inherit;
-  font-size: var(--text-micro-size);
-  font-weight: 700;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background var(--dur) var(--ease-out);
-}
-
-.btnXs:hover:not(:disabled) {
-  background: var(--surface-alt);
-}
-
-.btnXs:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: 1px;
-}
-
-.btnXs:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .num {
-  text-align: right;
   font-variant-numeric: tabular-nums;
-}
-
-.center {
-  text-align: center;
-}
-
-/*
- * ★ 머리말에도 같은 정렬을 준다. `.table th` 가 `text-align:left` 를 들고 있어서
- *   (셀렉터가 더 세다) 그냥 `.num` 만 붙이면 **머리말만 왼쪽으로 남는다** —
- *   금액 머리말이 숫자와 어긋나 보였다(2026-10-03).
- */
-.table th.num {
-  text-align: right;
-}
-
-.table th.center {
-  text-align: center;
 }
 
 /*
@@ -540,10 +465,6 @@
   outline: var(--focus-ring);
   outline-offset: 2px;
   border-radius: 2px;
-}
-
-.rowOff td {
-  color: var(--text-caption);
 }
 
 /* 「사용 안 함」 표시 */
@@ -618,9 +539,31 @@
 
 .sectionTitle {
   margin: 0 0 10px;
+  /* ★ 2026-11-25 센터·기준관리 일관성 — 팝업 안 구역 제목도 왼쪽 4px 아쿠아 막대(글자에만) */
+  border-left: 4px solid var(--color-primary);
+  padding-left: 8px;
+  line-height: 1.2;
   font-size: var(--text-micro-size);
   font-weight: var(--weight-bold);
   color: var(--text-caption);
+}
+
+/*
+ * ★ 2026-11-25 센터·기준관리 일관성 — 공통 팝업(Dialog) 본문.
+ *   종전 껍데기(ModalShell)의 `cf.modalExtra`(세로 · 사이 12px)와 같은 간격으로 칸 묶음을 쌓는다.
+ */
+.dlgBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 팝업 본문 안내 글 — 종전 `cf.modalDesc`(가운데) 대신 Dialog 설명과 같은 왼쪽 정렬 */
+.dlgText {
+  margin: 0;
+  font-size: var(--text-body-size);
+  line-height: 1.6;
+  color: var(--text-body);
 }
 
 .checks {

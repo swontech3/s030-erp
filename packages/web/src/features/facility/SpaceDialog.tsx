@@ -47,7 +47,8 @@ import {
   MIN_MAX_COMPANIES,
   warnVirtualShared,
 } from '@swonbiz/shared/domain/space-occupancy';
-import { Field, ModalShell, MoneyInput, cf, moneyValue } from './ModalShell';
+import { Button, Dialog } from '@/components/ds';
+import { Field, MoneyInput, cf, moneyValue } from './ModalShell';
 import styles from './facility.module.css';
 
 interface Props {
@@ -122,17 +123,37 @@ export function SpaceDialog({ floorId, floorLabel, codes, space, onClose, onSave
     }
   }
 
+  // ★ 2026-11-25 센터·기준관리 일관성 — 공통 팝업 Dialog(아쿠아 제목줄 · 아래 가운데 [저장](주) [취소](보통)).
   return (
-    <ModalShell
-      title={space ? '호실 수정' : '호실 등록'}
-      desc={floorLabel}
-      busy={busy}
-      error={error}
-      okLabel="저장"
-      okDisabled={form.roomType === '' || !maxValid}
+    <Dialog
+      open
       onClose={onClose}
-      onOk={submit}
+      closeDisabled={busy}
+      title={space ? '호실 수정' : '호실 등록'}
+      description={floorLabel || undefined}
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={busy || form.roomType === '' || !maxValid}
+            onClick={() => void submit()}
+          >
+            저장
+          </Button>
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            취소
+          </Button>
+        </>
+      }
     >
+      <div className={styles.dlgBody}>
+      {error ? (
+        <p className={cf.fieldError} role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className={styles.grid2}>
         <Field label="호실명">
           <input className={cf.input} value={form.roomName} onChange={set('roomName')} placeholder="301호" autoFocus />
@@ -225,6 +246,7 @@ export function SpaceDialog({ floorId, floorLabel, codes, space, onClose, onSave
           <textarea className={cf.textarea} rows={2} value={form.memo} onChange={set('memo')} />
         </Field>
       </div>
-    </ModalShell>
+      </div>
+    </Dialog>
   );
 }
