@@ -67,6 +67,14 @@ div.lineGrid {
   padding-right: 20px;
 }
 
+/* ★ 2026-11-25 대표 결정(정한 것 8) — 사용 안 함 줄 = 공통 Table 흐린 줄(muted · --text-caption)을 줄 전체에.
+     muted 는 줄 글자색만 바꿔 제 색을 가진 칸(코드값 · 사용타입 글자 단추 · 딱지 글자)은 그대로였다 →
+     줄 안 모든 글자를 같은 색으로. 공통 Button 은 글자색을 인라인으로 가져 그대로다 */
+div.rowOff,
+div.rowOff * {
+  color: var(--text-caption);
+}
+
 /* 표 위 단추 줄 — 등록(보통 단추) 왼쪽 */
 .listBar {
   flex: 0 0 auto;

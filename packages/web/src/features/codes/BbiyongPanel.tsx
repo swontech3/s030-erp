@@ -176,7 +176,7 @@ export function BbiyongPanel({ type, onChanged }: Props) {
             <TableEmpty>{values.length === 0 ? '코드값이 없습니다' : '조회 결과가 없습니다'}</TableEmpty>
           ) : (
             shown.map((v) => (
-              <TableRow key={v.cdV} className={view.lineGrid} muted={v.useYn !== 'Y'}>
+              <TableRow key={v.cdV} className={`${view.lineGrid}${v.useYn === 'Y' ? '' : ` ${view.rowOff}`}`} muted={v.useYn !== 'Y'}>
                 <span className={styles.code}>{v.cdV}</span>
                 <span>{v.cdVMeaning}</span>
                 <span className={`${styles.num} ${tableCell.right}`}>{v.sortSeq ?? ''}</span>
@@ -203,7 +203,7 @@ export function BbiyongPanel({ type, onChanged }: Props) {
         <span>
           코드값 {values.length}개 · 사용 {values.filter((v) => v.useYn === 'Y').length}개
         </span>
-        {!busy && shown.length !== values.length ? <span className={styles.panelFootSub}>조회 {shown.length}건</span> : null}
+        {/* ★ 2026-11-25 대표 결정(정한 것 3) — 「조회 n건」을 뺐다. 건수는 검색 줄 오른쪽 끝 「n건」 하나 */}
       </div>
 
       {dialog ? (

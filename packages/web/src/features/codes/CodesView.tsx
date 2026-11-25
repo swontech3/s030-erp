@@ -449,9 +449,7 @@ export function CodesView() {
                **오른쪽 목록 아래 띠**로 옮겼다. 그 수는 오른쪽에 열린 것의 수라, 세는
                대상이 있는 쪽에 붙어 있어야 읽힌다.
           */}
-          <div className={styles.treeFoot}>
-            <span>분류 {shownRows.length}개</span>
-          </div>
+          {/* ★ 2026-11-25 대표 결정(정한 것 3) — 아래 띠 「분류 N개」를 뺐다. 건수는 검색 줄 오른쪽 끝 「n건」 하나 */}
         </aside>
 
         {/* ══════════ 우측 · 코드값 ══════════ */}
@@ -576,7 +574,7 @@ export function CodesView() {
                     shownLines.map((l) => {
                       const why = lineBlockReason(l);
                       return (
-                        <TableRow key={l.lineId} className={view.lineGrid} muted={!l.isActive}>
+                        <TableRow key={l.lineId} className={`${view.lineGrid}${l.isActive ? '' : ` ${view.rowOff}`}`} muted={!l.isActive}>
                           <span>
                             {/*
                               ★ 누르면 **사용타입 수정** 팝업이 열린다(사용자 결정) —
@@ -660,9 +658,7 @@ export function CodesView() {
                 <span>
                   사용타입 {master.partitionCount}개 · 코드값 {master.lineCount}개
                 </span>
-                {!linesBusy && shownLines.length !== lines.length ? (
-                  <span className={styles.panelFootSub}>조회 {shownLines.length}건</span>
-                ) : null}
+                {/* ★ 2026-11-25 대표 결정(정한 것 3) — 「조회 n건」을 뺐다. 건수는 검색 줄 오른쪽 끝 「n건」 하나 */}
               </div>
             </>
           )}
