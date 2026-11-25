@@ -164,8 +164,8 @@ export function BizPurposesView() {
 
             <div className={styles.panelFoot}>
               <span>
-                {/* ★ 2026-11-25 대표 결정(법무 정한 것 5) — 「문구 n개」를 뺐다(「사용 n개」는 그대로) */}
-                {query === '' ? '' : `조회 ${items.length}개 · `}사용 {activeCount}개
+                {/* ★ 2026-11-25 대표 결정(법무 정한 것 5) — 「문구 n개」 · 「조회 n개」를 뺐다(검색 줄 「n건」과 겹침). 「사용 n개」만 */}
+                사용 {activeCount}개
               </span>
               {!loading && truncated ? (
                 <span className={styles.panelFootSub}>앞의 {items.length}개만 보입니다 — 검색어로 좁히세요</span>
