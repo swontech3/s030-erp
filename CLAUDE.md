@@ -31,6 +31,19 @@
 - 그대로 둠 : 미납 · 미수 · 음수 금액 빨간 글자 / 법무 · 세무 소스(청구가 쓰는 corp-changes.module.css 규칙은 청구 쪽으로 옮겨 쓴다)
 - 기능 · 데이터 · API 는 손대지 않는다 · 다르게 할 이유가 있으면 고치지 않고 「정할 것」
 
+## 센터·기준관리 화면 일관성 — 삐용 기준 (2026-11-25 · 가지 feature/design-center ← origin/feature/design-tenant 16900c5)
+
+- 받은 커밋 : 16900c5(입주관리 일관성 끝) · origin/master 8f703d5 merge — 이미 들어 있음(새 커밋 없음)
+- 대상 = screens.ts 010 기준설정 : 센터 관리 `/facility`(s030100010) · 표양식 관리 `/forms`(s030100020) ·
+  표양식 편집 `/forms/[id]`(s030100021) · 코드 관리 `/codes`(s030100030) — 각 팝업 · 상세 포함
+- 기준 = 입주관리 결과(feature/design-tenant). 공통 부품 Button(지우기) · Dialog · Table 을 쓴다. 공통 부품을 고쳐야 하면 멈추고 묻는다
+- 같이 쓰는 파일은 고치지 않고 보고 : codes.module.css(법무 사업목적 · 등기 설정 · 세무 설정 · 표양식) · forms.module.css(세무 설정) ·
+  facility/ModalShell.tsx(법무) · forms/FormDocument · FormPrintPortal(법무 인쇄) · contracts/contract-form.module.css(입주관리 · 청구)
+  → 새 규칙이 필요하면 화면 전용 새 css 에 둔다
+- 맞출 것 : 표 = 공통 Table(카드형 목록도) · 구역 제목 4px 아쿠아 막대 · 단추 주/보통/지우기와 자리 · 즉시 거르는 검색은 「n건」만 오른쪽 끝 ·
+  팝업 = 공통 Dialog(제목 짧은 이름 · 질문은 본문) · 직접 색 값 → 토큰 · px 글자 → 글자 크기 토큰
+- 기준에 없는 것 · 다르게 할 이유가 있는 것은 고치지 않고 「정할 것」 · 기능 · 데이터 · API 는 손대지 않는다
+
 ## 세무(S05) 작업 범위 (가지 tax-s05)
 
-- 2026-11-25 : master da03a13 을 tax-s05 에 합치고 세무가 깨지는 곳만 세무 코드에서 맞춤 — 화면 모양은 그대로
+- 2026-11-25 : master d12287c(da03a13 포함) 를 tax-s05 에 합치고 세무가 깨지는 곳만 세무 코드에서 맞춤 — 화면 모양은 그대로

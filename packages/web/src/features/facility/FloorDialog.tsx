@@ -16,9 +16,10 @@
  *   지하층을 넣을 수 없다. 목록 정렬은 서버가 숫자로 읽히는 것만 숫자로 센다.
  */
 import { useState } from 'react';
+import { Button, Dialog } from '@/components/ds';
 import { FacilityError, area, saveFloor, uploadFacilityFile, type Floor } from './facility-model';
 import { AttachField } from './AttachField';
-import { Field, ModalShell, MoneyInput, cf, moneyValue } from './ModalShell';
+import { Field, MoneyInput, cf, moneyValue } from './ModalShell';
 import styles from './facility.module.css';
 
 interface Props {
@@ -82,18 +83,40 @@ export function FloorDialog({ buildingId, buildingName, floor, onClose, onSaved 
     }
   }
 
+  /* ★ 이미 저장된 뒤에 닫으면 목록을 새로 받아야 한다 — 건물(p1)과 같은 이유다. */
+  const close = savedId ? onSaved : onClose;
+
+  // ★ 2026-11-25 센터·기준관리 일관성 — 공통 팝업 Dialog(아쿠아 제목줄 · 아래 가운데 [저장](주) [취소](보통)).
   return (
-    <ModalShell
+    <Dialog
+      open
+      onClose={close}
+      closeDisabled={busy}
       title={floor ? '층 수정' : '층 등록'}
-      desc={buildingName}
-      busy={busy}
-      error={error}
-      okLabel="저장"
-      okDisabled={form.floorNo.trim() === ''}
-      /* ★ 이미 저장된 뒤에 닫으면 목록을 새로 받아야 한다 — 건물(p1)과 같은 이유다. */
-      onClose={savedId ? onSaved : onClose}
-      onOk={submit}
+      description={buildingName || undefined}
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={busy || form.floorNo.trim() === ''}
+            onClick={() => void submit()}
+          >
+            저장
+          </Button>
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={close}>
+            취소
+          </Button>
+        </>
+      }
     >
+      <div className={styles.dlgBody}>
+      {error ? (
+        <p className={cf.fieldError} role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className={styles.grid2}>
         <Field label="층 번호">
           {/* ★ 글자다 — 「B1」을 넣을 수 있어야 한다. */}
@@ -130,6 +153,7 @@ export function FloorDialog({ buildingId, buildingName, floor, onClose, onSaved 
 
       {/* 레거시 `FloorForm` 의 파일 칸. ★ 화면코드는 늘지 않는다 — p2 안의 칸이다. */}
       <AttachField kind="floors" targetId={targetId} pending={doc} onPending={setDoc} />
-    </ModalShell>
+      </div>
+    </Dialog>
   );
 }

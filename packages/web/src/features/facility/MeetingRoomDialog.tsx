@@ -19,7 +19,8 @@
  */
 import { useState } from 'react';
 import { FacilityError, meetingRoomBlockReason, saveMeetingRoom, type MeetingRoom } from './facility-model';
-import { Field, ModalShell, MoneyInput, cf, moneyValue } from './ModalShell';
+import { Button, Dialog } from '@/components/ds';
+import { Field, MoneyInput, cf, moneyValue } from './ModalShell';
 import styles from './facility.module.css';
 
 interface Props {
@@ -76,17 +77,37 @@ export function MeetingRoomDialog({ floorId, floorLabel, room, onClose, onSaved 
     }
   }
 
+  // ★ 2026-11-25 센터·기준관리 일관성 — 공통 팝업 Dialog(아쿠아 제목줄 · 아래 가운데 [저장](주) [취소](보통)).
   return (
-    <ModalShell
-      title={room ? '회의실 수정' : '회의실 등록'}
-      desc={floorLabel}
-      busy={busy}
-      error={error}
-      okLabel="저장"
-      okDisabled={form.name.trim() === ''}
+    <Dialog
+      open
       onClose={onClose}
-      onOk={submit}
+      closeDisabled={busy}
+      title={room ? '회의실 수정' : '회의실 등록'}
+      description={floorLabel || undefined}
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={busy || form.name.trim() === ''}
+            onClick={() => void submit()}
+          >
+            저장
+          </Button>
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            취소
+          </Button>
+        </>
+      }
     >
+      <div className={styles.dlgBody}>
+      {error ? (
+        <p className={cf.fieldError} role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className={styles.grid2}>
         <Field label="회의실명" full>
           <input className={cf.input} value={form.name} onChange={set('name')} placeholder="회의실 A" autoFocus />
@@ -131,6 +152,7 @@ export function MeetingRoomDialog({ floorId, floorLabel, room, onClose, onSaved 
           </p>
         ) : null}
       </div>
-    </ModalShell>
+      </div>
+    </Dialog>
   );
 }

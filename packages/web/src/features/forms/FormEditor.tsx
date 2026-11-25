@@ -22,14 +22,15 @@
  *   칸을 만들어(보이지 않는 칸) 나중에 분할하면 엉뚱한 서식이 드러났다.
  * · 글자는 **왼쪽 위 칸 하나에만** 쓴다. 레거시는 여러 칸을 고른 채 글자를 치면 고른 칸
  *   전부에 같은 글자가 들어갔다.
- * · 나갈 때 확인은 `window.confirm` 대신 ERP 확인 창이다(`ModalShell`).
+ * · 나갈 때 확인은 `window.confirm` 대신 ERP 확인 창이다 — 2026-11-25 일관성에서 공통 팝업 `Dialog` 로 바꿨다
+ *   (제목 = 짧은 이름 「나가기 확인」 · 묻는 문장은 본문 첫 줄 · 아래 가운데 [나가기](지우기) [취소](보통)).
  * · 양식 정보 아래에 **법무 표시**가 있다(`LegalMarkPanel`, 2026-10-11) — 붙이면 법인변경 [서류 출력]에
  *   뜬다. 레거시 「데이터 소스」 대신 이것이 「법무 양식」의 정본이다.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Icon } from '@/components/ds';
-import { Field, ModalShell, cf } from '@/features/facility/ModalShell';
+import { Button, Dialog, Icon } from '@/components/ds';
+import { Field, cf } from '@/features/facility/ModalShell';
 import codes from '@/features/codes/codes.module.css';
 import {
   DEFAULT_FORM_KIND,
@@ -451,17 +452,30 @@ export function FormEditor({ id }: { id: string | null }) {
 
       {/** @screen s030100021p1 나가기 확인 · 010 기준설정 */}
       {leaving ? (
-        <ModalShell
-          title="저장하지 않고 나갈까요?"
-          desc={info.name || '새 양식'}
-          busy={false}
-          okLabel="나가기"
-          okDanger
+        <Dialog
+          open
           onClose={() => setLeaving(false)}
-          onOk={() => router.push(listHref)}
+          title="나가기 확인"
+          description={
+            <>
+              <strong>저장하지 않고 나갈까요?</strong>
+              <br />
+              {info.name || '새 양식'}
+            </>
+          }
+          footer={
+            <>
+              <Button variant="danger" size="sm" onClick={() => router.push(listHref)}>
+                나가기
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setLeaving(false)}>
+                취소
+              </Button>
+            </>
+          }
         >
           <p className={codes.formNote}>저장하지 않은 변경이 있습니다. 나가면 그 변경은 사라집니다.</p>
-        </ModalShell>
+        </Dialog>
       ) : null}
     </div>
   );

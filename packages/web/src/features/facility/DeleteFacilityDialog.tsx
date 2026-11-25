@@ -19,8 +19,10 @@
  *   일(「사용 안 함」으로 바꾸기)이 문구에 적혀 있다.
  */
 import { useState } from 'react';
+import { Button, Dialog } from '@/components/ds';
 import { FacilityError } from './facility-model';
-import { ModalShell, cf } from './ModalShell';
+import { cf } from './ModalShell';
+import styles from './facility.module.css';
 
 export type DeleteKind = 'building' | 'floor' | 'space' | 'facility';
 
@@ -68,24 +70,65 @@ export function DeleteFacilityDialog({ kind, label, blocked, onClose, onDelete }
     }
   }
 
+  /*
+   * ★ 2026-11-25 센터·기준관리 일관성 — 공통 팝업 Dialog. 제목 = 짧은 이름(「호실 삭제」),
+   *   묻는 문장은 본문 첫 줄 굵게. 아래 가운데 [삭제](지우기 · danger) [취소](보통).
+   *   안내(blocked) · 오류 · 「지울 수 없습니다」 줄은 종전 껍데기와 같은 차례 · 같은 글자다.
+   */
   return (
-    <ModalShell
-      title={`${label} 을(를) 지우시겠습니까?`}
-      desc={stop ? undefined : `${what}이 영구히 지워집니다. 이 작업은 되돌릴 수 없습니다.`}
-      busy={busy}
-      blocked={stop}
-      error={error}
-      okLabel="삭제"
-      okDanger
-      okDisabled={stop !== null}
+    <Dialog
+      open
       onClose={onClose}
-      onOk={submit}
+      closeDisabled={busy}
+      title={`${what} 삭제`}
+      description={
+        <>
+          {/* ★ 2026-11-25 대표 결정(정한 것 8) — 묻는 문장 = 입주관리와 같은 「…삭제하시겠습니까?」 */}
+          <strong>{label} 을(를) 삭제하시겠습니까?</strong>
+          {stop ? null : (
+            <>
+              <br />
+              {what}이 영구히 지워집니다. 이 작업은 되돌릴 수 없습니다.
+            </>
+          )}
+        </>
+      }
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            disabled={busy || stop !== null}
+            onClick={() => void submit()}
+          >
+            삭제
+          </Button>
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            취소
+          </Button>
+        </>
+      }
     >
-      {stop ? (
-        <p className={cf.modalDesc} style={{ textAlign: 'left' }}>
-          지울 수 없습니다. 위 안내를 확인해 주세요.
-        </p>
+      {stop || error ? (
+      <div className={styles.dlgBody}>
+        {/*
+          ★ 안내와 오류를 **가른다.** 「쓰고 있어서 못 지웁니다」는 운영자가 잘못한 것이
+            아니라 지금 상태가 그런 것이다 — 붉은 오류로 그리면 고장처럼 읽힌다.
+        */}
+        {stop ? (
+          <p className={styles.dlgText} role="status" data-facility-blocked="1">
+            {stop}
+          </p>
+        ) : null}
+        {error ? (
+          <p className={cf.fieldError} role="alert">
+            {error}
+          </p>
+        ) : null}
+        {stop ? <p className={styles.dlgText}>지울 수 없습니다. 위 안내를 확인해 주세요.</p> : null}
+      </div>
       ) : null}
-    </ModalShell>
+    </Dialog>
   );
 }

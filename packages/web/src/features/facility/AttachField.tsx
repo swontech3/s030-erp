@@ -34,7 +34,7 @@ import {
   rejectFacilityUpload,
   type FacilityTarget,
 } from '@swonbiz/shared/domain/facility-files';
-import { Icon } from '@/components/ds';
+import { Button, Icon } from '@/components/ds';
 import {
   FacilityError,
   loadFacilityFiles,
@@ -181,44 +181,48 @@ export function AttachField({ kind, targetId, pending, onPending }: Props) {
           </div>
         </div>
 
+        {/* ★ 2026-11-25 센터·기준관리 일관성 — 공통 단추(보기 · 취소 · 파일 선택 = 보통 · 삭제 = 지우기). 계약 서류(SectionDocs)와 같다 */}
         <div className={cf.docActions}>
           {file ? (
             <>
-              <button
+              <Button
                 type="button"
-                className={`${cf.btn} ${cf.btnGhost}`}
+                variant="ghost"
+                size="sm"
+                iconLeft={<Icon name="eye" size={16} />}
                 disabled={busy}
                 onClick={() => void open()}
               >
-                <Icon name="eye" size={16} />
                 보기
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className={`${cf.btn} ${cf.btnGhost}`}
+                variant="danger"
+                size="sm"
+                iconLeft={<Icon name="trash-2" size={16} />}
                 disabled={busy}
                 onClick={() => void remove()}
               >
-                <Icon name="trash-2" size={16} />
                 삭제
-              </button>
+              </Button>
             </>
           ) : null}
 
           {/* 저장 전이라 「삭제」가 아니라 「취소」다 — 지울 것이 아직 없다. */}
           {!file && pending ? (
-            <button
+            <Button
               type="button"
-              className={`${cf.btn} ${cf.btnGhost}`}
+              variant="ghost"
+              size="sm"
+              iconLeft={<Icon name="x" size={16} />}
               disabled={busy}
               onClick={() => {
                 onPending(null);
                 setNote(null);
               }}
             >
-              <Icon name="x" size={16} />
               취소
-            </button>
+            </Button>
           ) : null}
 
           <input
@@ -233,15 +237,16 @@ export function AttachField({ kind, targetId, pending, onPending }: Props) {
               if (picked) void pick(picked);
             }}
           />
-          <button
+          <Button
             type="button"
-            className={`${cf.btn} ${cf.btnGhost}`}
+            variant="ghost"
+            size="sm"
+            iconLeft={<Icon name="upload" size={16} />}
             disabled={busy}
             onClick={() => input.current?.click()}
           >
-            <Icon name="upload" size={16} />
             {busy ? '처리 중…' : file || pending ? '교체' : '파일 선택'}
-          </button>
+          </Button>
         </div>
       </div>
 

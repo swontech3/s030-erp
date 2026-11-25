@@ -5,6 +5,9 @@
  *
  * ★ 모양은 **코드 관리(s030100030)와 같다**(사용자 지시 「다른 ERP 화면과 같게」) —
  *   `codes.module.css` 를 그대로 쓴다. 왼쪽 420px · 검색 줄 · 줄 끝 작은 버튼 · 아래 띠.
+ * ★ 2026-11-25 센터·기준관리 일관성(삐용 기준 = 입주관리 결과) — 목록 = 공통 표(Table) · 단추 = 공통 Button ·
+ *   검색 줄 오른쪽 끝 [초기화][조회] + 「n건」(아래 띠는 없앴다) · [양식 추가] 표 위 왼쪽 · 삭제 확인 = 공통 Dialog ·
+ *   상세 제목 · 「채울 칸」 = 구역 제목 막대. 새 모양은 `forms-view.module.css`(같이 쓰는 css 는 고치지 않는다).
  *
  * =============================================================================
  * ★★★ 양식 편집은 이 화면, **법무 서류 출력은 법무 서비스(s04)** 다 (결정 2026-10-09)
@@ -25,9 +28,20 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Icon, type IconName } from '@/components/ds';
+import {
+  Button,
+  Dialog,
+  Icon,
+  Table,
+  TableEmpty,
+  TableHead,
+  TableRow,
+  tableCell,
+  type IconName,
+} from '@/components/ds';
+import { BTN_XS } from '@/features/billing/BillingTable';   // ★ 2026-11-25 정한 것 5 — 줄 끝 작은 단추 30px(코드 관리와 같은 방식)
 import { LoadingBar } from '@/components/patterns/LoadingBar';
-import { ModalShell, cf } from '@/features/facility/ModalShell';
+import { cf } from '@/features/facility/ModalShell';
 import codes from '@/features/codes/codes.module.css';
 import { inputFieldsOf, isLegalForm } from '@swonbiz/shared/domain/form-template';
 import {
@@ -44,12 +58,21 @@ import {
 import { FormDocument } from './FormDocument';
 import { FormPrintPortal, printFormDocument } from './FormPrintPortal';
 import styles from './forms.module.css';
+import fv from './forms-view.module.css';
 
 const EMPTY_FILTER = { name: '', kind: '' };
 
 /** 삭제가 막힌 이유 — 화면이 미리 잠근다. 판정은 서버(409)다. */
 const deleteBlockReason = (t: FormTemplateItem): string | null =>
   t.legal ? '법무 표시가 붙은 양식입니다 — 양식 편집에서 표시를 뗀 뒤 지울 수 있습니다' : null;
+
+/**
+ * ★ 2026-11-25 센터·기준관리 일관성 — 왼쪽 양식 목록(줄 목록) → 공통 표(Table). 칸 폭.
+ *   목록 칸 420px 은 그대로다. 칸은 종전 줄에 보이던 셋 : 양식 이름 | 종류 | 줄 끝 단추.
+ *   단추 칸 196 = 공통 단추 sm(40px) [편집] [복사] [삭제] 셋 + 사이 4px. 종류 64 = 「일반서류」.
+ *   양식 이름은 남는 폭(약 100px) — 종전처럼 넘치면 「…」로 줄인다.
+ */
+const FORM_COLS = 'minmax(0, 1fr) 64px 196px';
 
 export function FormsView({ initialId }: { initialId: string | null }) {
   const router = useRouter();
@@ -182,83 +205,90 @@ export function FormsView({ initialId }: { initialId: string | null }) {
                   </option>
                 ))}
               </select>
-              <button type="button" className={`${codes.btnXs} ${codes.searchBtn}`} onClick={applySearch}>
-                조회
-              </button>
-              <button
-                type="button"
-                className={`${codes.btnXs} ${codes.searchBtn}`}
+              {/* ★ 2026-11-25 일관성 — 삐용 검색 줄 : 오른쪽 끝 [초기화][조회](공통 보통 단추) 다음 「n건」.
+                    건수는 종전 목록 아래 띠(「양식 n개 · 조회 n건」)에서 옮겼다 — 조회 결과 건수 */}
+              <Button
+                variant="ghost"
+                size="sm"
+                iconLeft={<Icon name="rotate-ccw" size={16} />}
                 onClick={() => {
                   setFilterInput(EMPTY_FILTER);
                   setFilter(EMPTY_FILTER);
                 }}
               >
                 초기화
-              </button>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={applySearch}>
+                조회
+              </Button>
+              {loading ? null : <span className={fv.count}>{shown.length}건</span>}
             </div>
-            <div className={codes.addRow}>
-              <button
-                type="button"
-                className={`${codes.btnXs} ${codes.searchBtn}`}
+            {/* ★ 등록 = 표 위 왼쪽 · 보통 단추(2026-11-25 일관성) */}
+            <div className={fv.listBar}>
+              <Button
+                variant="ghost"
+                size="sm"
+                iconLeft={<Icon name="plus" size={16} />}
                 onClick={() => router.push('/forms/new')}
               >
-                <Icon name="plus" size={12} />
                 양식 추가
-              </button>
+              </Button>
             </div>
           </div>
 
           <div className={codes.treeBody}>
-            {loading ? (
-              <p className={codes.empty}>불러오는 중…</p>
-            ) : shown.length === 0 ? (
-              <p className={codes.empty}>{templates.length === 0 ? '양식이 없습니다' : '조회 결과가 없습니다'}</p>
-            ) : (
-              shown.map((t) => {
-                const why = deleteBlockReason(t);
-                return (
-                  <div key={t.id} className={`${codes.node} ${selectedId === t.id ? codes.nodeOn : ''}`}>
-                    <button type="button" className={codes.nodePick} onClick={() => setSelectedId(t.id)}>
-                      <span className={codes.nodeLabel}>{t.name}</span>
-                      <span className={codes.nodeKey}>{kindName(kinds, t.kind)}</span>
-                    </button>
-                    <span className={codes.nodeActions}>
-                      <button
-                        type="button"
-                        className={codes.btnXs}
-                        onClick={() => router.push(`/forms/${encodeURIComponent(t.id)}`)}
-                      >
-                        편집
-                      </button>
-                      <button
-                        type="button"
-                        className={codes.btnXs}
-                        disabled={busyId === t.id}
-                        onClick={() => void onDuplicate(t)}
-                      >
-                        복사
-                      </button>
-                      <button
-                        type="button"
-                        className={codes.btnXs}
-                        disabled={why !== null}
-                        title={why ?? undefined}
-                        onClick={() => setDeleting(t)}
-                      >
-                        삭제
-                      </button>
-                    </span>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          <div className={codes.treeFoot}>
-            <span>양식 {templates.length}개</span>
-            {shown.length !== templates.length ? (
-              <span className={codes.panelFootSub}>조회 {shown.length}건</span>
-            ) : null}
+            <Table cols={FORM_COLS}>
+              <TableHead sticky>
+                <span>양식 이름</span>
+                <span>종류</span>
+                <span />
+              </TableHead>
+              {loading ? (
+                <TableEmpty>불러오는 중…</TableEmpty>
+              ) : shown.length === 0 ? (
+                <TableEmpty>{templates.length === 0 ? '양식이 없습니다' : '조회 결과가 없습니다'}</TableEmpty>
+              ) : (
+                shown.map((t) => {
+                  const why = deleteBlockReason(t);
+                  return (
+                    <TableRow key={t.id} selected={selectedId === t.id} onClick={() => setSelectedId(t.id)}>
+                      <span className={tableCell.ellipsis}>{t.name}</span>
+                      <span className={`${tableCell.ellipsis} ${codes.nodeKey}`}>{kindName(kinds, t.kind)}</span>
+                      {/* ★ 줄 끝 단추는 줄 고르기와 섞이지 않는다(종전과 같다) — 잠긴 단추를 눌러도 줄로 올리지 않는다 */}
+                      <span className={fv.rowActions} onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          style={BTN_XS}
+                          onClick={() => router.push(`/forms/${encodeURIComponent(t.id)}`)}
+                        >
+                          편집
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          style={BTN_XS}
+                          disabled={busyId === t.id}
+                          onClick={() => void onDuplicate(t)}
+                        >
+                          복사
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          style={BTN_XS}
+                          disabled={why !== null}
+                          title={why ?? undefined}
+                          onClick={() => setDeleting(t)}
+                        >
+                          삭제
+                        </Button>
+                      </span>
+                    </TableRow>
+                  );
+                })
+              )}
+            </Table>
           </div>
         </aside>
 
@@ -278,7 +308,8 @@ export function FormsView({ initialId }: { initialId: string | null }) {
             <>
               <div className={codes.panelHead}>
                 <div>
-                  <h2 className={codes.panelTitle}>{current.name}</h2>
+                  {/* ★ 2026-11-25 일관성 — 상세 제목 = 구역 제목 막대(왼쪽 4px 아쿠아 · 글자에만) */}
+                  <h2 className={fv.panelTitle}>{current.name}</h2>
                   <p className={styles.panelMeta}>
                     <span className={`${codes.tag} ${codes.tagOn}`}>{kindName(kinds, current.kind)}</span>
                     <span>{current.definition.pages.length}장</span>
@@ -303,9 +334,10 @@ export function FormsView({ initialId }: { initialId: string | null }) {
                        법무 서비스(s04)에서 뽑는다. 이 화면은 운영사 전용이라 회사가 못 들어온다.
                        편집은 그대로 여기서 한다.
                   */}
+                  {/* ★ 2026-11-25 대표 결정(정한 것 6) — [인쇄] = 보통 단추 */}
                   <Button
                     size="sm"
-                    variant="primary"
+                    variant="ghost"
                     disabled={legal}
                     title={legal ? '법무 양식은 법무 화면(법인변경)에서 출력합니다' : undefined}
                     onClick={printFormDocument}
@@ -319,11 +351,11 @@ export function FormsView({ initialId }: { initialId: string | null }) {
               <div className={styles.work}>
                 <div className={styles.fields}>
                   <div className={styles.fieldsHead}>
-                    <span>채울 칸 {fields.length}개</span>
+                    <span className={fv.sectionBar}>채울 칸 {fields.length}개</span>
                     {fields.length > 0 ? (
-                      <button type="button" className={codes.btnXs} onClick={() => setValues({})}>
+                      <Button variant="ghost" size="sm" onClick={() => setValues({})}>
                         비우기
-                      </button>
+                      </Button>
                     ) : null}
                   </div>
                   <div className={styles.fieldsBody}>
@@ -418,24 +450,44 @@ function DeleteDialog({
     }
   }
 
+  /*
+   * ★ 2026-11-25 일관성 — 공통 팝업 Dialog(아쿠아 제목줄 · 아래 가운데 [삭제](지우기) [취소](보통)).
+   *   제목 = 짧은 이름(그대로) · 본문 첫 줄 = 지울 양식 이름(종전 제목 아래 줄). 지우는 중에는 바탕 · ESC 로 닫지 않는다.
+   *   못 지우는 안내(409)와 오류는 종전처럼 가른다 — 안내는 경고 띠, 오류는 붉은 띠.
+   */
   return (
-    <ModalShell
-      title="양식 삭제"
-      desc={template.name}
-      busy={busy}
-      error={error}
-      blocked={blocked}
-      okLabel="삭제"
-      okDanger
-      okDisabled={blocked !== null}
+    <Dialog
+      open
       onClose={onClose}
-      onOk={submit}
+      closeDisabled={busy}
+      title="양식 삭제"
+      description={<strong>{template.name}</strong>}
+      footer={
+        <>
+          <Button variant="danger" size="sm" disabled={busy || blocked !== null} onClick={() => void submit()}>
+            삭제
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            취소
+          </Button>
+        </>
+      }
     >
+      {blocked ? (
+        <p className={codes.blocked} role="status">
+          {blocked}
+        </p>
+      ) : null}
+      {error ? (
+        <p className={codes.error} role="alert">
+          {error}
+        </p>
+      ) : null}
       <p className={codes.formNote}>
         이 양식을 지웁니다. 되돌릴 수 없습니다 — 다시 쓰려면 처음부터 그려야 합니다. 이미 인쇄한 종이에는
         영향이 없습니다.
       </p>
-    </ModalShell>
+    </Dialog>
   );
 }
 
