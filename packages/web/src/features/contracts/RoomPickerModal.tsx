@@ -31,7 +31,7 @@ import {
   normalizeRoom,
   type RoomHolder,
 } from '@swonbiz/shared/domain/contract-room';
-import { Button, Dialog, Table, TableRow } from '@/components/ds';
+import { Button, Dialog, Table, TableHead, TableRow } from '@/components/ds';
 import styles from './contract-form.module.css';
 
 interface Props {
@@ -146,6 +146,15 @@ export function RoomPickerModal({ current, selfContractIds, onClose, onPick }: P
           <p className={styles.sectionNote}>사용 중인 계약호실이 없습니다.</p>
         ) : (
           <Table cols={ROOM_COLS} dense>
+            {/* ★ 2026-11-25 정한 것 10 — 호실 표 머리글(아쿠아) : 「회사 · 호실」 한 쌍 × PAIRS_PER_ROW */}
+            <TableHead sticky>
+              {Array.from({ length: PAIRS_PER_ROW }).map((_, k) => (
+                <Fragment key={`h-${k}`}>
+                  <span>회사</span>
+                  <span>호실</span>
+                </Fragment>
+              ))}
+            </TableHead>
             {chunks.map((row, i) => (
               <TableRow key={i}>
                 {row.map((h) => (
@@ -217,5 +226,6 @@ function verdictText(
 
 function verdictTone(rooms: RoomHolder[] | null, typed: string, conflict: RoomHolder | null): string {
   if (rooms === null || typed === '') return 'var(--text-muted)';
-  return conflict ? 'var(--color-danger)' : 'var(--color-success, green)';
+  // ★ 2026-11-25 정한 것 8 — 「사용할 수 있습니다」 녹색(없는 토큰의 예비값 green) → 진한 아쿠아 토큰
+  return conflict ? 'var(--color-danger)' : 'var(--color-primary-hover)';
 }

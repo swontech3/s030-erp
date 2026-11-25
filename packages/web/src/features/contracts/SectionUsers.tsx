@@ -18,7 +18,7 @@
  * ★ 미체크 행은 **입력값을 유지**하고 저장 때만 뺀다. 지우지 않는다.
  */
 import { Fragment } from 'react';
-import { Button, Icon } from '@/components/ds';
+import { Button, Icon, Table, TableHead, TableRow } from '@/components/ds';
 import styles from './contract-form.module.css';
 import {
   DOMAIN_CUSTOM,
@@ -44,6 +44,12 @@ interface Props {
   emailDomains: readonly string[];
   onUsers: (next: UserRow[]) => void;
 }
+
+/**
+ * 입주자 사용자 표 칸 폭 — 종전 `.userHead, .userRow` 의 grid-template-columns 그대로(최소 폭 합계 1020px).
+ * ★ 2026-11-25 정한 것 10 — 공통 Table 로 옮기며 값을 여기로 옮겼다. 칸 사이 · 좌우 여백 0 도 종전 그대로(`div.userTight`)
+ */
+const USER_COLS = '48px 48px 100px 152px minmax(400px, 1fr) 56px 160px 56px';
 
 export function SectionUsers({
   users,
@@ -76,7 +82,9 @@ export function SectionUsers({
       <div className={styles.sectionRule} />
       {notSaveable ? <p className={styles.sectionNote}>{NOT_SAVEABLE_NOTICE}</p> : null}
 
-      <div className={styles.userHead}>
+      {/* ★ 2026-11-25 정한 것 10 — 입주자 사용자 표 = 공통 Table(머리글 아쿠아). 칸 폭은 종전 grid 값 그대로(USER_COLS) */}
+      <Table cols={USER_COLS}>
+      <TableHead className={`${styles.userHead} ${styles.userTight}`}>
         <span>
           {/* 전체 선택 — 1행은 제외한다(해제할 수 없는 행이다) */}
           <input
@@ -94,7 +102,7 @@ export function SectionUsers({
         <span>대표자</span>
         <span className={styles.pad}>비고</span>
         <span>삭제</span>
-      </div>
+      </TableHead>
 
       {users.length === 0 ? (
         <div className={styles.tableEmpty}>
@@ -111,7 +119,7 @@ export function SectionUsers({
 
           return (
             <Fragment key={i}>
-            <div className={`${styles.userRow}${on ? '' : ` ${styles.userRowOff}`}`}>
+            <TableRow className={`${styles.userRow} ${styles.userTight}${on ? '' : ` ${styles.userRowOff}`}`}>
               <span className={`${styles.cell} ${styles.center}`}>
                 <input
                   type="checkbox"
@@ -243,7 +251,7 @@ export function SectionUsers({
                   <Icon name="trash-2" size={16} />
                 </button>
               </span>
-            </div>
+            </TableRow>
 
             {/*
               ★ 삐용 직원정보 연동 대기(035) — **고칠 칸 바로 아래**에 붙인다. 머리말
@@ -262,6 +270,7 @@ export function SectionUsers({
           );
         })
       )}
+      </Table>
 
       <span className={`${styles.tipWrap} ${styles.tipWrapBlock}`}>
         <Button

@@ -563,35 +563,21 @@
 
    ★ 최소 폭 합계는 1022px → 1020px 이다. 줄었으므로 가로 스크롤이 생길 여지는
      이 변경으로 **늘지 않는다**. */
-.userHead,
-.userRow {
-  display: grid;
-  grid-template-columns:
-    48px 48px 100px 152px
-    minmax(400px, 1fr) 56px 160px 56px;
-  align-items: center;
-}
-
-.userHead {
-  padding: 10px 0;
-  background: var(--surface-alt);
-  border-radius: var(--radius-sm);
+/* ★ 2026-11-25 정한 것 10 — 입주자 사용자 표 = 공통 Table(머리글 아쿠아 · 칸 폭은 SectionUsers.tsx USER_COLS).
+     종전 회색 머리 · grid 규칙은 지웠다. 공통 Table 의 칸 사이 12 · 좌우 16 은 종전처럼 0 으로 둔다
+     (div. = 공통 규칙보다 우선 · 넓어지면 최소 폭 1020px 이 늘어 가로 스크롤이 생긴다) */
+div.userTight {
+  column-gap: 0;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .userHead span {
   text-align: center;
-  font-size: var(--text-micro-size);
-  font-weight: 700;
-  color: var(--text-muted);
 }
 
 .userHead span.pad {
   padding: 0 10px;
-}
-
-.userRow {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
 }
 
 .userRowOff {
