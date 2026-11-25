@@ -245,7 +245,8 @@ export function DocFormSettingsView() {
                       <TableHead className={vs.nodeGrid}>
                         <span>코드</span>
                         <span>등기 종류</span>
-                        <span className={tableCell.right}>양식호수</span>
+                        {/* ★ 2026-11-25 대표 결정(법무 정한 것 7) — 머리글 「양식호수」 → 「양식호수 · 상태」(딱지도 이 칸에 든다) */}
+                        <span className={tableCell.right}>양식호수 · 상태</span>
                       </TableHead>
                       {g.items.map((it) => {
                         const b = rowOf(it, '');
