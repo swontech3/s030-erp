@@ -5,9 +5,9 @@
 /**
  * 글 전체 삭제 확인 창 (s030200080).
  *
- * ★ 시안이 없다 — 상태 전이 확인 창(`s030200040p2`)과 **같은 모양**이다
- *   (가운데 원형 아이콘 56px · 가운데 제목 · 50:50 버튼). 되돌릴 수 없는 처리라
- *   확정 버튼이 붉다.
+ * ★ 모양 = 공통 팝업 `Dialog`(삐용 기준 · 2026-11-25 입주관리 일관성) — 아쿠아 제목줄 ·
+ *   아래 가운데 [삭제](지우기 · danger) [취소](보통). 종전 원형 아이콘 · 50:50 단추는 없앴다.
+ *   바탕 누름 · ESC 로 닫힌다(지우는 중에는 막는다 — closeDisabled).
  *
  * =============================================================================
  * ★★★ 무엇이 지워지는지 **적어 두고 묻는다**
@@ -20,7 +20,7 @@
  *   지우는 것은 스팸 제거 같은 예외라 그렇다고 알린다.
  */
 import { useState } from 'react';
-import { Icon } from '@/components/ds';
+import { Button, Dialog } from '@/components/ds';
 import { dotDate } from '@/features/inquiry/inquiry-model';
 import styles from './inquiry-admin.module.css';
 
@@ -59,51 +59,41 @@ export function DeleteInquiryDialog({
   };
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div
-        className={styles.modal}
-        role="dialog"
-        aria-modal="true"
-        aria-label="문의 삭제"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={styles.modalIcon}>
-          <Icon name="triangle-alert" size={26} />
-        </div>
-        <h2 className={styles.modalTitle}>이 문의를 삭제하시겠습니까?</h2>
-        <p className={styles.modalDesc}>
-          <b>
-            {typeName} · {name} · {dotDate(day)} 등록
-          </b>
-          <br />
-          {retentionPassed
-            ? `등록일부터 ${retentionMonths}개월이 지난 글입니다. 삭제하면 개인정보가 파기됩니다.`
-            : `아직 보관 기간(${retentionMonths}개월) 안의 글입니다. 상담이 진행 중일 수 있습니다.`}
-        </p>
-        <div className={styles.modalList}>
-          지워지는 것 — 이름 · 연락처 · 이메일 · 회사명 · 문의 내용 · <b>답변과 추가 질문 전체</b>
-          <br />
-          남는 것 — 등록일과 문의 유형, 그리고 <b>연락처 해시</b>(같은 번호로 하루 3건을 넘겨 다시 쓰는 것을 막기
-          위한 값입니다. 번호 자체는 남지 않습니다)
-          <br />
-          <b>되돌릴 수 없습니다.</b> 고객 목록에서 사라지고 비밀번호로도 열리지 않습니다.
-        </div>
-        {error ? <p className={styles.modalErr}>{error}</p> : null}
-        <div className={styles.modalFoot}>
-          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} disabled={busy} onClick={onClose}>
-            돌아가기
-          </button>
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnDanger}`}
-            data-delete-ok="1"
-            disabled={busy}
-            onClick={() => void run()}
-          >
+    <Dialog
+      open
+      onClose={onClose}
+      closeDisabled={busy}
+      width={460}
+      title="이 문의를 삭제하시겠습니까?"
+      footer={
+        <>
+          <Button variant="danger" size="sm" data-delete-ok="1" disabled={busy} onClick={() => void run()}>
             삭제
-          </button>
-        </div>
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            취소
+          </Button>
+        </>
+      }
+    >
+      <p className={styles.modalDesc}>
+        <b>
+          {typeName} · {name} · {dotDate(day)} 등록
+        </b>
+        <br />
+        {retentionPassed
+          ? `등록일부터 ${retentionMonths}개월이 지난 글입니다. 삭제하면 개인정보가 파기됩니다.`
+          : `아직 보관 기간(${retentionMonths}개월) 안의 글입니다. 상담이 진행 중일 수 있습니다.`}
+      </p>
+      <div className={styles.modalList}>
+        지워지는 것 — 이름 · 연락처 · 이메일 · 회사명 · 문의 내용 · <b>답변과 추가 질문 전체</b>
+        <br />
+        남는 것 — 등록일과 문의 유형, 그리고 <b>연락처 해시</b>(같은 번호로 하루 3건을 넘겨 다시 쓰는 것을 막기
+        위한 값입니다. 번호 자체는 남지 않습니다)
+        <br />
+        <b>되돌릴 수 없습니다.</b> 고객 목록에서 사라지고 비밀번호로도 열리지 않습니다.
       </div>
-    </div>
+      {error ? <p className={styles.modalErr}>{error}</p> : null}
+    </Dialog>
   );
 }
