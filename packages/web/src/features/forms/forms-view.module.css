@@ -1,0 +1,67 @@
+/*
+ * 표양식 관리(s030100020) · 양식 편집(s030100021) — 2026-11-25 센터·기준관리 일관성(삐용 기준 = 입주관리 결과)에서 더한 모양.
+ *
+ * ★ 같이 쓰는 파일은 고치지 않는다 — `forms.module.css` 는 세무 설정이, `codes.module.css` 는 코드 관리 · 법무 · 세무가
+ *   import 한다. 이 화면에만 필요한 새 규칙은 여기에 둔다.
+ * ★ 색은 토큰만. 글자 크기는 글자 크기 토큰만.
+ */
+
+/* 검색 줄 오른쪽 끝 「n건」 — 공통 목록 틀 ListNote 와 같은 값 */
+.count {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  font-size: var(--text-body-size);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* 등록 단추 줄 — 검색 줄 아래 · 표 위 왼쪽(입주사 목록 .listBar 와 같은 자리) */
+.listBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* 줄 끝 [편집] [복사] [삭제] — 오른쪽에 모은다(종전 .nodeActions 자리) */
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* 오른쪽 상세 제목(양식 이름) — 종전 codes .panelTitle 값 + 구역 제목 막대(왼쪽 4px 아쿠아 · 글자에만) */
+.panelTitle {
+  margin: 0;
+  font-size: var(--text-button-lg-size);
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  color: var(--text-heading);
+  border-left: 4px solid var(--color-primary);
+  padding-left: 8px;
+  line-height: 1.2;
+}
+
+/* 구역 제목 막대 — 제목 글자에만(「채울 칸 n개」) */
+.sectionBar {
+  border-left: 4px solid var(--color-primary);
+  padding-left: 8px;
+  line-height: 1.2;
+}
+
+/*
+ * 칸 안에서 바로 쓰는 입력 — 종전 forms.module.css `.inlineEdit` 그대로, 바탕 #fff → 토큰 --surface.
+ * ★ forms.module.css 는 세무 설정이 같이 쓰므로 고치지 않고 이 화면 전용으로 옮겼다(편집기 화면에만 있다 · 종이에 안 나간다).
+ */
+.inlineEdit {
+  display: block;
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  resize: none;
+  border: 2px solid var(--color-primary);
+  background: var(--surface);
+  font: inherit;
+  padding: 0 2px;
+  outline: none;
+}

@@ -8,7 +8,9 @@
  * ★ 자리표시(`{{이름}}`)는 **글자 그대로** 보인다. 편집기는 무엇을 넣었는지 보여 주는 곳이다.
  *
  * ★ 바로 쓰기 입력은 칸 높이(행 높이 합, cm)를 그대로 받는다. 레거시는 절대위치로 칸을
- *   덮었다 — 표에 절대위치를 섞지 않는다(`forms.module.css` 의 `.inlineEdit`).
+ *   덮었다 — 표에 절대위치를 섞지 않는다(`.inlineEdit`).
+ * ★ 2026-11-25 일관성 — `.inlineEdit` 는 `forms-view.module.css` 로 옮겼다(바탕 #fff → 토큰 --surface · 같은 흰색).
+ *   `forms.module.css` 는 세무 설정이 같이 쓰므로 고치지 않았다.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_MARGIN_TOP, type Page } from '@swonbiz/shared/domain/form-template';
@@ -16,6 +18,7 @@ import { cellAt, coveredPositions } from '@swonbiz/shared/domain/form-grid';
 import { cellClass } from './FormDocument';
 import doc from './form-doc.module.css';
 import styles from './forms.module.css';
+import fv from './forms-view.module.css';
 
 export type Selection = { r0: number; c0: number; r1: number; c1: number };
 
@@ -133,7 +136,7 @@ export function GridEditor({ page, fontFamily, fontSize, selection, onSelectionC
                     >
                       {isEditing ? (
                         <textarea
-                          className={styles.inlineEdit}
+                          className={fv.inlineEdit}
                           style={{ height: `${spanHeight}cm` }}
                           value={editText}
                           autoFocus
