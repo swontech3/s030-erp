@@ -23,6 +23,10 @@ import styles from './contract-form.module.css';
 export type ConfirmKind = 'confirm' | 'cancel' | 'terminate';
 
 interface Def {
+  /* ★ 2026-11-25 정한 것 2 — 팝업 제목 = 짧은 이름, 묻는 문장은 본문 첫 줄 */
+  /** 팝업 제목줄 — 짧은 이름 */
+  name: string;
+  /** 묻는 문장 — 본문 첫 줄 */
   title: string;
   desc: string;
   cancelLabel: string;
@@ -41,6 +45,7 @@ interface Def {
 
 const DEFS: Record<ConfirmKind, Def> = {
   confirm: {
+    name: '계약 확정',
     title: '계약을 확정하시겠습니까?',
     desc: '확정 후에는 계약 조건을 변경할 수 없습니다. 회사 정보와 사용자 정보는 계속 수정할 수 있습니다.',
     cancelLabel: '취소',
@@ -48,6 +53,7 @@ const DEFS: Record<ConfirmKind, Def> = {
     danger: false,
   },
   cancel: {
+    name: '계약 취소',
     title: '계약을 취소하시겠습니까?',
     desc: '임시저장된 계약 정보가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.',
     cancelLabel: '돌아가기',
@@ -56,6 +62,7 @@ const DEFS: Record<ConfirmKind, Def> = {
     danger: true,
   },
   terminate: {
+    name: '계약 종료',
     title: '계약을 종료하시겠습니까?',
     desc: '종료 후 해당 호실은 예약 가능 상태가 됩니다.',
     cancelLabel: '취소',
@@ -116,8 +123,14 @@ export function ConfirmDialog({ kind, busy, endDate, statusNames, onClose, onOk 
     <Dialog
       open
       onClose={onClose}
-      title={def.title}
-      description={def.desc}
+      title={def.name}
+      description={
+        <>
+          <strong>{def.title}</strong>
+          <br />
+          {def.desc}
+        </>
+      }
       footer={
         <>
           <Button

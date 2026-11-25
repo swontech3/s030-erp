@@ -64,7 +64,9 @@ export function DeleteInquiryDialog({
       onClose={onClose}
       closeDisabled={busy}
       width={460}
-      title="이 문의를 삭제하시겠습니까?"
+      /* ★ 2026-11-25 정한 것 2 — 팝업 제목 = 짧은 이름, 묻는 문장은 본문 첫 줄 */
+      title="문의 삭제"
+      description={<strong>이 문의를 삭제하시겠습니까?</strong>}
       footer={
         <>
           <Button variant="danger" size="sm" data-delete-ok="1" disabled={busy} onClick={() => void run()}>

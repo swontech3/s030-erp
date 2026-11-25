@@ -242,9 +242,12 @@ export function SettleDialog({ s, onClose, onDone }: { s: Settlement; onClose: (
       open
       onClose={onClose}
       closeDisabled={busy}
-      title="정산을 처리하시겠습니까?"
+      /* ★ 2026-11-25 정한 것 2 — 팝업 제목 = 짧은 이름, 묻는 문장은 본문 첫 줄 */
+      title="정산 처리"
       description={
         <>
+          <strong>정산을 처리하시겠습니까?</strong>
+          <br />
           {s.companyName} · {dir.label} {dir.kind === 'none' ? '' : won(dir.amount)}
         </>
       }

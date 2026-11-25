@@ -65,9 +65,12 @@ export function DepositReturnDialog(props: {
       open
       onClose={props.onClose}
       closeDisabled={busy}
-      title="예치금을 반환하시겠습니까?"
+      /* ★ 2026-11-25 정한 것 2 — 팝업 제목 = 짧은 이름, 묻는 문장은 본문 첫 줄 */
+      title="예치금 반환"
       description={
         <>
+          <strong>예치금을 반환하시겠습니까?</strong>
+          <br />
           {props.companyName} · 환불할 금액 {won(props.amount)}
         </>
       }
