@@ -24,7 +24,8 @@ import {
   type ArticleRole,
 } from '@swonbiz/shared/domain/legal-articles';
 import type { CorpChangeArticlesView } from '@swonbiz/shared/domain/corp-change-detail';
-import { Icon } from '@/components/ds';
+import { Button, Icon } from '@/components/ds';
+import { BTN_XS } from '@/features/billing/BillingTable';
 import styles from './corp-change-detail.module.css';
 
 export type ArticleOverrides = Partial<Record<ArticleRole, string>>;
@@ -117,9 +118,9 @@ function RoleText({
           <span className={styles.labelNote}> {same ? '(바뀌지 않음)' : overridden ? '(직접 고침)' : '(자동 문구)'}</span>
         </span>
         {editable && overridden ? (
-          <button type="button" className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`} onClick={onReset}>
+          <Button type="button" variant="ghost" size="sm" style={BTN_XS} onClick={onReset}>
             자동 문구로
-          </button>
+          </Button>
         ) : null}
       </div>
       <span className={styles.labelNote}>변경 전</span>
