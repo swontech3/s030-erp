@@ -393,7 +393,7 @@ function BizCheckLine({ result }: { result: BizCheckResult }) {
     ? 'var(--color-warning)'
     : result.nts.kind === 'unavailable'
       ? 'var(--text-muted)'
-      : 'var(--color-success, green)';
+      : 'var(--color-primary-hover)'; // ★ 2026-11-25 대표 결정 — 녹색(없는 토큰의 예비값 green) → 진한 아쿠아 토큰(호실 팝업과 같게)
 
   return (
     <span className={styles.hint} style={{ color: tone }}>
