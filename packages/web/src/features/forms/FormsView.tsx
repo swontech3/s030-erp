@@ -39,6 +39,7 @@ import {
   tableCell,
   type IconName,
 } from '@/components/ds';
+import { BTN_XS } from '@/features/billing/BillingTable';   // ★ 2026-11-25 정한 것 5 — 줄 끝 작은 단추 30px(코드 관리와 같은 방식)
 import { LoadingBar } from '@/components/patterns/LoadingBar';
 import { cf } from '@/features/facility/ModalShell';
 import codes from '@/features/codes/codes.module.css';
@@ -258,6 +259,7 @@ export function FormsView({ initialId }: { initialId: string | null }) {
                         <Button
                           variant="ghost"
                           size="sm"
+                          style={BTN_XS}
                           onClick={() => router.push(`/forms/${encodeURIComponent(t.id)}`)}
                         >
                           편집
@@ -265,6 +267,7 @@ export function FormsView({ initialId }: { initialId: string | null }) {
                         <Button
                           variant="ghost"
                           size="sm"
+                          style={BTN_XS}
                           disabled={busyId === t.id}
                           onClick={() => void onDuplicate(t)}
                         >
@@ -273,6 +276,7 @@ export function FormsView({ initialId }: { initialId: string | null }) {
                         <Button
                           variant="danger"
                           size="sm"
+                          style={BTN_XS}
                           disabled={why !== null}
                           title={why ?? undefined}
                           onClick={() => setDeleting(t)}
@@ -330,9 +334,10 @@ export function FormsView({ initialId }: { initialId: string | null }) {
                        법무 서비스(s04)에서 뽑는다. 이 화면은 운영사 전용이라 회사가 못 들어온다.
                        편집은 그대로 여기서 한다.
                   */}
+                  {/* ★ 2026-11-25 대표 결정(정한 것 6) — [인쇄] = 보통 단추 */}
                   <Button
                     size="sm"
-                    variant="primary"
+                    variant="ghost"
                     disabled={legal}
                     title={legal ? '법무 양식은 법무 화면(법인변경)에서 출력합니다' : undefined}
                     onClick={printFormDocument}
