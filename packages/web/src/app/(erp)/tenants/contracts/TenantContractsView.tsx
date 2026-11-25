@@ -337,7 +337,8 @@ export function TenantContractsView({ tenants, total, codeNames, soonDays }: Pro
               <button type="button" className={styles.reset} onClick={() => patch({ chips: [] })}>
                 전체
               </button>
-              <span className={styles.count}>{total}곳</span>
+              {/* ★ 2026-11-25 정한 것 6 — 건수 글자 「곳」 → 「건」(삐용 「n건」) */}
+              <span className={styles.count}>{total}건</span>
             </div>
 
             <div className={styles.chipRow}>
