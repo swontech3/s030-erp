@@ -15,7 +15,7 @@
  *
  * ★ 막는 것은 서버다 — 이 창은 묻기만 한다. 실패하면 서버 문구를 창 안에 띄우고 닫지 않는다.
  *
- * ★ 2026-11-25 법무 일관성 — 창 틀은 공통 `Dialog`(components/ds) : 아쿠아 제목줄 · 아래 가운데 [처리](먼저) [돌아가기](나중).
+ * ★ 2026-11-25 법무 일관성 — 창 틀은 공통 `Dialog`(components/ds) : 아쿠아 제목줄 · 아래 가운데 [처리](먼저) [취소](나중 · 「취소 처리」 창만 [돌아가기]).
  *   제목 = 짧은 이름(확인 단추 문구 `okLabel` 그대로), 묻는 문장은 본문 첫 줄 굵게(계약 `ConfirmDialog` 와 같다).
  *   종전의 가운데 원형 그림 56px · 50:50 단추는 없앴다. 지우는 동작(취소 · 삭제)의 확인 단추는 지우기(danger)다.
  */
@@ -30,14 +30,16 @@ interface Def {
   tone: 'primary' | 'danger';
   title: string;
   okLabel: string;
+  /** 닫는 단추 문구 — 2026-11-25 대표 결정(법무 정한 것 2) : 「취소」. 단 「취소 처리」 창만 「돌아가기」(두 「취소」가 나란히 서지 않게) */
+  cancelLabel: string;
 }
 
 const DEFS: Record<CorpChangeConfirmKind, Def> = {
-  complete: { tone: 'primary', title: '완료 처리하시겠습니까?', okLabel: '완료' },
-  uncomplete: { tone: 'primary', title: '완료를 취소하시겠습니까?', okLabel: '완료 취소' },
-  cancel: { tone: 'danger', title: '이 건을 취소하시겠습니까?', okLabel: '취소 처리' },
-  restore: { tone: 'primary', title: '이 건을 복원하시겠습니까?', okLabel: '복원' },
-  delete: { tone: 'danger', title: '이 건을 삭제하시겠습니까?', okLabel: '삭제' },
+  complete: { tone: 'primary', title: '완료 처리하시겠습니까?', okLabel: '완료', cancelLabel: '취소' },
+  uncomplete: { tone: 'primary', title: '완료를 취소하시겠습니까?', okLabel: '완료 취소', cancelLabel: '취소' },
+  cancel: { tone: 'danger', title: '이 건을 취소하시겠습니까?', okLabel: '취소 처리', cancelLabel: '돌아가기' },
+  restore: { tone: 'primary', title: '이 건을 복원하시겠습니까?', okLabel: '복원', cancelLabel: '취소' },
+  delete: { tone: 'danger', title: '이 건을 삭제하시겠습니까?', okLabel: '삭제', cancelLabel: '취소' },
 };
 
 /** 본문 — 복원은 돌아갈 상태 이름이 들어간다. */
@@ -106,7 +108,7 @@ export function CorpChangeConfirmDialog({ kind, restoreToName = null, peopleLabe
             {def.okLabel}
           </Button>
           <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
-            돌아가기
+            {def.cancelLabel}
           </Button>
         </>
       }
