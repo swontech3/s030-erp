@@ -44,8 +44,10 @@
  *   읽는다 · 삐용 줄도 ERP 줄과 같은 칸 · 같은 배치(딱지 폭 고정 · 끝의 [수정] · [삭제] 자리는 잠가 둔다).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Icon, type IconName } from '@/components/ds';
+import { Button, Icon, Table, TableEmpty, TableHead, TableRow, tableCell, type IconName } from '@/components/ds';
+import { ListNote } from '@/components/patterns/ListFrame';
 import { LoadingBar } from '@/components/patterns/LoadingBar';
+import { BTN_XS } from '@/features/billing/BillingTable';
 import { cf } from '@/features/facility/ModalShell';
 import {
   CodesError,
@@ -72,6 +74,7 @@ import { PartitionDialog } from './PartitionDialog';
 import { LineDialog } from './LineDialog';
 import { DeleteCodeDialog, type DeleteTarget } from './DeleteCodeDialog';
 import styles from './codes.module.css';
+import view from './codes-view.module.css';
 
 type Dialog =
   | { kind: 'master'; master: CodeMaster | null }
@@ -84,6 +87,17 @@ const BBIYONG_TYPE_LOCKED = '삐용 종류는 여기서 고치거나 지울 수 
 
 /** 오른쪽 검색 조건. */
 const EMPTY_FILTER = { useTp: '', code: '', name: '' };
+
+/*
+ * ★ 2026-11-25 센터·기준관리 일관성 — 목록 두 개를 공통 표(Table)로. 칸 폭.
+ *   왼쪽(분류 목록 · 종전 카드형 줄) : 업무구분 | 분류코드 | 분류코드명 | 건수 | [수정][삭제]
+ *     업무구분 4.5em = 종전 딱지 폭(.bizTpTag) · 건수 3em · 단추 칸 100px = 30px 단추(BTN_XS) 「수정」「삭제」 + 사이 4.
+ *     종전엔 분류코드 · 분류코드명이 한 줄 안에서 남는 폭을 나눴다 — 이제 두 칸이 반씩 갖는다.
+ *   오른쪽(코드값 표 · 종전 <table> 자동 폭) : 사용타입 | 코드값 | 코드값 이름 | 순서 | 사용여부 | 동작
+ *     순서 56 · 사용여부 96(「사용 안 함」 딱지) · 동작 112 = 30px 단추 「수정」「삭제」 + 사이 6.
+ */
+const NODE_COLS = '4.5em minmax(0, 1fr) minmax(0, 1fr) 3em 100px';
+const LINE_COLS = 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr) 56px 96px 112px';
 
 export function CodesView() {
   const [masters, setMasters] = useState<CodeMaster[]>([]);
@@ -263,19 +277,10 @@ export function CodesView() {
                 placeholder="분류코드명"
                 aria-label="분류코드명"
               />
-              <button
-                type="button"
-                className={`${styles.btnXs} ${styles.searchBtn}`}
-                onClick={() => {
-                  setAppliedKey(inputKey.trim());
-                  setAppliedName(inputName.trim());
-                }}
-              >
-                조회
-              </button>
-              <button
-                type="button"
-                className={`${styles.btnXs} ${styles.searchBtn}`}
+              {/* ★ 2026-11-25 일관성 — 삐용 검색 줄 : 오른쪽 끝 [초기화][조회](보통 단추) 다음 「n건」 */}
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setInputKey('');
                   setInputName('');
@@ -284,7 +289,18 @@ export function CodesView() {
                 }}
               >
                 초기화
-              </button>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setAppliedKey(inputKey.trim());
+                  setAppliedName(inputName.trim());
+                }}
+              >
+                조회
+              </Button>
+              <ListNote>{loading ? '' : `${shownRows.length}건`}</ListNote>
             </div>
 
             {/*
@@ -292,10 +308,19 @@ export function CodesView() {
                 (사용자 지시 2026-10-03). 예전에는 검색 위 전체 폭이었다 — 전체 폭이면
                 이 패널에서 제일 큰 것이 되어 목록보다 먼저 읽힌다.
             */}
-            <div className={styles.addRow}>
+            <div className={view.addRow}>
+              {/* ★ 2026-11-25 일관성 — 등록 = 보통 단추 · 표 위 왼쪽 */}
+              <Button
+                variant="ghost"
+                size="sm"
+                iconLeft={<Icon name="plus" size={16} />}
+                onClick={() => setDialog({ kind: 'master', master: null })}
+              >
+                분류코드 추가
+              </Button>
               {/* ★ 업무구분 걸러 보기(2026-11-18 · 이름 2026-11-19) — 고르면 바로 걸린다. 선택지는 공통 코드 CODE_BIZ_TP. */}
               <select
-                className={`${cf.input} ${styles.ownerSelect}`}
+                className={`${cf.input} ${view.ownerSelect}`}
                 value={owner}
                 aria-label="업무구분"
                 onChange={(e) => setOwner(e.target.value as '' | CodeOwner)}
@@ -307,116 +332,115 @@ export function CodesView() {
                   </option>
                 ))}
               </select>
-              <button
-                type="button"
-                className={`${styles.btnXs} ${styles.searchBtn}`}
-                onClick={() => setDialog({ kind: 'master', master: null })}
-              >
-                <Icon name="plus" size={12} />
-                분류코드 추가
-              </button>
             </div>
           </div>
 
           <div className={styles.treeBody}>
             {bbiyongError ? <p className={styles.error}>{bbiyongError}</p> : null}
-            {loading ? (
-              <p className={styles.empty}>불러오는 중…</p>
-            ) : shownRows.length === 0 ? (
-              <p className={styles.empty}>
-                {allRows.length === 0 ? '분류코드가 없습니다' : '조회 결과가 없습니다'}
-              </p>
-            ) : (
-              /*
-               * ★★ 분류코드와 이름만 — 사용타입은 보이지 않는다(사용자 지시).
-               * ★★ 행 끝에 [수정]·[삭제] 가 있다(사용자 지시 2026-10-03). 그래서 행
-               *    전체를 `<button>` 으로 둘 수 없다 — **버튼 안에 버튼을 넣을 수 없다.**
-               *    고르는 것은 이름 쪽 버튼이 맡고, 행은 `<div>` 다(센터 관리의 호실 표가
-               *    같은 이유로 같은 모양이다).
-               */
-              shownRows.map((r) => {
-                /* ★ 업무구분 딱지 — 폭을 맞춰 두 종류의 코드 · 이름이 같은 자리에서 시작한다(2026-11-19). */
-                const ownerTag = (
-                  <span
-                    className={`${styles.tag} ${styles.bizTpTag} ${r.owner === 'bbiyong' ? styles.tagOn : styles.tagOff}`}
-                    title="업무구분"
-                  >
-                    {codeBizTpLabel(r.owner, bizTps)}
-                  </span>
-                );
-                if (r.owner === 'bbiyong') {
-                  /*
-                   * ★ 삐용 종류 — 고르기만. 종류 수정 · 삭제는 삐용 API 에 없다.
-                   * ★ ERP 줄과 같은 칸 · 같은 배치(2026-11-19) — 끝의 [수정] · [삭제] 자리를 두고 잠근다.
-                   */
-                  return (
-                    <div key={r.key} className={`${styles.node} ${bbiyongKey === r.key ? styles.nodeOn : ''}`}>
-                      <button
-                        type="button"
-                        className={styles.nodePick}
+            {/*
+              ★ 2026-11-25 일관성 — 카드형 줄 → 공통 표(Table). 보이던 것(딱지 · 분류코드 · 이름 · 건수 · [수정][삭제])을 칸으로 그대로.
+              ★★ 분류코드와 이름만 — 사용타입은 보이지 않는다(사용자 지시).
+              ★★ 줄을 누르면 고른다. 줄 끝 [수정] · [삭제] 는 고르기와 섞이지 않게 그 칸에서 누름을 멈춘다
+                 (종전엔 이름 쪽 버튼만 고르기를 맡았다 — 누르는 자리는 같다).
+            */}
+            <Table cols={NODE_COLS}>
+              <TableHead sticky className={view.nodeGrid}>
+                <span>업무구분</span>
+                <span>분류코드</span>
+                <span>분류코드명</span>
+                <span className={tableCell.right}>건수</span>
+                <span className={tableCell.center}>동작</span>
+              </TableHead>
+              {loading ? (
+                <TableEmpty>불러오는 중…</TableEmpty>
+              ) : shownRows.length === 0 ? (
+                <TableEmpty>{allRows.length === 0 ? '분류코드가 없습니다' : '조회 결과가 없습니다'}</TableEmpty>
+              ) : (
+                shownRows.map((r) => {
+                  /* ★ 업무구분 딱지 — 폭을 맞춰 두 종류의 코드 · 이름이 같은 자리에서 시작한다(2026-11-19). */
+                  const ownerTag = (
+                    <span>
+                      <span
+                        className={`${styles.tag} ${styles.bizTpTag} ${r.owner === 'bbiyong' ? styles.tagOn : styles.tagOff}`}
+                        title="업무구분"
+                      >
+                        {codeBizTpLabel(r.owner, bizTps)}
+                      </span>
+                    </span>
+                  );
+                  if (r.owner === 'bbiyong') {
+                    /*
+                     * ★ 삐용 종류 — 고르기만. 종류 수정 · 삭제는 삐용 API 에 없다.
+                     * ★ ERP 줄과 같은 칸 · 같은 배치(2026-11-19) — 끝의 [수정] · [삭제] 자리를 두고 잠근다.
+                     */
+                    const on = bbiyongKey === r.key;
+                    return (
+                      <TableRow
+                        key={r.key}
+                        className={`${view.nodeGrid}${on ? ` ${styles.nodeOn}` : ''}`}
+                        selected={on}
                         onClick={() => {
                           setCategory(null);
                           setBbiyongKey(r.key);
                         }}
                       >
                         {ownerTag}
-                        <span className={styles.nodeKey}>{r.code}</span>
+                        <span className={`${styles.nodeKey} ${view.codeCell}`}>{r.code}</span>
                         <span className={styles.nodeLabel}>{r.name}</span>
-                        <span className={styles.nodeCount}>{r.count}</span>
-                      </button>
-                      <span className={styles.nodeActions}>
-                        <button type="button" className={styles.btnXs} disabled title={BBIYONG_TYPE_LOCKED}>
-                          수정
-                        </button>
-                        <button type="button" className={styles.btnXs} disabled title={BBIYONG_TYPE_LOCKED}>
-                          삭제
-                        </button>
-                      </span>
-                    </div>
-                  );
-                }
-                const m = r.master;
-                const why = masterBlockReason(m);
-                return (
-                  <div
-                    key={r.key}
-                    className={`${styles.node} ${category === m.category ? styles.nodeOn : ''}`}
-                  >
-                    <button
-                      type="button"
-                      className={styles.nodePick}
+                        <span className={`${styles.nodeCount} ${tableCell.right}`}>{r.count}</span>
+                        <span className={view.nodeActions} role="presentation" onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="sm" style={BTN_XS} disabled title={BBIYONG_TYPE_LOCKED}>
+                            수정
+                          </Button>
+                          <Button variant="danger" size="sm" style={BTN_XS} disabled title={BBIYONG_TYPE_LOCKED}>
+                            삭제
+                          </Button>
+                        </span>
+                      </TableRow>
+                    );
+                  }
+                  const m = r.master;
+                  const why = masterBlockReason(m);
+                  const on = category === m.category;
+                  return (
+                    <TableRow
+                      key={r.key}
+                      className={`${view.nodeGrid}${on ? ` ${styles.nodeOn}` : ''}`}
+                      selected={on}
                       onClick={() => {
                         setBbiyongKey(null);
                         setCategory(m.category);
                       }}
                     >
                       {ownerTag}
-                      <span className={styles.nodeKey}>{m.category}</span>
+                      <span className={`${styles.nodeKey} ${view.codeCell}`}>{m.category}</span>
                       <span className={styles.nodeLabel}>{m.name}</span>
-                      <span className={styles.nodeCount}>{m.lineCount}</span>
-                    </button>
-                    <span className={styles.nodeActions}>
-                      <button
-                        type="button"
-                        className={styles.btnXs}
-                        onClick={() => setDialog({ kind: 'master', master: m })}
-                      >
-                        수정
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.btnXs}
-                        disabled={why !== null}
-                        title={why ?? undefined}
-                        onClick={() => setDialog({ kind: 'delete', target: { kind: 'master', master: m } })}
-                      >
-                        삭제
-                      </button>
-                    </span>
-                  </div>
-                );
-              })
-            )}
+                      <span className={`${styles.nodeCount} ${tableCell.right}`}>{m.lineCount}</span>
+                      <span className={view.nodeActions} role="presentation" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          style={BTN_XS}
+                          onClick={() => setDialog({ kind: 'master', master: m })}
+                        >
+                          수정
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          style={BTN_XS}
+                          disabled={why !== null}
+                          title={why ?? undefined}
+                          onClick={() => setDialog({ kind: 'delete', target: { kind: 'master', master: m } })}
+                        >
+                          삭제
+                        </Button>
+                      </span>
+                    </TableRow>
+                  );
+                })
+              )}
+            </Table>
           </div>
 
           {/*
@@ -452,34 +476,13 @@ export function CodesView() {
                     ★ 「회원구분(MEMBER_TYPE)」 한 덩이다(사용자 지시 2026-10-03).
                       예전에는 이름과 분류코드가 띄어져 있고 뒤에 「시스템」 딱지가 붙었다.
                   */}
-                  <h2 className={styles.panelTitle}>
+                  {/* ★ 2026-11-25 일관성 — 구역 제목 = 왼쪽 4px 아쿠아 막대(글자에만) */}
+                  <h2 className={`${styles.panelTitle} ${view.sectionTitle}`}>
                     {master.name}({master.category})
                   </h2>
                   {master.description ? (
                     <p className={styles.panelSub}>{master.description}</p>
                   ) : null}
-                </div>
-                {/*
-                  ★ 분류코드 수정·삭제는 **왼쪽 목록의 줄로 옮겼다**(사용자 지시 2026-10-03).
-                    여기에는 더하는 것만 남는다 — 오른쪽은 고른 분류코드의 **속**을 다룬다.
-                */}
-                <div className={styles.actions}>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => setDialog({ kind: 'partition', category: master.category, partition: null })}
-                  >
-                    <Icon name="plus" size={16} />
-                    사용타입 추가
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => setDialog({ kind: 'line', category: master.category, line: null })}
-                  >
-                    <Icon name="plus" size={16} />
-                    코드값 추가
-                  </Button>
                 </div>
               </div>
 
@@ -514,126 +517,137 @@ export function CodesView() {
                   placeholder="코드값 이름"
                   aria-label="코드값 이름"
                 />
-                <button
-                  type="button"
-                  className={`${styles.btnXs} ${styles.searchBtn}`}
-                  onClick={() => setFilter(filterInput)}
-                >
-                  조회
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.btnXs} ${styles.searchBtn}`}
+                {/* ★ 2026-11-25 일관성 — 오른쪽 끝 [초기화][조회](보통 단추) 다음 「n건」 */}
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setFilterInput(EMPTY_FILTER);
                     setFilter(EMPTY_FILTER);
                   }}
                 >
                   초기화
-                </button>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setFilter(filterInput)}>
+                  조회
+                </Button>
+                <ListNote>{linesBusy ? '' : `${shownLines.length}건`}</ListNote>
+              </div>
+
+              {/*
+                ★ 2026-11-25 일관성 — 등록 = 보통 단추 · 표 위 왼쪽(종전 제목 줄 오른쪽 주 단추 둘).
+                ★ 분류코드 수정·삭제는 **왼쪽 목록의 줄로 옮겼다**(사용자 지시 2026-10-03).
+                  여기에는 더하는 것만 남는다 — 오른쪽은 고른 분류코드의 **속**을 다룬다.
+              */}
+              <div className={view.listBar}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconLeft={<Icon name="plus" size={16} />}
+                  onClick={() => setDialog({ kind: 'partition', category: master.category, partition: null })}
+                >
+                  사용타입 추가
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconLeft={<Icon name="plus" size={16} />}
+                  onClick={() => setDialog({ kind: 'line', category: master.category, line: null })}
+                >
+                  코드값 추가
+                </Button>
               </div>
 
               <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>사용타입</th>
-                      <th>코드값</th>
-                      <th>코드값 이름</th>
-                      <th className={styles.num}>순서</th>
-                      <th className={styles.center}>사용여부</th>
-                      <th className={styles.center}>동작</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* ★ 「불러오는 중」과 「없음」을 가른다 — 둘을 섞으면 거짓을 보여 준다. */}
-                    {linesBusy ? null : shownLines.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className={styles.center}>
-                          {lines.length === 0 ? '코드값이 없습니다' : '조회 결과가 없습니다'}
-                        </td>
-                      </tr>
-                    ) : (
-                      shownLines.map((l) => {
-                        const why = lineBlockReason(l);
-                        return (
-                          <tr key={l.lineId} className={l.isActive ? undefined : styles.rowOff}>
-                            <td>
-                              {/*
-                                ★ 누르면 **사용타입 수정** 팝업이 열린다(사용자 결정) —
-                                  센터 관리의 호실명과 같은 방식이다. 삭제는 그 팝업 안에 있다.
-                                  그래서 파란 글씨에 밑줄이 선다(누를 수 있게 보여야 한다).
-                              */}
-                              <button
-                                type="button"
-                                className={styles.useTpBtn}
-                                onClick={() => {
-                                  const p = partitionOf(l.useTp);
-                                  if (p) setDialog({ kind: 'partition', category: master.category, partition: p });
-                                }}
-                              >
-                                {lineUseTpLabel(l)}
-                              </button>
-                            </td>
-                            <td className={styles.code}>{l.code}</td>
-                            <td>
-                              {/* ★ 「시스템」 딱지를 뺐다(사용자 지시 2026-10-03). */}
-                              {l.name}
-                              {l.pinnedBy ? (
-                                <span className={`${styles.tag} ${styles.tagWarn}`} title={l.pinnedBy}>
-                                  앱이 직접 씀
-                                </span>
-                              ) : l.usage.length > 0 ? (
-                                <span className={`${styles.tag} ${styles.tagWarn}`}>
-                                  {usageText(l.usage)}
-                                </span>
-                              ) : null}
-                            </td>
-                            <td className={styles.num}>{l.sortOrder}</td>
-                            <td className={styles.center}>
-                              <span
-                                className={`${styles.tag} ${l.isActive ? styles.tagOn : styles.tagOff}`}
-                              >
-                                {l.isActive ? '사용' : '사용 안 함'}
+                {/* ★ 2026-11-25 일관성 — 공통 표(Table · 머리글 아쿠아). 칸 폭은 LINE_COLS */}
+                <Table cols={LINE_COLS}>
+                  <TableHead sticky className={view.lineGrid}>
+                    <span>사용타입</span>
+                    <span>코드값</span>
+                    <span>코드값 이름</span>
+                    <span className={tableCell.right}>순서</span>
+                    <span className={tableCell.center}>사용여부</span>
+                    <span className={tableCell.center}>동작</span>
+                  </TableHead>
+                  {/* ★ 「불러오는 중」과 「없음」을 가른다 — 둘을 섞으면 거짓을 보여 준다. */}
+                  {linesBusy ? null : shownLines.length === 0 ? (
+                    <TableEmpty>{lines.length === 0 ? '코드값이 없습니다' : '조회 결과가 없습니다'}</TableEmpty>
+                  ) : (
+                    shownLines.map((l) => {
+                      const why = lineBlockReason(l);
+                      return (
+                        <TableRow key={l.lineId} className={view.lineGrid} muted={!l.isActive}>
+                          <span>
+                            {/*
+                              ★ 누르면 **사용타입 수정** 팝업이 열린다(사용자 결정) —
+                                센터 관리의 호실명과 같은 방식이다. 삭제는 그 팝업 안에 있다.
+                                그래서 파란 글씨에 밑줄이 선다(누를 수 있게 보여야 한다).
+                            */}
+                            <button
+                              type="button"
+                              className={styles.useTpBtn}
+                              onClick={() => {
+                                const p = partitionOf(l.useTp);
+                                if (p) setDialog({ kind: 'partition', category: master.category, partition: p });
+                              }}
+                            >
+                              {lineUseTpLabel(l)}
+                            </button>
+                          </span>
+                          <span className={styles.code}>{l.code}</span>
+                          <span>
+                            {/* ★ 「시스템」 딱지를 뺐다(사용자 지시 2026-10-03). */}
+                            {l.name}
+                            {l.pinnedBy ? (
+                              <span className={`${styles.tag} ${styles.tagWarn}`} title={l.pinnedBy}>
+                                앱이 직접 씀
                               </span>
-                            </td>
-                            <td>
-                              <div className={styles.rowActions}>
-                                {/* ★ 수정은 **언제나 열려 있다** — 이름은 늘 바꿀 수 있다. */}
-                                <button
-                                  type="button"
-                                  className={styles.btnXs}
-                                  onClick={() => setDialog({ kind: 'line', category: master.category, line: l })}
-                                >
-                                  수정
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.btnXs}
-                                  disabled={why !== null}
-                                  title={why ?? undefined}
-                                  onClick={() =>
-                                    setDialog({
-                                      kind: 'delete',
-                                      target: {
-                                        kind: 'line',
-                                        line: l,
-                                        category: master.category,
-                                        useTp: l.useTp,
-                                      },
-                                    })
-                                  }
-                                >
-                                  삭제
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                            ) : l.usage.length > 0 ? (
+                              <span className={`${styles.tag} ${styles.tagWarn}`}>{usageText(l.usage)}</span>
+                            ) : null}
+                          </span>
+                          <span className={`${styles.num} ${tableCell.right}`}>{l.sortOrder}</span>
+                          <span className={tableCell.center}>
+                            <span className={`${styles.tag} ${l.isActive ? styles.tagOn : styles.tagOff}`}>
+                              {l.isActive ? '사용' : '사용 안 함'}
+                            </span>
+                          </span>
+                          <span className={styles.rowActions}>
+                            {/* ★ 수정은 **언제나 열려 있다** — 이름은 늘 바꿀 수 있다. */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              style={BTN_XS}
+                              onClick={() => setDialog({ kind: 'line', category: master.category, line: l })}
+                            >
+                              수정
+                            </Button>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              style={BTN_XS}
+                              disabled={why !== null}
+                              title={why ?? undefined}
+                              onClick={() =>
+                                setDialog({
+                                  kind: 'delete',
+                                  target: {
+                                    kind: 'line',
+                                    line: l,
+                                    category: master.category,
+                                    useTp: l.useTp,
+                                  },
+                                })
+                              }
+                            >
+                              삭제
+                            </Button>
+                          </span>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </Table>
               </div>
 
               {/*

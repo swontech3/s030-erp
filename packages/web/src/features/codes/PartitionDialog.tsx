@@ -21,9 +21,15 @@
  *
  * ★ 사용타입은 **형제**다. `001` 이 `000` 을 물려받지 않는다 — 폼 아래에 적어 둔다.
  *   상속으로 읽으면 `001` 에 공통 코드값을 다시 적지 않아 목록이 비어 보인다.
+ *
+ * ★ 2026-11-25 센터·기준관리 일관성 — 공통 팝업(`Dialog` · 아쿠아 제목줄 · 아래 가운데 [저장](주) [취소](보통)).
+ *   종전 껍데기(facility ModalShell)의 [닫기] 는 [취소] 로 · 순서는 확인 먼저. 안내(blocked) · 오류는 본문 맨 위
+ *   (codes.module.css 의 .blocked · .error). 바탕 누름 · ESC 로 닫힌다(저장 중에는 막는다 — closeDisabled).
  */
 import { useState } from 'react';
-import { Field, ModalShell, cf } from '@/features/facility/ModalShell';
+import { Button, Dialog } from '@/components/ds';
+import { BTN_XS } from '@/features/billing/BillingTable';
+import { Field, cf } from '@/features/facility/ModalShell';
 import {
   CodesError,
   createPartition,
@@ -102,17 +108,37 @@ export function PartitionDialog({ category, partition, onClose, onSaved }: Props
   }
 
   return (
-    <ModalShell
-      title={partition ? '사용타입 수정' : '사용타입 추가'}
-      desc={partition ? `${category}/${partition.useTp}` : category}
-      busy={busy}
-      error={error}
-      blocked={blocked}
-      okLabel="저장"
-      okDisabled={form.name.trim() === '' || (!partition && form.useTp.trim() === '')}
+    <Dialog
+      open
       onClose={onClose}
-      onOk={submit}
+      closeDisabled={busy}
+      title={partition ? '사용타입 수정' : '사용타입 추가'}
+      description={partition ? `${category}/${partition.useTp}` : category}
+      footer={
+        <>
+          <Button variant="primary" size="sm" disabled={busy || form.name.trim() === '' || (!partition && form.useTp.trim() === '')} onClick={() => void submit()}>
+            저장
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            취소
+          </Button>
+        </>
+      }
     >
+      {/*
+        ★ 안내와 오류를 **가른다.** 「쓰고 있어서 못 지웁니다」는 운영자가 잘못한 것이
+          아니라 지금 상태가 그런 것이다 — 붉은 오류로 그리면 고장처럼 읽힌다.
+      */}
+      {blocked ? (
+        <p className={styles.blocked} role="status" data-facility-blocked="1">
+          {blocked}
+        </p>
+      ) : null}
+      {error ? (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className={styles.grid2}>
         <Field label="사용타입 번호">
           <input
@@ -166,17 +192,19 @@ export function PartitionDialog({ category, partition, onClose, onSaved }: Props
               {deleteWhy ?? '지우면 되돌릴 수 없습니다. 코드값이 남아 있으면 서버가 막습니다.'}
             </p>
           </div>
-          <button
-            type="button"
-            className={`${styles.btnXs} ${styles.btnDanger}`}
+          {/* ★ 2026-11-25 일관성 — 삭제 = 지우기 단추(공통 danger · 종전 30px 크기 그대로) */}
+          <Button
+            variant="danger"
+            size="sm"
+            style={BTN_XS}
             disabled={busy || deleteWhy !== null}
             title={deleteWhy ?? undefined}
-            onClick={remove}
+            onClick={() => void remove()}
           >
             삭제
-          </button>
+          </Button>
         </div>
       ) : null}
-    </ModalShell>
+    </Dialog>
   );
 }

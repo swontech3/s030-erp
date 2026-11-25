@@ -25,9 +25,14 @@
  * ★ 판정은 서버가 한다(`routes/codes.ts`). 화면은 목록에 실려 온 `usage`·`pinnedBy` 로
  *   칸을 미리 잠그고 이유를 적는다 — 두 곳이 따로 판정하면 화면은 통과시키는데 저장이
  *   막힌다(센터 관리의 「입주 가능 회사 수」에서 겪은 그대로).
+ *
+ * ★ 2026-11-25 센터·기준관리 일관성 — 공통 팝업(`Dialog` · 아쿠아 제목줄 · 아래 가운데 [저장](주) [취소](보통)).
+ *   종전 껍데기(facility ModalShell)의 [닫기] 는 [취소] 로 · 순서는 확인 먼저. 안내(blocked) · 오류는 본문 맨 위
+ *   (codes.module.css 의 .blocked · .error). 바탕 누름 · ESC 로 닫힌다(저장 중에는 막는다 — closeDisabled).
  */
 import { useState } from 'react';
-import { Field, ModalShell, cf } from '@/features/facility/ModalShell';
+import { Button, Dialog } from '@/components/ds';
+import { Field, cf } from '@/features/facility/ModalShell';
 import {
   CodesError,
   codeLockReason,
@@ -108,17 +113,37 @@ export function LineDialog({ category, partitions, line, onClose, onSaved }: Pro
   }
 
   return (
-    <ModalShell
-      title={line ? '코드값 수정' : '코드값 추가'}
-      desc={line ? `${category}/${line.useTp}` : category}
-      busy={busy}
-      error={error}
-      blocked={blocked}
-      okLabel="저장"
-      okDisabled={form.name.trim() === '' || form.code.trim() === ''}
+    <Dialog
+      open
       onClose={onClose}
-      onOk={submit}
+      closeDisabled={busy}
+      title={line ? '코드값 수정' : '코드값 추가'}
+      description={line ? `${category}/${line.useTp}` : category}
+      footer={
+        <>
+          <Button variant="primary" size="sm" disabled={busy || form.name.trim() === '' || form.code.trim() === ''} onClick={() => void submit()}>
+            저장
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            취소
+          </Button>
+        </>
+      }
     >
+      {/*
+        ★ 안내와 오류를 **가른다.** 「쓰고 있어서 못 지웁니다」는 운영자가 잘못한 것이
+          아니라 지금 상태가 그런 것이다 — 붉은 오류로 그리면 고장처럼 읽힌다.
+      */}
+      {blocked ? (
+        <p className={styles.blocked} role="status" data-facility-blocked="1">
+          {blocked}
+        </p>
+      ) : null}
+      {error ? (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className={styles.grid2}>
         {/*
           ★ 사용타입 — **신규일 때만 고른다.** 수정에서 사용타입을 옮기면 그 코드값을
@@ -204,6 +229,6 @@ export function LineDialog({ category, partitions, line, onClose, onSaved }: Pro
           없습니다 — 자료가 코드값으로만 연결돼 있어서입니다.
         </p>
       )}
-    </ModalShell>
+    </Dialog>
   );
 }

@@ -17,9 +17,14 @@
  *
  * ★ 레거시는 `.toUpperCase()` 만 하고 모양을 보지 않았다. 공백·한글이 들어가면 그 분류를
  *   문자열로 부르는 자리가 전부 깨진다 — 서버가 모양을 보고 400 을 돌려준다.
+ *
+ * ★ 2026-11-25 센터·기준관리 일관성 — 공통 팝업(`Dialog` · 아쿠아 제목줄 · 아래 가운데 [저장](주) [취소](보통)).
+ *   종전 껍데기(facility ModalShell)의 [닫기] 는 [취소] 로 · 순서는 확인 먼저. 안내(blocked) · 오류는 본문 맨 위
+ *   (codes.module.css 의 .blocked · .error). 바탕 누름 · ESC 로 닫힌다(저장 중에는 막는다 — closeDisabled).
  */
 import { useState } from 'react';
-import { Field, ModalShell, cf } from '@/features/facility/ModalShell';
+import { Button, Dialog } from '@/components/ds';
+import { Field, cf } from '@/features/facility/ModalShell';
 import { CodesError, createMaster, saveMaster, type CodeMaster } from './codes-model';
 import styles from './codes.module.css';
 
@@ -68,17 +73,37 @@ export function MasterDialog({ master, onClose, onSaved }: Props) {
   }
 
   return (
-    <ModalShell
-      title={master ? '분류코드 수정' : '분류코드 추가'}
-      desc={master ? master.category : '분류코드를 만들면 공통(000) 사용타입이 함께 생깁니다'}
-      busy={busy}
-      error={error}
-      blocked={blocked}
-      okLabel="저장"
-      okDisabled={form.name.trim() === '' || (!master && form.category.trim() === '')}
+    <Dialog
+      open
       onClose={onClose}
-      onOk={submit}
+      closeDisabled={busy}
+      title={master ? '분류코드 수정' : '분류코드 추가'}
+      description={master ? master.category : '분류코드를 만들면 공통(000) 사용타입이 함께 생깁니다'}
+      footer={
+        <>
+          <Button variant="primary" size="sm" disabled={busy || form.name.trim() === '' || (!master && form.category.trim() === '')} onClick={() => void submit()}>
+            저장
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            취소
+          </Button>
+        </>
+      }
     >
+      {/*
+        ★ 안내와 오류를 **가른다.** 「쓰고 있어서 못 지웁니다」는 운영자가 잘못한 것이
+          아니라 지금 상태가 그런 것이다 — 붉은 오류로 그리면 고장처럼 읽힌다.
+      */}
+      {blocked ? (
+        <p className={styles.blocked} role="status" data-facility-blocked="1">
+          {blocked}
+        </p>
+      ) : null}
+      {error ? (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className={styles.grid2}>
         <Field label="분류코드">
           <input
@@ -115,6 +140,6 @@ export function MasterDialog({ master, onClose, onSaved }: Props) {
           ? '분류코드는 바꿀 수 없습니다 — 소스에 문자열로 박혀 있어서, 바꾸면 그 분류코드를 읽는 화면이 빈 목록을 받습니다.'
           : '분류코드는 영문 대문자로 시작하고 영문 대문자·숫자·밑줄만 쓸 수 있습니다. 만든 뒤에는 바꿀 수 없습니다.'}
       </p>
-    </ModalShell>
+    </Dialog>
   );
 }

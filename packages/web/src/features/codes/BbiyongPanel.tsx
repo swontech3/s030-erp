@@ -9,8 +9,10 @@
  * ★ ERP 쪽 오른쪽(`CodesView`)과 같은 칸 모양 · 같은 「불러오는 중」/「없음」 가르기를 쓴다.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Icon } from '@/components/ds';
+import { Button, Icon, Table, TableEmpty, TableHead, TableRow, tableCell } from '@/components/ds';
+import { ListNote } from '@/components/patterns/ListFrame';
 import { LoadingBar } from '@/components/patterns/LoadingBar';
+import { BTN_XS } from '@/features/billing/BillingTable';
 import { cf } from '@/features/facility/ModalShell';
 import {
   CodesError,
@@ -23,8 +25,15 @@ import {
 } from './codes-model';
 import { BbiyongValueDialog } from './BbiyongValueDialog';
 import styles from './codes.module.css';
+import view from './codes-view.module.css';
 
 const EMPTY_FILTER = { code: '', name: '' };
+
+/*
+ * ★ 2026-11-25 센터·기준관리 일관성 — 공통 표(Table) 칸 폭(종전 <table> 자동 폭).
+ *   코드값 | 코드값 이름 | 순서 56 | 사용여부 96(「사용 안 함」 딱지) | 동작 152(30px 단추 「수정」「사용 안 함」 + 사이 6)
+ */
+const VALUE_COLS = 'minmax(0, 1fr) minmax(0, 2fr) 56px 96px 152px';
 
 interface Props {
   type: BbiyongCodeType;
@@ -99,16 +108,11 @@ export function BbiyongPanel({ type, onChanged }: Props) {
 
       <div className={styles.panelHead}>
         <div>
-          <h2 className={styles.panelTitle}>
+          {/* ★ 2026-11-25 일관성 — 구역 제목 = 왼쪽 4px 아쿠아 막대(글자에만) */}
+          <h2 className={`${styles.panelTitle} ${view.sectionTitle}`}>
             {type.cdTpMeaning}({bbiyongTypeLabel(type)})
           </h2>
           <p className={styles.panelSub}>주인 삐용 — 삐용 공통 코드 표에 있습니다. 지우는 대신 「사용 안 함」으로 바꿉니다.</p>
-        </div>
-        <div className={styles.actions}>
-          <Button size="sm" variant="primary" onClick={() => setDialog({ value: null })}>
-            <Icon name="plus" size={16} />
-            코드값 추가
-          </Button>
         </div>
       </div>
 
@@ -129,65 +133,70 @@ export function BbiyongPanel({ type, onChanged }: Props) {
           placeholder="코드값 이름"
           aria-label="코드값 이름"
         />
-        <button type="button" className={`${styles.btnXs} ${styles.searchBtn}`} onClick={() => setFilter(filterInput)}>
-          조회
-        </button>
-        <button
-          type="button"
-          className={`${styles.btnXs} ${styles.searchBtn}`}
+        {/* ★ 2026-11-25 일관성 — 오른쪽 끝 [초기화][조회](보통 단추) 다음 「n건」 */}
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => {
             setFilterInput(EMPTY_FILTER);
             setFilter(EMPTY_FILTER);
           }}
         >
           초기화
-        </button>
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setFilter(filterInput)}>
+          조회
+        </Button>
+        <ListNote>{busy ? '' : `${shown.length}건`}</ListNote>
+      </div>
+
+      {/* ★ 2026-11-25 일관성 — 등록 = 보통 단추 · 표 위 왼쪽(종전 제목 줄 오른쪽 주 단추) */}
+      <div className={view.listBar}>
+        <Button
+          size="sm"
+          variant="ghost"
+          iconLeft={<Icon name="plus" size={16} />}
+          onClick={() => setDialog({ value: null })}
+        >
+          코드값 추가
+        </Button>
       </div>
 
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>코드값</th>
-              <th>코드값 이름</th>
-              <th className={styles.num}>순서</th>
-              <th className={styles.center}>사용여부</th>
-              <th className={styles.center}>동작</th>
-            </tr>
-          </thead>
-          <tbody>
-            {busy ? null : shown.length === 0 ? (
-              <tr>
-                <td colSpan={5} className={styles.center}>
-                  {values.length === 0 ? '코드값이 없습니다' : '조회 결과가 없습니다'}
-                </td>
-              </tr>
-            ) : (
-              shown.map((v) => (
-                <tr key={v.cdV} className={v.useYn === 'Y' ? undefined : styles.rowOff}>
-                  <td className={styles.code}>{v.cdV}</td>
-                  <td>{v.cdVMeaning}</td>
-                  <td className={styles.num}>{v.sortSeq ?? ''}</td>
-                  <td className={styles.center}>
-                    <span className={`${styles.tag} ${v.useYn === 'Y' ? styles.tagOn : styles.tagOff}`}>
-                      {v.useYn === 'Y' ? '사용' : '사용 안 함'}
-                    </span>
-                  </td>
-                  <td>
-                    <div className={styles.rowActions}>
-                      <button type="button" className={styles.btnXs} onClick={() => setDialog({ value: v })}>
-                        수정
-                      </button>
-                      <button type="button" className={styles.btnXs} onClick={() => void switchUse(v)}>
-                        {v.useYn === 'Y' ? '사용 안 함' : '다시 사용'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+        {/* ★ 2026-11-25 일관성 — 공통 표(Table · 머리글 아쿠아) */}
+        <Table cols={VALUE_COLS}>
+          <TableHead sticky className={view.lineGrid}>
+            <span>코드값</span>
+            <span>코드값 이름</span>
+            <span className={tableCell.right}>순서</span>
+            <span className={tableCell.center}>사용여부</span>
+            <span className={tableCell.center}>동작</span>
+          </TableHead>
+          {busy ? null : shown.length === 0 ? (
+            <TableEmpty>{values.length === 0 ? '코드값이 없습니다' : '조회 결과가 없습니다'}</TableEmpty>
+          ) : (
+            shown.map((v) => (
+              <TableRow key={v.cdV} className={view.lineGrid} muted={v.useYn !== 'Y'}>
+                <span className={styles.code}>{v.cdV}</span>
+                <span>{v.cdVMeaning}</span>
+                <span className={`${styles.num} ${tableCell.right}`}>{v.sortSeq ?? ''}</span>
+                <span className={tableCell.center}>
+                  <span className={`${styles.tag} ${v.useYn === 'Y' ? styles.tagOn : styles.tagOff}`}>
+                    {v.useYn === 'Y' ? '사용' : '사용 안 함'}
+                  </span>
+                </span>
+                <span className={styles.rowActions}>
+                  <Button variant="ghost" size="sm" style={BTN_XS} onClick={() => setDialog({ value: v })}>
+                    수정
+                  </Button>
+                  <Button variant="ghost" size="sm" style={BTN_XS} onClick={() => void switchUse(v)}>
+                    {v.useYn === 'Y' ? '사용 안 함' : '다시 사용'}
+                  </Button>
+                </span>
+              </TableRow>
+            ))
+          )}
+        </Table>
       </div>
 
       <div className={styles.panelFoot}>
