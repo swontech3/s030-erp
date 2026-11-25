@@ -22,7 +22,7 @@
  *   `terminated`·`cancelled` 에서만 전체가 읽기 전용이다 — 판정은 `editableSections()` 가 한다.
  */
 import { bizCheckLine, type BizCheckResult } from '@swonbiz/shared/domain/biz-number-check';
-import { Icon } from '@/components/ds';
+import { Button, Icon } from '@/components/ds';
 import { useKakaoPostcode } from '@/lib/useKakaoPostcode';
 import styles from './contract-form.module.css';
 import {
@@ -155,15 +155,16 @@ export function SectionCompany({
               disabled={disabled}
               onChange={(e) => onChange({ bizno: maskInput(e.currentTarget, 'bizno') })}
             />
-            <button
+            <Button
               type="button"
-              className={`${styles.btn} ${styles.btnGhost}`}
+              variant="ghost"
+              size="sm"
               style={{ width: 72, height: 44 }}
               disabled={disabled || bizCheck.kind === 'checking'}
               onClick={onBizCheck}
             >
               {bizCheck.kind === 'checking' ? '확인 중' : '확인'}
-            </button>
+            </Button>
             {bizCheck.kind === 'format' ? (
               <span style={{ display: 'flex', flex: '0 0 auto', color: 'var(--color-warning)' }} title="형식이 올바르지 않습니다">
                 <Icon name="circle-alert" size={20} />
@@ -328,15 +329,16 @@ export function SectionCompany({
               카카오 우편번호 팝업. ★ 상세주소(`addr2`)는 건드리지 않는다 — 팝업이 주는
               것은 우편번호와 기본주소뿐이고, 사람이 적어 둔 동·호수를 지울 이유가 없다.
             */}
-            <button
+            <Button
               type="button"
-              className={`${styles.btn} ${styles.btnGhost}`}
+              variant="ghost"
+              size="sm"
               style={{ width: 100, height: 44 }}
               disabled={disabled}
               onClick={() => postcode.open((r) => onChange({ zip: r.zipCode, addr1: r.address }))}
             >
               주소 검색
-            </button>
+            </Button>
             <input className={`${styles.input} ${styles.flex1}`} readOnly value={value.addr1} />
             <input
               className={styles.input}

@@ -18,7 +18,7 @@
  * ★ 미체크 행은 **입력값을 유지**하고 저장 때만 뺀다. 지우지 않는다.
  */
 import { Fragment } from 'react';
-import { Icon } from '@/components/ds';
+import { Button, Icon } from '@/components/ds';
 import styles from './contract-form.module.css';
 import {
   DOMAIN_CUSTOM,
@@ -264,15 +264,18 @@ export function SectionUsers({
       )}
 
       <span className={`${styles.tipWrap} ${styles.tipWrapBlock}`}>
-        <button
+        <Button
           type="button"
-          className={styles.addRow}
+          variant="ghost"
+          size="sm"
+          fullWidth
+          iconLeft={<Icon name="plus" size={16} />}
+          style={{ marginTop: 12 }}
           disabled={frozen || full}
           onClick={() => onUsers([...users, { ...USER_TEMPLATE }])}
         >
-          <Icon name="plus" size={16} />
           사용자 추가
-        </button>
+        </Button>
         <span className={`${styles.tip}${full ? '' : ` ${styles.tipHidden}`}`}>
           최대 {MAX_USERS}명까지 등록 가능합니다
         </span>
