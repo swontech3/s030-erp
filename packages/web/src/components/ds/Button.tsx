@@ -85,7 +85,9 @@ export function Button({
       boxShadow: 'none',
     },
     subtle: {
-      background: h ? '#E4E9FF' : 'var(--color-accent-bg)',
+      // ★ 2026-11-25 정한 것 9 — 올림 바탕 #E4E9FF(원본 인디고 계열 리터럴) → 아쿠아 옅은 토큰.
+      //   기본 바탕도 같은 토큰이라 올려도 바탕은 그대로다(글자 · 테두리도 그대로)
+      background: 'var(--color-accent-bg)',
       color: 'var(--color-primary-hover)',
       border: '1px solid transparent',
       boxShadow: 'none',
