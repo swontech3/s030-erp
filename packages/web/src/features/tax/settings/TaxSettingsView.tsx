@@ -190,9 +190,8 @@ export function TaxSettingsView() {
     const rows = draft[confirm.list].filter((f) => confirm.keys.includes(f.key) && (f.number || f.alias));
     return (
       <TaxConfirmDialog
-        icon="trash-2"
         danger
-        title={confirm.keys.length > 1 ? `${what} ${confirm.keys.length}개를 지우시겠습니까?` : `이 ${what}를 지우시겠습니까?`}
+        question={confirm.keys.length > 1 ? `${what} ${confirm.keys.length}개를 지우시겠습니까?` : `이 ${what}를 지우시겠습니까?`}
         body={
           <>
             {rows.map((f) => (
@@ -496,9 +495,8 @@ export function TaxSettingsView() {
       {renderConfirm()}
       {leave.pendingHref ? (
         <TaxConfirmDialog
-          icon="triangle-alert"
-          title="저장하지 않은 변경이 있습니다"
-          body="이 화면을 나가면 바꾼 내용이 사라집니다. 저장하려면 [돌아가기]를 누른 뒤 [저장]을 누르세요."
+          question="저장하지 않은 변경이 있습니다. 이 화면을 나가시겠습니까?"
+          body="나가면 바꾼 내용이 사라집니다. 저장하려면 [취소]를 누른 뒤 [저장]을 누르세요."
           okLabel="나가기"
           onCancel={leave.stay}
           onOk={leave.leave}

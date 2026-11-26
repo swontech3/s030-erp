@@ -363,9 +363,8 @@ export function TaxUploadsView({ month }: { month: string }) {
 
       {confirm ? (
         <TaxConfirmDialog
-          icon="trash-2"
           danger
-          title={confirm.ids.length > 1 ? `파일 ${confirm.ids.length}개를 지우시겠습니까?` : '이 파일을 지우시겠습니까?'}
+          question={confirm.ids.length > 1 ? `파일 ${confirm.ids.length}개를 지우시겠습니까?` : '이 파일을 지우시겠습니까?'}
           okLabel="삭제"
           onCancel={() => setConfirm(null)}
           onOk={runDelete}
