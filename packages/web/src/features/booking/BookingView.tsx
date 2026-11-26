@@ -545,11 +545,12 @@ export function BookingView({ operator, companyId, me, initialRoomId = null, ini
             <button type="button" className={styles.iconBtn} aria-label="이전" onClick={() => stepBy(-1)}>
               <Icon name="chevron-left" size={16} />
             </button>
-            {/* ★ 2026-11-26 일관성 — 공통 Button 보통(ghost) */}
+            {/* ★ 2026-11-26 일관성 — 공통 Button 보통(ghost) · 높이 36 은 예약 화면 css(.todayBtn · 정한 것 7) */}
             <Button
               type="button"
               variant="ghost"
               size="sm"
+              className={styles.todayBtn}
               onClick={() => {
                 setAnchor(today());
                 setTimeout(scrollToNow, 0);

@@ -131,6 +131,14 @@
   box-shadow: none;
 }
 
+/*
+ * [오늘] 높이 = 옆 ‹ › 단추 · 회의실 고르기와 같은 36(정한 것 7 · 2026-11-26).
+ * ★ 공통 Button 은 높이를 인라인 style(--control-h-sm 40)로 준다 — 공통 부품을 고치지 않고 덮으려면 !important 뿐이다.
+ */
+.todayBtn {
+  height: 36px !important;
+}
+
 .iconBtn {
   width: 36px;
   height: 36px;
