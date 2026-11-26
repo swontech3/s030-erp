@@ -16,12 +16,19 @@
  * ★★ 구분 이름(주거래처 · 일반)은 **API 가 준 코드 값으로만** 그린다.
  * ★ 사업자번호 끝자리가 틀리면 **주황 경고만** — 저장은 된다(결정 3).
  * ★ 아이콘 집합(ERP 공용)에 시안의 star 가 없어 sparkles 로 대신했다.
+ * ★ 2026-11-26 세무 일관성(삐용 기준) — 표 = 공통 Table(머리글 아쿠아) · 버튼 줄 단추 = 공통 Button 보통(40px) · 엑셀 = 같은 꼴(.btn) ·
+ *   검색 조건은 바꾸면 바로 걸러짐 그대로, 오른쪽 끝에 「n건」 · 거래처 수정 팝업 = 공통 Dialog([저장] 주 · [취소] 보통) ·
+ *   거래종료 확인 = TaxConfirmDialog(공통 Dialog)
  */
+
+/** 표 칸 폭 — 선택 · 거래처명 · 사업자번호 · 구분 · 종료여부 · 첫 거래월(종전 colgroup 값 그대로 · 선택 칸은 Table 칸 사이 12px 를 뺀 값) */
+const VENDOR_COLS = '20px minmax(0,1fr) 140px 120px 100px 110px';
 import { useCallback, useEffect, useState } from 'react';
 import { digitsOnly, formatBizNumber, isBizNumberChecksumOk, isBizNumberLength } from '@swonbiz/shared/domain/tax-number';
 import { TAX_VENDOR_GENERAL, TAX_VENDOR_MAIN, filterVendors, withRo, type VendorClosedFilter } from '@swonbiz/shared/domain/tax-uploads';
-import { Button, Icon } from '@/components/ds';
+import { Button, Dialog, Icon, Table, TableEmpty, TableHead, TableRow, tableCell } from '@/components/ds';
 import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
+import { ListNote, ListSpacer } from '@/components/patterns/ListFrame';
 import t from '../common/tax.module.css';
 import { TaxEmpty } from '../common/TaxEmpty';
 import { TaxConfirmDialog } from '../common/TaxConfirmDialog';
@@ -160,108 +167,104 @@ export function TaxVendorsView() {
               </option>
             ))}
           </select>
+          {/* ★ 2026-11-26 세무 일관성 ④ — 바꾸면 바로 걸러짐(그대로) · 오른쪽 끝 「n건」 */}
+          <ListSpacer />
+          <ListNote>{list.length}건</ListNote>
         </div>
       </div>
 
       <div className={`${t.tbar} ${t.tbarOut}`}>
-        <button
-          type="button"
-          className={`${t.btn} ${t.btnSm}`}
+        {/* ★ 2026-11-26 세무 일관성 ③ — 버튼 줄 단추 = 공통 Button 보통(sm 40px) · 자리는 그대로 */}
+        <Button
+          variant="ghost"
+          size="sm"
+          iconLeft={<Icon name="pencil-line" size={16} />}
           disabled={sel.length !== 1}
           onClick={() => {
             const v = byId(sel[0] ?? '');
             if (v) setModal({ kind: 'edit', vendor: v });
           }}
         >
-          <Icon name="pencil-line" size={16} />
           수정
-        </button>
-        <button
-          type="button"
-          className={`${t.btn} ${t.btnSm}`}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconLeft={<Icon name="circle-x" size={16} />}
           disabled={openSel.length === 0}
           onClick={() => setModal({ kind: 'close', ids: openSel })}
         >
-          <Icon name="circle-x" size={16} />
           거래종료
-        </button>
+        </Button>
         <span className={t.sp} />
-        <button type="button" className={`${t.btn} ${t.btnSm}`} disabled={!sel.length} onClick={() => changeType(TAX_VENDOR_MAIN)}>
-          <Icon name="sparkles" size={16} />
+        <Button
+          variant="ghost"
+          size="sm"
+          iconLeft={<Icon name="sparkles" size={16} />}
+          disabled={!sel.length}
+          onClick={() => changeType(TAX_VENDOR_MAIN)}
+        >
           {withRo(tpName(TAX_VENDOR_MAIN))}
-        </button>
-        <button type="button" className={`${t.btn} ${t.btnSm}`} disabled={!sel.length} onClick={() => changeType(TAX_VENDOR_GENERAL)}>
+        </Button>
+        <Button variant="ghost" size="sm" disabled={!sel.length} onClick={() => changeType(TAX_VENDOR_GENERAL)}>
           {withRo(tpName(TAX_VENDOR_GENERAL))}
-        </button>
-        <ExcelDownloadButton href={exportHref(query)} className={`${t.btn} ${t.btnSm}`} onError={setFailed} />
+        </Button>
+        <ExcelDownloadButton href={exportHref(query)} className={t.btn} onError={setFailed} />
       </div>
       {failed ? <TaxFormErrorBanner kind="failed" message={failed} /> : null}
 
       <div className={`${t.card} ${t.listCard}`}>
         <div className={t.listScroll}>
-          <table className={`${t.tbl} ${t.tblSticky}`}>
-            <colgroup>
-              <col className={t.wChk} />
-              <col />
-              <col style={{ width: 140 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 110 }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th aria-label="선택" />
-                <th>거래처명</th>
-                <th>사업자번호</th>
-                <th>구분</th>
-                <th>종료여부</th>
-                <th>첫 거래월</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className={t.empty}>
-                    <TaxEmpty icon="building-2" lead="찾는 거래처가 없습니다" />
-                  </td>
-                </tr>
-              ) : (
-                list.map((v) => {
-                  const on = sel.includes(v.id);
-                  return (
-                    <tr key={v.id} className={`${t.clickable} ${on ? t.pick : ''}`} onClick={() => toggle(v.id)}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          className={t.rowchk}
-                          checked={on}
-                          aria-label="선택"
-                          onChange={() => toggle(v.id)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </td>
-                      <td className={t.ell} style={{ fontWeight: 700 }} title={v.name}>
-                        {v.name}
-                      </td>
-                      <td className={t.tnum}>{bizView(v.bizNo) ?? <span style={{ color: 'var(--text-caption)' }}>없음</span>}</td>
-                      <td>
-                        {v.vendorTp === TAX_VENDOR_MAIN ? (
-                          <span className={`${t.badge} ${t.bDone}`}>
-                            <Icon name="sparkles" size={16} />
-                            {tpName(v.vendorTp)}
-                          </span>
-                        ) : (
-                          <span className={`${t.badge} ${t.bGray}`}>{tpName(v.vendorTp)}</span>
-                        )}
-                      </td>
-                      <td>{v.closed ? <span className={`${t.badge} ${t.bGray}`}>종료</span> : '거래 중'}</td>
-                      <td className={`${t.mut} ${t.tnum}`}>{v.firstMonth ?? '—'}</td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+          {/* ★ 2026-11-26 세무 일관성 ① — 표 = 공통 Table(머리글 아쿠아 · 머리 고정). 줄을 누르면 고름(그대로) */}
+          <Table cols={VENDOR_COLS}>
+            <TableHead sticky>
+              <span aria-label="선택" />
+              <span>거래처명</span>
+              <span>사업자번호</span>
+              <span>구분</span>
+              <span>종료여부</span>
+              <span>첫 거래월</span>
+            </TableHead>
+            {list.length === 0 ? (
+              <TableEmpty>
+                <TaxEmpty icon="building-2" lead="찾는 거래처가 없습니다" />
+              </TableEmpty>
+            ) : (
+              list.map((v) => {
+                const on = sel.includes(v.id);
+                return (
+                  <TableRow key={v.id} selected={on} onClick={() => toggle(v.id)}>
+                    <span className={t.cellChk}>
+                      <input
+                        type="checkbox"
+                        className={t.rowchk}
+                        checked={on}
+                        aria-label="선택"
+                        onChange={() => toggle(v.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </span>
+                    <span className={tableCell.ellipsis} style={{ fontWeight: 700 }} title={v.name}>
+                      {v.name}
+                    </span>
+                    <span className={t.tnum}>{bizView(v.bizNo) ?? <span style={{ color: 'var(--text-caption)' }}>없음</span>}</span>
+                    <span>
+                      {v.vendorTp === TAX_VENDOR_MAIN ? (
+                        <span className={`${t.badge} ${t.bDone}`}>
+                          <Icon name="sparkles" size={16} />
+                          {tpName(v.vendorTp)}
+                        </span>
+                      ) : (
+                        <span className={`${t.badge} ${t.bGray}`}>{tpName(v.vendorTp)}</span>
+                      )}
+                    </span>
+                    <span>{v.closed ? <span className={`${t.badge} ${t.bGray}`}>종료</span> : '거래 중'}</span>
+                    <span className={`${t.mutT} ${t.tnum}`}>{v.firstMonth ?? '—'}</span>
+                  </TableRow>
+                );
+              })
+            )}
+          </Table>
         </div>
       </div>
 
@@ -270,8 +273,7 @@ export function TaxVendorsView() {
       ) : null}
       {modal?.kind === 'close' ? (
         <TaxConfirmDialog
-          icon="circle-x"
-          title={`${modal.ids.length}곳의 거래를 종료하시겠습니까?`}
+          question={`${modal.ids.length}곳의 거래를 종료하시겠습니까?`}
           okLabel="거래종료"
           onCancel={() => setModal(null)}
           onOk={() => runClose(modal.ids)}
@@ -285,50 +287,6 @@ export function TaxVendorsView() {
         />
       ) : null}
       <TaxToast message={toast} />
-    </div>
-  );
-}
-
-/* ── 팝업 공통 틀(480px) ──────────────────────────────────────────────────── */
-
-function Frame({ title, sub, onClose, children, footer }: {
-  title: string;
-  sub: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  footer: React.ReactNode;
-}) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-  return (
-    <div
-      className={t.overlay}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className={`${t.modal} ${t.modalSmW}`} role="dialog" aria-modal="true" aria-label={title}>
-        <div className={t.mH}>
-          <div>
-            <h3>{title}</h3>
-            <p>{sub}</p>
-          </div>
-          <button type="button" className={t.iconBtn} aria-label="닫기" onClick={onClose}>
-            <Icon name="x" size={20} />
-          </button>
-        </div>
-        <div className={t.mB}>{children}</div>
-        <div className={t.mF}>
-          <span className={t.sp} />
-          {footer}
-        </div>
-      </div>
     </div>
   );
 }
@@ -361,21 +319,25 @@ function EditModal({ vendor, onClose, onDone }: { vendor: TaxVendorView; onClose
   };
 
   return (
-    <Frame
+    /* ★ 2026-11-26 세무 일관성 ⑤ — 공통 Dialog(아쿠아 제목줄 · 아래 가운데 [저장](주) [취소](보통)) · 종전 부제목 한 줄은 본문 첫 줄 */
+    <Dialog
+      open
       title="거래처 수정"
-      sub="고친 이름은 모든 달의 자료에 함께 바뀝니다"
+      description="고친 이름은 모든 달의 자료에 함께 바뀝니다"
       onClose={onClose}
+      closeDisabled={busy}
       footer={
         <>
-          <Button size="sm" variant="ghost" onClick={onClose}>
-            취소
-          </Button>
           <Button size="sm" variant="primary" disabled={busy} onClick={save}>
             저장
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onClose}>
+            취소
           </Button>
         </>
       }
     >
+      <div className={t.dlgBody}>
       <label className={t.field}>
         <span className={t.lab}>거래처명</span>
         <input
@@ -420,6 +382,7 @@ function EditModal({ vendor, onClose, onDone }: { vendor: TaxVendorView; onClose
         {errs.closed ? <span className={t.errT}>{errs.closed}</span> : null}
       </div>
       {failed ? <TaxFormErrorBanner kind="failed" message={failed} /> : null}
-    </Frame>
+      </div>
+    </Dialog>
   );
 }

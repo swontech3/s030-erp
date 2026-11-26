@@ -19,6 +19,8 @@
 /* ── 안내 줄(달 선택을 숨긴 화면) ── */
 .ctx { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .ctxNote { font-size: var(--fs-xs); color: var(--text-muted); }
+/* ★ 2026-11-26 세무 일관성 ④ — 안내 + 「n건」 묶음(줄 오른쪽 끝) */
+.ctxR { display: inline-flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 
 /* ── 화면 제목 ── */
 .pageH { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
@@ -28,8 +30,12 @@
 /* ── 카드 ── */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .cardPad { padding: 20px 24px; }
-/* ★ 2026-11-07 ERP 디자인 컨셉에 맞춤 — 16px + 왼쪽 인디고 막대 → 18px/700 막대 없음(05-patterns §2) */
-.secT { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xl); font-weight: 700; color: var(--text-heading); }
+/* ★ 2026-11-07 ERP 디자인 컨셉에 맞춤 — 16px + 왼쪽 인디고 막대 → 18px/700 막대 없음(05-patterns §2)
+ * ★ 2026-11-26 세무 일관성 ② — 구역 제목 = 왼쪽 4px 아쿠아 막대(글자에만 · 입주관리 · 법무 · 회의실 예약과 같은 값) */
+.secT {
+  display: flex; align-items: center; gap: 8px; font-size: var(--fs-xl); font-weight: 700; color: var(--text-heading);
+  border-left: 4px solid var(--color-primary); padding-left: 8px; line-height: 1.2;
+}
 .help { margin: 0; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.6; text-wrap: pretty; }
 .sm { font-size: var(--fs-xs); color: var(--text-muted); }
 .tnum { font-variant-numeric: tabular-nums; }
@@ -49,20 +55,19 @@
     transform var(--dur-fast) var(--ease-out);
 }
 /* ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(03-components Button) — 크기는 그대로, 글자색 · 그림자 · 눌림 · 초점 · 위험 꼴을 ERP 값으로.
- *   40px 버튼은 화면에서 ERP 공통 Button(sm)을 쓰고, 이 클래스는 32px · 빨강 · 링크 · 엑셀 · 확인 팝업(44px)에만 남는다. */
+ *   40px 버튼은 화면에서 ERP 공통 Button(sm)을 쓰고, 이 클래스는 32px · 빨강 · 링크 · 엑셀 · 확인 팝업(44px)에만 남는다.
+ *   ★ 2026-11-26 세무 일관성 — 링크 · 엑셀 40px(.btn) · 줄 안 30px(.btnXs)만 남고, 주 · 빨강 꼴은 공통 Button 을 쓴다. */
 .btn:hover { background: var(--surface-alt); color: var(--text-heading); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
-.btnPrimary { background: var(--color-primary); border-color: transparent; color: var(--text-on-primary); box-shadow: var(--shadow-primary); }
-.btnPrimary:hover { background: var(--color-primary-hover); color: var(--text-on-primary); box-shadow: var(--shadow-primary-hover); }
-.btnDanger { color: var(--color-danger); }
-.btnDanger:hover { background: var(--color-danger-bg); color: var(--color-danger); }
-.btnDangerSolid { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
-.btnDangerSolid:hover { background: var(--red-800); color: #fff; }
+
 .btnSm { height: 32px; padding: 0 12px; font-size: var(--fs-md); }
 .btnLink { height: auto; padding: 0; border: 0; background: transparent; color: var(--color-primary); font-weight: 700; }
 .btnLink:hover { background: transparent; color: var(--color-primary-hover); }
 .btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+/* ★ 2026-11-26 세무 일관성 ③ — 줄 안 작은 단추 30px(청구 BillingTable BTN_XS 와 같은 값). 40px 단추는 공통 Button(sm) ·
+ *   링크 · 엑셀처럼 Button 을 쓸 수 없는 단추는 .btn(40px = Button ghost sm 과 같은 꼴) */
+.btnXs { height: 30px; padding: 0 10px; font-size: var(--text-micro-size); }
 
 /* ── 입력 ── */
 .input, .select {
@@ -88,29 +93,10 @@
   background: var(--surface-alt); border: 1px solid var(--border); font-size: var(--fs-xs); line-height: 1.6; color: var(--text-body);
 }
 .note > span:first-child { flex: 0 0 auto; margin-top: 3px; }
-.noteDanger { background: var(--color-danger-bg); border-color: rgba(220, 38, 38, .25); color: var(--color-danger-text); }
+.noteDanger { background: var(--color-danger-bg); border-color: color-mix(in srgb, var(--color-danger) 25%, transparent); color: var(--color-danger-text); }
 .note b { font-weight: 700; }
 
-/* ── 팝업 · 확인 창(결과서 0-6) ── */
-.overlay {
-  position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center;
-  padding: 80px 24px 24px; background: rgba(11, 17, 32, .45);
-}
-.modalSm {
-  width: 480px; max-width: 100%; display: flex; flex-direction: column; background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-overlay); overflow: hidden;
-}
-.confirm { padding: 28px 28px 8px; text-align: center; }
-/* ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(계약 폼 확인 모달) — 아이콘 52 → 56px, 제목 20/700 → 22/600, 본문 줄 간격 1.6, 버튼 높이 44px */
-.confirmIc {
-  width: 56px; height: 56px; margin: 0 auto; border-radius: 999px; display: grid; place-items: center;
-  background: var(--color-accent-bg); color: var(--color-primary);
-}
-.confirmIcRed { background: var(--color-danger-bg); color: var(--color-danger); }
-.confirm h3 { margin: 16px 0 0; font-size: var(--fs-4xl); font-weight: 600; color: var(--text-heading); }
-.confirm p { margin: 8px 0 0; font-size: var(--fs-md); line-height: 1.6; color: var(--text-body); text-wrap: pretty; }
-.confirmF { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 24px 28px 28px; }
-.confirmF .btn { height: 44px; }
+/* ── 팝업 · 확인 창 — ★ 2026-11-26 세무 일관성 ⑤ 공통 Dialog 로 바꿔 종전 틀(.overlay · .modalSm · .confirm*) · 빨강 바탕 단추(.btnDangerSolid)를 지웠다 ── */
 
 /* ── 토스트 — ★ 2026-11-07 ERP 디자인 컨셉에 맞춤(월별 청구 · 03-components Toast): 아래 가운데 44px 검정 →
  *   오른쪽 아래 380px 흰 카드 + 인디고 점, 2.4초 → 2.8초 ── */
@@ -141,7 +127,8 @@
 
 /* ── 카드 머리 ── */
 .cardH { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.cardH h2 { margin: 0; font-size: var(--fs-lg); font-weight: 700; line-height: 1.4; color: var(--text-heading); }
+.cardH h2 { margin: 0; font-size: var(--fs-lg); font-weight: 700; line-height: 1.2; color: var(--text-heading);
+  border-left: 4px solid var(--color-primary); padding-left: 8px; } /* ★ 2026-11-26 세무 일관성 ② 구역 제목 막대 */
 .cardHSub { font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* ── 배지(녹색 없음: 끝남 = 인디고) ── */
@@ -193,6 +180,14 @@
 .tbl .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tbl td.mut { color: var(--text-muted); }
 .tbl .wChk { width: 44px; }
+/* ★ 2026-11-26 세무 일관성 ① — 공통 Table 칸 안 글자 모양(색 · 줄은 Table 부품) */
+.mutT { color: var(--text-muted); }
+.cellChk { display: inline-flex; align-items: center; }
+.numC { text-align: right; justify-self: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* 합계 줄 — 여러 칸을 묶는 칸(종전 colSpan) */
+.span2 { grid-column: span 2; }
+.span3 { grid-column: span 3; }
+.span4 { grid-column: span 4; }
 .clickable { cursor: pointer; }
 .clickable:hover td { background: var(--surface-alt); }
 .pick td { background: var(--color-accent-bg); }
@@ -262,7 +257,7 @@
 .tplBtn { height: 28px; padding: 0 6px; font-size: var(--fs-xs); gap: 4px; flex: 0 0 auto; }
 /* 올린 파일 표 — 고정 칸 합 702 + 파일 이름 최소 160. 더 좁으면 목록 안에서 옆으로 스크롤(작업 칸 버튼이 잘리지 않게, 2026-11-08)
  *   ★ 2026-11-16 글자 크기 변수 — 행수 칸 64 → 72 라 고정 칸 합 694 → 702, 최소 폭 854 → 862 */
-.tblUploads { min-width: 862px; }
+
 .kindCard .kindDs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 올리기 팝업 — 파일마다 한 칸(미리보기 · 같은 파일 · 오류). 은행은 한 줄 = 계좌 · 파일 종류 · 파일 */
@@ -271,23 +266,14 @@
 .bankRow { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.6fr) 32px; gap: 8px; align-items: center; }
 
 /* ── 상태 띠 더함 ── */
-.noteWarn { background: var(--color-warning-bg); border-color: rgba(217, 119, 6, .25); color: var(--color-warning-text); }
-.noteInfo { background: var(--color-accent-bg); border-color: rgba(11, 147, 184, .18); color: var(--color-primary-hover); }
+.noteWarn { background: var(--color-warning-bg); border-color: color-mix(in srgb, var(--color-warning) 25%, transparent); color: var(--color-warning-text); }
+.noteInfo { background: var(--color-accent-bg); border-color: color-mix(in srgb, var(--color-primary) 18%, transparent); color: var(--color-primary-hover); }
 .warnT { font-size: var(--fs-xs); color: var(--color-warning-text); }
 
-/* ── 팝업(기본 640 · 작은 것 480 · 큰 것 820) ── */
-.modal {
-  width: 640px; max-width: 100%; max-height: calc(100vh - 120px); display: flex; flex-direction: column;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-overlay);
-  overflow: hidden;
-}
-.modalSmW { width: 480px; }
-.modalLg { width: 820px; }
-.mH { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--border); }
-.mH h3 { margin: 0; font-size: var(--fs-4xl); font-weight: 700; line-height: 1.4; color: var(--text-heading); }
-.mH p { margin: 2px 0 0; font-size: var(--fs-xs); color: var(--text-muted); }
-.mB { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 18px; }
-.mF { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--border); }
+/* ★ 2026-11-26 세무 일관성 ⑤ — 공통 Dialog 본문 안 칸 묶음(종전 .mB 의 세로 간격 18px 그대로) */
+.dlgBody { display: flex; flex-direction: column; gap: 18px; }
+/* ── 팝업 — ★ 2026-11-26 공통 Dialog 로 바꿔 종전 틀(.modal · .mH · .mB · .mF)을 지웠다 ── */
+
 .sp { flex: 1; }
 .iconBtn {
   width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: var(--radius-sm);

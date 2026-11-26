@@ -21,11 +21,13 @@
  * ★ 회사 기본정보는 보기만 — 번호는 숫자로 받아 **화면에서만** 하이픈을 붙인다. 없으면 「삐용에서 아직 받지 못했습니다」.
  * ★ 저장하지 않고 화면 안에서 떠나면 시안 모양 확인 창, 새로고침 · 창 닫기는 브라우저 기본(`useLeaveGuard`).
  * ★ 1-1 에는 올린 자료가 없다 — 계좌 · 카드 「올린 자료가 있으면 지우기 막기」는 1-2 에서 붙는다(지금은 늘 지울 수 있다).
+ * ★ 2026-11-26 세무 일관성(삐용 기준) — 세무사 메일 표 · 계좌 · 카드 줄 = 공통 Table(머리글 아쿠아 · 칸 폭 종전 값) ·
+ *   목록 위 단추 = 공통 Button([계좌 · 카드 추가] · [사용 안 함] · [다시 사용] 보통 · [삭제] 지우기) · 자리 · 동작 그대로
  */
 import { useCallback, useEffect, useState } from 'react';
 import { formatBizNumber } from '@swonbiz/shared/domain/tax-number';
 import { TAX_FIN_KIND_BANK, TAX_FIN_KIND_CARD, type TaxCodeOption } from '@swonbiz/shared/domain/tax-settings';
-import { Button, Icon } from '@/components/ds';
+import { Button, Icon, Table, TableHead, TableRow } from '@/components/ds';
 // ★ 버튼 줄은 ERP 표양식 편집(s030100020)과 같은 클래스를 그대로 쓴다(FormEditor 가 codes.module.css 를 쓰는 것과 같은 방식)
 import codesCss from '@/features/codes/codes.module.css';
 import forms from '@/features/forms/forms.module.css';
@@ -47,6 +49,7 @@ import {
   type DraftFin,
   type TaxSettingsResponse,
 } from './tax-settings-model';
+import st from './tax-settings.module.css';
 
 type FinList = 'accounts' | 'cards';
 type ListName = FinList;
@@ -61,6 +64,12 @@ const FROM_REP_NOTE = '운영자 계정에서 최신 정보로 보입니다';
 const OFF_OPACITY = 0.45;
 
 type Confirm = { kind: 'fin'; list: FinList; keys: string[] } | null;
+
+/** 세무사 메일 표 칸 폭 — 번호 48 · 이름 18% · 메일 나머지 × 두 묶음(종전 colgroup 값 그대로) */
+const EMAIL_COLS = '48px 18% minmax(0,1fr) 48px 18% minmax(0,1fr)';
+/** 계좌 · 카드 표 칸 폭 — 선택 · 은행(카드사) 112 · 번호 · 별칭(종전 입력칸 폭 그대로 · 선택 칸은 Table 칸 사이 12px 를 뺀 값) */
+const BANK_COLS = '20px 112px minmax(0,1fr) 100px';
+const CARD_COLS = '20px 112px 90px minmax(0,1fr)';
 
 const nameOf = (list: TaxCodeOption[], code: string) => list.find((c) => c.code === code)?.name ?? code;
 
@@ -190,9 +199,8 @@ export function TaxSettingsView() {
     const rows = draft[confirm.list].filter((f) => confirm.keys.includes(f.key) && (f.number || f.alias));
     return (
       <TaxConfirmDialog
-        icon="trash-2"
         danger
-        title={confirm.keys.length > 1 ? `${what} ${confirm.keys.length}개를 지우시겠습니까?` : `이 ${what}를 지우시겠습니까?`}
+        question={confirm.keys.length > 1 ? `${what} ${confirm.keys.length}개를 지우시겠습니까?` : `이 ${what}를 지우시겠습니까?`}
         body={
           <>
             {rows.map((f) => (
@@ -251,21 +259,20 @@ export function TaxSettingsView() {
     const picked = sel[list].length;
     const chosen = draft[list].filter((f) => sel[list].includes(f.key));
     return (
+      // ★ 2026-11-26 세무 일관성 ③ — 공통 Button(sm 40px) : 추가 · 사용 안 함 · 다시 사용 = 보통 · 삭제 = 지우기 · 자리(표 위 왼쪽) 그대로
       <div className={t.row} style={{ marginTop: 12 }}>
-        <button type="button" className={`${t.btn} ${t.btnSm}`} onClick={() => add(list)}>
-          <Icon name="plus" size={14} />
+        <Button variant="ghost" size="sm" iconLeft={<Icon name="plus" size={16} />} onClick={() => add(list)}>
           {addLabel}
-        </button>
-        <button type="button" className={`${t.btn} ${t.btnSm} ${t.btnDanger}`} disabled={picked === 0} onClick={() => askDelete(list)}>
-          <Icon name="trash-2" size={14} />
+        </Button>
+        <Button variant="danger" size="sm" iconLeft={<Icon name="trash-2" size={16} />} disabled={picked === 0} onClick={() => askDelete(list)}>
           삭제
-        </button>
-        <button type="button" className={`${t.btn} ${t.btnSm}`} disabled={!chosen.some((f) => f.isActive)} onClick={() => setActive(list, false)}>
+        </Button>
+        <Button variant="ghost" size="sm" disabled={!chosen.some((f) => f.isActive)} onClick={() => setActive(list, false)}>
           사용 안 함
-        </button>
-        <button type="button" className={`${t.btn} ${t.btnSm}`} disabled={!chosen.some((f) => !f.isActive)} onClick={() => setActive(list, true)}>
+        </Button>
+        <Button variant="ghost" size="sm" disabled={!chosen.some((f) => !f.isActive)} onClick={() => setActive(list, true)}>
           다시 사용
-        </button>
+        </Button>
         <span className={t.sm}>{picked > 0 ? `${picked}개 선택` : ''}</span>
       </div>
     );
@@ -284,51 +291,62 @@ export function TaxSettingsView() {
   const finRows = (list: FinList) => {
     const isBank = list === 'accounts';
     const options = isBank ? codes.banks : codes.cardCompanies;
+    // ★ 2026-11-26 세무 일관성 ① — 계좌 · 카드 줄 = 공통 Table(머리글은 종전 입력칸 이름 그대로). 입력 · 체크 · 「사용 안 함」 흐림은 그대로
     return (
-      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {draft[list].map((f) => {
-          const off = !f.isActive;
-          return (
-            <div key={f.key} className={t.row} style={{ flexWrap: 'nowrap' }}>
-              {rowChk(list, f.key)}
-              <div className={t.row} style={{ flex: 1, minWidth: 0, flexWrap: 'nowrap', opacity: off ? OFF_OPACITY : 1 }}>
-                <select
-                  disabled={off}
-                  className={`${t.select} ${errCls(`fin:${f.key}:inst`)}`}
-                  style={{ width: 112 }}
-                  value={f.instCode}
-                  aria-label={isBank ? '은행' : '카드사'}
-                  onChange={(e) => editFin(list, f.key, 'instCode', e.target.value)}
-                >
-                  {options.map((o) => (
-                    <option key={o.code} value={o.code}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  disabled={off}
-                  className={`${t.input} ${t.tnum} ${errCls(`fin:${f.key}:number`)}`}
-                  style={isBank ? { flex: 1, minWidth: 0 } : { width: 90 }}
-                  value={f.number}
-                  maxLength={isBank ? undefined : 4}
-                  placeholder={isBank ? '계좌번호' : '끝 4자리'}
-                  aria-label={isBank ? '계좌번호' : '카드 끝 4자리'}
-                  onChange={(e) => editFin(list, f.key, 'number', e.target.value)}
-                />
-                <input
-                  disabled={off}
-                  className={`${t.input} ${errCls(`fin:${f.key}:alias`)}`}
-                  style={isBank ? { width: 100 } : { flex: 1, minWidth: 0 }}
-                  value={f.alias}
-                  placeholder="별칭"
-                  aria-label="별칭"
-                  onChange={(e) => editFin(list, f.key, 'alias', e.target.value)}
-                />
-              </div>
-            </div>
-          );
-        })}
+      <div style={{ marginTop: 8 }}>
+        <Table cols={isBank ? BANK_COLS : CARD_COLS}>
+          <TableHead>
+            <span aria-label="선택" />
+            <span>{isBank ? '은행' : '카드사'}</span>
+            <span>{isBank ? '계좌번호' : '끝 4자리'}</span>
+            <span>별칭</span>
+          </TableHead>
+          {draft[list].map((f) => {
+            const off = !f.isActive;
+            const dim = { opacity: off ? OFF_OPACITY : 1 };
+            return (
+              <TableRow key={f.key}>
+                <span className={t.cellChk}>{rowChk(list, f.key)}</span>
+                <span style={dim}>
+                  <select
+                    disabled={off}
+                    className={`${t.select} ${st.cellInput} ${errCls(`fin:${f.key}:inst`)}`}
+                    value={f.instCode}
+                    aria-label={isBank ? '은행' : '카드사'}
+                    onChange={(e) => editFin(list, f.key, 'instCode', e.target.value)}
+                  >
+                    {options.map((o) => (
+                      <option key={o.code} value={o.code}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
+                </span>
+                <span style={dim}>
+                  <input
+                    disabled={off}
+                    className={`${t.input} ${t.tnum} ${st.cellInput} ${errCls(`fin:${f.key}:number`)}`}
+                    value={f.number}
+                    maxLength={isBank ? undefined : 4}
+                    placeholder={isBank ? '계좌번호' : '끝 4자리'}
+                    aria-label={isBank ? '계좌번호' : '카드 끝 4자리'}
+                    onChange={(e) => editFin(list, f.key, 'number', e.target.value)}
+                  />
+                </span>
+                <span style={dim}>
+                  <input
+                    disabled={off}
+                    className={`${t.input} ${st.cellInput} ${errCls(`fin:${f.key}:alias`)}`}
+                    value={f.alias}
+                    placeholder="별칭"
+                    aria-label="별칭"
+                    onChange={(e) => editFin(list, f.key, 'alias', e.target.value)}
+                  />
+                </span>
+              </TableRow>
+            );
+          })}
+        </Table>
       </div>
     );
   };
@@ -337,66 +355,60 @@ export function TaxSettingsView() {
    * 세무사 메일 4명 — 2행 × 두 사람(2026-11-15 대표 수정): 1행 1 · 2, 2행 3 · 4. 머리 줄은 묶음마다 No · 이름 · 메일 주소,
    * 묶음 앞 작은 번호 칸, 두 묶음 사이 굵은 세로선(ERP 테두리 색 2px). 빈 칸 허용(서버가 둘 다 빈 사람은 버린다). 저장 규칙 · 개수 · 검사는 그대로.
    */
-  const SPLIT = '2px solid var(--border)';
-  const cellPad = { padding: '6px 12px' } as const;
+  // ★ 2026-11-26 세무 일관성 ① — 공통 Table(머리글 아쿠아). 두 묶음 사이 굵은 세로선은 .split(종전 2px 그대로)
   const emailPerson = (e: (typeof draft.taxEmails)[number], i: number, right: boolean) => [
-    <td key={`${e.key}-no`} className={t.tnum} style={{ ...cellPad, color: 'var(--text-muted)', ...(right ? { borderLeft: SPLIT } : null) }}>
+    <span key={`${e.key}-no`} className={`${t.tnum} ${t.mutT}${right ? ` ${st.split} ${st.splitRow}` : ''}`}>
       {i + 1}
-    </td>,
-    <td key={`${e.key}-n`} style={cellPad}>
+    </span>,
+    <span key={`${e.key}-n`}>
       <input
-        className={`${t.input} ${errCls(`email:${e.key}:name`)}`}
-        style={{ width: '100%' }}
+        className={`${t.input} ${st.cellInput} ${errCls(`email:${e.key}:name`)}`}
         value={e.name}
         placeholder="이름"
         aria-label={`세무사 ${i + 1} 이름`}
         onChange={(ev) => editEmail(e.key, 'name', ev.target.value)}
       />
-    </td>,
-    <td key={`${e.key}-m`} style={cellPad}>
+    </span>,
+    <span key={`${e.key}-m`}>
       <input
-        className={`${t.input} ${errCls(`email:${e.key}:email`)}`}
-        style={{ width: '100%' }}
+        className={`${t.input} ${st.cellInput} ${errCls(`email:${e.key}:email`)}`}
         type="email"
         value={e.email}
         placeholder="메일주소"
         aria-label={`세무사 ${i + 1} 메일`}
         onChange={(ev) => editEmail(e.key, 'email', ev.target.value)}
       />
-    </td>,
+    </span>,
   ];
   const emailPairs = draft.taxEmails.flatMap((e, i, all) => (i % 2 === 0 ? [[e, all[i + 1]] as const] : []));
   const emailGrid = (
     // ★ 2026-11-15 — 920px 제한을 없애고 카드 폭을 꽉 채운다. 번호 칸은 48px 그대로, 이름 18% · 메일은 나머지(메일이 더 넓다)
-    <div style={{ marginTop: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-      <table className={t.tbl}>
-        <colgroup>
-          <col style={{ width: 48 }} />
-          <col style={{ width: '18%' }} />
-          <col />
-          <col style={{ width: 48 }} />
-          <col style={{ width: '18%' }} />
-          <col />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>No</th>
-            <th>이름</th>
-            <th>메일 주소</th>
-            <th style={{ borderLeft: SPLIT }}>No</th>
-            <th>이름</th>
-            <th>메일 주소</th>
-          </tr>
-        </thead>
-        <tbody>
-          {emailPairs.map(([a, b], r) => (
-            <tr key={a.key}>
-              {emailPerson(a, r * 2, false)}
-              {b ? emailPerson(b, r * 2 + 1, true) : <td colSpan={3} style={{ borderLeft: SPLIT }} />}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    // ★ 2026-11-26 정한 것 11 — 바깥 테두리 상자를 없애 계좌 · 카드 표와 같게(위 여백만 그대로)
+    <div style={{ marginTop: 12 }}>
+      <Table cols={EMAIL_COLS}>
+        <TableHead>
+          <span>No</span>
+          <span>이름</span>
+          <span>메일 주소</span>
+          <span className={st.split}>No</span>
+          <span>이름</span>
+          <span>메일 주소</span>
+        </TableHead>
+        {emailPairs.map(([a, b], r) => (
+          <TableRow key={a.key}>
+            {emailPerson(a, r * 2, false)}
+            {b ? (
+              emailPerson(b, r * 2 + 1, true)
+            ) : (
+              <>
+                <span className={`${st.split} ${st.splitRow}`} />
+                <span />
+                <span />
+              </>
+            )}
+          </TableRow>
+        ))}
+      </Table>
     </div>
   );
 
@@ -496,9 +508,8 @@ export function TaxSettingsView() {
       {renderConfirm()}
       {leave.pendingHref ? (
         <TaxConfirmDialog
-          icon="triangle-alert"
-          title="저장하지 않은 변경이 있습니다"
-          body="이 화면을 나가면 바꾼 내용이 사라집니다. 저장하려면 [돌아가기]를 누른 뒤 [저장]을 누르세요."
+          question="저장하지 않은 변경이 있습니다. 이 화면을 나가시겠습니까?"
+          body="나가면 바꾼 내용이 사라집니다. 저장하려면 [취소]를 누른 뒤 [저장]을 누르세요."
           okLabel="나가기"
           onCancel={leave.stay}
           onOk={leave.leave}

@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Icon } from '@/components/ds';
+import { Button, Icon, TableEmpty } from '@/components/ds';
 import t from '../common/tax.module.css';
 import { TaxEmpty } from '../common/TaxEmpty';
 import { TaxPaymentsError, loadPayments, type PaymentsQuery, type TaxPaymentsResponse } from './tax-payments-model';
@@ -54,20 +54,19 @@ export function FileNote({ file, month }: { file: { fileName: string } | null; m
       <span className={t.ell} style={{ maxWidth: 260 }} title={file.fileName}>
         「{file.fileName}」 파일로 들어온 줄만 보는 중
       </span>
-      <button type="button" className={`${t.btn} ${t.btnSm}`} onClick={() => router.replace(`${pathname}?month=${month}`)}>
+      {/* ★ 2026-11-26 세무 일관성 ③ — 보통 단추 = 공통 Button(sm) */}
+      <Button variant="ghost" size="sm" onClick={() => router.replace(`${pathname}?month=${month}`)}>
         모두 보기
-      </button>
+      </Button>
     </span>
   );
 }
 
-/** 빈 목록 한 줄. */
-export function EmptyRow({ cols }: { cols: number }) {
+/** 빈 목록 한 줄 — ★ 2026-11-26 세무 일관성 ① 공통 Table 의 빈 줄(TableEmpty). */
+export function EmptyRow() {
   return (
-    <tr>
-      <td colSpan={cols} className={t.empty}>
-        <TaxEmpty icon="receipt" lead="해당하는 줄이 없습니다" />
-      </td>
-    </tr>
+    <TableEmpty>
+      <TaxEmpty icon="receipt" lead="해당하는 줄이 없습니다" />
+    </TableEmpty>
   );
 }

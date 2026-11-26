@@ -16,6 +16,9 @@
  * ★ 신고 기간은 부가세 조회와 같은 선택 상자 — 고르면 주소 `?month=` 가 그 기간 끝 달로 바뀐다.
  * ★ 시트 · 제목 · 내용 처음 값 · 파일 이름 · 참조는 서버가 정한 것만 그린다. 메일도 서버가 엑셀을 만들어 첨부해 보낸다.
  * ★ 받는 사람은 세무 설정의 세무사 메일 — 이 화면에서 고치지 않는다.
+ * ★ 2026-11-26 세무 일관성(삐용 기준) — 버튼 줄 [메일 보내기] = 공통 Button(보통 — 2026-11-26 정한 것 7 · sm 40px) · 엑셀 · 링크 = 같은 꼴(.btn) ·
+ *   팝업 「메일 보내기」 = 공통 Dialog([보내기] 주 · [취소] 보통 · ✕ 없앰) · 경고 창 = 공통 Dialog(TaxConfirmDialog · [확인] 하나).
+ *   시트 미리보기 표(엑셀 시트 그대로 보여 주는 표)는 그대로 둔다.
  */
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -24,9 +27,10 @@ import { thisMonthOf } from '@swonbiz/shared/domain/tax-uploads';
 import { TAX_CLS_LEFT } from '@swonbiz/shared/domain/tax-classify';
 import { vatPeriodMonth } from '@swonbiz/shared/domain/tax-vat';
 import { HANDOFF_SUBJECT_MAX, HANDOFF_TEXT_MAX, type HandoffCell, type HandoffSheetKey } from '@swonbiz/shared/domain/tax-handoff';
-import { Icon, type IconName } from '@/components/ds';
+import { Button, Dialog, Icon } from '@/components/ds';
 import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
 import t from '../common/tax.module.css';
+import { TaxConfirmDialog } from '../common/TaxConfirmDialog';
 import { TaxEmpty } from '../common/TaxEmpty';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { TaxMonthBar } from '../common/TaxMonthBar';
@@ -43,7 +47,8 @@ import {
 } from './tax-handoff-model';
 
 const NO_MAIL = '메일 발송 설정이 아직 없습니다 — 엑셀을 내려받아 보내 주세요';
-const SELECT_STYLE = { height: 32, width: 'auto' } as const;
+/* ★ 2026-11-26 검색 줄 고르기 상자 = 40px(세무 css .select 그대로 · 종전 인라인 32px 를 뺐다) — 전달 종류 · 신고 기간 */
+const SELECT_STYLE = { width: 'auto' } as const;
 
 const cellText = (v: HandoffCell) => (typeof v === 'number' ? won(v) : (v ?? ''));
 
@@ -134,7 +139,7 @@ export function TaxHandoffView({ month }: { month: string }) {
             <Icon name="info" size={16} />
           </span>
           <span style={{ flex: 1 }}>세무 설정에서 사업자 유형을 먼저 고르세요 — 사업자 유형에 따라 신고 기간이 다릅니다.</span>
-          <Link href="/tax/settings" className={`${t.btn} ${t.btnSm}`}>
+          <Link href="/tax/settings" className={t.btn}>
             <Icon name="settings" size={16} />
             세무 설정
           </Link>
@@ -150,16 +155,22 @@ export function TaxHandoffView({ month }: { month: string }) {
       {/* ① 검색조건 */}
       {search}
 
-      {/* ② 버튼 */}
+      {/* ② 버튼 — ★ 2026-11-26 세무 일관성 ③ 공통 Button(sm 40px) · 종류 · 자리는 그대로 */}
       <div className={`${t.tbar} ${t.tbarOut}`}>
-        <button type="button" className={`${t.btn} ${t.btnSm} ${t.btnPrimary}`} disabled={!data.mailReady} onClick={() => setMailOpen(true)}>
-          <Icon name="mail" size={16} />
+        {/* ★ 2026-11-26 정한 것 7 — [메일 보내기] = 보통 단추(팝업을 여는 단추 · 팝업 안 [보내기]가 주) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          iconLeft={<Icon name="mail" size={16} />}
+          disabled={!data.mailReady}
+          onClick={() => setMailOpen(true)}
+        >
           메일 보내기
-        </button>
+        </Button>
         <span className={t.help}>{lastSentLabel(data.last)}</span>
         {data.mailReady ? null : <span className={t.help}>{NO_MAIL}</span>}
         <span className={t.sp} />
-        <ExcelDownloadButton href={exportHref(data.query)} className={`${t.btn} ${t.btnSm}`} onError={setFailed} />
+        <ExcelDownloadButton href={exportHref(data.query)} className={t.btn} onError={setFailed} />
       </div>
       {failed ? <TaxFormErrorBanner kind="failed" message={failed} /> : null}
 
@@ -218,7 +229,7 @@ export function TaxHandoffView({ month }: { month: string }) {
         {data.unassignedCount > 0 && data.unassignedFirstMonth ? (
           <div className={t.tbar} style={{ color: 'var(--color-danger)', fontSize: 'var(--fs-xs)' }}>
             미지정 항목이 있으니 확인하시기 바랍니다.
-            <Link href={`/tax/classify?month=${data.unassignedFirstMonth}&status=${TAX_CLS_LEFT}`} className={`${t.btn} ${t.btnSm}`}>
+            <Link href={`/tax/classify?month=${data.unassignedFirstMonth}&status=${TAX_CLS_LEFT}`} className={t.btn}>
               항목지정
             </Link>
           </div>
@@ -242,7 +253,7 @@ export function TaxHandoffView({ month }: { month: string }) {
   );
 }
 
-/* ── 팝업 — 메일 보내기(480px 팝업 틀, 거래처 수정과 같은 모양) ─────────────── */
+/* ── 팝업 — 메일 보내기(★ 2026-11-26 세무 일관성 ⑤ 공통 Dialog 480px, 거래처 수정과 같은 모양) ─────────────── */
 
 type Warn = 'noRecipient' | 'noChoice' | null;
 
@@ -263,14 +274,7 @@ function SendMailModal({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warn, setWarn] = useState<Warn>(null);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !sending && warn === null) onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose, sending, warn]);
+  const nav = useRouter();
 
   const send = async () => {
     if (data.recipients.length === 0) return setWarn('noRecipient');
@@ -292,21 +296,25 @@ function SendMailModal({
   const person = (p: { name: string | null; email: string | null }) => [p.name, p.email].filter(Boolean).join(' · ') || '—';
 
   return (
-    <div
-      className={t.overlay}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !sending) onClose();
-      }}
-    >
-      <div className={`${t.modal} ${t.modalSmW}`} role="dialog" aria-modal="true" aria-label="메일 보내기">
-        <div className={t.mH}>
-          <h3>메일 보내기</h3>
-          <button type="button" className={t.iconBtn} aria-label="닫기" disabled={sending} onClick={onClose}>
-            <Icon name="x" size={20} />
-          </button>
-        </div>
-        <div className={t.mB}>
+    <>
+      {/* 보내는 중 · 경고 창이 떠 있을 때는 바탕 누름 · ESC 로 닫지 않는다(종전 그대로) */}
+      <Dialog
+        open
+        title="메일 보내기"
+        onClose={onClose}
+        closeDisabled={sending || warn !== null}
+        footer={
+          <>
+            <Button type="button" variant="primary" size="sm" disabled={sending} onClick={() => void send()}>
+              {sending ? '보내는 중…' : '보내기'}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={sending} onClick={onClose}>
+              취소
+            </Button>
+          </>
+        }
+      >
+        <div className={t.dlgBody}>
           {error ? <TaxFormErrorBanner kind="failed" message={error} /> : null}
           <div className={t.field}>
             <span className={t.lab}>발송인</span>
@@ -366,86 +374,36 @@ function SendMailModal({
             </span>
           </div>
         </div>
-        <div className={t.mF}>
-          <span className={t.sp} />
-          <button type="button" className={t.btn} disabled={sending} onClick={onClose}>
-            취소
-          </button>
-          <button type="button" className={`${t.btn} ${t.btnPrimary}`} disabled={sending} onClick={() => void send()}>
-            {sending ? '보내는 중…' : '보내기'}
-          </button>
-        </div>
-      </div>
+      </Dialog>
 
+      {/* 경고 창 — ★ 2026-11-26 세무 일관성 ⑤ 공통 Dialog(뒤에 그려 메일 팝업 위에 뜬다) */}
       {warn === 'noRecipient' ? (
-        <WarnDialog
-          icon="triangle-alert"
-          title="세무 설정에서 세무사를 먼저 등록하세요"
+        <TaxConfirmDialog
+          question="세무 설정에서 세무사를 먼저 등록하세요"
           okLabel="세무 설정"
-          okHref="/tax/settings"
           onCancel={() => setWarn(null)}
+          onOk={() => nav.push('/tax/settings')}
         />
       ) : warn === 'noChoice' ? (
-        <WarnDialog icon="triangle-alert" title="받는 사람을 한 명 이상 선택하세요" onCancel={() => setWarn(null)} />
+        <WarnDialog message="받는 사람을 한 명 이상 선택하세요" onClose={() => setWarn(null)} />
       ) : null}
-    </div>
+    </>
   );
 }
 
-/** 경고 창 — 세무 확인 창(480px, `TaxConfirmDialog`)과 같은 모양. [세무 설정]이 있으면 둘, 없으면 [확인] 하나. */
-function WarnDialog({
-  icon,
-  title,
-  okLabel,
-  okHref,
-  onCancel,
-}: {
-  icon: IconName;
-  title: string;
-  okLabel?: string;
-  okHref?: string;
-  onCancel: () => void;
-}) {
-  const nav = useRouter();
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onCancel]);
+/** 알림 창 — [확인](주) 하나(★ 2026-11-26 세무 일관성 ⑤ 공통 Dialog). */
+function WarnDialog({ message, onClose }: { message: string; onClose: () => void }) {
   return (
-    <div
-      className={t.overlay}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel();
-      }}
-    >
-      <div className={t.modalSm} role="alertdialog" aria-modal="true" aria-label={title}>
-        <div className={t.confirm}>
-          <div className={`${t.confirmIc} ${t.confirmIcRed}`}>
-            <Icon name={icon} size={24} />
-          </div>
-          <h3>{title}</h3>
-        </div>
-        <div className={t.confirmF} style={okHref ? undefined : { gridTemplateColumns: '1fr' }}>
-          {okHref ? (
-            <>
-              <button type="button" className={t.btn} onClick={onCancel}>
-                돌아가기
-              </button>
-              <button type="button" className={`${t.btn} ${t.btnPrimary}`} onClick={() => nav.push(okHref)} autoFocus>
-                {okLabel}
-              </button>
-            </>
-          ) : (
-            <button type="button" className={`${t.btn} ${t.btnPrimary}`} onClick={onCancel} autoFocus>
-              확인
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+    <Dialog
+      open
+      title="수신인 선택"
+      description={<strong>{message}</strong>}
+      onClose={onClose}
+      footer={
+        <Button type="button" variant="primary" size="sm" onClick={onClose} autoFocus>
+          확인
+        </Button>
+      }
+    />
   );
 }
