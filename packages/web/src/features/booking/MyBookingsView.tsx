@@ -16,6 +16,7 @@
  * ★ 데이터는 클라이언트가 받는다 — 「지금」을 보는 사람의 시각으로 정한다(예약 화면과 같다).
  */
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { localDayMinutes } from '@swonbiz/shared/domain/reservation-rules';
 import {
@@ -26,10 +27,17 @@ import {
   pickMyBookings,
   type MyBooking,
 } from '@swonbiz/shared/domain/my-bookings';
-import { Icon } from '@/components/ds';
+import { Icon, Table, TableEmpty, TableHead, TableRow, tableCell } from '@/components/ds';
 import styles from './my-bookings.module.css';
 
+/**
+ * 목록 표 칸 — 날짜 · 시간 / 회의실 / 예약한 사람(2026-11-26 일관성 · 카드 세 줄 → 공통 Table 세 칸).
+ * ★ 앱 웹뷰(폭 360 안팎)에서도 세 칸이 들어가게 고정 폭 없이 비율로 나눈다. 넘치면 말줄임.
+ */
+const LIST_COLS = 'minmax(0,1.6fr) minmax(0,1fr) minmax(0,0.8fr)';
+
 export function MyBookingsView() {
+  const router = useRouter();
   const [items, setItems] = useState<MyBooking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,35 +73,54 @@ export function MyBookingsView() {
             {items === null ? '불러오는 중입니다' : error ? error : `오늘부터 예정된 우리 회사 예약 ${items.length}건`}
           </p>
         </div>
-        <Link href={BOOK_HREF} className={`${styles.btn} ${styles.btnPrimary}`} data-book="1">
+      </div>
+
+      {/*
+        ★ 2026-11-26 일관성 — 「예약하기」는 예약 화면으로 가는 등록 단추라 보통 단추 · 표 위 왼쪽(종전 머리 오른쪽 주 단추).
+          링크 이동(방문 기록 · 앱 [뒤로])을 지키려고 공통 Button(as="a")이 아니라 Link 에 보통 단추 모양을 입혔다.
+      */}
+      <div className={styles.bar}>
+        <Link href={BOOK_HREF} className={`${styles.btn} ${styles.btnGhost}`} data-book="1">
           <Icon name="plus" size={16} />
           예약하기
         </Link>
       </div>
 
       <div className={styles.panel}>
-        {items === null ? (
-          <Empty icon="calendar-check" lead="예약을 불러오는 중입니다" />
-        ) : error ? (
-          <Empty icon="circle-alert" lead={error} />
-        ) : items.length === 0 ? (
-          <Empty icon="calendar-check" lead="예정된 예약이 없습니다" sub="「예약하기」에서 회의실을 예약할 수 있습니다" />
-        ) : (
-          <ul className={styles.list}>
-            {items.map((r) => {
-              const line = myBookingLine(r);
-              return (
-                <li key={r.reservationId}>
-                  <Link href={myBookingHref(r)} className={styles.row} data-booking-row={r.reservationId}>
-                    <span className={styles.when}>{line.when}</span>
-                    <span className={styles.room}>{line.room}</span>
-                    <span className={styles.booker}>{line.booker}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        {/* ★ 2026-11-26 일관성 — 카드 목록 → 공통 Table(머리글 아쿠아). 한 줄을 누르면 종전처럼 예약 화면의 그날 · 그 회의실로 간다 */}
+        <div className={styles.scroll}>
+          <Table cols={LIST_COLS}>
+            <TableHead sticky>
+              <span>날짜 · 시간</span>
+              <span>회의실</span>
+              <span>예약한 사람</span>
+            </TableHead>
+            {items === null ? (
+              <TableEmpty>
+                <Empty icon="calendar-check" lead="예약을 불러오는 중입니다" />
+              </TableEmpty>
+            ) : error ? (
+              <TableEmpty>
+                <Empty icon="circle-alert" lead={error} />
+              </TableEmpty>
+            ) : items.length === 0 ? (
+              <TableEmpty>
+                <Empty icon="calendar-check" lead="예정된 예약이 없습니다" sub="「예약하기」에서 회의실을 예약할 수 있습니다" />
+              </TableEmpty>
+            ) : (
+              items.map((r) => {
+                const line = myBookingLine(r);
+                return (
+                  <TableRow key={r.reservationId} onClick={() => router.push(myBookingHref(r))}>
+                    <span className={`${styles.when} ${tableCell.ellipsis}`}>{line.when}</span>
+                    <span className={tableCell.ellipsis}>{line.room}</span>
+                    <span className={tableCell.ellipsis}>{line.booker}</span>
+                  </TableRow>
+                );
+              })
+            )}
+          </Table>
+        </div>
       </div>
     </div>
   );
