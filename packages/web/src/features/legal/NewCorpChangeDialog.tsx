@@ -31,7 +31,7 @@ import type { CorpChangeCompanyTypeResponse } from '@swonbiz/shared/domain/corp-
 import { useRouter } from 'next/navigation';
 import type { CodeOption } from '@swonbiz/shared/domain/corp-change-list';
 import type { OrgPick } from '@swonbiz/shared/domain/org-lookup';
-import { Icon } from '@/components/ds';
+import { Button, Dialog, Icon } from '@/components/ds';
 import { OrgLookupDialog } from '@/components/org-lookup/OrgLookupDialog';
 import styles from './corp-changes.module.css';
 
@@ -131,22 +131,30 @@ export function NewCorpChangeDialog({ changeTypes, pickOrg, onClose, onStart }: 
 
   return (
     <>
-      <div
-        className={styles.overlay}
-        role="presentation"
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget && !busy) onClose();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape' && !busy && !lookup) onClose();
-        }}
+      {/*
+        ★ 2026-11-25 법무 일관성 — 공통 팝업(Dialog · 아쿠아 제목줄 · 아래 가운데 [다음](주) 먼저 · [취소](보통) 나중).
+        ★ 공용 회사 조회 팝업(z 80)이 이 위에 뜬다 — 종전 덮개 z 40 그대로(zIndex). 회사 조회가 열린 동안은
+          ESC · 바탕 누름으로 이 팝업을 닫지 않는다(종전 ESC 규칙 `!busy && !lookup` 그대로 — closeDisabled).
+      */}
+      <Dialog
+        open
+        onClose={onClose}
+        closeDisabled={busy || lookup}
+        zIndex={40}
+        title="새 법인변경"
+        description="변경 구분을 고르면 작성 화면으로 갑니다. 건은 그 화면에서 [저장] 을 누를 때 만들어집니다. 구분은 저장한 뒤 바꿀 수 없습니다."
+        footer={
+          <>
+            <Button variant="primary" size="sm" disabled={busy || !ready} onClick={start}>
+              다음
+            </Button>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+              취소
+            </Button>
+          </>
+        }
       >
-        <div className={styles.modal} role="dialog" aria-modal="true" aria-label="새 법인변경">
-          <h2 className={styles.modalTitle}>새 법인변경</h2>
-          <p className={styles.modalDesc}>
-            변경 구분을 고르면 작성 화면으로 갑니다. 건은 그 화면에서 [저장] 을 누를 때 만들어집니다. 구분은 저장한 뒤 바꿀 수 없습니다.
-          </p>
-
+        <div className={styles.modalBody}>
           {pickOrg ? (
             <div className={styles.modalField}>
               <span className={styles.label}>회사</span>
@@ -154,10 +162,15 @@ export function NewCorpChangeDialog({ changeTypes, pickOrg, onClose, onStart }: 
                 <span className={`${styles.orgValue}${org ? '' : ` ${styles.orgEmpty}`}`}>
                   {org ? `${org.orgName} (${org.orgCode})` : '회사를 고르세요'}
                 </span>
-                <button type="button" className={styles.btn} disabled={busy} onClick={() => setLookup(true)}>
-                  <Icon name="search" size={16} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconLeft={<Icon name="search" size={16} />}
+                  disabled={busy}
+                  onClick={() => setLookup(true)}
+                >
                   회사 조회
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
@@ -207,22 +220,8 @@ export function NewCorpChangeDialog({ changeTypes, pickOrg, onClose, onStart }: 
           {typeLoad.state === 'ok' && !typeLoad.isTenant && typeLoad.memberType === null && !typeLoad.canEditCompany ? (
             <p className={styles.modalDesc}>유한회사면 회사 정보에서 회사유형을 먼저 넣어 주세요.</p>
           ) : null}
-
-          <div className={styles.modalFoot}>
-            <button type="button" className={styles.btn} disabled={busy} onClick={onClose}>
-              취소
-            </button>
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnPrimary}`}
-              disabled={busy || !ready}
-              onClick={start}
-            >
-              다음
-            </button>
-          </div>
         </div>
-      </div>
+      </Dialog>
 
       {lookup ? (
         <OrgLookupDialog

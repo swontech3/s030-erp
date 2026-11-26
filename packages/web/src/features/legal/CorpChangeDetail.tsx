@@ -83,7 +83,8 @@ import {
 import { parseDay } from '@swonbiz/shared/domain/day';
 import { DIGIT_MASK_RULE, isDigitMaskComplete, maskValue, type DigitMaskKind } from '@swonbiz/shared/domain/masked-caret';
 import { maskInput } from '@/features/contracts/form-model';
-import { Icon } from '@/components/ds';
+import { Button, Icon, Table, TableEmpty, TableHead, TableRow } from '@/components/ds';
+import { BTN_XS } from '@/features/billing/BillingTable';
 import { useKakaoPostcode } from '@/lib/useKakaoPostcode';
 import { CorpChangeConfirmDialog, type CorpChangeConfirmKind } from './CorpChangeConfirmDialog';
 import { CorpChangePrintDialog } from './CorpChangePrintDialog';
@@ -749,10 +750,9 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
           </div>
           <div className={styles.headActions}>
             {saved && canPrintCorpChange(saved.status) ? (
-              <button type="button" className={`${styles.btn} ${styles.btnGhost}`} disabled={busy} onClick={() => setPrinting(true)}>
-                <Icon name="printer" size={16} />
+              <Button type="button" variant="ghost" size="sm" iconLeft={<Icon name="printer" size={16} />} disabled={busy} onClick={() => setPrinting(true)}>
                 서류 출력
-              </button>
+              </Button>
             ) : null}
             {saved ? (
               <StatusActions
@@ -771,24 +771,25 @@ export function CorpChangeDetail({ draft, saved: initialSaved, canOpenTenantScre
                 법인변경 목록
               </Link>
             )}
+            {/* ★ 2026-11-25 법무 일관성 — [저장] = 주 단추(종전 보통). [작성완료] 는 상태를 넘기는 단추라 종전대로 주(보고 「정할 것」) */}
             {editable ? (
-              <button
+              <Button
                 type="button"
-                className={`${styles.btn} ${styles.btnGhost}`}
+                variant="primary"
+                size="sm"
+                iconLeft={<Icon name="save" size={16} />}
                 // ★ 임시 모드는 늘 누를 수 있다 — 빈 채로 저장하는 것도 사람이 고른 일이다.
                 disabled={busy || (!isNew && !dirty)}
                 onClick={() => void save()}
               >
-                <Icon name="save" size={16} />
                 저장
-              </button>
+              </Button>
             ) : null}
             {/* [작성완료] — 저장 + 검증 + P→E 한 번에. 임시 모드에도 있다(회사 · 운영사 모두 P→E 를 누른다). */}
             {isNew || (saved.status === 'P' && saved.availableTransitions.includes('E')) ? (
-              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} disabled={busy} onClick={() => void complete()}>
-                <Icon name="check" size={16} />
+              <Button type="button" variant="primary" size="sm" iconLeft={<Icon name="check" size={16} />} disabled={busy} onClick={() => void complete()}>
                 작성완료
-              </button>
+              </Button>
             ) : null}
             {saved && dirty && (saved.canDelete || saved.availableTransitions.some((t) => t !== 'E')) ? (
               <span className={styles.headHint}>저장하지 않은 입력이 있습니다 — 저장한 뒤 다른 처리를 할 수 있습니다</span>
@@ -992,47 +993,41 @@ export function StatusActions({
 }) {
   const can = (to: CorpChangeStatus) => saved.availableTransitions.includes(to);
   const from = saved.status;
-  const ghost = `${styles.btn} ${styles.btnGhost}`;
-  const danger = `${styles.btn} ${styles.btnDanger}`;
-  const primary = `${styles.btn} ${styles.btnPrimary}`;
-
+  /*
+   * ★ 2026-11-25 법무 일관성 — 공통 Button. 종류는 종전 그대로 : [삭제] · [취소](→X) = 지우기 · [복원] · [완료 취소] ·
+   *   [서류수정] = 보통 · [완료] = 주(상태를 넘기는 단추 — 보고 「정할 것」).
+   */
   return (
     <>
       {saved.canDelete ? (
-        <button type="button" className={danger} disabled={disabled} onClick={() => onConfirm('delete')}>
-          <Icon name="trash-2" size={16} />
+        <Button type="button" variant="danger" size="sm" iconLeft={<Icon name="trash-2" size={16} />} disabled={disabled} onClick={() => onConfirm('delete')}>
           삭제
-        </button>
+        </Button>
       ) : null}
       {from !== 'X' && can('X') ? (
-        <button type="button" className={danger} disabled={disabled} onClick={() => onConfirm('cancel')}>
-          <Icon name="circle-x" size={16} />
+        <Button type="button" variant="danger" size="sm" iconLeft={<Icon name="circle-x" size={16} />} disabled={disabled} onClick={() => onConfirm('cancel')}>
           취소
-        </button>
+        </Button>
       ) : null}
       {from === 'X' && saved.statusBeforeCancel && can(saved.statusBeforeCancel) ? (
-        <button type="button" className={ghost} disabled={disabled} onClick={() => onConfirm('restore')}>
-          <Icon name="rotate-ccw" size={16} />
+        <Button type="button" variant="ghost" size="sm" iconLeft={<Icon name="rotate-ccw" size={16} />} disabled={disabled} onClick={() => onConfirm('restore')}>
           복원
-        </button>
+        </Button>
       ) : null}
       {from === 'C' && can('E') ? (
-        <button type="button" className={ghost} disabled={disabled} onClick={() => onConfirm('uncomplete')}>
-          <Icon name="rotate-ccw" size={16} />
+        <Button type="button" variant="ghost" size="sm" iconLeft={<Icon name="rotate-ccw" size={16} />} disabled={disabled} onClick={() => onConfirm('uncomplete')}>
           완료 취소
-        </button>
+        </Button>
       ) : null}
       {from === 'E' && can('P') ? (
-        <button type="button" className={ghost} disabled={disabled} onClick={() => onTransition('P')}>
-          <Icon name="pencil-line" size={16} />
+        <Button type="button" variant="ghost" size="sm" iconLeft={<Icon name="pencil-line" size={16} />} disabled={disabled} onClick={() => onTransition('P')}>
           서류수정
-        </button>
+        </Button>
       ) : null}
       {from === 'E' && can('C') ? (
-        <button type="button" className={primary} disabled={disabled} onClick={() => onConfirm('complete')}>
-          <Icon name="circle-check" size={16} />
+        <Button type="button" variant="primary" size="sm" iconLeft={<Icon name="circle-check" size={16} />} disabled={disabled} onClick={() => onConfirm('complete')}>
           완료
-        </button>
+        </Button>
       ) : null}
     </>
   );
@@ -1103,15 +1098,17 @@ function PayloadField({
         <div className={styles.fieldHead}>
           <label htmlFor={textareaId}>{label}</label>
           {pickable ? (
-            <button
+            <Button
               type="button"
-              className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+              variant="ghost"
+              size="sm"
+              style={BTN_XS}
+              iconLeft={<Icon name="search" size={14} />}
               disabled={disabled}
               onClick={() => setPicking(true)}
             >
-              <Icon name="search" size={14} />
               목록에서 고르기
-            </button>
+            </Button>
           ) : null}
         </div>
         <span className={styles.hint}>{def.hint ?? '한 줄에 하나씩 적습니다'}</span>
@@ -1187,6 +1184,12 @@ function PayloadField({
  */
 export const PaneAddressCompact = createContext(false);
 
+/**
+ * 임원 표(법인변경) · 발기인(사원) 표(법인설립)의 칸 폭 — 공통 Table `cols`.
+ * ★ 2026-11-25 법무 일관성 — 종전 `.oHead` · `.oRow` 의 grid-template-columns 값 그대로 옮겼다(두 상세가 같이 쓴다).
+ */
+export const PEOPLE_COLS = 'minmax(90px, 0.8fr) 70px minmax(90px, 0.8fr) 110px 140px minmax(160px, 1.6fr) 136px';
+
 export function AddressInput({
   value,
   disabled,
@@ -1212,18 +1215,20 @@ export function AddressInput({
         placeholder="우편번호"
         value={value.zipCode}
       />
-      <button
+      {/* ★ 칸 높이(38)에 맞춘 단추 — 높이 · 반 줄 여백은 종전 그대로 */}
+      <Button
         type="button"
-        className={`${styles.btn} ${styles.btnGhost}`}
-        style={{ height: 38, ...(compact ? { padding: '0 10px' } : {}) }}
+        variant="ghost"
+        size="sm"
+        style={{ height: 38, flex: 'none', ...(compact ? { padding: '0 10px' } : {}) }}
+        iconLeft={<Icon name="search" size={14} />}
         disabled={disabled}
         aria-label="주소 검색"
         title="주소 검색"
         onClick={() => postcode.open((r) => onChange({ ...value, zipCode: r.zipCode, address: r.address }))}
       >
-        <Icon name="search" size={14} />
         {compact ? null : '주소 검색'}
-      </button>
+      </Button>
       <input className={`${styles.input} ${styles.addrMain}`} readOnly placeholder="기본주소" value={value.address} />
       <input
         className={`${styles.input} ${styles.addrDetail}`}
@@ -1615,18 +1620,19 @@ function OfficersSection({
           <span className={styles.muted}>{officers.length}명</span>
         </div>
         {editable ? (
-          <button
+          <Button
             type="button"
-            className={`${styles.btn} ${styles.btnGhost}`}
+            variant="ghost"
+            size="sm"
+            iconLeft={<Icon name="plus" size={16} />}
             disabled={busy || (draft !== null && draft.id === null)}
             onClick={() => {
               setError(null);
               setDraft(blankDraft());
             }}
           >
-            <Icon name="plus" size={16} />
             임원 추가
-          </button>
+          </Button>
         ) : null}
       </div>
       <div className={styles.sectionRule} />
@@ -1641,8 +1647,10 @@ function OfficersSection({
         </div>
       ) : null}
 
+      {/* ★ 2026-11-25 법무 일관성 — 표 = 공통 Table(머리글 아쿠아). 칸 폭은 종전 그대로(`PEOPLE_COLS`) · 줄 안 단추 30px(BTN_XS) */}
       <div className={styles.oTable}>
-        <div className={styles.oHead}>
+        <Table cols={PEOPLE_COLS} dense>
+        <TableHead className={styles.oHead}>
           <span>성명</span>
           <span>구분</span>
           <span>직위</span>
@@ -1650,13 +1658,13 @@ function OfficersSection({
           <span>주민등록번호</span>
           <span>주소</span>
           <span />
-        </div>
+        </TableHead>
         {officers.length === 0 ? (
-          <div className={styles.empty}>등록된 임원이 없습니다</div>
+          <TableEmpty>등록된 임원이 없습니다</TableEmpty>
         ) : (
           officers.map((o, i) => (
             <div key={o.id} className={styles.oItem}>
-              <div className={`${styles.oRow}${draft?.id === o.id ? ` ${styles.oRowEditing}` : ''}`}>
+              <TableRow className={`${styles.oRow}${draft?.id === o.id ? ` ${styles.oRowEditing}` : ''}`}>
                 <span className={o.name ? styles.ellipsis : styles.muted}>{o.name || '(성명 없음)'}</span>
                 <span>{OFFICER_CHANGE_KIND_LABEL[o.changeKind as OfficerChangeKind] ?? o.changeKind}</span>
                 <span className={o.position ? styles.ellipsis : styles.muted}>{o.position ?? '—'}</span>
@@ -1669,51 +1677,52 @@ function OfficersSection({
                   {editable ? (
                     confirmDelete === o.id ? (
                       <>
-                        <button
+                        <Button
                           type="button"
-                          className={`${styles.btn} ${styles.btnDanger} ${styles.btnXs}`}
+                          variant="danger"
+                          size="sm"
+                          style={BTN_XS}
                           disabled={busy}
                           onClick={() => void remove(o.id)}
                         >
                           삭제 확인
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
-                          disabled={busy}
-                          onClick={() => setConfirmDelete(null)}
-                        >
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" style={BTN_XS} disabled={busy} onClick={() => setConfirmDelete(null)}>
                           취소
-                        </button>
+                        </Button>
                       </>
                     ) : (
                       <>
-                        <button
+                        <Button
                           type="button"
-                          className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
+                          variant="ghost"
+                          size="sm"
+                          style={BTN_XS}
+                          iconLeft={<Icon name="pencil-line" size={14} />}
                           disabled={busy}
                           onClick={() => {
                             setError(null);
                             setDraft(draftOf(o));
                           }}
                         >
-                          <Icon name="pencil-line" size={14} />
                           수정
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          className={`${styles.btn} ${styles.btnDanger} ${styles.btnXs}`}
+                          variant="danger"
+                          size="sm"
+                          style={BTN_XS}
                           disabled={busy}
                           aria-label={`${o.name || '임원'} 삭제`}
                           onClick={() => setConfirmDelete(o.id)}
                         >
                           <Icon name="trash-2" size={14} />
-                        </button>
+                        </Button>
                       </>
                     )
                   ) : null}
                 </span>
-              </div>
+              </TableRow>
               {rowErrors[i] ? (
                 <div className={styles.oRowError} role="alert">
                   {rowErrors[i].join(' · ')}
@@ -1722,6 +1731,7 @@ function OfficersSection({
             </div>
           ))
         )}
+        </Table>
       </div>
 
       {draft && editable ? (
@@ -1825,23 +1835,19 @@ function OfficersSection({
             </div>
           </div>
           <div className={styles.editorActions}>
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnGhost}`}
-              disabled={busy}
-              onClick={() => setDraft(null)}
-            >
+            <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setDraft(null)}>
               취소
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className={`${styles.btn} ${styles.btnPrimary}`}
+              variant="primary"
+              size="sm"
+              iconLeft={<Icon name="save" size={16} />}
               disabled={busy || rrnBad}
               onClick={() => void save()}
             >
-              <Icon name="save" size={16} />
               {isNew ? (draft.id ? '목록에 반영' : '목록에 추가') : draft.id ? '임원 저장' : '임원 추가'}
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}

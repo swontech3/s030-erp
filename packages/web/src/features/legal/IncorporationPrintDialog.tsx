@@ -23,7 +23,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { INCORP_PRINT_FIELDS, type IncorporationPrintResponse } from '@swonbiz/shared/domain/incorporation-print';
 import type { FormDefinition } from '@swonbiz/shared/domain/form-template';
-import { Icon } from '@/components/ds';
+import { Button, Dialog, Icon } from '@/components/ds';
 import { FormDocument } from '@/features/forms/FormDocument';
 import { FormPrintPortal, printFormDocument } from '@/features/forms/FormPrintPortal';
 import styles from './corp-change-detail.module.css';
@@ -127,17 +127,40 @@ export function IncorporationPrintDialog({
 
   const title = doc ? `${doc.name}${sheet?.personName ? ` · ${sheet.personName}` : ''}` : '서류 출력';
 
+  /*
+   * ★ 2026-11-25 법무 일관성 — 창 틀 = 공통 Dialog(아쿠아 제목줄 「서류 출력」 · 아래 가운데 [인쇄][닫기] 보통 단추).
+   *   인쇄는 그대로다 — 종이는 아래 `FormPrintPortal`(body 포털 · `data-print-portal`)만 나가고, 인쇄 규칙(print.css)이
+   *   body 의 다른 자식(이 창 포함)을 감춘다. 날짜 칸 · 서류 목록 · 미리보기 배치도 그대로(`.printFrame` — css 머리말).
+   */
   return (
-    <div
-      className={styles.overlay}
-      role="presentation"
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
-      }}
+    <Dialog
+      open
+      onClose={onClose}
+      title="서류 출력"
+      width={1180}
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            iconLeft={<Icon name="printer" size={16} />}
+            disabled={loading || !sheet}
+            onClick={() => {
+              if (doc) recordPrint(id, { formId: doc.formId, sheet: pick.sheet, applyDate, writeDate });
+              printFormDocument();
+            }}
+          >
+            인쇄
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+            닫기
+          </Button>
+        </>
+      }
     >
-      <div className={styles.printPanel} role="dialog" aria-modal="true" aria-label="서류 출력">
+      <div className={styles.printFrame} aria-label="서류 출력">
         <div className={styles.printHead}>
-          <h2 className={styles.printTitle}>서류 출력</h2>
           <label className={styles.printDate}>
             <span className={styles.label}>신청일</span>
             <input type="date" className={styles.input} value={applyDate} onChange={(e) => setApplyDate(e.target.value)} />
@@ -146,23 +169,6 @@ export function IncorporationPrintDialog({
             <span className={styles.label}>작성일</span>
             <input type="date" className={styles.input} value={writeDate} onChange={(e) => setWriteDate(e.target.value)} />
           </label>
-          <div className={styles.printActions}>
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnPrimary}`}
-              disabled={loading || !sheet}
-              onClick={() => {
-                if (doc) recordPrint(id, { formId: doc.formId, sheet: pick.sheet, applyDate, writeDate });
-                printFormDocument();
-              }}
-            >
-              <Icon name="printer" size={16} />
-              인쇄
-            </button>
-            <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={onClose}>
-              닫기
-            </button>
-          </div>
         </div>
 
         <div className={styles.printBody}>
@@ -223,8 +229,8 @@ export function IncorporationPrintDialog({
         </div>
       </div>
 
-      {/* 종이에 나갈 문서 — 고른 장 하나. 대화상자를 닫으면 함께 내려간다. */}
+      {/* 종이에 나갈 문서 — 고른 장 하나. 대화상자를 닫으면 함께 내려간다(포털이라 Dialog 안에 두어도 body 바로 밑에 붙는다). */}
       {doc && sheet ? <FormPrintPortal definition={doc.definition} values={sheet.values} inlineBlanks /> : null}
-    </div>
+    </Dialog>
   );
 }

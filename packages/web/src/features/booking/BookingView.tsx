@@ -38,7 +38,7 @@ import {
   timeToMinutes,
   validateReservation,
 } from '@swonbiz/shared/domain/reservation-rules';
-import { Icon } from '@/components/ds';
+import { Button, Dialog, Icon } from '@/components/ds';
 import styles from './booking.module.css';
 import { BookingForm, messageFor, shownStatus, type FormSeed } from './BookingForm';
 import {
@@ -545,16 +545,19 @@ export function BookingView({ operator, companyId, me, initialRoomId = null, ini
             <button type="button" className={styles.iconBtn} aria-label="이전" onClick={() => stepBy(-1)}>
               <Icon name="chevron-left" size={16} />
             </button>
-            <button
+            {/* ★ 2026-11-26 일관성 — 공통 Button 보통(ghost) · 높이 36 은 예약 화면 css(.todayBtn · 정한 것 7) */}
+            <Button
               type="button"
-              className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`}
+              variant="ghost"
+              size="sm"
+              className={styles.todayBtn}
               onClick={() => {
                 setAnchor(today());
                 setTimeout(scrollToNow, 0);
               }}
             >
               오늘
-            </button>
+            </Button>
             <button
               type="button"
               className={styles.iconBtn}
@@ -616,16 +619,19 @@ export function BookingView({ operator, companyId, me, initialRoomId = null, ini
           ) : null}
 
           {wide === 'sm' ? null : (
-            <button
+            /* ★ 2026-11-26 일관성 — [예약 추가] = 등록(창을 여는 단추)이라 공통 Button 보통(ghost).
+                 주(primary)는 창 안 [예약하기] · [저장]. 자리(툴바 오른쪽)는 그대로 — 보고 「정할 것」 */
+            <Button
               type="button"
-              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`}
+              variant="ghost"
+              size="sm"
               data-add="1"
               disabled={!room}
+              iconLeft={<Icon name="plus" size={16} />}
               onClick={openCreateDefault}
             >
-              <Icon name="plus" size={16} />
               예약 추가
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -925,6 +931,8 @@ export function BookingView({ operator, companyId, me, initialRoomId = null, ini
              돌아온다(시안 03-booking-form.md §5). 닫아 버리면 취소를 그만둔 사람이
              처음부터 다시 찾아 들어가야 한다. */
           onCancelAsk={(r) => setConfirming(r)}
+          /* ★ 확인 창이 위에 떠 있으면 이 창은 ESC · 바탕 누름으로 닫히지 않는다(공통 Dialog 2026-11-26) */
+          covered={!!confirming}
           onComplete={(r) => void complete(r)}
           onDone={(message, moved) => {
             setForm(null);
@@ -941,7 +949,6 @@ export function BookingView({ operator, companyId, me, initialRoomId = null, ini
       {confirming ? (
         <CancelConfirm
           reservation={confirming}
-          widthMode={wide}
           onClose={() => setConfirming(null)}
           onDone={() => {
             setConfirming(null);
@@ -1040,12 +1047,10 @@ function BookingBlock({
  */
 function CancelConfirm({
   reservation,
-  widthMode,
   onClose,
   onDone,
 }: {
   reservation: Reservation;
-  widthMode: WidthMode;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -1071,59 +1076,47 @@ function CancelConfirm({
     }
   };
 
+  /*
+   * ★ 2026-11-26 일관성 — 공통 Dialog(제목 = 짧은 이름 「예약 취소」 · 묻는 문장은 본문).
+   *   단추 [예약 취소](지우기) · [돌아가기](보통). 닫는 단추를 「취소」로 하면 [예약 취소] 옆에 「취소」가 둘이 된다 —
+   *   법무 「취소 처리」 창과 같이 「돌아가기」 그대로(법무 정한 것 2 · 보고 「정할 것」).
+   *   수정 창 위에 뜬다 — zIndex 90(수정 창 80 위).
+   */
   return (
-    <div
-      className={`${styles.overlay}${widthMode === 'sm' ? ` ${styles.overlayNarrow}` : ''}`}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !busy) onClose();
-      }}
-    >
-      <div
-        className={`${styles.modal} ${styles.modalSm}`}
-        role="alertdialog"
-        aria-modal="true"
-        aria-label="예약 취소 확인"
-      >
-        <div className={styles.confirm}>
-          <div className={styles.confirmIcon}>
-            <Icon name="circle-x" size={24} />
-          </div>
-          <h3 className={styles.confirmTitle}>예약을 취소하시겠습니까?</h3>
-          <p className={styles.confirmText}>
-            취소한 시간은 바로 다른 조직이 예약할 수 있습니다.
-            <br />이 작업은 되돌릴 수 없습니다.
-          </p>
-          <div className={styles.confirmSum}>
-            {reservation.roomName} · {md(reservation.day)} {reservation.startTime}–{reservation.endTime}
-          </div>
-          <label className={`${styles.field} ${styles.confirmReason}`}>
-            <span className={styles.label}>취소 사유 (선택)</span>
-            <input
-              className={styles.input}
-              value={reason}
-              maxLength={200}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </label>
-          {error ? <p className={styles.err}>{error}</p> : null}
-        </div>
-        <div className={styles.confirmFoot}>
-          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} disabled={busy} onClick={onClose}>
-            돌아가기
-          </button>
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnDanger}`}
-            data-cancel-do="1"
-            disabled={busy}
-            onClick={() => void submit()}
-          >
+    <Dialog
+      open
+      title="예약 취소"
+      width={480}
+      zIndex={90}
+      onClose={onClose}
+      closeDisabled={busy}
+      description={
+        <>
+          <strong>예약을 취소하시겠습니까?</strong>
+          <br />
+          취소한 시간은 바로 다른 조직이 예약할 수 있습니다. 이 작업은 되돌릴 수 없습니다.
+        </>
+      }
+      footer={
+        <>
+          <Button type="button" variant="danger" size="sm" data-cancel-do="1" disabled={busy} onClick={() => void submit()}>
             예약 취소
-          </button>
-        </div>
+          </Button>
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            돌아가기
+          </Button>
+        </>
+      }
+    >
+      <div className={styles.confirmSum}>
+        {reservation.roomName} · {md(reservation.day)} {reservation.startTime}–{reservation.endTime}
       </div>
-    </div>
+      <label className={`${styles.field} ${styles.confirmReason}`}>
+        <span className={styles.label}>취소 사유 (선택)</span>
+        <input className={styles.input} value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
+      </label>
+      {error ? <p className={styles.err}>{error}</p> : null}
+    </Dialog>
   );
 }
 

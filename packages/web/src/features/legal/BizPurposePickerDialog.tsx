@@ -30,6 +30,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { BizPurposeError, loadBizPurposes, type BizPurposeItem } from './biz-purposes-model';
 import { BizPurposeRecommendTab } from './BizPurposeRecommendTab';
+import { Button, Dialog, Table, TableHead, TableRow } from '@/components/ds';
 import base from '@/components/org-lookup/org-lookup.module.css';
 import styles from './biz-purpose-picker.module.css';
 
@@ -52,6 +53,13 @@ interface Props {
   /** 고른 문구 — 고른 순서. */
   onPick: (texts: string[]) => void;
 }
+
+/*
+ * ★ 2026-11-25 법무 일관성(삐용 기준) — 공통 팝업(Dialog · 폭 720 = 종전 상자 폭) · 공통 표(Table).
+ *   표 칸 폭 = 종전 체크 칸 40px + 문구. 칸 안 여백 12 는 종전 칸(좌우 12)과 같게(.pickGrid).
+ *   검색 줄 · 목록 상자 · 안내 글은 공용 회사 조회 팝업 CSS(org-lookup.module.css) 그대로 쓴다.
+ */
+const PICK_COLS = '40px minmax(0, 1fr)';
 
 type Load =
   | { state: 'loading' }
@@ -104,129 +112,115 @@ export function BizPurposePickerDialog({ title = '사업목적 고르기', exist
   const filters: ReactNode = null;
 
   return (
-    <div
-      className={base.overlay}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
-      }}
-    >
-      <div className={base.modal} role="dialog" aria-modal="true" aria-label={title}>
-        <h2 className={base.title}>{title}</h2>
-        <p className={base.desc}>고른 문구는 사업목적 칸 끝에 한 줄씩 붙습니다. 이미 적힌 문구는 고를 수 없습니다.</p>
-
-        <div className={styles.tabs} role="tablist">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.key}
-              className={`${styles.tab}${tab === t.key ? ` ${styles.tabOn}` : ''}`}
-              onClick={() => setTab(t.key)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {tab === 'recommend' ? (
-          <BizPurposeRecommendTab have={have} checked={checked} onToggle={toggleKey} />
-        ) : (
-          <>
-            <form
-              className={base.searchRow}
-              onSubmit={(e) => {
-                e.preventDefault();
-                void search(query);
-              }}
-            >
-              {filters}
-              <input
-                className={base.input}
-                placeholder="문구"
-                value={query}
-                autoFocus
-                maxLength={200}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <button type="submit" className={`${base.btn} ${base.btnGhost} ${base.btnSearch}`}>
-                검색
-              </button>
-            </form>
-
-            <div className={base.list}>
-              {load.state === 'loading' ? (
-                <p className={base.note}>불러오는 중…</p>
-              ) : load.state === 'error' ? (
-                <p className={base.error} role="alert">
-                  {load.message}
-                </p>
-              ) : items.length === 0 ? (
-                <p className={base.note}>찾는 문구가 없습니다.</p>
-              ) : (
-                <table className={base.table}>
-                  <thead>
-                    <tr>
-                      <th className={styles.checkCell} aria-label="고르기" />
-                      <th>사업목적 문구</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((i) => {
-                      const done = have.has(i.text.trim());
-                      return (
-                        <tr
-                          key={i.id}
-                          className={done ? styles.rowDone : `${base.row}${checked.has(i.id) ? ` ${base.rowOn}` : ''}`}
-                          onClick={() => !done && toggle(i)}
-                        >
-                          <td className={styles.checkCell}>
-                            {done ? null : (
-                              <input
-                                type="checkbox"
-                                checked={checked.has(i.id)}
-                                onChange={() => toggle(i)}
-                                onClick={(e) => e.stopPropagation()}
-                                aria-label={i.text}
-                              />
-                            )}
-                          </td>
-                          <td>
-                            {i.text} {done ? <span className={styles.done}>추가됨</span> : null}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </>
-        )}
-
-        <p className={styles.count}>
-          {checked.size}개 고름
-          {tab === 'all' && load.state === 'ok' && load.truncated ? ` · 앞의 ${items.length}개만 보입니다 — 검색어로 좁히세요` : ''}
-        </p>
-
-        <div className={base.foot}>
-          <button type="button" className={`${base.btn} ${base.btnGhost}`} onClick={onClose}>
-            닫기
-          </button>
-          <button
-            type="button"
-            className={`${base.btn} ${base.btnPrimary}`}
-            disabled={checked.size === 0}
-            onClick={() => onPick([...checked.values()])}
-          >
+    <Dialog
+      open
+      onClose={onClose}
+      title={title}
+      width={720}
+      description="고른 문구는 사업목적 칸 끝에 한 줄씩 붙습니다. 이미 적힌 문구는 고를 수 없습니다."
+      footer={
+        /* 아래 가운데 — [선택](주) 먼저 · [닫기](보통) 나중 */
+        <>
+          <Button variant="primary" size="sm" disabled={checked.size === 0} onClick={() => onPick([...checked.values()])}>
             {tab === 'recommend' ? '사업목적에 넣기' : '선택'}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            닫기
+          </Button>
+        </>
+      }
+    >
+      <div className={styles.tabs} role="tablist">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            className={`${styles.tab}${tab === t.key ? ` ${styles.tabOn}` : ''}`}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
           </button>
-        </div>
+        ))}
       </div>
-    </div>
+
+      {tab === 'recommend' ? (
+        <BizPurposeRecommendTab have={have} checked={checked} onToggle={toggleKey} />
+      ) : (
+        <>
+          <form
+            className={base.searchRow}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void search(query);
+            }}
+          >
+            {filters}
+            <input
+              className={base.input}
+              placeholder="문구"
+              value={query}
+              autoFocus
+              maxLength={200}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <Button type="submit" variant="ghost" size="sm">
+              검색
+            </Button>
+          </form>
+
+          <div className={base.list}>
+            {load.state === 'loading' ? (
+              <p className={base.note}>불러오는 중…</p>
+            ) : load.state === 'error' ? (
+              <p className={base.error} role="alert">
+                {load.message}
+              </p>
+            ) : items.length === 0 ? (
+              <p className={base.note}>찾는 문구가 없습니다.</p>
+            ) : (
+              <Table cols={PICK_COLS}>
+                <TableHead sticky className={styles.pickGrid}>
+                  <span className={styles.checkCell} aria-label="고르기" />
+                  <span>사업목적 문구</span>
+                </TableHead>
+                {items.map((i) => {
+                  const done = have.has(i.text.trim());
+                  return (
+                    <TableRow
+                      key={i.id}
+                      selected={!done && checked.has(i.id)}
+                      className={`${styles.pickGrid}${done ? ` ${styles.rowDone}` : ''}`}
+                      onClick={done ? undefined : () => toggle(i)}
+                    >
+                      <span className={styles.checkCell}>
+                        {done ? null : (
+                          <input
+                            type="checkbox"
+                            checked={checked.has(i.id)}
+                            onChange={() => toggle(i)}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={i.text}
+                          />
+                        )}
+                      </span>
+                      <span>
+                        {i.text} {done ? <span className={styles.done}>추가됨</span> : null}
+                      </span>
+                    </TableRow>
+                  );
+                })}
+              </Table>
+            )}
+          </div>
+        </>
+      )}
+
+      <p className={styles.count}>
+        {checked.size}개 고름
+        {tab === 'all' && load.state === 'ok' && load.truncated ? ` · 앞의 ${items.length}개만 보입니다 — 검색어로 좁히세요` : ''}
+      </p>
+    </Dialog>
   );
 }

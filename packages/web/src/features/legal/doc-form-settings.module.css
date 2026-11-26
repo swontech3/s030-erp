@@ -1,0 +1,39 @@
+/*
+ * 설정(s040900010 · DocFormSettingsView) 전용 — 2026-11-25 법무 일관성(삐용 기준 = 입주관리 · 센터·기준관리 결과).
+ *
+ * ★ 이 화면은 `codes.module.css` · `billing.module.css` · `corp-change-detail.module.css` 를 가져다 쓴다 —
+ *   그 파일들은 다른 화면 · 다른 작업자의 것이라 한 줄도 고치지 않는다. 이 화면에만 필요한 새 규칙은 여기 둔다.
+ * ★ 색은 토큰만. 표 머리 · 줄의 색 · 선은 공통 Table 이 그린다 — 여기는 칸 사이 · 글자 모양만.
+ */
+
+/* ── 구역 제목 = 왼쪽 4px 아쿠아 막대(글자에만 · 삐용 단체관리 「단체 정보」 모양) ──
+ * ★ `div h2.` = 가져다 쓰는 제목 규칙(codes .panelTitle · 법무 상세 .sectionHeader h2 의 line-height)보다 앞서게.
+ */
+div h2.sectionTitle {
+  border-left: 4px solid var(--color-primary);
+  padding-left: 8px;
+  line-height: 1.2;
+}
+
+/* ── 왼쪽 구분 목록(카드형 줄 → 공통 Table) ──
+ * ★ 칸 사이 8px · 좌우 16px · 글자 13px(--text-micro-size) = 종전 줄(codes .node 패딩 16 · .nodePick gap 8 · 13px).
+ * ★ `div.` 를 붙여 공통 Table 의 .head/.row(같은 세기)보다 앞서게 한다(코드 관리 div.nodeGrid 와 같은 수법).
+ */
+div.nodeGrid {
+  column-gap: 8px;
+  font-size: var(--text-micro-size);
+}
+
+/* 코드 — 종전엔 줄이지 않았다. 칸이 좁으면 줄을 넘긴다(잘라 숨기지 않는다) */
+.codeCell {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 줄 삭제 팝업 본문 안내 — Dialog 설명과 같은 글자 */
+.dialogNote {
+  margin: 0;
+  font-size: var(--text-body-size);
+  line-height: 1.6;
+  color: var(--text-body);
+}

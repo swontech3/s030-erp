@@ -10,7 +10,14 @@
  */
 import { useEffect, useState } from 'react';
 import type { IncorpPrintLogItem as PrintLogItem } from '@swonbiz/shared/domain/incorporation-print';
+import { Table, TableHead, TableRow } from '@/components/ds';
 import styles from './corp-change-detail.module.css';
+
+/*
+ * ★ 2026-11-25 법무 일관성 — 표 = 공통 Table(머리글 아쿠아). 종전 <table> 은 칸 폭을 정하지 않은 자동 폭이라 같은 값이 없다 —
+ *   일시 · 신청일 · 작성일은 날짜 글자 폭, 서류 · 누가는 남는 폭을 나눠 가진다(보고 「정할 것」).
+ */
+const HISTORY_COLS = '150px minmax(0, 1.6fr) minmax(0, 0.8fr) 110px 110px minmax(0, 1.2fr)';
 
 const ROLE: Readonly<Record<PrintLogItem['printedRole'], string>> = { operator: '운영사', tenant: '회사' };
 
@@ -50,32 +57,28 @@ export function IncorporationPrintHistory({ id, reloadKey }: { id: string; reloa
       {items === null && !error ? <p className={styles.hint}>불러오는 중…</p> : null}
       {items && items.length === 0 ? <p className={styles.hint}>아직 출력한 서류가 없습니다.</p> : null}
       {items && items.length > 0 ? (
-        <table className={styles.historyTable}>
-          <thead>
-            <tr>
-              <th>일시</th>
-              <th>서류</th>
-              <th>사람</th>
-              <th>신청일</th>
-              <th>작성일</th>
-              <th>누가</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((it, i) => (
-              <tr key={i}>
-                <td>{it.printedAt}</td>
-                <td>{it.formName}</td>
-                <td>{it.personName ?? '—'}</td>
-                <td>{it.applyDate ?? '—'}</td>
-                <td>{it.writeDate ?? '—'}</td>
-                <td>
-                  {ROLE[it.printedRole] ?? it.printedRole} · {it.printedBy}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <Table cols={HISTORY_COLS} dense>
+          <TableHead>
+            <span>일시</span>
+            <span>서류</span>
+            <span>사람</span>
+            <span>신청일</span>
+            <span>작성일</span>
+            <span>누가</span>
+          </TableHead>
+          {items.map((it, i) => (
+            <TableRow key={i}>
+              <span className={styles.tabular}>{it.printedAt}</span>
+              <span>{it.formName}</span>
+              <span>{it.personName ?? '—'}</span>
+              <span className={styles.tabular}>{it.applyDate ?? '—'}</span>
+              <span className={styles.tabular}>{it.writeDate ?? '—'}</span>
+              <span>
+                {ROLE[it.printedRole] ?? it.printedRole} · {it.printedBy}
+              </span>
+            </TableRow>
+          ))}
+        </Table>
       ) : null}
       <p className={styles.hint} style={{ marginTop: 8 }}>
         [인쇄] 를 누른 기록입니다 — 인쇄 창에서 취소했는지는 남지 않습니다.

@@ -6,6 +6,8 @@
  * ★ **시안이 없다.** 모양은 코드 관리(s030100030)와 같다 — 왼쪽 목록 · 오른쪽 패널은 `codes.module.css`,
  *   입력칸 · 버튼 · 안내 띠는 법무 상세(`corp-change-detail.module.css`), 회사유형 탭은 청구 화면의 탭
  *   (`billing.module.css` — 입주사 화면의 탭과 같은 모양)을 그대로 쓴다. 새 색 · 새 스타일은 없다.
+ * ★ 2026-11-25 법무 일관성(삐용 기준) — 왼쪽 목록 = 공통 표 · 구역 제목 막대 · 단추 = 공통 Button(줄 안 30px BTN_XS) ·
+ *   줄 삭제 팝업 = 공통 Dialog. 이 화면만의 새 규칙은 `doc-form-settings.module.css`(공유 CSS 는 고치지 않는다).
  *
  * ★★ 저장 규칙은 shared `doc-form-setting.ts` 머리말 1~8 — 화면은 칸을 글자로 들고 있다가 저장할 때 보내고,
  *    서버의 칸별 오류를 그 칸 아래에 그린다.
@@ -20,9 +22,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { INCORP_TAX_LABEL, type DocFormSettingItem } from '@swonbiz/shared/domain/doc-form-setting';
 import { INCORP_TAX_KEYS } from '@swonbiz/shared/domain/incorporation-tax';
-import { Button, Icon } from '@/components/ds';
+import { Button, Dialog, Icon, Table, TableHead, TableRow, tableCell } from '@/components/ds';
+import { BTN_XS } from '@/features/billing/BillingTable';
 import { comma, formatMoneyInput } from '@/features/contracts/form-model';
-import { ModalShell } from '@/features/facility/ModalShell';
+import { cf } from '@/features/facility/ModalShell';
 import {
   DocFormSettingError,
   bodyOf,
@@ -39,6 +42,7 @@ import {
 import cs from '@/features/codes/codes.module.css';
 import ls from './corp-change-detail.module.css';
 import bs from '@/features/billing/billing.module.css';
+import vs from './doc-form-settings.module.css';
 
 /** 설립 세금 칸의 안내 — 단위. */
 const INCORP_TAX_HINT: Record<IncorpTaxKey, string> = {
@@ -48,6 +52,13 @@ const INCORP_TAX_HINT: Record<IncorpTaxKey, string> = {
   localEduRate: '등록면허세의 100분의 n',
   regFee: '원',
 };
+
+/*
+ * ★ 2026-11-25 법무 일관성(삐용 기준 = 코드 관리 결과) — 왼쪽 구분 목록(카드형 줄) → 공통 표(Table). 보이던 것을 칸으로 그대로:
+ *   코드 | 등기 종류 이름 | 양식호수(또는 「미설정」 · 「사용 끔」 · 「상호변경 줄 사용」 딱지).
+ *   종전 줄은 코드 · 딱지가 글자 폭 · 이름이 남는 폭이었다 — 코드 6em · 끝 칸 8.5em(가장 긴 딱지 「상호변경 줄 사용」)은 이번에 정한 값.
+ */
+const NODE_COLS = '6em minmax(0, 1fr) 8.5em';
 
 const money = (n: number | null | undefined) => (n === null || n === undefined ? '' : comma(n));
 
@@ -230,27 +241,40 @@ export function DocFormSettingsView() {
                   {g.items.length === 0 ? (
                     <p className={cs.empty}>등기 종류 코드가 없습니다</p>
                   ) : (
-                    g.items.map((it) => {
-                      const b = rowOf(it, '');
-                      const on = sel?.domain === g.domain && sel.code === it.code;
-                      return (
-                        <div key={it.code} className={`${cs.node} ${on ? cs.nodeOn : ''}`}>
-                          <button type="button" className={cs.nodePick} onClick={() => open(g.domain, it.code, '')}>
-                            <span className={cs.nodeKey}>{it.code}</span>
-                            <span className={cs.nodeLabel}>{it.name}</span>
-                            {it.sharedWith ? (
-                              <span className={`${cs.tag} ${cs.tagOff}`}>상호변경 줄 사용</span>
-                            ) : !b ? (
-                              <span className={`${cs.tag} ${cs.tagOff}`}>미설정</span>
-                            ) : !b.isActive ? (
-                              <span className={`${cs.tag} ${cs.tagOff}`}>사용 끔</span>
-                            ) : (
-                              <span className={cs.nodeCount}>{b.formNo ?? ''}</span>
-                            )}
-                          </button>
-                        </div>
-                      );
-                    })
+                    <Table cols={NODE_COLS}>
+                      <TableHead className={vs.nodeGrid}>
+                        <span>코드</span>
+                        <span>등기 종류</span>
+                        {/* ★ 2026-11-25 대표 결정(법무 정한 것 7) — 머리글 「양식호수」 → 「양식호수 · 상태」(딱지도 이 칸에 든다) */}
+                        <span className={tableCell.right}>양식호수 · 상태</span>
+                      </TableHead>
+                      {g.items.map((it) => {
+                        const b = rowOf(it, '');
+                        const on = sel?.domain === g.domain && sel.code === it.code;
+                        return (
+                          <TableRow
+                            key={it.code}
+                            selected={on}
+                            className={`${vs.nodeGrid}${on ? ` ${cs.nodeOn}` : ''}`}
+                            onClick={() => open(g.domain, it.code, '')}
+                          >
+                            <span className={`${cs.nodeKey} ${vs.codeCell}`}>{it.code}</span>
+                            <span className={tableCell.ellipsis}>{it.name}</span>
+                            <span className={tableCell.right}>
+                              {it.sharedWith ? (
+                                <span className={`${cs.tag} ${cs.tagOff}`}>상호변경 줄 사용</span>
+                              ) : !b ? (
+                                <span className={`${cs.tag} ${cs.tagOff}`}>미설정</span>
+                              ) : !b.isActive ? (
+                                <span className={`${cs.tag} ${cs.tagOff}`}>사용 끔</span>
+                              ) : (
+                                <span className={cs.nodeCount}>{b.formNo ?? ''}</span>
+                              )}
+                            </span>
+                          </TableRow>
+                        );
+                      })}
+                    </Table>
                   )}
                 </div>
               ))
@@ -283,16 +307,17 @@ export function DocFormSettingsView() {
               </p>
               <p className={cs.emptySub}>표시명 · 양식호수 · 세금 · 첨부서면은 그 줄에서 고칩니다</p>
               <p className={cs.emptySub}>
-                <button type="button" className={cs.btnXs} onClick={() => open(group.domain, item.sharedWith!, '')}>
+                <Button variant="ghost" size="sm" style={BTN_XS} onClick={() => open(group.domain, item.sharedWith!, '')}>
                   {group.items.find((i) => i.code === item.sharedWith)?.name ?? item.sharedWith} 열기
-                </button>
+                </Button>
               </p>
             </div>
           ) : (
             <>
               <div className={cs.panelHead}>
                 <div>
-                  <h2 className={cs.panelTitle}>
+                  {/* ★ 2026-11-25 일관성 — 구역 제목 = 왼쪽 4px 아쿠아 막대(글자에만) */}
+                  <h2 className={`${cs.panelTitle} ${vs.sectionTitle}`}>
                     {item.name}({item.code})
                   </h2>
                   <p className={cs.panelSub}>
@@ -301,16 +326,17 @@ export function DocFormSettingsView() {
                 </div>
                 <div className={cs.actions}>
                   {!isBase && row ? (
-                    <button
-                      type="button"
-                      className={`${cs.btnXs} ${cs.btnDanger}`}
+                    /* ★ 2026-11-25 일관성 — 삭제 = 지우기 단추(danger) · 저장 = 주 단추, 둘 다 상세 제목 줄 오른쪽(자리 그대로) */
+                    <Button
+                      variant="danger"
+                      size="sm"
                       onClick={() => {
                         setDeleteError(null);
                         setConfirmDelete(true);
                       }}
                     >
                       {tabName} 줄 삭제
-                    </button>
+                    </Button>
                   ) : null}
                   <Button size="sm" variant="primary" disabled={saving} onClick={() => void save()}>
                     <Icon name="save" size={16} />
@@ -431,7 +457,7 @@ export function DocFormSettingsView() {
                     {/* ── 세금 ── */}
                     <div>
                       <div className={ls.sectionHeader}>
-                        <h2>세금</h2>
+                        <h2 className={vs.sectionTitle}>세금</h2>
                       </div>
                       <div className={ls.sectionRule} />
                       {group.domain === 'corp-change' ? (
@@ -478,17 +504,18 @@ export function DocFormSettingsView() {
                     <div>
                       <div className={ls.sectionHeader}>
                         <div className={ls.sectionTitle}>
-                          <h2>첨부서면</h2>
+                          <h2 className={vs.sectionTitle}>첨부서면</h2>
                           <span className={ls.muted}>{draft.attachments.length}개</span>
                         </div>
-                        <button
-                          type="button"
-                          className={`${ls.btn} ${ls.btnGhost} ${ls.btnXs}`}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          style={BTN_XS}
+                          iconLeft={<Icon name="plus" size={14} />}
                           onClick={() => patch({ attachments: [...draft.attachments, { name: '', copies: '1' }] })}
                         >
-                          <Icon name="plus" size={14} />
                           행 추가
-                        </button>
+                        </Button>
                       </div>
                       <div className={ls.sectionRule} />
                       <p className={ls.sectionNote}>
@@ -537,24 +564,27 @@ export function DocFormSettingsView() {
                                     {copiesErr ? <span className={ls.fieldError}>{copiesErr}</span> : null}
                                   </div>
                                   <div className={ls.oActions}>
-                                    <button type="button" className={cs.btnXs} disabled={i === 0} onClick={() => move(i - 1)}>
+                                    {/* ★ 2026-11-25 일관성 — 줄 안 작은 단추 30px(BTN_XS) · 위 · 아래 = 보통 · 삭제 = 지우기 */}
+                                    <Button variant="ghost" size="sm" style={BTN_XS} disabled={i === 0} onClick={() => move(i - 1)}>
                                       위
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className={cs.btnXs}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      style={BTN_XS}
                                       disabled={i === draft.attachments.length - 1}
                                       onClick={() => move(i + 1)}
                                     >
                                       아래
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className={cs.btnXs}
+                                    </Button>
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      style={BTN_XS}
                                       onClick={() => patch({ attachments: draft.attachments.filter((_, j) => j !== i) })}
                                     >
                                       삭제
-                                    </button>
+                                    </Button>
                                   </div>
                                 </div>
                               </div>
@@ -573,18 +603,31 @@ export function DocFormSettingsView() {
 
       {/** @screen s040900010p1 등기 설정 줄 삭제 · 090 설정 · 법무 서비스(s04) */}
       {confirmDelete && item && group ? (
-        <ModalShell
-          title={`${tabName} 줄 삭제`}
-          desc={`${item.name}의 ${tabName} 줄을 지웁니다. 지우면 ${tabName} 회사도 기본 줄 값을 씁니다.`}
-          busy={deleting}
-          error={deleteError}
-          okLabel="삭제"
-          okDanger
+        /* ★ 2026-11-25 일관성 — 공통 팝업(Dialog). 제목 = 짧은 이름 · 묻는 문장은 본문 첫 줄(굵게) · [삭제](지우기) 먼저 · [취소] 나중 */
+        <Dialog
+          open
           onClose={() => setConfirmDelete(false)}
-          onOk={() => void remove()}
+          closeDisabled={deleting}
+          title={`${tabName} 줄 삭제`}
+          description={<strong>{`${item.name}의 ${tabName} 줄을 삭제하시겠습니까?`}</strong>}
+          footer={
+            <>
+              <Button variant="danger" size="sm" disabled={deleting} onClick={() => void remove()}>
+                삭제
+              </Button>
+              <Button variant="ghost" size="sm" disabled={deleting} onClick={() => setConfirmDelete(false)}>
+                취소
+              </Button>
+            </>
+          }
         >
-          {null}
-        </ModalShell>
+          <p className={vs.dialogNote}>지우면 {tabName} 회사도 기본 줄 값을 씁니다.</p>
+          {deleteError ? (
+            <p className={cf.fieldError} role="alert">
+              {deleteError}
+            </p>
+          ) : null}
+        </Dialog>
       ) : null}
 
       {toast ? (
