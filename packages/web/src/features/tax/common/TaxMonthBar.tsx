@@ -39,7 +39,8 @@ interface Props {
   count?: number;
 }
 
-const SELECT_STYLE = { height: 32, width: 'auto' } as const;
+/* ★ 2026-11-26 정한 것 3 — 연 · 월 고르기 상자 높이 = 40px(세무 css .select 그대로 · 종전 인라인 32px 를 뺐다) — 옆 40px 단추와 맞춘다 */
+const SELECT_STYLE = { width: 'auto' } as const;
 
 export function TaxMonthBar({ month, note, picker, children, count }: Props) {
   const router = useRouter();

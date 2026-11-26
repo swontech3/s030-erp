@@ -278,7 +278,8 @@ export function TaxClassifyView({ month, fileId, initialStatus = 'all' }: Props)
             <span className={t.tbarSep} />
             <select
               className={t.select}
-              style={{ height: 32, width: 220 }}
+              // ★ 2026-11-26 정한 것 3 — 계정과목 고르기 상자 높이 = 40px(세무 css .select 그대로 · 종전 인라인 32px 를 뺐다)
+              style={{ width: 220 }}
               value={bulk}
               disabled={!canClassify}
               aria-label="여러 줄 한 번에 — 계정과목"
