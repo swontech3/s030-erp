@@ -383,7 +383,8 @@ export function TaxSettingsView() {
   const emailPairs = draft.taxEmails.flatMap((e, i, all) => (i % 2 === 0 ? [[e, all[i + 1]] as const] : []));
   const emailGrid = (
     // ★ 2026-11-15 — 920px 제한을 없애고 카드 폭을 꽉 채운다. 번호 칸은 48px 그대로, 이름 18% · 메일은 나머지(메일이 더 넓다)
-    <div style={{ marginTop: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+    // ★ 2026-11-26 정한 것 11 — 바깥 테두리 상자를 없애 계좌 · 카드 표와 같게(위 여백만 그대로)
+    <div style={{ marginTop: 12 }}>
       <Table cols={EMAIL_COLS}>
         <TableHead>
           <span>No</span>
