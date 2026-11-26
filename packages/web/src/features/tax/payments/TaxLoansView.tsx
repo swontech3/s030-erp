@@ -10,12 +10,17 @@
  * ★ 기간 직접 지정 · 설명 글을 없앴다. ★ 대출번호는 끝 4자리만(서버가 그것만 준다). 이름(은행 · 구분)은 API 의 코드 이름.
  */
 import { loanSummary } from '@swonbiz/shared/domain/tax-payments';
+import { Table, TableHead, TableRow, tableCell } from '@/components/ds';
 import t from '../common/tax.module.css';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { TaxMonthBar } from '../common/TaxMonthBar';
 import { won } from '../uploads/tax-uploads-model';
 import { DASH, EmptyRow, FileNote, codeName, shortDate, usePayments } from './payments-common';
 import type { PaymentsQuery } from './tax-payments-model';
+
+/* ★ 2026-11-26 세무 일관성(삐용 기준) — 표 = 공통 Table(머리글 아쿠아 · 머리 고정 · 칸 폭은 종전 colgroup 값) ·
+ *   검색조건은 바꾸면 바로 다시 읽음(그대로) · 줄 오른쪽 끝 「n건」 · [모두 보기] = 공통 Button 보통 */
+const LOAN_COLS = '64px minmax(0,1fr) 72px 140px 130px 120px 100px 140px';
 
 interface Props {
   month: string;
@@ -49,7 +54,7 @@ export function TaxLoansView({ month, fileId }: Props) {
     <div className={`${t.page} ${t.pageFill}`}>
       {/* ① 검색조건 */}
       <div className={`${t.card} ${t.secLow}`}>
-        <TaxMonthBar month={month} note={<FileNote file={data.file} month={month} />} />
+        <TaxMonthBar month={month} note={<FileNote file={data.file} month={month} />} count={data.loans.length} />
       </div>
 
       {/* 대출별 요약 — 작게 */}
@@ -69,48 +74,34 @@ export function TaxLoansView({ month, fileId }: Props) {
       {/* ② 거래 목록 */}
       <div className={`${t.card} ${t.listCard}`}>
         <div className={t.listScroll}>
-          <table className={`${t.tbl} ${t.tblSticky}`}>
-            <colgroup>
-              <col style={{ width: 64 }} />
-              <col />
-              <col style={{ width: 72 }} />
-              <col style={{ width: 140 }} />
-              <col style={{ width: 130 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 140 }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>거래일</th>
-                <th>대출</th>
-                <th>구분</th>
-                <th>거래종류</th>
-                <th className={t.num}>원금</th>
-                <th className={t.num}>이자</th>
-                <th className={t.num}>수수료</th>
-                <th className={t.num}>잔액</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.loans.length === 0 ? (
-                <EmptyRow cols={8} />
-              ) : (
-                data.loans.map((r) => (
-                  <tr key={r.id}>
-                    <td className={t.tnum}>{shortDate(r.txnDate)}</td>
-                    <td className={`${t.mut} ${t.ell}`}>{label(r)}</td>
-                    <td>{codeName(data.codes.loanTps, r.txnTp)}</td>
-                    <td className={`${t.mut} ${t.ell}`}>{r.txnType ?? DASH}</td>
-                    <td className={t.num}>{won(r.principal)}</td>
-                    <td className={t.num}>{won(r.interest)}</td>
-                    <td className={t.num}>{won(r.fee)}</td>
-                    <td className={t.num}>{won(r.balance)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <Table cols={LOAN_COLS}>
+            <TableHead sticky>
+              <span>거래일</span>
+              <span>대출</span>
+              <span>구분</span>
+              <span>거래종류</span>
+              <span className={tableCell.right}>원금</span>
+              <span className={tableCell.right}>이자</span>
+              <span className={tableCell.right}>수수료</span>
+              <span className={tableCell.right}>잔액</span>
+            </TableHead>
+            {data.loans.length === 0 ? (
+              <EmptyRow />
+            ) : (
+              data.loans.map((r) => (
+                <TableRow key={r.id}>
+                  <span className={t.tnum}>{shortDate(r.txnDate)}</span>
+                  <span className={`${t.mutT} ${tableCell.ellipsis}`}>{label(r)}</span>
+                  <span>{codeName(data.codes.loanTps, r.txnTp)}</span>
+                  <span className={`${t.mutT} ${tableCell.ellipsis}`}>{r.txnType ?? DASH}</span>
+                  <span className={t.numC}>{won(r.principal)}</span>
+                  <span className={t.numC}>{won(r.interest)}</span>
+                  <span className={t.numC}>{won(r.fee)}</span>
+                  <span className={t.numC}>{won(r.balance)}</span>
+                </TableRow>
+              ))
+            )}
+          </Table>
         </div>
       </div>
     </div>

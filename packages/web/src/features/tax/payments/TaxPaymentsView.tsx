@@ -13,12 +13,17 @@
  */
 import { useState } from 'react';
 import { PAY_ALL, payTotals, type PaymentView } from '@swonbiz/shared/domain/tax-payments';
+import { Table, TableHead, TableRow, tableCell } from '@/components/ds';
 import t from '../common/tax.module.css';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { TaxMonthBar } from '../common/TaxMonthBar';
 import { won } from '../uploads/tax-uploads-model';
 import { DASH, EmptyRow, FileNote, codeName, shortDate, usePayments } from './payments-common';
 import type { PaymentsQuery } from './tax-payments-model';
+
+/* ★ 2026-11-26 세무 일관성(삐용 기준) — 표 = 공통 Table(머리글 아쿠아 · 머리 고정 · 칸 폭은 종전 colgroup 값) ·
+ *   검색조건은 바꾸면 바로 다시 읽음(그대로) · 줄 오른쪽 끝 「n건」 · [모두 보기] = 공통 Button 보통 */
+const PAY_COLS = '64px 72px minmax(0,1fr) 96px 120px 100px 84px 100px 160px 170px';
 
 interface Props {
   month: string;
@@ -49,13 +54,13 @@ export function TaxPaymentsView({ month, fileId }: Props) {
   const shown = data.query.tab;
   const sum = payTotals(data.pays);
   const srcName = (k: string) => codeName(data.codes.paySrcs, k);
-  const dash = <span className={t.mut}>{DASH}</span>;
+  const dash = <span className={t.mutT}>{DASH}</span>;
 
   return (
     <div className={`${t.page} ${t.pageFill}`}>
       {/* ① 검색조건 */}
       <div className={`${t.card} ${t.secLow}`}>
-        <TaxMonthBar month={month} note={<FileNote file={data.file} month={month} />}>
+        <TaxMonthBar month={month} note={<FileNote file={data.file} month={month} />} count={data.pays.length}>
           <select
             className={t.select}
             style={{ height: 32, width: 'auto', minWidth: 120 }}
@@ -77,80 +82,64 @@ export function TaxPaymentsView({ month, fileId }: Props) {
       {/* ② 목록 */}
       <div className={`${t.card} ${t.listCard}`}>
         <div className={t.listScroll}>
-          <table className={`${t.tbl} ${t.tblSticky}`}>
-            <colgroup>
-              <col style={{ width: 64 }} />
-              <col style={{ width: 72 }} />
-              <col />
-              <col style={{ width: 96 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 84 }} />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 160 }} />
-              <col style={{ width: 170 }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>납부일</th>
-                <th>구분</th>
-                <th>세목</th>
-                <th>비용 여부</th>
-                <th className={t.num}>금액</th>
-                <th className={t.num}>가산금</th>
-                <th>귀속</th>
-                <th>납부방법</th>
-                <th>기관</th>
-                <th>납부번호</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.pays.length === 0 ? (
-                <EmptyRow cols={10} />
-              ) : (
-                data.pays.map((r) => {
-                  const nt = r.kind === 'NTAX';
-                  return (
-                    <tr key={`${r.kind}:${r.id}`}>
-                      <td className={t.tnum}>{shortDate(r.payDate)}</td>
-                      <td className={t.mut}>{srcName(r.kind)}</td>
-                      <td className={t.ell} title={r.taxItem}>
-                        {r.taxItem}
-                      </td>
-                      <td>
-                        <span className={`${t.badge} ${r.expense ? t.bDoing : t.bGray}`}>{r.expense ? '비용' : '비용 아님'}</span>
-                      </td>
-                      <td className={t.num}>{won(r.amount)}</td>
-                      <td className={t.num}>{nt ? won(r.penalty ?? 0) : dash}</td>
-                      <td className={t.mut}>{nt ? dash : (r.belongMonth ?? dash)}</td>
-                      <td className={`${t.mut} ${t.ell}`}>{nt ? dash : (r.payMethod ?? dash)}</td>
-                      <td className={`${t.mut} ${t.ell}`} title={r.office ?? ''}>
-                        {r.office ?? dash}
-                      </td>
-                      <td className={`${t.mut} ${t.ell}`} title={r.payNo}>
-                        {r.payNo}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-              {data.pays.length ? (
-                <tr>
-                  <td className={t.sm}>합계</td>
-                  <td className={t.sm} colSpan={3}>
-                    {won(sum.count)}줄 · 비용 {won(sum.expense)} · 비용 아님 {won(sum.nonExpense)}
-                  </td>
-                  <td className={t.num}>
-                    <b>{won(sum.amount)}</b>
-                  </td>
-                  <td className={t.num}>
-                    <b>{won(sum.penalty)}</b>
-                  </td>
-                  <td colSpan={4} />
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+          <Table cols={PAY_COLS}>
+            <TableHead sticky>
+              <span>납부일</span>
+              <span>구분</span>
+              <span>세목</span>
+              <span>비용 여부</span>
+              <span className={tableCell.right}>금액</span>
+              <span className={tableCell.right}>가산금</span>
+              <span>귀속</span>
+              <span>납부방법</span>
+              <span>기관</span>
+              <span>납부번호</span>
+            </TableHead>
+            {data.pays.length === 0 ? (
+              <EmptyRow />
+            ) : (
+              data.pays.map((r) => {
+                const nt = r.kind === 'NTAX';
+                return (
+                  <TableRow key={`${r.kind}:${r.id}`}>
+                    <span className={t.tnum}>{shortDate(r.payDate)}</span>
+                    <span className={t.mutT}>{srcName(r.kind)}</span>
+                    <span className={tableCell.ellipsis} title={r.taxItem}>
+                      {r.taxItem}
+                    </span>
+                    <span>
+                      <span className={`${t.badge} ${r.expense ? t.bDoing : t.bGray}`}>{r.expense ? '비용' : '비용 아님'}</span>
+                    </span>
+                    <span className={t.numC}>{won(r.amount)}</span>
+                    <span className={t.numC}>{nt ? won(r.penalty ?? 0) : dash}</span>
+                    <span className={t.mutT}>{nt ? dash : (r.belongMonth ?? dash)}</span>
+                    <span className={`${t.mutT} ${tableCell.ellipsis}`}>{nt ? dash : (r.payMethod ?? dash)}</span>
+                    <span className={`${t.mutT} ${tableCell.ellipsis}`} title={r.office ?? ''}>
+                      {r.office ?? dash}
+                    </span>
+                    <span className={`${t.mutT} ${tableCell.ellipsis}`} title={r.payNo}>
+                      {r.payNo}
+                    </span>
+                  </TableRow>
+                );
+              })
+            )}
+            {data.pays.length ? (
+              <TableRow>
+                <span className={t.sm}>합계</span>
+                <span className={`${t.sm} ${t.span3}`}>
+                  {won(sum.count)}줄 · 비용 {won(sum.expense)} · 비용 아님 {won(sum.nonExpense)}
+                </span>
+                <span className={t.numC}>
+                  <b>{won(sum.amount)}</b>
+                </span>
+                <span className={t.numC}>
+                  <b>{won(sum.penalty)}</b>
+                </span>
+                <span className={t.span4} />
+              </TableRow>
+            ) : null}
+          </Table>
         </div>
       </div>
     </div>

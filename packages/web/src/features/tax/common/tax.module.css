@@ -19,6 +19,8 @@
 /* ── 안내 줄(달 선택을 숨긴 화면) ── */
 .ctx { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .ctxNote { font-size: var(--fs-xs); color: var(--text-muted); }
+/* ★ 2026-11-26 세무 일관성 ④ — 안내 + 「n건」 묶음(줄 오른쪽 끝) */
+.ctxR { display: inline-flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 
 /* ── 화면 제목 ── */
 .pageH { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
@@ -204,6 +206,11 @@
 /* ★ 2026-11-26 세무 일관성 ① — 공통 Table 칸 안 글자 모양(색 · 줄은 Table 부품) */
 .mutT { color: var(--text-muted); }
 .cellChk { display: inline-flex; align-items: center; }
+.numC { text-align: right; justify-self: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* 합계 줄 — 여러 칸을 묶는 칸(종전 colSpan) */
+.span2 { grid-column: span 2; }
+.span3 { grid-column: span 3; }
+.span4 { grid-column: span 4; }
 .clickable { cursor: pointer; }
 .clickable:hover td { background: var(--surface-alt); }
 .pick td { background: var(--color-accent-bg); }

@@ -13,12 +13,17 @@
 import { useState } from 'react';
 import { socialTotals } from '@swonbiz/shared/domain/tax-pay-social-loan';
 import { SOCIAL_INS_FILTERS } from '@swonbiz/shared/domain/tax-payments';
+import { Table, TableHead, TableRow, tableCell } from '@/components/ds';
 import t from '../common/tax.module.css';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
 import { TaxMonthBar } from '../common/TaxMonthBar';
 import { won } from '../uploads/tax-uploads-model';
 import { DASH, EmptyRow, FileNote, codeName, usePayments } from './payments-common';
 import type { PaymentsQuery } from './tax-payments-model';
+
+/* ★ 2026-11-26 세무 일관성(삐용 기준) — 표 = 공통 Table(머리글 아쿠아 · 머리 고정 · 칸 폭은 종전 colgroup 값) ·
+ *   검색조건은 바꾸면 바로 다시 읽음(그대로) · 줄 오른쪽 끝 「n건」 · [모두 보기] = 공통 Button 보통 */
+const SOCIAL_COLS = '100px 120px minmax(0,1fr) 140px 140px';
 
 interface Props {
   month: string;
@@ -55,7 +60,7 @@ export function TaxSocialView({ month, fileId }: Props) {
     <div className={`${t.page} ${t.pageFill}`}>
       {/* ① 검색조건 */}
       <div className={`${t.card} ${t.secLow}`}>
-        <TaxMonthBar month={month} note={<FileNote file={data.file} month={month} />}>
+        <TaxMonthBar month={month} note={<FileNote file={data.file} month={month} />} count={data.social.length}>
           <select
             className={t.select}
             style={{ height: 32, width: 'auto', minWidth: 120 }}
@@ -92,41 +97,30 @@ export function TaxSocialView({ month, fileId }: Props) {
       {/* ② 사람별 목록 */}
       <div className={`${t.card} ${t.listCard}`}>
         <div className={t.listScroll}>
-          <table className={`${t.tbl} ${t.tblSticky}`}>
-            <colgroup>
-              <col style={{ width: 100 }} />
-              <col style={{ width: 120 }} />
-              <col />
-              <col style={{ width: 140 }} />
-              <col style={{ width: 140 }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>고지 연월</th>
-                <th>보험 종류</th>
-                <th>가입자</th>
-                <th className={t.num}>보수월액</th>
-                <th className={t.num}>금액</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.social.length === 0 ? (
-                <EmptyRow cols={5} />
-              ) : (
-                data.social.map((r) => (
-                  <tr key={r.id}>
-                    <td className={t.tnum}>{r.noticeMonth}</td>
-                    <td className={t.mut}>{codeName(names, r.insTp)}</td>
-                    <td className={t.ell} title={r.name}>
-                      {r.name}
-                    </td>
-                    <td className={t.num}>{r.payBase === null ? <span className={t.mut}>{DASH}</span> : won(r.payBase)}</td>
-                    <td className={t.num}>{won(r.noticeAmount)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <Table cols={SOCIAL_COLS}>
+            <TableHead sticky>
+              <span>고지 연월</span>
+              <span>보험 종류</span>
+              <span>가입자</span>
+              <span className={tableCell.right}>보수월액</span>
+              <span className={tableCell.right}>금액</span>
+            </TableHead>
+            {data.social.length === 0 ? (
+              <EmptyRow />
+            ) : (
+              data.social.map((r) => (
+                <TableRow key={r.id}>
+                  <span className={t.tnum}>{r.noticeMonth}</span>
+                  <span className={t.mutT}>{codeName(names, r.insTp)}</span>
+                  <span className={tableCell.ellipsis} title={r.name}>
+                    {r.name}
+                  </span>
+                  <span className={t.numC}>{r.payBase === null ? <span className={t.mutT}>{DASH}</span> : won(r.payBase)}</span>
+                  <span className={t.numC}>{won(r.noticeAmount)}</span>
+                </TableRow>
+              ))
+            )}
+          </Table>
         </div>
       </div>
     </div>

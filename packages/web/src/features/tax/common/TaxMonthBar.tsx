@@ -15,6 +15,7 @@
 import type { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { pickTaxMonth, taxMonthOptions, taxYearOptions, thisMonthOf } from '@swonbiz/shared/domain/tax-uploads';
+import { ListNote } from '@/components/patterns/ListFrame';
 import t from './tax.module.css';
 
 /** `2026-09` → 「2026년 9월」. */
@@ -34,11 +35,13 @@ interface Props {
   picker?: ReactNode;
   /** 연도 · 월 뒤에 붙일 검색조건. */
   children?: ReactNode;
+  /** ★ 2026-11-26 세무 일관성 ④ — 목록 건수. 주면 줄 오른쪽 끝(안내 뒤)에 「n건」(법무 · 입주관리 목록과 같은 ListNote). */
+  count?: number;
 }
 
 const SELECT_STYLE = { height: 32, width: 'auto' } as const;
 
-export function TaxMonthBar({ month, note, picker, children }: Props) {
+export function TaxMonthBar({ month, note, picker, children, count }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const now = thisMonthOf(new Date());
@@ -76,7 +79,14 @@ export function TaxMonthBar({ month, note, picker, children }: Props) {
         )}
         {children}
       </div>
-      <span className={t.ctxNote}>{note}</span>
+      {count === undefined ? (
+        <span className={t.ctxNote}>{note}</span>
+      ) : (
+        <span className={t.ctxR}>
+          <span className={t.ctxNote}>{note}</span>
+          <ListNote>{count}건</ListNote>
+        </span>
+      )}
     </div>
   );
 }
