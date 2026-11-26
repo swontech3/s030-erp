@@ -63,7 +63,8 @@ import {
 const CLASSIFY_COLS = '20px 64px 120px minmax(0,1fr) 180px 120px 260px';
 /** 목록에 없는 값. */
 const DASH = '—';
-const FILTER_STYLE = { height: 32, width: 'auto', minWidth: 110 } as const;
+/* ★ 2026-11-26 검색 줄 고르기 상자 = 40px(세무 css .select 그대로 · 종전 인라인 32px 를 뺐다) */
+const FILTER_STYLE = { width: 'auto', minWidth: 110 } as const;
 
 interface Props {
   month: string;
