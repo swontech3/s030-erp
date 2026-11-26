@@ -63,7 +63,8 @@ export function TaxPaymentsView({ month, fileId }: Props) {
         <TaxMonthBar month={month} note={<FileNote file={data.file} month={month} />} count={data.pays.length}>
           <select
             className={t.select}
-            style={{ height: 32, width: 'auto', minWidth: 120 }}
+            // ★ 2026-11-26 검색 줄 고르기 상자 = 40px(세무 css .select 그대로 · 종전 인라인 32px 를 뺐다)
+            style={{ width: 'auto', minWidth: 120 }}
             aria-label="세금"
             value={shown}
             disabled={!!fileId}
