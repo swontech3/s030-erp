@@ -127,7 +127,8 @@ export function TaxVatView({ month }: { month: string }) {
       <div className={t.between}>
         <select
           className={t.select}
-          style={{ height: 32, width: 'auto' }}
+          // ★ 2026-11-26 검색 줄 고르기 상자 = 40px(세무 css .select 그대로 · 종전 인라인 32px 를 뺐다) — 신고 기간
+          style={{ width: 'auto' }}
           value={period.id}
           aria-label="신고 기간"
           onChange={(e) => {
