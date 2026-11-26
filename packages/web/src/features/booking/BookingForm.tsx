@@ -31,7 +31,7 @@ import {
   type ReservationReason,
 } from '@swonbiz/shared/domain/reservation-rules';
 import { bookingShownStatus } from '@swonbiz/shared/domain/my-bookings';
-import { Icon } from '@/components/ds';
+import { Button, Dialog, Icon } from '@/components/ds';
 import styles from './booking.module.css';
 import {
   STATUS_LABEL,
@@ -83,6 +83,11 @@ interface Props {
   onCancelAsk: (reservation: Reservation) => void;
   onComplete: (reservation: Reservation) => void;
   onDone: (message: string, moved: { facilityId: string; day: string }) => void;
+  /**
+   * 취소 확인 창이 위에 떠 있는가 — 참이면 이 창은 ESC · 바탕 누름으로 닫히지 않는다
+   * (2026-11-26 공통 Dialog — ESC 한 번에 두 창이 같이 닫히지 않게).
+   */
+  covered?: boolean;
 }
 
 export function BookingForm({
@@ -100,6 +105,7 @@ export function BookingForm({
   onCancelAsk,
   onComplete,
   onDone,
+  covered = false,
 }: Props) {
   const readOnly = seed.mode === 'view';
   const [facilityId, setFacilityId] = useState(seed.facilityId);
@@ -253,352 +259,349 @@ export function BookingForm({
   const heading = seed.mode === 'create' ? '회의실 예약' : seed.mode === 'edit' ? '예약 수정' : '예약 상세';
   const full = widthMode === 'sm';
 
+  /* ★ 2026-11-26 회의실 예약 일관성 — 상태 뱃지 · 회의실 줄은 제목줄(공통 Dialog 는 글자 제목만)에서 본문 맨 위로 옮겼다 */
+  const lead = (
+    <div className={styles.formLead}>
+      {shown ? (
+        <span
+          className={`${styles.badge} ${
+            waiting
+              ? styles.badgeWaiting
+              : shown === 'confirmed'
+              ? styles.badgeIndigo
+              : shown === 'completed'
+              ? styles.badgeNeutral
+              : styles.badgeCancel
+          }`}
+          data-badge="1"
+        >
+          {/* ★ 운영자에게만 「미처리」를 덧붙인다 — 닫아야 할 것이 무엇인지 보여야 한다 */}
+          {waiting && operator ? '종료 · 미처리' : STATUS_LABEL[shown] ?? shown}
+        </span>
+      ) : null}
+      <span className={styles.modalSub}>
+        {room.name}
+        {room.capacity ? ` · ${room.capacity}인` : ''} · 30분 단위
+      </span>
+    </div>
+  );
+
+  const content = (
+    <>
+      {lead}
+      {/* ── 예약 정보 ── */}
+      <div>
+        <div className={styles.secTitle}>예약 정보</div>
+        <div className={styles.fgrid}>
+          <label className={`${styles.field} ${styles.span6}`}>
+            <span className={styles.label}>회의실</span>
+            <span className={styles.selectWrap}>
+              <select
+                className={styles.select}
+                data-f="room"
+                value={facilityId}
+                disabled={readOnly}
+                onChange={(e) => pickRoom(e.target.value)}
+              >
+                {rooms.map((r) => (
+                  <option key={r.facilityId} value={r.facilityId}>
+                    {r.name}
+                    {r.capacity ? ` (${r.capacity}인)` : ''}
+                  </option>
+                ))}
+              </select>
+              <span className={styles.caret}>
+                <Icon name="chevron-down" size={16} />
+              </span>
+            </span>
+          </label>
+
+          <label className={`${styles.field} ${styles.span2} ${styles.fdate}`}>
+            <span className={styles.label}>날짜</span>
+            <input
+              className={styles.input}
+              type="date"
+              data-f="date"
+              value={day}
+              min={operator ? undefined : asOf.day}
+              max={operator ? undefined : lastBookable ?? undefined}
+              disabled={readOnly}
+              onChange={(e) => e.target.value && setDay(e.target.value)}
+            />
+          </label>
+
+          <label className={`${styles.field} ${styles.span2}`}>
+            <span className={styles.label}>시작</span>
+            <span className={styles.selectWrap}>
+              <select
+                className={`${styles.select}${timeError ? ` ${styles.isError}` : ''}`}
+                data-f="start"
+                value={startMinutes}
+                disabled={readOnly}
+                onChange={(e) => pickStart(Number(e.target.value))}
+              >
+                {times.starts.map((t) => (
+                  <option key={t} value={t}>
+                    {minutesToTime(t)}
+                  </option>
+                ))}
+              </select>
+              <span className={styles.caret}>
+                <Icon name="chevron-down" size={16} />
+              </span>
+            </span>
+          </label>
+
+          <label className={`${styles.field} ${styles.span2}`}>
+            <span className={styles.label}>종료</span>
+            <span className={styles.selectWrap}>
+              <select
+                className={`${styles.select}${timeError ? ` ${styles.isError}` : ''}`}
+                data-f="end"
+                value={endMinutes}
+                disabled={readOnly}
+                onChange={(e) => setEndMinutes(Number(e.target.value))}
+              >
+                {times.ends.map((t) => (
+                  <option key={t} value={t}>
+                    {minutesToTime(t)}
+                  </option>
+                ))}
+              </select>
+              <span className={styles.caret}>
+                <Icon name="chevron-down" size={16} />
+              </span>
+            </span>
+          </label>
+
+          <div className={styles.span6} style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: -6 }}>
+            {timeError ? (
+              <span className={styles.err} data-time-err="1">
+                <Icon name="circle-alert" size={16} />
+                <span>{timeError}</span>
+              </span>
+            ) : null}
+            <span className={styles.hint}>
+              {room.name} · 운영 {room.openTime} – {room.closeTime} · 1회 {dur(room.minDuration)}
+              {room.maxDuration > 0 ? ` ~ ${dur(room.maxDuration)}` : ' 이상'}
+            </span>
+            {usageLine ? (
+              <span className={styles.hint} data-usage="1">
+                {usageLine}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* ── 예약 내용 ── */}
+      <div>
+        <div className={styles.secTitle}>예약 내용</div>
+        <div className={styles.fgrid}>
+          <label className={`${styles.field} ${styles.span6}`}>
+            <span className={styles.label}>
+              회의 제목 <span className={styles.req}>*</span>
+            </span>
+            <input
+              className={`${styles.input}${titleError ? ` ${styles.isError}` : ''}`}
+              data-f="title"
+              value={title}
+              maxLength={40}
+              placeholder="주간 회의"
+              autoComplete="off"
+              disabled={readOnly}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (e.target.value.trim()) setTitleError(false);
+              }}
+            />
+            {titleError ? (
+              <span className={styles.err}>
+                <Icon name="circle-alert" size={16} />
+                회의 제목을 입력해 주세요
+              </span>
+            ) : null}
+          </label>
+
+          <div className={`${styles.field} ${styles.span6}`}>
+            <span className={styles.label}>참석 인원</span>
+            <span className={styles.peopleRow}>
+              <span className={styles.stepper}>
+                <button
+                  type="button"
+                  aria-label="인원 감소"
+                  data-people="minus"
+                  disabled={readOnly || people <= 1}
+                  onClick={() => setPeople((p) => Math.max(1, p - 1))}
+                >
+                  <Icon name="minus" size={16} />
+                </button>
+                <span className={styles.stepValue} data-people="value">
+                  {people}
+                </span>
+                <button
+                  type="button"
+                  aria-label="인원 증가"
+                  data-people="plus"
+                  disabled={readOnly || people >= capacity}
+                  onClick={() => setPeople((p) => Math.min(capacity, p + 1))}
+                >
+                  <Icon name="plus" size={16} />
+                </button>
+              </span>
+              {room.capacity ? <span className={styles.hint}>최대 {room.capacity}명</span> : null}
+            </span>
+          </div>
+
+          <label className={`${styles.field} ${styles.span6}`}>
+            <span className={styles.label}>메모</span>
+            <textarea
+              className={styles.textarea}
+              data-f="memo"
+              value={memo}
+              maxLength={200}
+              rows={2}
+              placeholder="준비물, 참석자 안내 등"
+              disabled={readOnly}
+              onChange={(e) => setMemo(e.target.value)}
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* ── 예약자 정보 ── */}
+      <div>
+        <div className={styles.secRow}>
+          <div className={styles.secTitle}>예약자 정보</div>
+          <span className={styles.secNote}>
+            {seed.mode === 'create'
+              ? operator
+                ? '등록자는 로그인한 운영자로 기록됩니다'
+                : '로그인 정보로 자동 입력됩니다'
+              : '등록 후에는 바꿀 수 없습니다'}
+          </span>
+        </div>
+
+        {/* ★ 예약 조직은 **운영자가 새로 만들 때만** 고른다. 저장 뒤에는 못 바꾼다(서버 400). */}
+        {operator && seed.mode === 'create' ? (
+          <label className={styles.field} style={{ marginTop: 12 }}>
+            <span className={styles.label}>예약 조직</span>
+            <span className={styles.selectWrap}>
+              <select
+                className={styles.select}
+                data-org="1"
+                value={orgId}
+                onChange={(e) => setOrgId(e.target.value)}
+              >
+                <option value="">운영사 (에스원비즈)</option>
+                {companies.map((c) => (
+                  <option key={c.companyId} value={c.companyId}>
+                    {c.companyName}
+                  </option>
+                ))}
+              </select>
+              <span className={styles.caret}>
+                <Icon name="chevron-down" size={16} />
+              </span>
+            </span>
+          </label>
+        ) : null}
+
+        <div className={styles.booker}>
+          <div className={styles.bookerGrid}>
+            <div>
+              <div className={styles.bookerKey}>조직명</div>
+              <div className={`${styles.bookerValue} ${styles.bookerValueBold}`} data-booker="org">
+                {orgName}
+              </div>
+            </div>
+            <div>
+              <div className={styles.bookerKey}>{source ? '예약자' : '등록자'}</div>
+              <div className={styles.bookerValue} data-booker="name">
+                {source ? source.bookerName ?? '—' : me.memberName}
+              </div>
+            </div>
+            {/*
+              ★★ 연락처 — **자리는 남기고 숨겼다.** 지금 세션에 전화번호가 없다(삐용 Mock
+                 계정에 필드 자체가 없다). 삐용 실연동으로 계정에서 받게 되면 `hidden` 만
+                 떼면 된다. 빈 칸을 보여 주면 「채워야 하는데 비어 있는 칸」으로 읽힌다.
+            */}
+            <div hidden data-booker="phone">
+              <div className={styles.bookerKey}>연락처</div>
+              <div className={styles.bookerValue}>—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {source?.createdAt ? (
+        <div className={styles.metaLine}>
+          등록 {source.createdAt} · {source.bookerName ?? '—'}
+          {source.status === 'cancelled' ? ' · 취소됨' : ''}
+          {source.cancelReason ? ` (${source.cancelReason})` : ''}
+        </div>
+      ) : null}
+
+      {error ? <p className={styles.err}>{error}</p> : null}
+    </>
+  );
+
+  /*
+   * 아래 단추 줄 — 공통 Button. [예약하기 · 저장](주) · [예약 취소](지우기) · [종료 처리](보통) · [취소](보통).
+   * ★ 보기 전용(view)은 고칠 것이 없어 닫는 단추 하나 「닫기」 그대로(보고 「정할 것」).
+   */
+  const footer = (
+    <>
+      {readOnly ? null : (
+        <Button type="button" variant="primary" size="sm" data-submit="1" disabled={busy || !!timeError} onClick={() => void submit()}>
+          {seed.mode === 'edit' ? '저장' : '예약하기'}
+        </Button>
+      )}
+      {seed.mode === 'edit' && source ? (
+        <Button type="button" variant="danger" size="sm" data-cancel-ask="1" disabled={busy} onClick={() => onCancelAsk(source)}>
+          예약 취소
+        </Button>
+      ) : null}
+      {/*
+        ★ 종료 처리 — 시안에는 없다. 우리 규칙이 「자동 종료 없음 · 운영자가 닫는다」라서
+          지난 확정 예약을 운영자가 닫을 길이 필요하다(2026-09-27 결정).
+      */}
+      {waiting && operator && source ? (
+        <Button type="button" variant="ghost" size="sm" data-complete="1" disabled={busy} onClick={() => onComplete(source)}>
+          종료 처리
+        </Button>
+      ) : null}
+      <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+        {readOnly ? '닫기' : '취소'}
+      </Button>
+    </>
+  );
+
+  /* 768 이상 — 공통 Dialog(아쿠아 제목줄 · 아래 가운데 단추). 폭 640 = 종전 모달 */
+  if (!full) {
+    return (
+      <Dialog open title={heading} width={640} onClose={onClose} closeDisabled={busy || covered} footer={footer}>
+        <div className={styles.formBody}>{content}</div>
+      </Dialog>
+    );
+  }
+
+  /*
+   * 767 이하 — 전체 화면 시트 그대로(시안 08-responsive). 공통 Dialog 에는 전체 화면이 없어 틀은 두고
+   * 제목줄 · 단추 줄만 공통 Dialog 와 같은 모양으로 맞췄다(아쿠아 제목줄 · 가운데 단추).
+   */
   return (
     <div
-      className={`${styles.overlay}${full ? ` ${styles.overlayFull}` : ''}`}
+      className={`${styles.overlay} ${styles.overlayFull}`}
       role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) onClose();
       }}
     >
       <div className={styles.modal} role="dialog" aria-modal="true" aria-label={heading}>
-        <div className={styles.modalHead}>
-          <div>
-            <div className={styles.modalTitleRow}>
-              <h3 className={styles.modalTitle}>{heading}</h3>
-              {shown ? (
-                <span
-                  className={`${styles.badge} ${
-                    waiting
-                      ? styles.badgeWaiting
-                      : shown === 'confirmed'
-                      ? styles.badgeIndigo
-                      : shown === 'completed'
-                      ? styles.badgeNeutral
-                      : styles.badgeCancel
-                  }`}
-                  data-badge="1"
-                >
-                  {/* ★ 운영자에게만 「미처리」를 덧붙인다 — 닫아야 할 것이 무엇인지 보여야 한다 */}
-                  {waiting && operator ? '종료 · 미처리' : STATUS_LABEL[shown] ?? shown}
-                </span>
-              ) : null}
-            </div>
-            <p className={styles.modalSub}>
-              {room.name}
-              {room.capacity ? ` · ${room.capacity}인` : ''} · 30분 단위
-            </p>
-          </div>
-          <button type="button" className={`${styles.iconBtn} ${styles.iconBtnBare}`} aria-label="닫기" onClick={onClose}>
-            <Icon name="x" size={20} />
-          </button>
-        </div>
-
-        <div className={styles.modalBody}>
-          {/* ── 예약 정보 ── */}
-          <div>
-            <div className={styles.secTitle}>예약 정보</div>
-            <div className={styles.fgrid}>
-              <label className={`${styles.field} ${styles.span6}`}>
-                <span className={styles.label}>회의실</span>
-                <span className={styles.selectWrap}>
-                  <select
-                    className={styles.select}
-                    data-f="room"
-                    value={facilityId}
-                    disabled={readOnly}
-                    onChange={(e) => pickRoom(e.target.value)}
-                  >
-                    {rooms.map((r) => (
-                      <option key={r.facilityId} value={r.facilityId}>
-                        {r.name}
-                        {r.capacity ? ` (${r.capacity}인)` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <span className={styles.caret}>
-                    <Icon name="chevron-down" size={16} />
-                  </span>
-                </span>
-              </label>
-
-              <label className={`${styles.field} ${styles.span2} ${styles.fdate}`}>
-                <span className={styles.label}>날짜</span>
-                <input
-                  className={styles.input}
-                  type="date"
-                  data-f="date"
-                  value={day}
-                  min={operator ? undefined : asOf.day}
-                  max={operator ? undefined : lastBookable ?? undefined}
-                  disabled={readOnly}
-                  onChange={(e) => e.target.value && setDay(e.target.value)}
-                />
-              </label>
-
-              <label className={`${styles.field} ${styles.span2}`}>
-                <span className={styles.label}>시작</span>
-                <span className={styles.selectWrap}>
-                  <select
-                    className={`${styles.select}${timeError ? ` ${styles.isError}` : ''}`}
-                    data-f="start"
-                    value={startMinutes}
-                    disabled={readOnly}
-                    onChange={(e) => pickStart(Number(e.target.value))}
-                  >
-                    {times.starts.map((t) => (
-                      <option key={t} value={t}>
-                        {minutesToTime(t)}
-                      </option>
-                    ))}
-                  </select>
-                  <span className={styles.caret}>
-                    <Icon name="chevron-down" size={16} />
-                  </span>
-                </span>
-              </label>
-
-              <label className={`${styles.field} ${styles.span2}`}>
-                <span className={styles.label}>종료</span>
-                <span className={styles.selectWrap}>
-                  <select
-                    className={`${styles.select}${timeError ? ` ${styles.isError}` : ''}`}
-                    data-f="end"
-                    value={endMinutes}
-                    disabled={readOnly}
-                    onChange={(e) => setEndMinutes(Number(e.target.value))}
-                  >
-                    {times.ends.map((t) => (
-                      <option key={t} value={t}>
-                        {minutesToTime(t)}
-                      </option>
-                    ))}
-                  </select>
-                  <span className={styles.caret}>
-                    <Icon name="chevron-down" size={16} />
-                  </span>
-                </span>
-              </label>
-
-              <div className={styles.span6} style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: -6 }}>
-                {timeError ? (
-                  <span className={styles.err} data-time-err="1">
-                    <Icon name="circle-alert" size={16} />
-                    <span>{timeError}</span>
-                  </span>
-                ) : null}
-                <span className={styles.hint}>
-                  {room.name} · 운영 {room.openTime} – {room.closeTime} · 1회 {dur(room.minDuration)}
-                  {room.maxDuration > 0 ? ` ~ ${dur(room.maxDuration)}` : ' 이상'}
-                </span>
-                {usageLine ? (
-                  <span className={styles.hint} data-usage="1">
-                    {usageLine}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          {/* ── 예약 내용 ── */}
-          <div>
-            <div className={styles.secTitle}>예약 내용</div>
-            <div className={styles.fgrid}>
-              <label className={`${styles.field} ${styles.span6}`}>
-                <span className={styles.label}>
-                  회의 제목 <span className={styles.req}>*</span>
-                </span>
-                <input
-                  className={`${styles.input}${titleError ? ` ${styles.isError}` : ''}`}
-                  data-f="title"
-                  value={title}
-                  maxLength={40}
-                  placeholder="주간 회의"
-                  autoComplete="off"
-                  disabled={readOnly}
-                  onChange={(e) => {
-                    setTitle(e.target.value);
-                    if (e.target.value.trim()) setTitleError(false);
-                  }}
-                />
-                {titleError ? (
-                  <span className={styles.err}>
-                    <Icon name="circle-alert" size={16} />
-                    회의 제목을 입력해 주세요
-                  </span>
-                ) : null}
-              </label>
-
-              <div className={`${styles.field} ${styles.span6}`}>
-                <span className={styles.label}>참석 인원</span>
-                <span className={styles.peopleRow}>
-                  <span className={styles.stepper}>
-                    <button
-                      type="button"
-                      aria-label="인원 감소"
-                      data-people="minus"
-                      disabled={readOnly || people <= 1}
-                      onClick={() => setPeople((p) => Math.max(1, p - 1))}
-                    >
-                      <Icon name="minus" size={16} />
-                    </button>
-                    <span className={styles.stepValue} data-people="value">
-                      {people}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label="인원 증가"
-                      data-people="plus"
-                      disabled={readOnly || people >= capacity}
-                      onClick={() => setPeople((p) => Math.min(capacity, p + 1))}
-                    >
-                      <Icon name="plus" size={16} />
-                    </button>
-                  </span>
-                  {room.capacity ? <span className={styles.hint}>최대 {room.capacity}명</span> : null}
-                </span>
-              </div>
-
-              <label className={`${styles.field} ${styles.span6}`}>
-                <span className={styles.label}>메모</span>
-                <textarea
-                  className={styles.textarea}
-                  data-f="memo"
-                  value={memo}
-                  maxLength={200}
-                  rows={2}
-                  placeholder="준비물, 참석자 안내 등"
-                  disabled={readOnly}
-                  onChange={(e) => setMemo(e.target.value)}
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* ── 예약자 정보 ── */}
-          <div>
-            <div className={styles.secRow}>
-              <div className={styles.secTitle}>예약자 정보</div>
-              <span className={styles.secNote}>
-                {seed.mode === 'create'
-                  ? operator
-                    ? '등록자는 로그인한 운영자로 기록됩니다'
-                    : '로그인 정보로 자동 입력됩니다'
-                  : '등록 후에는 바꿀 수 없습니다'}
-              </span>
-            </div>
-
-            {/* ★ 예약 조직은 **운영자가 새로 만들 때만** 고른다. 저장 뒤에는 못 바꾼다(서버 400). */}
-            {operator && seed.mode === 'create' ? (
-              <label className={styles.field} style={{ marginTop: 12 }}>
-                <span className={styles.label}>예약 조직</span>
-                <span className={styles.selectWrap}>
-                  <select
-                    className={styles.select}
-                    data-org="1"
-                    value={orgId}
-                    onChange={(e) => setOrgId(e.target.value)}
-                  >
-                    <option value="">운영사 (에스원비즈)</option>
-                    {companies.map((c) => (
-                      <option key={c.companyId} value={c.companyId}>
-                        {c.companyName}
-                      </option>
-                    ))}
-                  </select>
-                  <span className={styles.caret}>
-                    <Icon name="chevron-down" size={16} />
-                  </span>
-                </span>
-              </label>
-            ) : null}
-
-            <div className={styles.booker}>
-              <div className={styles.bookerGrid}>
-                <div>
-                  <div className={styles.bookerKey}>조직명</div>
-                  <div className={`${styles.bookerValue} ${styles.bookerValueBold}`} data-booker="org">
-                    {orgName}
-                  </div>
-                </div>
-                <div>
-                  <div className={styles.bookerKey}>{source ? '예약자' : '등록자'}</div>
-                  <div className={styles.bookerValue} data-booker="name">
-                    {source ? source.bookerName ?? '—' : me.memberName}
-                  </div>
-                </div>
-                {/*
-                  ★★ 연락처 — **자리는 남기고 숨겼다.** 지금 세션에 전화번호가 없다(삐용 Mock
-                     계정에 필드 자체가 없다). 삐용 실연동으로 계정에서 받게 되면 `hidden` 만
-                     떼면 된다. 빈 칸을 보여 주면 「채워야 하는데 비어 있는 칸」으로 읽힌다.
-                */}
-                <div hidden data-booker="phone">
-                  <div className={styles.bookerKey}>연락처</div>
-                  <div className={styles.bookerValue}>—</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {source?.createdAt ? (
-            <div className={styles.metaLine}>
-              등록 {source.createdAt} · {source.bookerName ?? '—'}
-              {source.status === 'cancelled' ? ' · 취소됨' : ''}
-              {source.cancelReason ? ` (${source.cancelReason})` : ''}
-            </div>
-          ) : null}
-
-          {error ? <p className={styles.err}>{error}</p> : null}
-        </div>
-
-        <div className={styles.modalFoot}>
-          {seed.mode === 'edit' && source ? (
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnDangerGhost} ${styles.btnLg}`}
-              data-cancel-ask="1"
-              disabled={busy}
-              onClick={() => onCancelAsk(source)}
-            >
-              예약 취소
-            </button>
-          ) : null}
-          {/*
-            ★ 종료 처리 — 시안에는 없다. 우리 규칙이 「자동 종료 없음 · 운영자가 닫는다」라서
-              지난 확정 예약을 운영자가 닫을 길이 필요하다(2026-09-27 결정).
-          */}
-          {waiting && operator && source ? (
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnGhost} ${styles.btnLg}`}
-              data-complete="1"
-              disabled={busy}
-              onClick={() => onComplete(source)}
-            >
-              종료 처리
-            </button>
-          ) : null}
-          <span className={styles.sp} />
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnGhost} ${styles.btnLg}`}
-            disabled={busy}
-            onClick={onClose}
-          >
-            {readOnly ? '닫기' : '취소'}
-          </button>
-          {readOnly ? null : (
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnLg}`}
-              data-submit="1"
-              disabled={busy || !!timeError}
-              onClick={() => void submit()}
-            >
-              {seed.mode === 'edit' ? '저장' : '예약하기'}
-            </button>
-          )}
-        </div>
+        <h3 className={styles.modalTitle}>{heading}</h3>
+        <div className={styles.modalBody}>{content}</div>
+        <div className={styles.modalFoot}>{footer}</div>
       </div>
     </div>
   );

@@ -1,6 +1,11 @@
 /*
  * s030600010 회의실 예약 — 주간 그리드 · 월간 · 등록/수정 모달.
  *
+ * ★ 2026-11-26 회의실 예약 일관성(삐용 기준) — 직접 색 값을 토큰으로 바꿨다(같은 색 · rgba(11,147,184,a) =
+ *   --color-primary a% · 그림자 = --shadow-* · 포커스 = --focus-ring · 흰색 = --surface/--text-on-*).
+ *   #f1f4f8 · #eef0f4(옅은 회색)는 같은 토큰이 없어 --border 와 --surface-alt 를 섞었다(눈에 띄는 차이 없음).
+ *   예약 칸 · 블록 · 월간 칸의 배치와 치수는 그대로다.
+ *
  * 원본: design/handoff/prototypes/s0300600010.html (2차 인계 시안, 2026-09-27)
  * 치수·색·간격을 그 파일에서 그대로 옮겼다 — 값을 바꾸면 시안과 갈라진다.
  * ★ 녹색은 쓰지 않는다(`lint-no-green`). 시안도 인디고·앰버·레드만 쓴다.
@@ -90,14 +95,10 @@
   padding: 0 14px;
 }
 
-.btnLg {
-  height: 44px;
-}
-
 .btnPrimary {
   background: var(--color-primary);
   color: var(--text-on-primary);
-  box-shadow: 0 4px 16px rgba(11, 147, 184, 0.22);
+  box-shadow: var(--shadow-primary);
 }
 
 .btnPrimary:hover {
@@ -124,15 +125,18 @@
   background: var(--color-danger-bg);
 }
 
-.btnDanger {
-  background: var(--color-danger);
-  color: #fff;
-}
-
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+/*
+ * [오늘] 높이 = 옆 ‹ › 단추 · 회의실 고르기와 같은 36(정한 것 7 · 2026-11-26).
+ * ★ 공통 Button 은 높이를 인라인 style(--control-h-sm 40)로 준다 — 공통 부품을 고치지 않고 덮으려면 !important 뿐이다.
+ */
+.todayBtn {
+  height: 36px !important;
 }
 
 .iconBtn {
@@ -157,11 +161,6 @@
   cursor: not-allowed;
 }
 
-.iconBtnBare {
-  border: 0;
-  background: transparent;
-}
-
 /* 회의실 고르기 — 좌측 door-open · 우측 caret */
 .roomPick {
   position: relative;
@@ -184,7 +183,7 @@
 
 .roomPick select:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(11, 147, 184, 0.32);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .page[data-w='sm'] .roomPick,
@@ -237,7 +236,7 @@
   background: var(--surface);
   color: var(--text-heading);
   font-weight: 700;
-  box-shadow: 0 1px 2px rgba(11, 17, 32, 0.06);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--surface-inverse) 6%, transparent);
 }
 
 /* ── 날짜 스트립 (767 이하) ── */
@@ -368,7 +367,7 @@
 }
 
 .hToday {
-  background: rgba(11, 147, 184, 0.03);
+  background: color-mix(in srgb, var(--color-primary) 3%, transparent);
 }
 
 .hToday .hDow,
@@ -417,7 +416,7 @@
 }
 
 .dToday {
-  background: rgba(11, 147, 184, 0.03);
+  background: color-mix(in srgb, var(--color-primary) 3%, transparent);
 }
 
 .cell {
@@ -427,7 +426,7 @@
 }
 
 .cell:hover {
-  background: rgba(11, 147, 184, 0.05);
+  background: color-mix(in srgb, var(--color-primary) 5%, transparent);
 }
 
 .cellPast {
@@ -444,7 +443,7 @@
 
 /* 예약 가능 기간 밖 — 지난 칸과 막힌 이유가 달라 사선으로 구분한다 */
 .cellLimit {
-  background: repeating-linear-gradient(135deg, var(--surface-alt) 0 6px, #fff 6px 12px);
+  background: repeating-linear-gradient(135deg, var(--surface-alt) 0 6px, var(--surface) 6px 12px);
 }
 
 /* ── 예약 블록 — 절대배치 한 덩어리 ── */
@@ -457,7 +456,7 @@
   border: 0;
   border-left: 3px solid var(--color-primary);
   border-radius: 4px;
-  background: rgba(11, 147, 184, 0.08);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
   overflow: hidden;
   text-align: left;
   line-height: 1.35;
@@ -470,7 +469,7 @@
 }
 
 .bkFull:hover {
-  background: rgba(11, 147, 184, 0.14);
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
 }
 
 .bkTime {
@@ -531,7 +530,7 @@
 }
 
 .bkDone:hover {
-  background: #f1f4f8;
+  background: color-mix(in srgb, var(--border) 40%, var(--surface-alt));
 }
 
 .bkDone .bkTime,
@@ -581,7 +580,7 @@
   justify-content: center;
   border: 1px dashed var(--color-primary);
   border-radius: 4px;
-  background: rgba(11, 147, 184, 0.1);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
   pointer-events: none;
   overflow: hidden;
   line-height: 1.35;
@@ -635,7 +634,7 @@
   width: 12px;
   height: 12px;
   border-radius: 3px;
-  background: rgba(11, 147, 184, 0.08);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
   border-left: 3px solid var(--color-primary);
 }
 
@@ -652,7 +651,7 @@
   height: 12px;
   border-radius: 3px;
   border: 1px solid var(--border);
-  background: repeating-linear-gradient(135deg, var(--surface-alt) 0 3px, #fff 3px 6px);
+  background: repeating-linear-gradient(135deg, var(--surface-alt) 0 3px, var(--surface) 3px 6px);
 }
 
 .swNow {
@@ -741,14 +740,14 @@
   place-items: center;
   border-radius: 999px;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--text-on-primary);
 }
 
 .track {
   display: block;
   height: 8px;
   border-radius: 4px;
-  background: #eef0f4;
+  background: color-mix(in srgb, var(--border) 60%, var(--surface-alt));
   overflow: hidden;
 }
 
@@ -831,7 +830,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(11, 17, 32, 0.45);
+  background: color-mix(in srgb, var(--surface-inverse) 45%, transparent);
 }
 
 .modal {
@@ -843,7 +842,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 20px 48px rgba(11, 17, 32, 0.18);
+  box-shadow: var(--shadow-overlay);
   overflow: hidden;
 }
 
@@ -865,43 +864,37 @@
   border-radius: 0;
 }
 
-.overlayNarrow {
-  padding: 16px;
+/*
+ * ★ 2026-11-26 일관성 — 768 이상은 공통 Dialog 를 쓴다. 아래 .modal* 는 767 이하 전체 화면 시트뿐이다.
+ *   제목줄 = 공통 Dialog 제목줄과 같은 값(아쿠아 바탕 · 흰 글자 · 24px/600 · 줄 높이 52px · 닫기 ✕ 없음)
+ */
+.modalTitle {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 16px;
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  font-size: var(--fs-4xl);
+  font-weight: var(--weight-semibold);
+  line-height: 52px;
 }
 
-.modalHead {
-  flex: 0 0 auto;
+/* 등록·수정 창 본문(공통 Dialog 안) — 구역 사이 24 = 종전 .modalBody */
+.formBody {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 24px;
-  border-bottom: 1px solid var(--border);
+  flex-direction: column;
+  gap: 24px;
 }
 
-.page[data-w='sm'] .modalHead,
-.overlayFull .modalHead {
-  padding: 16px;
-}
-
-.modalTitleRow {
+/* 본문 맨 위 — 상태 뱃지 · 「회의실 · n인 · 30분 단위」(종전 제목줄 아래 줄) */
+.formLead {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.modalTitle {
-  margin: 0;
-  font-size: var(--text-h2-size);
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: -0.02em;
-  color: var(--text-heading);
-}
-
 .modalSub {
-  margin: 4px 0 0;
   font-size: var(--text-body-size);
   color: var(--text-muted);
 }
@@ -920,25 +913,19 @@
   padding: 16px;
 }
 
+/* 아래 단추 줄 — 공통 Dialog 처럼 가운데 · 사이 12. 좁은 화면이라 단추가 줄을 나눠 채운다(종전 flex:1) */
 .modalFoot {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 20px 24px;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px;
   border-top: 1px solid var(--border);
 }
 
-.overlayFull .modalFoot {
-  padding: 12px 16px;
-}
-
-.overlayFull .modalFoot .btn {
+.modalFoot > * {
   flex: 1;
-}
-
-.overlayFull .modalFoot .sp {
-  display: none;
 }
 
 .badge {
@@ -979,20 +966,14 @@
   color: var(--color-warning-text);
 }
 
+/* 구역 제목 = 왼쪽 4px 아쿠아 막대(글자에만 · 입주관리 · 법무와 같다 · 종전 3px × 16 막대) */
 .secTitle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  border-left: 4px solid var(--color-primary);
+  padding-left: 8px;
   font-size: var(--text-body-size);
   font-weight: 700;
+  line-height: 1.2;
   color: var(--text-heading);
-}
-
-.secTitle::before {
-  content: '';
-  width: 3px;
-  height: 16px;
-  background: var(--color-primary);
 }
 
 .secRow {
@@ -1069,7 +1050,7 @@
 .select:focus,
 .textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(11, 147, 184, 0.32);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .isError {
@@ -1220,38 +1201,8 @@
   color: var(--text-caption);
 }
 
-/* ── 취소 확인 ── */
-.confirm {
-  padding: 32px 28px 24px;
-  text-align: center;
-}
-
-.confirmIcon {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-
-.confirmTitle {
-  margin: 16px 0 0;
-  font-size: var(--text-bar-title-size);
-  font-weight: 600;
-  color: var(--text-heading);
-}
-
-.confirmText {
-  margin: 8px 0 0;
-  font-size: var(--text-body-size);
-  color: var(--text-body);
-}
-
+/* ── 취소 확인(공통 Dialog 본문) ── 종전 아이콘 동그라미 · 가운데 제목 · 2칸 단추 줄은 공통 Dialog 로 바뀌었다(2026-11-26) */
 .confirmSum {
-  margin-top: 16px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
   background: var(--surface-alt);
@@ -1262,18 +1213,6 @@
 
 .confirmReason {
   margin-top: 16px;
-  text-align: left;
-}
-
-.confirmFoot {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 0 28px 28px;
-}
-
-.confirmFoot .btn {
-  height: 44px;
 }
 
 /* ── 토스트 ── */
@@ -1290,11 +1229,11 @@
   padding: 0 18px;
   border-radius: var(--radius-md);
   background: var(--surface-inverse);
-  color: #fff;
+  color: var(--text-on-inverse);
   font-size: var(--text-body-size);
   font-weight: 700;
   white-space: nowrap;
-  box-shadow: 0 8px 24px rgba(11, 17, 32, 0.1);
+  box-shadow: var(--shadow-float);
 }
 
 /* 막았다는 알림 — 처리된 것과 같은 모양이면 안 된다(테두리로 구분한다) */
