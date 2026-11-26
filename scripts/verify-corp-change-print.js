@@ -22,6 +22,8 @@ import {
   recordCorpChangePrint,
 } from '../packages/api/src/legal/corpChangePrint.ts';
 import { parseFirstSave } from '../packages/shared/src/domain/corp-change-detail.ts';
+import { corpChangeDocName, formatAddress } from '../packages/shared/src/domain/corp-change-print.ts';
+import { completedIncorpNamePosition } from '../packages/api/src/db/incorporations.ts';
 
 const ORG_A = 990001;
 const ORG_B = 990002;
@@ -103,8 +105,12 @@ async function main() {
 
       const app = docOf(r, '법인변경등록1');
       const v = app?.sheets[0]?.values ?? {};
+      // 기대값은 출력이 쓰는 같은 함수로 만든다 — 상호 = 「서류에 쓰이는 상호」(회사 종류 낱말 붙임, 결정 2026-11-06) ·
+      // 주소 = 「기본주소, 상세주소」(법무 1단계 결정). 바탕 회사 A = '시험입주사A' · member_type R · 본점 '서울 강남구 본점로 1' / '3층'
+      const docNameA = corpChangeDocName('시험입주사A', 'R', await completedIncorpNamePosition(c, ORG_A));
+      const hqA = formatAddress({ address: '서울 강남구 본점로 1', addressDetail: '3층' });
       check('P4', '건마다 서류 — 스냅샷 회사값 · 결의일 · 신청일 · 등기할 사항',
-        v.companyName === '시험입주사A' && v.hqAddress === '서울 강남구 본점로 1 3층' && v.ceoPhone === '02-000-0001' &&
+        v.companyName === docNameA && v.hqAddress === hqA && v.ceoPhone === '02-000-0001' &&
           v.resolutionDate === '2026년 10월 1일' && v.applyDate === '2026년 10월 11일' &&
           v.matterBody?.includes('사내이사 김사임 — 사임') && v.matterBody?.includes('감사 이취임 — 취임') && v.officerRrn === '',
         { companyName: v.companyName, hq: v.hqAddress, res: v.resolutionDate });
@@ -130,7 +136,7 @@ async function main() {
       await as(OP);
       await c.query(`UPDATE public.tb_s080_companies SET company_name = '바뀐이름' WHERE company_id = $1`, [companyA]);
       const after = await print(TA, id);
-      check('P8', '★ 작성완료 뒤 회사명이 바뀌어도 서류는 작성완료 당시 이름', docOf(after, '법인변경등록1')?.sheets[0]?.values.companyName === '시험입주사A');
+      check('P8', '★ 작성완료 뒤 회사명이 바뀌어도 서류는 작성완료 당시 이름', docOf(after, '법인변경등록1')?.sheets[0]?.values.companyName === docNameA);
 
       // ── 출력 이력 ──────────────────────────────────────────────────
       await as(TA);
