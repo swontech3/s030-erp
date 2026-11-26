@@ -47,7 +47,8 @@ import {
 } from './tax-handoff-model';
 
 const NO_MAIL = '메일 발송 설정이 아직 없습니다 — 엑셀을 내려받아 보내 주세요';
-const SELECT_STYLE = { height: 32, width: 'auto' } as const;
+/* ★ 2026-11-26 검색 줄 고르기 상자 = 40px(세무 css .select 그대로 · 종전 인라인 32px 를 뺐다) — 전달 종류 · 신고 기간 */
+const SELECT_STYLE = { width: 'auto' } as const;
 
 const cellText = (v: HandoffCell) => (typeof v === 'number' ? won(v) : (v ?? ''));
 
