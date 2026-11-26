@@ -38,7 +38,7 @@ import {
   timeToMinutes,
   validateReservation,
 } from '@swonbiz/shared/domain/reservation-rules';
-import { Button, Icon } from '@/components/ds';
+import { Button, Dialog, Icon } from '@/components/ds';
 import styles from './booking.module.css';
 import { BookingForm, messageFor, shownStatus, type FormSeed } from './BookingForm';
 import {
@@ -948,7 +948,6 @@ export function BookingView({ operator, companyId, me, initialRoomId = null, ini
       {confirming ? (
         <CancelConfirm
           reservation={confirming}
-          widthMode={wide}
           onClose={() => setConfirming(null)}
           onDone={() => {
             setConfirming(null);
@@ -1047,12 +1046,10 @@ function BookingBlock({
  */
 function CancelConfirm({
   reservation,
-  widthMode,
   onClose,
   onDone,
 }: {
   reservation: Reservation;
-  widthMode: WidthMode;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -1078,59 +1075,47 @@ function CancelConfirm({
     }
   };
 
+  /*
+   * ★ 2026-11-26 일관성 — 공통 Dialog(제목 = 짧은 이름 「예약 취소」 · 묻는 문장은 본문).
+   *   단추 [예약 취소](지우기) · [돌아가기](보통). 닫는 단추를 「취소」로 하면 [예약 취소] 옆에 「취소」가 둘이 된다 —
+   *   법무 「취소 처리」 창과 같이 「돌아가기」 그대로(법무 정한 것 2 · 보고 「정할 것」).
+   *   수정 창 위에 뜬다 — zIndex 90(수정 창 80 위).
+   */
   return (
-    <div
-      className={`${styles.overlay}${widthMode === 'sm' ? ` ${styles.overlayNarrow}` : ''}`}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !busy) onClose();
-      }}
-    >
-      <div
-        className={`${styles.modal} ${styles.modalSm}`}
-        role="alertdialog"
-        aria-modal="true"
-        aria-label="예약 취소 확인"
-      >
-        <div className={styles.confirm}>
-          <div className={styles.confirmIcon}>
-            <Icon name="circle-x" size={24} />
-          </div>
-          <h3 className={styles.confirmTitle}>예약을 취소하시겠습니까?</h3>
-          <p className={styles.confirmText}>
-            취소한 시간은 바로 다른 조직이 예약할 수 있습니다.
-            <br />이 작업은 되돌릴 수 없습니다.
-          </p>
-          <div className={styles.confirmSum}>
-            {reservation.roomName} · {md(reservation.day)} {reservation.startTime}–{reservation.endTime}
-          </div>
-          <label className={`${styles.field} ${styles.confirmReason}`}>
-            <span className={styles.label}>취소 사유 (선택)</span>
-            <input
-              className={styles.input}
-              value={reason}
-              maxLength={200}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </label>
-          {error ? <p className={styles.err}>{error}</p> : null}
-        </div>
-        <div className={styles.confirmFoot}>
-          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} disabled={busy} onClick={onClose}>
-            돌아가기
-          </button>
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnDanger}`}
-            data-cancel-do="1"
-            disabled={busy}
-            onClick={() => void submit()}
-          >
+    <Dialog
+      open
+      title="예약 취소"
+      width={480}
+      zIndex={90}
+      onClose={onClose}
+      closeDisabled={busy}
+      description={
+        <>
+          <strong>예약을 취소하시겠습니까?</strong>
+          <br />
+          취소한 시간은 바로 다른 조직이 예약할 수 있습니다. 이 작업은 되돌릴 수 없습니다.
+        </>
+      }
+      footer={
+        <>
+          <Button type="button" variant="danger" size="sm" data-cancel-do="1" disabled={busy} onClick={() => void submit()}>
             예약 취소
-          </button>
-        </div>
+          </Button>
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            돌아가기
+          </Button>
+        </>
+      }
+    >
+      <div className={styles.confirmSum}>
+        {reservation.roomName} · {md(reservation.day)} {reservation.startTime}–{reservation.endTime}
       </div>
-    </div>
+      <label className={`${styles.field} ${styles.confirmReason}`}>
+        <span className={styles.label}>취소 사유 (선택)</span>
+        <input className={styles.input} value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
+      </label>
+      {error ? <p className={styles.err}>{error}</p> : null}
+    </Dialog>
   );
 }
 

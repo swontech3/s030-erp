@@ -125,11 +125,6 @@
   background: var(--color-danger-bg);
 }
 
-.btnDanger {
-  background: var(--color-danger);
-  color: var(--text-on-primary);
-}
-
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -861,10 +856,6 @@
   border-radius: 0;
 }
 
-.overlayNarrow {
-  padding: 16px;
-}
-
 /*
  * ★ 2026-11-26 일관성 — 768 이상은 공통 Dialog 를 쓴다. 아래 .modal* 는 767 이하 전체 화면 시트뿐이다.
  *   제목줄 = 공통 Dialog 제목줄과 같은 값(아쿠아 바탕 · 흰 글자 · 24px/600 · 줄 높이 52px · 닫기 ✕ 없음)
@@ -1202,38 +1193,8 @@
   color: var(--text-caption);
 }
 
-/* ── 취소 확인 ── */
-.confirm {
-  padding: 32px 28px 24px;
-  text-align: center;
-}
-
-.confirmIcon {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-
-.confirmTitle {
-  margin: 16px 0 0;
-  font-size: var(--text-bar-title-size);
-  font-weight: 600;
-  color: var(--text-heading);
-}
-
-.confirmText {
-  margin: 8px 0 0;
-  font-size: var(--text-body-size);
-  color: var(--text-body);
-}
-
+/* ── 취소 확인(공통 Dialog 본문) ── 종전 아이콘 동그라미 · 가운데 제목 · 2칸 단추 줄은 공통 Dialog 로 바뀌었다(2026-11-26) */
 .confirmSum {
-  margin-top: 16px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
   background: var(--surface-alt);
@@ -1244,18 +1205,6 @@
 
 .confirmReason {
   margin-top: 16px;
-  text-align: left;
-}
-
-.confirmFoot {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 0 28px 28px;
-}
-
-.confirmFoot .btn {
-  height: 44px;
 }
 
 /* ── 토스트 ── */
