@@ -21,6 +21,8 @@ import {
   incorpArticlesHref,
   type ArticlesFileView,
 } from '@swonbiz/shared/domain/legal-articles-file';
+import { Button } from '@/components/ds';
+import { BTN_XS } from '@/features/billing/BillingTable';
 import styles from './corp-change-detail.module.css';
 
 const base = (orgId: number) => `/api/legal/orgs/${encodeURIComponent(String(orgId))}/articles-file`;
@@ -119,20 +121,15 @@ export function ArticlesFileField({ orgId, onError }: { orgId: number; onError: 
           {loadError ?? (view === null ? '읽는 중…' : file ? `${file.originalName}${file.fileSize !== null ? ` (${sizeText(file.fileSize)})` : ''}` : view.completedIncorporationId ? INCORP_ARTICLES_NOTE : '올린 파일 없음')}
         </span>
         {file ? (
-          <button type="button" className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`} onClick={() => void open()}>
+          <Button type="button" variant="ghost" size="sm" style={BTN_XS} onClick={() => void open()}>
             보기
-          </button>
+          </Button>
         ) : null}
         {view?.canUpload ? (
           <>
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnGhost} ${styles.btnXs}`}
-              disabled={busy}
-              onClick={() => input.current?.click()}
-            >
+            <Button type="button" variant="ghost" size="sm" style={BTN_XS} disabled={busy} onClick={() => input.current?.click()}>
               {busy ? '올리는 중…' : file ? '바꾸기' : '올리기'}
-            </button>
+            </Button>
             <input
               ref={input}
               type="file"

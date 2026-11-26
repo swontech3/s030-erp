@@ -12,9 +12,11 @@
  * ★ 문구 검사(앞뒤 공백 · 200자 · 한 줄)는 shared `checkBizPurposeText` 와 같은 규칙을 서버가 한다.
  *   화면은 빈 칸 · 길이만 미리 막는다.
  * ★ 안내(409 같은 문구)와 오류를 가르는 것 · [닫기] · [저장] 은 옛 창(`ModalShell`)과 같다. [닫기] 는 고른 줄을 비운다.
+ *   (2026-11-25 일관성 — 두 단추 자리는 제목 줄 오른쪽)
  */
 import { useState } from 'react';
 import { BIZ_PURPOSE_TEXT_MAX } from '@swonbiz/shared/domain/biz-purpose';
+import { Button } from '@/components/ds';
 import { Field, cf } from '@/features/facility/ModalShell';
 import { BizPurposeError, createBizPurpose, saveBizPurpose, type BizPurposeItem } from './biz-purposes-model';
 import styles from '@/features/codes/codes.module.css';
@@ -63,7 +65,21 @@ export function BizPurposeDetail({ item, onClose, onSaved }: Props) {
 
   return (
     <div className={ls.paneForm} role="region" aria-label={item ? '문구 수정' : '문구 추가'}>
-      <h2 className={styles.panelTitle}>{item ? '문구 수정' : '문구 추가'}</h2>
+      {/*
+        ★ 2026-11-25 법무 일관성 — 구역 제목 = 왼쪽 4px 아쿠아 막대(글자에만). [저장](주) = 상세 제목 줄 오른쪽,
+          [닫기](보통)는 그 옆(종전 아래 줄 [닫기][저장] 에서 옮김).
+      */}
+      <div className={ls.paneHead}>
+        <h2 className={`${styles.panelTitle} ${ls.sectionTitle}`}>{item ? '문구 수정' : '문구 추가'}</h2>
+        <div className={ls.paneActions}>
+          <Button variant="primary" size="sm" disabled={busy || okDisabled} onClick={() => void submit()}>
+            저장
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            닫기
+          </Button>
+        </div>
+      </div>
 
       {/*
         ★ 안내와 오류를 **가른다**(옛 창과 같다). 「같은 문구가 있습니다」는 운영자가 잘못한 것이 아니다.
@@ -104,15 +120,6 @@ export function BizPurposeDetail({ item, onClose, onSaved }: Props) {
         「사용 안 함」으로 끕니다 — 끄면 회사의 [목록에서 고르기]에서 빠집니다. 문구를 고쳐도 이미 법인변경에 적힌 글은
         바뀌지 않습니다.
       </p>
-
-      <div className={ls.paneFoot}>
-        <button type="button" className={`${cf.btn} ${cf.btnGhost}`} disabled={busy} onClick={onClose}>
-          닫기
-        </button>
-        <button type="button" className={`${cf.btn} ${cf.btnPrimary}`} disabled={busy || okDisabled} onClick={() => void submit()}>
-          저장
-        </button>
-      </div>
     </div>
   );
 }

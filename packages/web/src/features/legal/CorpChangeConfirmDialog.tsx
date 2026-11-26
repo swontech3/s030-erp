@@ -14,27 +14,32 @@
  *   ★ 「공용 확인 창 하나로 합치기」는 **별건**이다 — 이 창을 그 근거로 넓히지 않는다.
  *
  * ★ 막는 것은 서버다 — 이 창은 묻기만 한다. 실패하면 서버 문구를 창 안에 띄우고 닫지 않는다.
+ *
+ * ★ 2026-11-25 법무 일관성 — 창 틀은 공통 `Dialog`(components/ds) : 아쿠아 제목줄 · 아래 가운데 [처리](먼저) [취소](나중 · 「취소 처리」 창만 [돌아가기]).
+ *   제목 = 짧은 이름(확인 단추 문구 `okLabel` 그대로), 묻는 문장은 본문 첫 줄 굵게(계약 `ConfirmDialog` 와 같다).
+ *   종전의 가운데 원형 그림 56px · 50:50 단추는 없앴다. 지우는 동작(취소 · 삭제)의 확인 단추는 지우기(danger)다.
  */
 import { useState } from 'react';
 import { CANCEL_REASON_MAX } from '@swonbiz/shared/domain/corp-change-transition';
-import { Icon, type IconName } from '@/components/ds';
+import { Button, Dialog } from '@/components/ds';
 import styles from './corp-change-detail.module.css';
 
 export type CorpChangeConfirmKind = 'complete' | 'uncomplete' | 'cancel' | 'restore' | 'delete';
 
 interface Def {
-  icon: IconName;
   tone: 'primary' | 'danger';
   title: string;
   okLabel: string;
+  /** 닫는 단추 문구 — 2026-11-25 대표 결정(법무 정한 것 2) : 「취소」. 단 「취소 처리」 창만 「돌아가기」(두 「취소」가 나란히 서지 않게) */
+  cancelLabel: string;
 }
 
 const DEFS: Record<CorpChangeConfirmKind, Def> = {
-  complete: { icon: 'circle-check', tone: 'primary', title: '완료 처리하시겠습니까?', okLabel: '완료' },
-  uncomplete: { icon: 'rotate-ccw', tone: 'primary', title: '완료를 취소하시겠습니까?', okLabel: '완료 취소' },
-  cancel: { icon: 'circle-x', tone: 'danger', title: '이 건을 취소하시겠습니까?', okLabel: '취소 처리' },
-  restore: { icon: 'rotate-ccw', tone: 'primary', title: '이 건을 복원하시겠습니까?', okLabel: '복원' },
-  delete: { icon: 'trash-2', tone: 'danger', title: '이 건을 삭제하시겠습니까?', okLabel: '삭제' },
+  complete: { tone: 'primary', title: '완료 처리하시겠습니까?', okLabel: '완료', cancelLabel: '취소' },
+  uncomplete: { tone: 'primary', title: '완료를 취소하시겠습니까?', okLabel: '완료 취소', cancelLabel: '취소' },
+  cancel: { tone: 'danger', title: '이 건을 취소하시겠습니까?', okLabel: '취소 처리', cancelLabel: '돌아가기' },
+  restore: { tone: 'primary', title: '이 건을 복원하시겠습니까?', okLabel: '복원', cancelLabel: '취소' },
+  delete: { tone: 'danger', title: '이 건을 삭제하시겠습니까?', okLabel: '삭제', cancelLabel: '취소' },
 };
 
 /** 본문 — 복원은 돌아갈 상태 이름이 들어간다. */
@@ -79,56 +84,54 @@ export function CorpChangeConfirmDialog({ kind, restoreToName = null, peopleLabe
   };
 
   return (
-    <div
-      className={styles.overlay}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !busy) onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && !busy) onClose();
-      }}
-    >
-      <div className={styles.modal} role="dialog" aria-modal="true" aria-label={def.title}>
-        <div className={`${styles.modalIcon} ${def.tone === 'danger' ? styles.modalIconDanger : styles.modalIconPrimary}`}>
-          <Icon name={def.icon} size={24} />
-        </div>
-        <h2 className={styles.modalTitle}>{def.title}</h2>
-        <p className={styles.modalDesc}>{descOf(kind, restoreToName, peopleLabel)}</p>
-
-        {kind === 'cancel' ? (
-          <label className={styles.modalField}>
-            <span className={styles.label}>취소 사유 (선택)</span>
-            <textarea
-              className={styles.textarea}
-              rows={3}
-              maxLength={CANCEL_REASON_MAX}
-              value={reason}
-              disabled={busy}
-              placeholder="비워 두어도 됩니다"
-              onChange={(e) => setReason(e.target.value)}
-            />
-            <span className={styles.hint}>
-              {reason.length}/{CANCEL_REASON_MAX}자 · 회사 사용자도 상세에서 봅니다
-            </span>
-          </label>
-        ) : null}
-
-        {error ? <p className={styles.modalErr}>{error}</p> : null}
-        <div className={styles.modalFoot}>
-          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} disabled={busy} onClick={onClose}>
-            돌아가기
-          </button>
-          <button
+    <Dialog
+      open
+      onClose={onClose}
+      closeDisabled={busy}
+      title={def.okLabel}
+      description={
+        <>
+          <strong>{def.title}</strong>
+          <br />
+          {descOf(kind, restoreToName, peopleLabel)}
+        </>
+      }
+      footer={
+        <>
+          <Button
             type="button"
-            className={`${styles.btn} ${def.tone === 'danger' ? styles.btnDanger : styles.btnPrimary}`}
+            variant={def.tone === 'danger' ? 'danger' : 'primary'}
+            size="sm"
             disabled={busy}
             onClick={() => void run()}
           >
             {def.okLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            {def.cancelLabel}
+          </Button>
+        </>
+      }
+    >
+      {kind === 'cancel' ? (
+        <label className={styles.modalField}>
+          <span className={styles.label}>취소 사유 (선택)</span>
+          <textarea
+            className={styles.textarea}
+            rows={3}
+            maxLength={CANCEL_REASON_MAX}
+            value={reason}
+            disabled={busy}
+            placeholder="비워 두어도 됩니다"
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <span className={styles.hint}>
+            {reason.length}/{CANCEL_REASON_MAX}자 · 회사 사용자도 상세에서 봅니다
+          </span>
+        </label>
+      ) : null}
+
+      {error ? <p className={styles.modalErr}>{error}</p> : null}
+    </Dialog>
   );
 }

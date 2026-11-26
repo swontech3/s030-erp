@@ -41,8 +41,8 @@ import {
   type TenancyFilter,
 } from '@swonbiz/shared/domain/corp-change-list';
 import type { CorpChangeStatus, CorpChangeType } from '@swonbiz/shared/domain/corp-change';
-import { Icon } from '@/components/ds';
-import { ListFrame, ListNote, ListScroll } from '@/components/patterns/ListFrame';
+import { Button, Icon, Table, TableHead, TableRow, tableCell } from '@/components/ds';
+import { ListFrame, ListNote, ListScroll, ListSpacer } from '@/components/patterns/ListFrame';
 import { NewCorpChangeDialog } from './NewCorpChangeDialog';
 import type { LegalDetailPane } from './CorpChangeDetail';
 import { CorpChangeDetailPane, PaneEmpty } from './LegalDetailPanes';
@@ -63,6 +63,12 @@ const EMPTY_FILTER: CorpChangeListFilter = {
 };
 
 const TENANCY_LABEL: Record<TenancyFilter, string> = { tenant: '입주사', nontenant: '비입주사' };
+
+/*
+ * ★ 2026-11-25 법무 일관성(삐용 기준) — 목록 = 공통 표(Table). 칸 폭은 종전 .colsSplit 그대로
+ *   (회사 · 변경구분 80 · 진행상태 100). 칸 사이 8 · 좌우 12 도 종전 값(.splitGrid).
+ */
+const CORP_COLS = 'minmax(0, 1fr) 80px 100px';
 
 type Load =
   | { state: 'loading' }
@@ -197,7 +203,7 @@ export function CorpChangesView({
   return (
     /*
       ★ 2026-11-16 — 왼쪽 목록 4 : 오른쪽 상세 6(청구 화면과 같은 틀 · 3.5 에서는 목록 칸이 들지 않았다).
-        왼쪽: 검색(한 줄 · 위 이름표 없음) → 버튼 줄([새 건] · 건수) → 목록. 오른쪽: 고른 건의 상세(받는 동안 공통 로딩바).
+        왼쪽: 검색(한 줄 · 위 이름표 없음 · 오른쪽 끝 [초기화] 「n건」) → 버튼 줄([새 건]) → 목록. 오른쪽: 고른 건의 상세(받는 동안 공통 로딩바).
     */
     <div className={styles.splitPage}>
       <div className={styles.head} data-page-title>
@@ -278,87 +284,94 @@ export function CorpChangesView({
                   취소 포함
                 </label>
 
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.searchBtn}`}
+                {/* ★ 2026-11-25 일관성 — 고르면 바로 걸린다(그대로). 오른쪽 끝 [초기화](보통 단추) 다음 「n건」 */}
+                <ListSpacer />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconLeft={<Icon name="rotate-ccw" size={16} />}
                   disabled={!filtered}
                   onClick={() => setFilter(EMPTY_FILTER)}
                 >
-                  <Icon name="rotate-ccw" size={16} />
-                  조건 초기화
-                </button>
+                  초기화
+                </Button>
+                <ListNote>{load.state === 'ok' ? `${items.length}건` : ''}</ListNote>
               </>
             }
             actions={
-              <>
-                {/* ★ 구분 선택지가 아직 없으면(목록을 못 받음) 누를 수 없다 — 고를 것이 없다. */}
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.btnPrimary}`}
-                  disabled={changeTypes.length === 0}
-                  onClick={startNew}
-                >
-                  <Icon name="plus" size={16} />
-                  새 건
-                </button>
-                <ListNote>
-                  {load.state === 'loading'
-                    ? '불러오는 중입니다'
-                    : load.state === 'error'
-                    ? '목록을 불러오지 못했습니다'
-                    : `${items.length}건${filter.includeCancelled ? ' · 취소 포함' : ''}`}
-                </ListNote>
-              </>
+              /*
+                ★ 2026-11-25 일관성 — 등록([새 건]) = 보통 단추 · 표 위 왼쪽.
+                ★ 구분 선택지가 아직 없으면(목록을 못 받음) 누를 수 없다 — 고를 것이 없다.
+              */
+              <Button
+                variant="ghost"
+                size="sm"
+                iconLeft={<Icon name="plus" size={16} />}
+                disabled={changeTypes.length === 0}
+                onClick={startNew}
+              >
+                새 건
+              </Button>
             }
           >
-            <div className={`${styles.tHead} ${styles.colsSplit}`}>
-              <span>회사</span>
-              <span>변경구분</span>
-              <span>진행상태</span>
-            </div>
-
             <ListScroll>
-              {load.state === 'loading' ? (
-                <Empty lead="법인변경 건을 불러오는 중입니다" />
-              ) : load.state === 'error' ? (
-                <Empty lead={load.message} />
-              ) : items.length === 0 ? (
-                filtered ? (
-                  <Empty lead="조건에 맞는 법인변경 건이 없습니다" sub="조건을 바꾸거나 초기화해 보세요" />
+              <Table cols={CORP_COLS}>
+                <TableHead sticky className={styles.splitGrid}>
+                  <span>회사</span>
+                  <span>변경구분</span>
+                  <span>진행상태</span>
+                </TableHead>
+                {/* 빈 안내는 종전 모양(아이콘 · 두 줄) 그대로 — 표 폭 전체 */}
+                {load.state === 'loading' ? (
+                  <Empty lead="법인변경 건을 불러오는 중입니다" />
+                ) : load.state === 'error' ? (
+                  <Empty lead={load.message} />
+                ) : items.length === 0 ? (
+                  filtered ? (
+                    <Empty lead="조건에 맞는 법인변경 건이 없습니다" sub="조건을 바꾸거나 초기화해 보세요" />
+                  ) : (
+                    <Empty lead="등록된 법인변경 건이 없습니다" />
+                  )
                 ) : (
-                  <Empty lead="등록된 법인변경 건이 없습니다" />
-                )
-              ) : (
-                items.map((item) => {
-                  const on = sel?.kind === 'saved' && sel.id === item.id;
-                  return (
-                    <a
-                      key={item.id}
-                      href={selHref(LIST_PATH, { kind: 'saved', id: item.id, print: null }, listQs)}
-                      onClick={(e) => pick(e, item.id)}
-                      aria-current={on ? 'true' : undefined}
-                      className={`${styles.tRow} ${styles.colsSplit}${on ? ` ${styles.tRowOn}` : ''}${
-                        item.status === 'X' ? ` ${styles.tRowCanceled}` : ''
-                      }`}
-                    >
-                      <span className={styles.company}>
-                        <span className={styles.ellipsis} title={corpChangeCompanyLabel(item)}>
-                          {corpChangeCompanyLabel(item)}
+                  items.map((item) => {
+                    const on = sel?.kind === 'saved' && sel.id === item.id;
+                    return (
+                      /*
+                       * ★ 줄은 공통 TableRow, 링크는 첫 칸의 `<a>` 가 줄 전체를 덮는다(.rowLink::after —
+                       *   입주관리 계약 목록과 같은 수법). 누르는 자리 · 새 탭 · 가운데 단추는 종전과 같다.
+                       */
+                      <TableRow
+                        key={item.id}
+                        selected={on}
+                        muted={item.status === 'X'}
+                        className={`${styles.splitGrid} ${styles.linkRow}${on ? '' : ` ${styles.linkRowHover}`}`}
+                      >
+                        <span className={styles.company}>
+                          <span className={tableCell.ellipsis} title={corpChangeCompanyLabel(item)}>
+                            <a
+                              href={selHref(LIST_PATH, { kind: 'saved', id: item.id, print: null }, listQs)}
+                              onClick={(e) => pick(e, item.id)}
+                              aria-current={on ? 'true' : undefined}
+                              className={styles.rowLink}
+                            >
+                              {corpChangeCompanyLabel(item)}
+                            </a>
+                          </span>
+                          <span className={`${styles.badge} ${item.isTenant ? styles.tenant : styles.nonTenant}`}>
+                            {item.isTenant ? '입주사' : '비입주사'}
+                          </span>
                         </span>
-                        <span className={`${styles.badge} ${item.isTenant ? styles.tenant : styles.nonTenant}`}>
-                          {item.isTenant ? '입주사' : '비입주사'}
+                        <span className={tableCell.ellipsis}>{typeNames[item.changeType] ?? item.changeType}</span>
+                        <span>
+                          <span className={`${styles.badge} ${statusClass(item.status)}`}>
+                            {statusNames[item.status] ?? item.status}
+                          </span>
                         </span>
-                      </span>
-                      <span className={styles.ellipsis}>{typeNames[item.changeType] ?? item.changeType}</span>
-                      <span>
-                        <span className={`${styles.badge} ${statusClass(item.status)}`}>
-                          {statusNames[item.status] ?? item.status}
-                        </span>
-                      </span>
-                    </a>
-                  );
-                })
-              )}
+                      </TableRow>
+                    );
+                  })
+                )}
+              </Table>
             </ListScroll>
           </ListFrame>
         </div>

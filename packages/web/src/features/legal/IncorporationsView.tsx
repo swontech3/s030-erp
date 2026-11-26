@@ -32,8 +32,8 @@ import {
   type IncorporationListResponse,
 } from '@swonbiz/shared/domain/incorporation-detail';
 import type { CodeOption } from '@swonbiz/shared/domain/corp-change-list';
-import { Icon } from '@/components/ds';
-import { ListFrame, ListNote, ListScroll } from '@/components/patterns/ListFrame';
+import { Button, Icon, Table, TableHead, TableRow, tableCell } from '@/components/ds';
+import { ListFrame, ListNote, ListScroll, ListSpacer } from '@/components/patterns/ListFrame';
 import { OrgLookupDialog } from '@/components/org-lookup/OrgLookupDialog';
 import type { LegalDetailPane } from './CorpChangeDetail';
 import { IncorporationDetailPane, PaneEmpty } from './LegalDetailPanes';
@@ -45,6 +45,12 @@ const LIST_PATH = '/legal/incorporations';
 const LEAVE_MESSAGE = '저장하지 않은 내용이 사라집니다. 이 화면을 나갈까요?';
 
 const EMPTY_FILTER: IncorporationListFilter = { status: null, includeCancelled: false };
+
+/*
+ * ★ 2026-11-25 법무 일관성(삐용 기준) — 목록 = 공통 표(Table). 칸 폭은 종전 .colsSplitIncorp 그대로
+ *   (상호 · 진행상태 100 · 설립예정일 92 · 등록일 92). 칸 사이 8 · 좌우 12 도 종전 값(.splitGrid).
+ */
+const INCORP_COLS = 'minmax(0, 1fr) 100px 92px 92px';
 
 /** 조건 → 주소 · API 조건. 빈 조건은 싣지 않는다. */
 function listSearch(f: IncorporationListFilter): URLSearchParams {
@@ -160,7 +166,7 @@ export function IncorporationsView({
   return (
     /*
       ★ 2026-11-16 — 왼쪽 목록 4 : 오른쪽 상세 6(청구 화면과 같은 틀 · 3.5 에서는 목록 칸이 들지 않았다).
-        왼쪽: 검색(한 줄 · 위 이름표 없음) → 버튼 줄([새 건] · 건수) → 목록. 오른쪽: 고른 건의 상세(받는 동안 공통 로딩바).
+        왼쪽: 검색(한 줄 · 위 이름표 없음 · 오른쪽 끝 [초기화] 「n건」) → 버튼 줄([새 건]) → 목록. 오른쪽: 고른 건의 상세(받는 동안 공통 로딩바).
     */
     <div className={styles.splitPage}>
       <div className={styles.head} data-page-title>
@@ -196,79 +202,83 @@ export function IncorporationsView({
                   취소 포함
                 </label>
 
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.searchBtn}`}
+                {/* ★ 2026-11-25 일관성 — 고르면 바로 걸린다(그대로). 오른쪽 끝 [초기화](보통 단추) 다음 「n건」 */}
+                <ListSpacer />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconLeft={<Icon name="rotate-ccw" size={16} />}
                   disabled={!filtered}
                   onClick={() => setFilter(EMPTY_FILTER)}
                 >
-                  <Icon name="rotate-ccw" size={16} />
-                  조건 초기화
-                </button>
+                  초기화
+                </Button>
+                <ListNote>{load.state === 'ok' ? `${items.length}건` : ''}</ListNote>
               </>
             }
             actions={
-              <>
-                <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={start}>
-                  <Icon name="plus" size={16} />
-                  새 건
-                </button>
-                <ListNote>
-                  {load.state === 'loading'
-                    ? '불러오는 중입니다'
-                    : load.state === 'error'
-                    ? '목록을 불러오지 못했습니다'
-                    : `${items.length}건${filter.includeCancelled ? ' · 취소 포함' : ''}`}
-                </ListNote>
-              </>
+              /* ★ 2026-11-25 일관성 — 등록([새 건]) = 보통 단추 · 표 위 왼쪽 */
+              <Button variant="ghost" size="sm" iconLeft={<Icon name="plus" size={16} />} onClick={start}>
+                새 건
+              </Button>
             }
           >
-            <div className={`${styles.tHead} ${styles.colsSplitIncorp}`}>
-              <span>상호</span>
-              <span>진행상태</span>
-              <span>설립예정일</span>
-              <span>등록일</span>
-            </div>
-
             <ListScroll>
-              {load.state === 'loading' ? (
-                <Empty lead="법인설립 건을 불러오는 중입니다" />
-              ) : load.state === 'error' ? (
-                <Empty lead={load.message} />
-              ) : items.length === 0 ? (
-                filtered ? (
-                  <Empty lead="조건에 맞는 법인설립 건이 없습니다" sub="조건을 바꾸거나 초기화해 보세요" />
+              <Table cols={INCORP_COLS}>
+                <TableHead sticky className={styles.splitGrid}>
+                  <span>상호</span>
+                  <span>진행상태</span>
+                  <span>설립예정일</span>
+                  <span>등록일</span>
+                </TableHead>
+                {/* 빈 안내는 종전 모양(아이콘 · 두 줄) 그대로 — 표 폭 전체 */}
+                {load.state === 'loading' ? (
+                  <Empty lead="법인설립 건을 불러오는 중입니다" />
+                ) : load.state === 'error' ? (
+                  <Empty lead={load.message} />
+                ) : items.length === 0 ? (
+                  filtered ? (
+                    <Empty lead="조건에 맞는 법인설립 건이 없습니다" sub="조건을 바꾸거나 초기화해 보세요" />
+                  ) : (
+                    <Empty lead="등록된 법인설립 건이 없습니다" />
+                  )
                 ) : (
-                  <Empty lead="등록된 법인설립 건이 없습니다" />
-                )
-              ) : (
-                items.map((item) => {
-                  const name = incorporationDisplayName(item.composedName ?? '', item);
-                  const on = sel?.kind === 'saved' && sel.id === item.id;
-                  return (
-                    <a
-                      key={item.id}
-                      href={selHref(LIST_PATH, { kind: 'saved', id: item.id, print: null }, listQs)}
-                      onClick={(e) => pick(e, item.id)}
-                      aria-current={on ? 'true' : undefined}
-                      className={`${styles.tRow} ${styles.colsSplitIncorp}${on ? ` ${styles.tRowOn}` : ''}${
-                        item.status === 'X' ? ` ${styles.tRowCanceled}` : ''
-                      }`}
-                    >
-                      <span className={item.composedName ? styles.ellipsis : `${styles.ellipsis} ${styles.muted}`} title={name}>
-                        {name}
-                      </span>
-                      <span>
-                        <span className={`${styles.badge} ${statusClass(item.status)}`}>
-                          {statusNames[item.status] ?? item.status}
+                  items.map((item) => {
+                    const name = incorporationDisplayName(item.composedName ?? '', item);
+                    const on = sel?.kind === 'saved' && sel.id === item.id;
+                    return (
+                      /*
+                       * ★ 줄은 공통 TableRow, 링크는 첫 칸의 `<a>` 가 줄 전체를 덮는다(.rowLink::after —
+                       *   입주관리 계약 목록과 같은 수법). 누르는 자리 · 새 탭 · 가운데 단추는 종전과 같다.
+                       */
+                      <TableRow
+                        key={item.id}
+                        selected={on}
+                        muted={item.status === 'X'}
+                        className={`${styles.splitGrid} ${styles.linkRow}${on ? '' : ` ${styles.linkRowHover}`}`}
+                      >
+                        <span className={item.composedName ? tableCell.ellipsis : `${tableCell.ellipsis} ${styles.muted}`} title={name}>
+                          <a
+                            href={selHref(LIST_PATH, { kind: 'saved', id: item.id, print: null }, listQs)}
+                            onClick={(e) => pick(e, item.id)}
+                            aria-current={on ? 'true' : undefined}
+                            className={styles.rowLink}
+                          >
+                            {name}
+                          </a>
                         </span>
-                      </span>
-                      <span className={item.plannedDate ? styles.mono : styles.muted}>{item.plannedDate ?? '—'}</span>
-                      <span className={styles.mono}>{item.createdOn}</span>
-                    </a>
-                  );
-                })
-              )}
+                        <span>
+                          <span className={`${styles.badge} ${statusClass(item.status)}`}>
+                            {statusNames[item.status] ?? item.status}
+                          </span>
+                        </span>
+                        <span className={item.plannedDate ? styles.mono : styles.muted}>{item.plannedDate ?? '—'}</span>
+                        <span className={styles.mono}>{item.createdOn}</span>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </Table>
             </ListScroll>
           </ListFrame>
         </div>
