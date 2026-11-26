@@ -38,7 +38,7 @@ import {
   timeToMinutes,
   validateReservation,
 } from '@swonbiz/shared/domain/reservation-rules';
-import { Icon } from '@/components/ds';
+import { Button, Icon } from '@/components/ds';
 import styles from './booking.module.css';
 import { BookingForm, messageFor, shownStatus, type FormSeed } from './BookingForm';
 import {
@@ -545,16 +545,18 @@ export function BookingView({ operator, companyId, me, initialRoomId = null, ini
             <button type="button" className={styles.iconBtn} aria-label="이전" onClick={() => stepBy(-1)}>
               <Icon name="chevron-left" size={16} />
             </button>
-            <button
+            {/* ★ 2026-11-26 일관성 — 공통 Button 보통(ghost) */}
+            <Button
               type="button"
-              className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`}
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setAnchor(today());
                 setTimeout(scrollToNow, 0);
               }}
             >
               오늘
-            </button>
+            </Button>
             <button
               type="button"
               className={styles.iconBtn}
@@ -616,16 +618,19 @@ export function BookingView({ operator, companyId, me, initialRoomId = null, ini
           ) : null}
 
           {wide === 'sm' ? null : (
-            <button
+            /* ★ 2026-11-26 일관성 — [예약 추가] = 등록(창을 여는 단추)이라 공통 Button 보통(ghost).
+                 주(primary)는 창 안 [예약하기] · [저장]. 자리(툴바 오른쪽)는 그대로 — 보고 「정할 것」 */
+            <Button
               type="button"
-              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`}
+              variant="ghost"
+              size="sm"
               data-add="1"
               disabled={!room}
+              iconLeft={<Icon name="plus" size={16} />}
               onClick={openCreateDefault}
             >
-              <Icon name="plus" size={16} />
               예약 추가
-            </button>
+            </Button>
           )}
         </div>
       </div>
