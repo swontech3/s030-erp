@@ -83,7 +83,7 @@ export function TaxVatView({ month }: { month: string }) {
             <Icon name="info" size={16} />
           </span>
           <span style={{ flex: 1 }}>세무 설정에서 사업자 유형을 먼저 고르세요 — 사업자 유형에 따라 신고 기간이 다릅니다.</span>
-          <Link href="/tax/settings" className={`${t.btn} ${t.btnSm}`}>
+          <Link href="/tax/settings" className={t.btn}>
             <Icon name="settings" size={16} />
             세무 설정
           </Link>
@@ -127,7 +127,8 @@ export function TaxVatView({ month }: { month: string }) {
       <div className={t.between}>
         <select
           className={t.select}
-          style={{ height: 32, width: 'auto' }}
+          // ★ 2026-11-26 검색 줄 고르기 상자 = 40px(세무 css .select 그대로 · 종전 인라인 32px 를 뺐다) — 신고 기간
+          style={{ width: 'auto' }}
           value={period.id}
           aria-label="신고 기간"
           onChange={(e) => {
@@ -143,7 +144,8 @@ export function TaxVatView({ month }: { month: string }) {
             </option>
           ))}
         </select>
-        <ExcelDownloadButton href={exportHref(data.query)} className={`${t.btn} ${t.btnSm}`} onError={setFailed} />
+        {/* ★ 2026-11-26 세무 일관성 ③ — 보통 단추 40px(공통 Button ghost sm 과 같은 꼴 · 엑셀 · 링크는 .btn) */}
+        <ExcelDownloadButton href={exportHref(data.query)} className={t.btn} onError={setFailed} />
       </div>
       {failed ? <TaxFormErrorBanner kind="failed" message={failed} /> : null}
 
@@ -199,7 +201,7 @@ export function TaxVatView({ month }: { month: string }) {
           {vat.unassignedCount > 0 && vat.unassignedFirstMonth ? (
             <span className={t.row} style={{ gap: 8, color: 'var(--color-danger)' }}>
               미지정 건 {won(vat.unassignedCount)}줄이 빠져 있습니다. 항목 지정에서 확정해 주시기 바랍니다.
-              <Link href={`/tax/classify?month=${vat.unassignedFirstMonth}&status=${TAX_CLS_LEFT}`} className={`${t.btn} ${t.btnSm}`}>
+              <Link href={`/tax/classify?month=${vat.unassignedFirstMonth}&status=${TAX_CLS_LEFT}`} className={t.btn}>
                 항목지정
               </Link>
             </span>

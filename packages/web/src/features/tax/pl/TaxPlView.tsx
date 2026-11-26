@@ -82,7 +82,8 @@ export function TaxPlView({ month }: { month: string }) {
 
       <div className={`${t.card} ${t.cardPad}`}>
         <div className={t.between} style={{ marginBottom: 16 }}>
-          <h2 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, margin: 0 }}>{pl.year}년</h2>
+          {/* ★ 2026-11-26 세무 일관성 ② — 구역 제목 = 왼쪽 4px 아쿠아 막대(글자 크기 · 굵기는 그대로) */}
+          <h2 className={r.secH}>{pl.year}년</h2>
           <span className={r.leg}>
             <span>
               <i style={{ background: 'var(--color-primary)' }} />매출
@@ -184,7 +185,8 @@ export function TaxPlView({ month }: { month: string }) {
                 미지정 건 {won(d.unassigned.count)}줄 ({won(d.unassigned.amount)}원)은 「미지정」으로 비용에 들어가 있습니다. 항목지정을 해 주시기
                 바랍니다.
               </p>
-              <Link href={`/tax/classify?month=${month}`} className={`${t.btn} ${t.btnSm}`}>
+              {/* ★ 2026-11-26 세무 일관성 ③ — 보통 단추 40px(공통 Button ghost sm 과 같은 꼴 · 링크라 .btn) */}
+              <Link href={`/tax/classify?month=${month}`} className={t.btn}>
                 항목지정
               </Link>
             </div>

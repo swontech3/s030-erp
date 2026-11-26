@@ -1,0 +1,19 @@
+/*
+ * 세무 설정(s050100010) 전용 모양 — ★ 2026-11-26 세무 일관성(삐용 기준).
+ * 표 머리 · 줄의 색 · 선은 공통 Table 이 정한다. 여기는 칸 안 모양만.
+ * ★ 색은 토큰만.
+ */
+
+/* 세무사 메일 — 두 묶음 사이 굵은 세로선(2026-11-15 대표 수정 · 종전 td borderLeft 2px 그대로).
+ * 칸 높이 끝까지 긋도록 칸을 늘린다. 줄(TableRow)은 위아래 8px 안쪽 여백이 있어 그만큼 넓힌다. */
+.split {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+}
+.splitRow { margin-block: -8px; }
+
+/* 표 칸 안 입력칸 — 칸 폭(cols)을 꽉 채운다 */
+.cellInput { width: 100%; min-width: 0; }

@@ -1,63 +1,60 @@
 'use client';
 
 /**
- * 세무 확인 창(480px) — 결과서 0-6 · 시안 `MODALS.confirm`.
+ * 세무 확인 창 — ★ 2026-11-26 세무 일관성 ⑤ : 공통 Dialog(삐용 팝업 — 아쿠아 제목줄 · 아래 가운데 단추)로 바꿨다.
  *
- *   위 56px 동그라미 아이콘(인디고 연한 바탕, 지우기는 빨강 연한 바탕) · 제목 22px/600 · 본문 14px ·
- *   아래 버튼 둘 반반(44px) — [돌아가기](흰) · [실행](primary, 지우기는 빨강 바탕). ★ 2026-11-07 ERP 계약 폼 확인 모달 값에 맞춤(아이콘 52 → 56 · 제목 20/700 → 22/600 · 버튼 44px).
- *   닫기: 바깥 누르기 · Esc · [돌아가기].
+ *   제목 = 짧은 이름(실행 단추 글자와 같다 — 법무 확인 창과 같은 방식) · 질문(「…하시겠습니까?」)은 본문 첫 줄(굵게) · 그 아래 설명.
+ *   아래 단추 = [실행](주 · 지우기는 빨강 Button danger) [취소](보통). 「○○ 취소」 확인 창이면 취소 단추를 「돌아가기」로(cancelLabel).
+ *   닫기: 바깥 누르기 · Esc · [취소] — 공통 Dialog 가 한다.
+ *   (종전 : 위 56px 동그라미 아이콘 · 제목 22px 질문 · 반반 단추 [돌아가기][실행] — 세무만의 꼴)
  *
  * ★ 세무 화면만 쓴다. 화면 번호가 없다 — 마크업 재사용일 뿐이다.
  */
-import { useEffect, type ReactNode } from 'react';
-import { Icon, type IconName } from '@/components/ds';
-import t from './tax.module.css';
+import type { ReactNode } from 'react';
+import { Button, Dialog } from '@/components/ds';
 
 interface Props {
-  icon: IconName;
-  title: string;
-  body: ReactNode;
+  /** 짧은 제목 — 보통 실행 단추 글자(okLabel)와 같다. 없으면 okLabel. */
+  title?: string;
+  /** 본문 첫 줄 질문 — 「…하시겠습니까?」 */
+  question: string;
+  body?: ReactNode;
   okLabel: string;
-  /** 지우기 — 빨강 아이콘 바탕 · 빨강 [실행]. */
+  /** 지우기 — 빨강 [실행](공통 Button danger). */
   danger?: boolean;
+  /** 취소 단추 글자 — 기본 「취소」. 「○○ 취소」 확인 창은 「돌아가기」. */
+  cancelLabel?: string;
   onCancel: () => void;
   onOk: () => void;
 }
 
-export function TaxConfirmDialog({ icon, title, body, okLabel, danger = false, onCancel, onOk }: Props) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onCancel]);
-
+export function TaxConfirmDialog({ title, question, body, okLabel, danger = false, cancelLabel = '취소', onCancel, onOk }: Props) {
   return (
-    <div
-      className={t.overlay}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel();
-      }}
-    >
-      <div className={t.modalSm} role="alertdialog" aria-modal="true" aria-label={title}>
-        <div className={t.confirm}>
-          <div className={`${t.confirmIc} ${danger ? t.confirmIcRed : ''}`}>
-            <Icon name={icon} size={24} />
-          </div>
-          <h3>{title}</h3>
-          <p>{body}</p>
-        </div>
-        <div className={t.confirmF}>
-          <button type="button" className={t.btn} onClick={onCancel}>
-            돌아가기
-          </button>
-          <button type="button" className={`${t.btn} ${danger ? t.btnDangerSolid : t.btnPrimary}`} onClick={onOk} autoFocus>
+    <Dialog
+      open
+      onClose={onCancel}
+      title={title ?? okLabel}
+      description={
+        <>
+          <strong>{question}</strong>
+          {body ? (
+            <>
+              <br />
+              {body}
+            </>
+          ) : null}
+        </>
+      }
+      footer={
+        <>
+          <Button type="button" variant={danger ? 'danger' : 'primary'} size="sm" onClick={onOk} autoFocus>
             {okLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+            {cancelLabel}
+          </Button>
+        </>
+      }
+    />
   );
 }

@@ -26,14 +26,19 @@
  *   [세무 설정에서 추가]」. 그 은행의 대응표가 없는 파일 종류는 막고 안내. ★ 받는 계좌번호 · 카드번호는 끝 4자리만(서버가 그것만 준다).
  *
  * ★★ 이름 · 설명 · 선택지는 **API 가 준 코드 값으로만** 그린다(자료 종류 이름 · 설명은 코드 TAX_KIND — 221 에서 바꿈).
+ *
+ * ★ 2026-11-26 세무 일관성(삐용 기준) — 올린 파일 표 · 미리보기 표 = 공통 Table(머리글 아쿠아 · 칸 폭은 종전 colgroup 값 그대로) ·
+ *   줄 안 [보기](보통) [삭제](지우기) = 30px · 올리기 팝업 = 공통 Dialog(짧은 제목 = 자료 종류 이름 · 설명 한 줄 · [올리기](주) [취소](보통)) ·
+ *   팝업 [행 추가] · 은행 [파일 고르기] = 공통 Button 보통(40px). 자료 종류 카드(고르기 카드)는 그대로.
  */
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, Icon } from '@/components/ds';
+import { Button, Dialog, Icon, Table, TableEmpty, TableHead, TableRow, tableCell } from '@/components/ds';
 import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
 import { uploadCountLabel, uploadSummary } from '@swonbiz/shared/domain/tax-uploads';
 import t from '../common/tax.module.css';
+import u from './tax-uploads.module.css';
 import { TaxEmpty } from '../common/TaxEmpty';
 import { TaxConfirmDialog } from '../common/TaxConfirmDialog';
 import { TaxFormErrorBanner } from '../common/TaxFormErrorBanner';
@@ -73,6 +78,12 @@ type Modal = { kind: string; files: File[] } | null;
 
 /** 카드 안의 버튼 — 눌러도 카드 고르기(목록 거르기)가 같이 일어나지 않게. */
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+
+/** 줄 안 작은 단추 30px(세무 .btnXs · 청구 BTN_XS 와 같은 값) */
+const BTN_XS = { height: 30, padding: '0 10px', fontSize: 'var(--text-micro-size)' } as const;
+
+/** 올린 파일 표 칸 폭 — 구분 · 기관 · 계좌 · 파일 이름 · 행수 · 올린 시각 · 작업(종전 colgroup 값 그대로) */
+const UPLOAD_COLS = '150px 170px minmax(0,1fr) 72px 120px 190px';
 
 export function TaxUploadsView({ month }: { month: string }) {
   const router = useRouter();
@@ -173,7 +184,7 @@ export function TaxUploadsView({ month }: { month: string }) {
     <div className={`${t.page} ${t.pageFill}`}>
       {/* ① 년월 검색조건 */}
       <div className={`${t.card} ${t.secLow}`}>
-        <TaxMonthBar month={month} note={`등록현황 : ${summary.done}종 / ${summary.total}종`} />
+        <TaxMonthBar month={month} note={`등록현황 : ${summary.done}종 / ${summary.total}종`} count={files.length} />
       </div>
 
       {/* ② 파일 올리기 — 카드를 누르면 ③ 이 그 자료의 파일만 */}
@@ -271,77 +282,64 @@ export function TaxUploadsView({ month }: { month: string }) {
        *   창이 좁아져 파일 이름 칸이 160 아래로 줄면 표가 줄지 않고 목록 안에서 옆으로 스크롤한다(버튼이 잘리지 않게, `tblUploads`) */}
       <div className={`${t.card} ${t.listCard}`}>
         <div className={t.listScroll}>
-          <table className={`${t.tbl} ${t.tblSticky} ${t.tblUploads}`}>
-            <colgroup>
-              <col style={{ width: 150 }} />
-              <col style={{ width: 170 }} />
-              <col />
-              {/* 행수 64 → 72 — 글자 15px 에서 「12,345」(약 47px)가 칸 안에 들어가게(2026-11-16) */}
-              <col style={{ width: 72 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 190 }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>구분</th>
-                <th>기관 · 계좌</th>
-                <th>파일 이름</th>
-                <th className={t.num}>행수</th>
-                <th>올린 시각</th>
-                <th>작업</th>
-              </tr>
-            </thead>
-            <tbody>
-              {files.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className={t.empty}>
-                    <TaxEmpty icon="upload" lead="아직 올린 파일이 없습니다" />
-                  </td>
-                </tr>
-              ) : (
-                files.map((f) => {
-                  const viewHref = viewHrefOf(f.kind, month, f.id);
-                  return (
-                    <tr key={f.id}>
-                      {/* 은행 파일은 파일 종류 코드 이름 하나만(「은행거래내역」 · 「은행이체내역」, 216) — 자료 종류와 이어 붙이지 않는다 */}
-                      <td>{f.bankFileTp ? bankFileName(f.bankFileTp) : kindName(f.kind)}</td>
-                      <td className={`${t.mut} ${t.ell}`}>
-                        {f.account ? accountLabel(f.account) : f.social ? socialLabel(f.social) : dirName(f.direction)}
-                      </td>
-                      <td className={t.ell} title={f.fileName}>
-                        {f.fileName}
-                      </td>
-                      <td className={t.num}>{won(f.insertedCount)}</td>
-                      <td className={`${t.mut} ${t.tnum}`} style={{ whiteSpace: 'nowrap' }}>
-                        {shortStamp(f.uploadedAt)}
-                      </td>
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        <span className={t.row} style={{ gap: 6, flexWrap: 'nowrap' }}>
-                          <button
-                            type="button"
-                            className={`${t.btn} ${t.btnSm}`}
-                            disabled={viewHref === null}
-                            onClick={() => viewHref && router.push(viewHref)}
-                          >
-                            <Icon name="eye" size={16} />
-                            보기
-                          </button>
-                          <button
-                            type="button"
-                            className={`${t.btn} ${t.btnSm} ${t.btnDanger}`}
-                            onClick={() => void askDelete(f.id)}
-                          >
-                            <Icon name="trash-2" size={16} />
-                            삭제
-                          </button>
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+          {/* ★ 2026-11-26 세무 일관성 ① — 표 = 공통 Table(머리글 아쿠아 · 머리 고정). 행수 칸 72 — 「12,345」가 칸 안에 들어가게(2026-11-16) */}
+          <Table cols={UPLOAD_COLS} className={u.uploadsTable}>
+            <TableHead sticky>
+              <span>구분</span>
+              <span>기관 · 계좌</span>
+              <span>파일 이름</span>
+              <span className={t.numC}>행수</span>
+              <span>올린 시각</span>
+              <span>작업</span>
+            </TableHead>
+            {files.length === 0 ? (
+              <TableEmpty>
+                <TaxEmpty icon="upload" lead="아직 올린 파일이 없습니다" />
+              </TableEmpty>
+            ) : (
+              files.map((f) => {
+                const viewHref = viewHrefOf(f.kind, month, f.id);
+                return (
+                  <TableRow key={f.id}>
+                    {/* 은행 파일은 파일 종류 코드 이름 하나만(「은행거래내역」 · 「은행이체내역」, 216) — 자료 종류와 이어 붙이지 않는다 */}
+                    <span>{f.bankFileTp ? bankFileName(f.bankFileTp) : kindName(f.kind)}</span>
+                    <span className={`${t.mutT} ${tableCell.ellipsis}`}>
+                      {f.account ? accountLabel(f.account) : f.social ? socialLabel(f.social) : dirName(f.direction)}
+                    </span>
+                    <span className={tableCell.ellipsis} title={f.fileName}>
+                      {f.fileName}
+                    </span>
+                    <span className={t.numC}>{won(f.insertedCount)}</span>
+                    <span className={`${t.mutT} ${t.tnum} ${u.nowrap}`}>{shortStamp(f.uploadedAt)}</span>
+                    {/* ★ 세무 일관성 ③ — 줄 안 작은 단추 30px : [보기] 보통 · [삭제] 지우기 */}
+                    <span className={u.acts}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        style={BTN_XS}
+                        iconLeft={<Icon name="eye" size={16} />}
+                        disabled={viewHref === null}
+                        onClick={() => viewHref && router.push(viewHref)}
+                      >
+                        보기
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="sm"
+                        style={BTN_XS}
+                        iconLeft={<Icon name="trash-2" size={16} />}
+                        onClick={() => void askDelete(f.id)}
+                      >
+                        삭제
+                      </Button>
+                    </span>
+                  </TableRow>
+                );
+              })
+            )}
+          </Table>
         </div>
       </div>
 
@@ -363,9 +361,8 @@ export function TaxUploadsView({ month }: { month: string }) {
 
       {confirm ? (
         <TaxConfirmDialog
-          icon="trash-2"
           danger
-          title={confirm.ids.length > 1 ? `파일 ${confirm.ids.length}개를 지우시겠습니까?` : '이 파일을 지우시겠습니까?'}
+          question={confirm.ids.length > 1 ? `파일 ${confirm.ids.length}개를 지우시겠습니까?` : '이 파일을 지우시겠습니까?'}
           okLabel="삭제"
           onCancel={() => setConfirm(null)}
           onOk={runDelete}
@@ -498,13 +495,7 @@ function UploadModal({ month, kind, initialFiles, data, onClose, onUploaded, onD
     }
   }, [items]);
 
-  useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose, busy]);
+  // ESC · 바탕 누름 닫기(올리는 중 막기)는 공통 Dialog 가 한다(closeDisabled)
 
   const live = items.filter((it) => it.state !== 'done');
   const readyItems = live.filter((it) => ready(it, items));
@@ -544,87 +535,85 @@ function UploadModal({ month, kind, initialFiles, data, onClose, onUploaded, onD
   };
 
   return (
-    <div
-      className={t.overlay}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !busy) onClose();
-      }}
-    >
-      <div className={`${t.modal} ${t.modalLg}`} role="dialog" aria-modal="true" aria-label="자료 올리기">
-        <div className={t.mH}>
-          <div>
-            <h3>{k?.name ?? kind}</h3>
-            {k?.description ? <p>{k.description}</p> : null}
-          </div>
-          <button type="button" className={t.iconBtn} aria-label="닫기" onClick={onClose} disabled={busy}>
-            <Icon name="x" size={20} />
-          </button>
-        </div>
-
-        <div className={t.mB}>
-          {isBank && data.bankAccounts.length === 0 ? (
-            <div className={`${t.note} ${t.noteWarn}`}>
-              <span>
-                <Icon name="triangle-alert" size={16} />
-              </span>
-              <span>
-                등록된 계좌가 없습니다 ·{' '}
-                <Link href="/tax/settings" className={`${t.btn} ${t.btnLink}`}>
-                  세무 설정에서 추가
-                </Link>
-              </span>
-            </div>
-          ) : null}
-
-          {!isBank && items.length === 0 ? <p className={t.help}>올릴 파일이 없습니다</p> : null}
-
-          {items.map((it) => (
-            <FileItem
-              key={it.key}
-              item={it}
-              month={month}
-              data={data}
-              isBank={isBank}
-              deferred={deferred(it, items)}
-              busy={busy}
-              bankName={bankName}
-              onChange={(p) => patch(it.key, p)}
-              onRemove={() => setItems((xs) => xs.filter((x) => x.key !== it.key))}
-            />
-          ))}
-
-          {isBank && data.bankAccounts.length > 0 ? (
-            <div>
-              <button
-                type="button"
-                className={`${t.btn} ${t.btnSm}`}
-                disabled={busy}
-                onClick={() => setItems((xs) => [...xs, newItem(null, firstAccount)])}
-              >
-                <Icon name="plus" size={16} />행 추가
-              </button>
-            </div>
-          ) : null}
-
-          {error ? <TaxFormErrorBanner kind="failed" message={error} /> : null}
-        </div>
-
-        <div className={t.mF}>
-          <span className={t.sm}>
-            {checking ? '파일을 확인하는 중…' : null}
-            {!checking && skipped > 0 ? `못 올리는 파일 ${skipped}개는 빠집니다` : null}
-          </span>
-          <span className={t.sp} />
-          <Button size="sm" variant="ghost" onClick={onClose} disabled={busy}>
-            취소
-          </Button>
+    /* ★ 2026-11-26 세무 일관성 ⑤ — 공통 Dialog(아쿠아 제목줄 · 아래 가운데 [올리기](주) [취소](보통) · ✕ 없음 — 닫기 = [취소] · 바탕 · ESC).
+     *   제목 = 자료 종류 이름 · 종전 부제목(자료 종류 설명) = description · 올리는 중에는 닫지 않는다(종전 그대로) */
+    <Dialog
+      open
+      title={k?.name ?? kind}
+      description={k?.description || undefined}
+      width={820}
+      onClose={onClose}
+      closeDisabled={busy}
+      footer={
+        <>
           <Button size="sm" variant="primary" disabled={busy || checking || readyItems.length === 0} onClick={doUpload}>
             {busy ? '올리는 중…' : readyItems.length > 0 ? `파일 ${readyItems.length}개 올리기` : '올리기'}
           </Button>
-        </div>
+          <Button size="sm" variant="ghost" onClick={onClose} disabled={busy}>
+            취소
+          </Button>
+        </>
+      }
+    >
+      <div className={t.dlgBody}>
+        {isBank && data.bankAccounts.length === 0 ? (
+          <div className={`${t.note} ${t.noteWarn}`}>
+            <span>
+              <Icon name="triangle-alert" size={16} />
+            </span>
+            <span>
+              등록된 계좌가 없습니다 ·{' '}
+              <Link href="/tax/settings" className={`${t.btn} ${t.btnLink}`}>
+                세무 설정에서 추가
+              </Link>
+            </span>
+          </div>
+        ) : null}
+
+        {!isBank && items.length === 0 ? <p className={t.help}>올릴 파일이 없습니다</p> : null}
+
+        {items.map((it) => (
+          <FileItem
+            key={it.key}
+            item={it}
+            month={month}
+            data={data}
+            isBank={isBank}
+            deferred={deferred(it, items)}
+            busy={busy}
+            bankName={bankName}
+            onChange={(p) => patch(it.key, p)}
+            onRemove={() => setItems((xs) => xs.filter((x) => x.key !== it.key))}
+          />
+        ))}
+
+        {isBank && data.bankAccounts.length > 0 ? (
+          <div>
+            {/* ★ 세무 일관성 ③ — [행 추가] = 공통 Button 보통(40px) */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              iconLeft={<Icon name="plus" size={16} />}
+              disabled={busy}
+              onClick={() => setItems((xs) => [...xs, newItem(null, firstAccount)])}
+            >
+              행 추가
+            </Button>
+          </div>
+        ) : null}
+
+        {error ? <TaxFormErrorBanner kind="failed" message={error} /> : null}
+
+        {/* 종전 아래 줄 왼쪽 안내 — Dialog 아래 줄은 가운데 단추만이라 본문 끝으로 옮겼다 */}
+        {checking || skipped > 0 ? (
+          <p className={`${t.sm} ${u.status}`}>
+            {checking ? '파일을 확인하는 중…' : null}
+            {!checking && skipped > 0 ? `못 올리는 파일 ${skipped}개는 빠집니다` : null}
+          </p>
+        ) : null}
       </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -702,14 +691,10 @@ function FileItem({ item: it, month, data, isBank, deferred, busy, bankName, onC
             ))}
           </select>
           <span className={t.fileBlkH}>
-            <button
-              type="button"
-              className={`${t.btn} ${t.btnSm}`}
-              disabled={locked || !mapOk}
-              onClick={() => input.current?.click()}
-            >
+            {/* ★ 세무 일관성 ③ — 공통 Button 보통(40px · 옆 계좌 · 파일 종류 선택 칸과 같은 높이) */}
+            <Button type="button" variant="ghost" size="sm" disabled={locked || !mapOk} onClick={() => input.current?.click()}>
               파일 고르기
-            </button>
+            </Button>
             <span className={`${t.sm} ${t.ell}`} title={it.file?.name ?? ''}>
               {it.file?.name ?? '고른 파일 없음'}
             </span>
@@ -881,6 +866,7 @@ const XFER_STATUS: Record<'match' | 'none' | 'ambiguous' | 'already', string> = 
   already: '이미 덧붙임',
 };
 
+/* ★ 2026-11-26 세무 일관성 ① — 미리보기 표 = 공통 Table(머리글 아쿠아). 칸 폭은 종전 colgroup 값 그대로(폭 없는 칸 = minmax(0,1fr)) */
 function PreviewTable({
   preview: p,
   dirName,
@@ -890,292 +876,209 @@ function PreviewTable({
   dirName: (code: string) => string;
   codeName: (list: 'socialInsTps' | 'loanTps', code: string) => string;
 }) {
-  const more = (cols: number) => (
-    <tr>
-      <td colSpan={cols} className={t.sm} style={{ textAlign: 'center' }}>
-        … 앞 5줄만 보여 줍니다
-      </td>
-    </tr>
+  const more = (
+    <TableRow>
+      <span className={`${t.sm} ${u.more}`}>… 앞 5줄만 보여 줍니다</span>
+    </TableRow>
   );
   if (p.kind === 'NTAX' || p.kind === 'LTAX') {
     // 비용 여부 = 코드 「비용이 아닌 세목」으로 서버가 정한 것(저장하지 않음, 1-6). 귀속은 지방세만(국세 파일은 비어 있다)
     return (
-      <table className={t.tbl}>
-        <colgroup>
-          <col style={{ width: 80 }} />
-          <col />
-          <col style={{ width: 90 }} />
-          <col style={{ width: 80 }} />
-          <col style={{ width: 150 }} />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>납부일</th>
-            <th>세목</th>
-            <th>비용</th>
-            <th>귀속</th>
-            <th className={t.num}>금액</th>
-          </tr>
-        </thead>
-        <tbody>
-          {p.sample.map((r, i) => (
-            <tr key={i}>
-              <td className={t.tnum}>{md(r.payDate)}</td>
-              <td className={t.ell}>{r.taxItem}</td>
-              <td className={r.expense ? '' : t.mut}>{r.expense ? '비용' : '비용 아님'}</td>
-              <td className={`${t.mut} ${t.tnum}`}>{r.belongMonth ? monthShort(r.belongMonth) : '—'}</td>
-              <td className={t.num}>
-                {won(r.amount)}
-                {r.penalty ? <span className={t.mut}> (가산금 {won(r.penalty)})</span> : null}
-              </td>
-            </tr>
-          ))}
-          {more(5)}
-        </tbody>
-      </table>
+      <Table cols="80px minmax(0,1fr) 90px 80px 150px">
+        <TableHead>
+          <span>납부일</span>
+          <span>세목</span>
+          <span>비용</span>
+          <span>귀속</span>
+          <span className={t.numC}>금액</span>
+        </TableHead>
+        {p.sample.map((r, i) => (
+          <TableRow key={i}>
+            <span className={t.tnum}>{md(r.payDate)}</span>
+            <span className={tableCell.ellipsis}>{r.taxItem}</span>
+            <span className={r.expense ? '' : t.mutT}>{r.expense ? '비용' : '비용 아님'}</span>
+            <span className={`${t.mutT} ${t.tnum}`}>{r.belongMonth ? monthShort(r.belongMonth) : '—'}</span>
+            <span className={t.numC}>
+              {won(r.amount)}
+              {r.penalty ? <span className={t.mut}> (가산금 {won(r.penalty)})</span> : null}
+            </span>
+          </TableRow>
+        ))}
+        {more}
+      </Table>
     );
   }
   if (p.kind === 'SOCIAL') {
     // ★ 주민번호는 없다 — 이름 · 가입자 번호 끝 4자리만. 금액은 파일 그대로(직원 · 회사 나눔은 직원 급여 단계)
     return (
-      <table className={t.tbl}>
-        <colgroup>
-          <col />
-          <col style={{ width: 110 }} />
-          <col style={{ width: 140 }} />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>가입자</th>
-            <th>보험</th>
-            <th className={t.num}>금액</th>
-          </tr>
-        </thead>
-        <tbody>
-          {p.sample.map((r, i) => (
-            <tr key={i}>
-              <td className={t.ell}>
-                {r.memberName}
-                {r.memberNoLast4 ? <span className={t.mut}> · 끝 {r.memberNoLast4}</span> : null}
-              </td>
-              <td className={t.mut}>{codeName('socialInsTps', r.insTp)}</td>
-              <td className={t.num}>{won(r.noticeAmount)}</td>
-            </tr>
-          ))}
-          {more(3)}
-          {p.byInsTp.map((x) => (
-            <tr key={x.insTp}>
-              <td className={t.sm}>합계 · {won(x.count)}줄</td>
-              <td>{codeName('socialInsTps', x.insTp)}</td>
-              <td className={t.num}>
-                <b>{won(x.amount)}</b>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Table cols="minmax(0,1fr) 110px 140px">
+        <TableHead>
+          <span>가입자</span>
+          <span>보험</span>
+          <span className={t.numC}>금액</span>
+        </TableHead>
+        {p.sample.map((r, i) => (
+          <TableRow key={i}>
+            <span className={tableCell.ellipsis}>
+              {r.memberName}
+              {r.memberNoLast4 ? <span className={t.mut}> · 끝 {r.memberNoLast4}</span> : null}
+            </span>
+            <span className={t.mutT}>{codeName('socialInsTps', r.insTp)}</span>
+            <span className={t.numC}>{won(r.noticeAmount)}</span>
+          </TableRow>
+        ))}
+        {more}
+        {p.byInsTp.map((x) => (
+          <TableRow key={x.insTp}>
+            <span className={t.sm}>합계 · {won(x.count)}줄</span>
+            <span>{codeName('socialInsTps', x.insTp)}</span>
+            <span className={t.numC}>
+              <b>{won(x.amount)}</b>
+            </span>
+          </TableRow>
+        ))}
+      </Table>
     );
   }
   if (p.kind === 'LOAN') {
     // 이자만 비용 — 원금 · 이자 · 수수료를 나눠 보인다(이자 = 정상 + 연체 − 환출, 1-6 결정 13)
     return (
-      <table className={t.tbl}>
-        <colgroup>
-          <col style={{ width: 80 }} />
-          <col style={{ width: 70 }} />
-          <col />
-          <col />
-          <col style={{ width: 90 }} />
-          <col />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>거래일</th>
-            <th>구분</th>
-            <th className={t.num}>원금</th>
-            <th className={t.num}>이자</th>
-            <th className={t.num}>수수료</th>
-            <th className={t.num}>잔액</th>
-          </tr>
-        </thead>
-        <tbody>
-          {p.sample.map((r, i) => (
-            <tr key={i}>
-              <td className={t.tnum}>{md(r.txnDate)}</td>
-              <td className={t.mut} title={r.txnType ?? ''}>
-                {codeName('loanTps', r.txnTp)}
-              </td>
-              <td className={t.num}>{r.principal ? won(r.principal) : ''}</td>
-              <td className={t.num}>{r.interest ? won(r.interest) : ''}</td>
-              <td className={t.num}>{r.fee ? won(r.fee) : ''}</td>
-              <td className={t.num}>{won(r.balance)}</td>
-            </tr>
-          ))}
-          {more(6)}
-        </tbody>
-      </table>
+      <Table cols="80px 70px minmax(0,1fr) minmax(0,1fr) 90px minmax(0,1fr)">
+        <TableHead>
+          <span>거래일</span>
+          <span>구분</span>
+          <span className={t.numC}>원금</span>
+          <span className={t.numC}>이자</span>
+          <span className={t.numC}>수수료</span>
+          <span className={t.numC}>잔액</span>
+        </TableHead>
+        {p.sample.map((r, i) => (
+          <TableRow key={i}>
+            <span className={t.tnum}>{md(r.txnDate)}</span>
+            <span className={t.mutT} title={r.txnType ?? ''}>
+              {codeName('loanTps', r.txnTp)}
+            </span>
+            <span className={t.numC}>{r.principal ? won(r.principal) : ''}</span>
+            <span className={t.numC}>{r.interest ? won(r.interest) : ''}</span>
+            <span className={t.numC}>{r.fee ? won(r.fee) : ''}</span>
+            <span className={t.numC}>{won(r.balance)}</span>
+          </TableRow>
+        ))}
+        {more}
+      </Table>
     );
   }
   if (p.kind === 'CARD') {
     // 홈택스 파일에는 결제일 · 적용월이 없다(1-4 「다르게 해야 할 곳」 1 · 2). ★ 카드는 끝 4자리만
     return (
-      <table className={t.tbl}>
-        <colgroup>
-          <col style={{ width: 92 }} />
-          <col style={{ width: 90 }} />
-          <col />
-          <col style={{ width: 130 }} />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>사용일자</th>
-            <th>카드</th>
-            <th>가맹점</th>
-            <th className={t.num}>금액</th>
-          </tr>
-        </thead>
-        <tbody>
-          {p.sample.map((r, i) => (
-            <tr key={i}>
-              <td className={t.tnum}>{md(r.useDate)}</td>
-              <td className={`${t.mut} ${t.tnum}`}>끝 {r.cardLast4}</td>
-              <td className={t.ell}>{r.merchantName}</td>
-              <td className={t.num}>{won(r.totalAmount)}</td>
-            </tr>
-          ))}
-          {more(4)}
-        </tbody>
-      </table>
+      <Table cols="92px 90px minmax(0,1fr) 130px">
+        <TableHead>
+          <span>사용일자</span>
+          <span>카드</span>
+          <span>가맹점</span>
+          <span className={t.numC}>금액</span>
+        </TableHead>
+        {p.sample.map((r, i) => (
+          <TableRow key={i}>
+            <span className={t.tnum}>{md(r.useDate)}</span>
+            <span className={`${t.mutT} ${t.tnum}`}>끝 {r.cardLast4}</span>
+            <span className={tableCell.ellipsis}>{r.merchantName}</span>
+            <span className={t.numC}>{won(r.totalAmount)}</span>
+          </TableRow>
+        ))}
+        {more}
+      </Table>
     );
   }
   if (p.kind === 'BANK' && p.bankFileTp === 'TXN') {
     // 입금 · 출금 두 칸(대표 결정 16). 내용 = 상대(없으면 적요)
     return (
-      <table className={t.tbl}>
-        <colgroup>
-          <col style={{ width: 100 }} />
-          <col />
-          <col style={{ width: 120 }} />
-          <col style={{ width: 120 }} />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>거래일시</th>
-            <th>내용</th>
-            <th className={t.num}>입금</th>
-            <th className={t.num}>출금</th>
-          </tr>
-        </thead>
-        <tbody>
-          {p.sample.map((r, i) => (
-            <tr key={i}>
-              <td className={t.tnum}>{shortDateTime(r.txnAt)}</td>
-              <td className={t.ell}>{r.counterparty ?? r.description ?? ''}</td>
-              <td className={t.num}>{r.inAmount > 0 ? won(r.inAmount) : ''}</td>
-              <td className={t.num}>{r.outAmount > 0 ? won(r.outAmount) : ''}</td>
-            </tr>
-          ))}
-          {more(4)}
-        </tbody>
-      </table>
+      <Table cols="100px minmax(0,1fr) 120px 120px">
+        <TableHead>
+          <span>거래일시</span>
+          <span>내용</span>
+          <span className={t.numC}>입금</span>
+          <span className={t.numC}>출금</span>
+        </TableHead>
+        {p.sample.map((r, i) => (
+          <TableRow key={i}>
+            <span className={t.tnum}>{shortDateTime(r.txnAt)}</span>
+            <span className={tableCell.ellipsis}>{r.counterparty ?? r.description ?? ''}</span>
+            <span className={t.numC}>{r.inAmount > 0 ? won(r.inAmount) : ''}</span>
+            <span className={t.numC}>{r.outAmount > 0 ? won(r.outAmount) : ''}</span>
+          </TableRow>
+        ))}
+        {more}
+      </Table>
     );
   }
   if (p.kind === 'BANK') {
     // 이체 — ★ 받는 계좌는 끝 4자리만. 짝 = 그 계좌 출금 줄(±60초 · 같은 금액)
     return (
-      <table className={t.tbl}>
-        <colgroup>
-          <col style={{ width: 100 }} />
-          <col />
-          <col style={{ width: 120 }} />
-          <col style={{ width: 110 }} />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>이체일시</th>
-            <th>받는분</th>
-            <th className={t.num}>금액</th>
-            <th>짝</th>
-          </tr>
-        </thead>
-        <tbody>
-          {p.sample.map((r, i) => (
-            <tr key={i}>
-              <td className={t.tnum}>{shortDateTime(r.xferAt)}</td>
-              <td className={t.ell}>
-                {r.holder}
-                <span className={t.mut}>
-                  {' '}
-                  · {r.toBank} 끝 {r.toAccountLast4}
-                </span>
-              </td>
-              <td className={t.num}>{won(r.amount)}</td>
-              <td className={r.status === 'match' ? '' : t.mut}>{XFER_STATUS[r.status]}</td>
-            </tr>
-          ))}
-          {more(4)}
-        </tbody>
-      </table>
+      <Table cols="100px minmax(0,1fr) 120px 110px">
+        <TableHead>
+          <span>이체일시</span>
+          <span>받는분</span>
+          <span className={t.numC}>금액</span>
+          <span>짝</span>
+        </TableHead>
+        {p.sample.map((r, i) => (
+          <TableRow key={i}>
+            <span className={t.tnum}>{shortDateTime(r.xferAt)}</span>
+            <span className={tableCell.ellipsis}>
+              {r.holder}
+              <span className={t.mut}>
+                {' '}
+                · {r.toBank} 끝 {r.toAccountLast4}
+              </span>
+            </span>
+            <span className={t.numC}>{won(r.amount)}</span>
+            <span className={r.status === 'match' ? '' : t.mutT}>{XFER_STATUS[r.status]}</span>
+          </TableRow>
+        ))}
+        {more}
+      </Table>
     );
   }
   if (p.kind === 'CASH') {
     return (
-      <table className={t.tbl}>
-        <colgroup>
-          <col style={{ width: 90 }} />
-          <col />
-          <col style={{ width: 70 }} />
-          <col style={{ width: 140 }} />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>날짜</th>
-            <th>내용</th>
-            <th>구분</th>
-            <th className={t.num}>금액</th>
-          </tr>
-        </thead>
-        <tbody>
-          {p.sample.map((r, i) => (
-            <tr key={i}>
-              <td className={t.tnum}>{md(r.useDate)}</td>
-              <td className={t.ell}>
-                {r.description}
-                {r.vendorName ? ` · ${r.vendorName}` : ''}
-              </td>
-              <td className={t.mut}>{dirName(r.direction)}</td>
-              <td className={t.num}>{won(r.amount)}</td>
-            </tr>
-          ))}
-          {more(4)}
-        </tbody>
-      </table>
+      <Table cols="90px minmax(0,1fr) 70px 140px">
+        <TableHead>
+          <span>날짜</span>
+          <span>내용</span>
+          <span>구분</span>
+          <span className={t.numC}>금액</span>
+        </TableHead>
+        {p.sample.map((r, i) => (
+          <TableRow key={i}>
+            <span className={t.tnum}>{md(r.useDate)}</span>
+            <span className={tableCell.ellipsis}>
+              {r.description}
+              {r.vendorName ? ` · ${r.vendorName}` : ''}
+            </span>
+            <span className={t.mutT}>{dirName(r.direction)}</span>
+            <span className={t.numC}>{won(r.amount)}</span>
+          </TableRow>
+        ))}
+        {more}
+      </Table>
     );
   }
   return (
-    <table className={t.tbl}>
-      <colgroup>
-        <col style={{ width: 90 }} />
-        <col />
-        <col style={{ width: 140 }} />
-      </colgroup>
-      <thead>
-        <tr>
-          <th>날짜</th>
-          <th>내용</th>
-          <th className={t.num}>금액</th>
-        </tr>
-      </thead>
-      <tbody>
-        {p.sample.map((r) => (
-          <tr key={r.approvalNo}>
-            <td className={t.tnum}>{md(r.writeDate)}</td>
-            <td>{r.partnerName}</td>
-            <td className={t.num}>{won(r.totalAmount)}</td>
-          </tr>
-        ))}
-        {more(3)}
-      </tbody>
-    </table>
+    <Table cols="90px minmax(0,1fr) 140px">
+      <TableHead>
+        <span>날짜</span>
+        <span>내용</span>
+        <span className={t.numC}>금액</span>
+      </TableHead>
+      {p.sample.map((r) => (
+        <TableRow key={r.approvalNo}>
+          <span className={t.tnum}>{md(r.writeDate)}</span>
+          <span>{r.partnerName}</span>
+          <span className={t.numC}>{won(r.totalAmount)}</span>
+        </TableRow>
+      ))}
+      {more}
+    </Table>
   );
 }
