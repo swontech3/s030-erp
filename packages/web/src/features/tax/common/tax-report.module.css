@@ -3,6 +3,9 @@
  * .kpi · .chart · .bar-g · .leg · .calc · .term · .gloss · .b-sm 그대로. 나머지(카드 · 띠 · 배지)는 tax.module.css 를 쓴다.
  */
 
+/* ★ 2026-11-26 세무 일관성 ② — 카드 안 구역 제목(월별 손익 「2026년」) = 왼쪽 4px 아쿠아 막대(글자에만) */
+.secH { margin: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--text-heading); border-left: 4px solid var(--color-primary); padding-left: 8px; line-height: 1.2; }
+
 /* ── 숫자 카드 ── */
 .kpi { padding: 16px 20px; }
 .kpiK { font-size: var(--fs-xs); color: var(--text-muted); }
