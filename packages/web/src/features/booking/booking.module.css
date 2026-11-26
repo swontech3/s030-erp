@@ -95,10 +95,6 @@
   padding: 0 14px;
 }
 
-.btnLg {
-  height: 44px;
-}
-
 .btnPrimary {
   background: var(--color-primary);
   color: var(--text-on-primary);
@@ -160,11 +156,6 @@
 .iconBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-.iconBtnBare {
-  border: 0;
-  background: transparent;
 }
 
 /* 회의실 고르기 — 좌측 door-open · 우측 caret */
@@ -874,39 +865,37 @@
   padding: 16px;
 }
 
-.modalHead {
-  flex: 0 0 auto;
+/*
+ * ★ 2026-11-26 일관성 — 768 이상은 공통 Dialog 를 쓴다. 아래 .modal* 는 767 이하 전체 화면 시트뿐이다.
+ *   제목줄 = 공통 Dialog 제목줄과 같은 값(아쿠아 바탕 · 흰 글자 · 24px/600 · 줄 높이 52px · 닫기 ✕ 없음)
+ */
+.modalTitle {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 16px;
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  font-size: var(--fs-4xl);
+  font-weight: var(--weight-semibold);
+  line-height: 52px;
+}
+
+/* 등록·수정 창 본문(공통 Dialog 안) — 구역 사이 24 = 종전 .modalBody */
+.formBody {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 24px;
-  border-bottom: 1px solid var(--border);
+  flex-direction: column;
+  gap: 24px;
 }
 
-.page[data-w='sm'] .modalHead,
-.overlayFull .modalHead {
-  padding: 16px;
-}
-
-.modalTitleRow {
+/* 본문 맨 위 — 상태 뱃지 · 「회의실 · n인 · 30분 단위」(종전 제목줄 아래 줄) */
+.formLead {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.modalTitle {
-  margin: 0;
-  font-size: var(--text-h2-size);
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: -0.02em;
-  color: var(--text-heading);
-}
-
 .modalSub {
-  margin: 4px 0 0;
   font-size: var(--text-body-size);
   color: var(--text-muted);
 }
@@ -925,25 +914,19 @@
   padding: 16px;
 }
 
+/* 아래 단추 줄 — 공통 Dialog 처럼 가운데 · 사이 12. 좁은 화면이라 단추가 줄을 나눠 채운다(종전 flex:1) */
 .modalFoot {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 20px 24px;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px;
   border-top: 1px solid var(--border);
 }
 
-.overlayFull .modalFoot {
-  padding: 12px 16px;
-}
-
-.overlayFull .modalFoot .btn {
+.modalFoot > * {
   flex: 1;
-}
-
-.overlayFull .modalFoot .sp {
-  display: none;
 }
 
 .badge {
@@ -984,20 +967,14 @@
   color: var(--color-warning-text);
 }
 
+/* 구역 제목 = 왼쪽 4px 아쿠아 막대(글자에만 · 입주관리 · 법무와 같다 · 종전 3px × 16 막대) */
 .secTitle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  border-left: 4px solid var(--color-primary);
+  padding-left: 8px;
   font-size: var(--text-body-size);
   font-weight: 700;
+  line-height: 1.2;
   color: var(--text-heading);
-}
-
-.secTitle::before {
-  content: '';
-  width: 3px;
-  height: 16px;
-  background: var(--color-primary);
 }
 
 .secRow {

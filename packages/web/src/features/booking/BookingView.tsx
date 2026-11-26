@@ -930,6 +930,8 @@ export function BookingView({ operator, companyId, me, initialRoomId = null, ini
              돌아온다(시안 03-booking-form.md §5). 닫아 버리면 취소를 그만둔 사람이
              처음부터 다시 찾아 들어가야 한다. */
           onCancelAsk={(r) => setConfirming(r)}
+          /* ★ 확인 창이 위에 떠 있으면 이 창은 ESC · 바탕 누름으로 닫히지 않는다(공통 Dialog 2026-11-26) */
+          covered={!!confirming}
           onComplete={(r) => void complete(r)}
           onDone={(message, moved) => {
             setForm(null);
