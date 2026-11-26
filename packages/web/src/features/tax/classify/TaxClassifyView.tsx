@@ -21,6 +21,8 @@
  * ★★ 항목 이름 · 풀이 · 계산서 구분 · 자료 종류 · 구분 · 출처 이름은 **API 가 준 코드 값으로만** 그린다.
  * ★ 사업자 유형이 없으면(세무 설정 전) 항목 선택 · 확정 · 붙이기를 막고 안내한다(결정 2026-10-27). 목록 · 엑셀은 된다.
  * ★ 파일로 들어오면 기간 거르기를 걸지 않는다(결정) — 구분 · 출처는 그대로 걸린다.
+ * ★ 2026-11-26 세무 일관성(삐용 기준) — 목록 = 공통 Table(머리글 아쿠아 · 머리 고정) · 버튼 줄 단추 = 공통 Button(보통 sm 40px,
+ *   [확정]은 주 그대로) · 엑셀 · 링크 = 같은 꼴(.btn) · 검색조건은 바꾸면 바로 걸러짐 그대로, 오른쪽 끝에 「n건」(TaxMonthBar count)
  */
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -39,7 +41,7 @@ import {
   type TaxClassifyRow,
 } from '@swonbiz/shared/domain/tax-classify';
 import { TAX_INV_DIR_PURCHASE, TAX_INV_DIR_SALES } from '@swonbiz/shared/domain/tax-uploads';
-import { Icon } from '@/components/ds';
+import { Button, Icon, Table, TableEmpty, TableHead, TableRow, tableCell } from '@/components/ds';
 import { ExcelDownloadButton } from '@/components/patterns/ExcelDownloadButton';
 import t from '../common/tax.module.css';
 import { TaxEmpty } from '../common/TaxEmpty';
@@ -57,6 +59,8 @@ import {
   type TaxClassifyResponse,
 } from './tax-classify-model';
 
+/** 표 칸 폭 — 선택 · 날짜 · 출처 · 사용처 · 내용 · 금액 · 계정과목(종전 colgroup 값 그대로 · 선택 칸은 거래처와 같은 20px) */
+const CLASSIFY_COLS = '20px 64px 120px minmax(0,1fr) 180px 120px 260px';
 /** 목록에 없는 값. */
 const DASH = '—';
 const FILTER_STYLE = { height: 32, width: 'auto', minWidth: 110 } as const;
@@ -179,9 +183,9 @@ export function TaxClassifyView({ month, fileId, initialStatus = 'all' }: Props)
       <span className={t.ell} style={{ maxWidth: 260 }} title={data.file.fileName}>
         「{data.file.fileName}」 파일로 들어온 줄만 보는 중
       </span>
-      <button type="button" className={`${t.btn} ${t.btnSm}`} onClick={clearFile}>
+      <Button variant="ghost" size="sm" onClick={clearFile}>
         모두 보기
-      </button>
+      </Button>
     </span>
   ) : null;
 
@@ -189,7 +193,8 @@ export function TaxClassifyView({ month, fileId, initialStatus = 'all' }: Props)
     <div className={`${t.page} ${t.pageFill}`}>
       {/* ① 검색조건 — 바꾸면 바로 걸러진다 */}
       <div className={`${t.card} ${t.secLow}`}>
-        <TaxMonthBar month={month} note={fileNote}>
+        {/* ★ 2026-11-26 세무 일관성 ④ — 바꾸면 바로 걸러짐(그대로) · 오른쪽 끝 「n건」 */}
+        <TaxMonthBar month={month} note={fileNote} count={data.rows.length}>
           <select
             className={t.select}
             style={FILTER_STYLE}
@@ -241,33 +246,33 @@ export function TaxClassifyView({ month, fileId, initialStatus = 'all' }: Props)
             <Icon name="info" size={16} />
           </span>
           <span style={{ flex: 1 }}>세무 설정에서 사업자 유형을 먼저 고르세요 — 사업자 유형에 따라 출금 항목 목록이 다릅니다.</span>
-          <Link href="/tax/settings" className={`${t.btn} ${t.btnSm}`}>
+          <Link href="/tax/settings" className={t.btn}>
             <Icon name="settings" size={16} />
             세무 설정
           </Link>
         </div>
       )}
 
-      {/* ② 버튼 — 고른 줄 기준 */}
+      {/* ② 버튼 — 고른 줄 기준 · ★ 2026-11-26 세무 일관성 ③ 공통 Button(sm 40px) · 자리는 그대로 */}
       <div className={`${t.tbar} ${t.tbarOut}`}>
-        <button
-          type="button"
-          className={`${t.btn} ${t.btnSm}`}
+        <Button
+          variant="ghost"
+          size="sm"
+          iconLeft={<Icon name="pencil-line" size={16} />}
           disabled={!canClassify || plan.reopen.length === 0}
           onClick={reopen}
         >
-          <Icon name="pencil-line" size={16} />
           수정{plan.reopen.length ? ` (${plan.reopen.length})` : ''}
-        </button>
-        <button
-          type="button"
-          className={`${t.btn} ${t.btnSm} ${t.btnPrimary}`}
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          iconLeft={<Icon name="check" size={16} />}
           disabled={!canClassify || plan.confirm.length === 0}
           onClick={runConfirm}
         >
-          <Icon name="check" size={16} />
           확정{plan.confirm.length ? ` (${plan.confirm.length})` : ''}
-        </button>
+        </Button>
         {bulkRows.length ? (
           <>
             <span className={t.tbarSep} />
@@ -281,134 +286,115 @@ export function TaxClassifyView({ month, fileId, initialStatus = 'all' }: Props)
             >
               {itemOptions}
             </select>
-            <button type="button" className={`${t.btn} ${t.btnSm}`} disabled={!canClassify || !bulk} onClick={runBulk}>
+            <Button variant="ghost" size="sm" disabled={!canClassify || !bulk} onClick={runBulk}>
               선택한 줄에 붙이기 ({bulkRows.length})
-            </button>
+            </Button>
           </>
         ) : null}
         <span className={t.sp} />
-        <ExcelDownloadButton href={exportHref(query)} className={`${t.btn} ${t.btnSm}`} onError={setFailed} />
+        <ExcelDownloadButton href={exportHref(query)} className={t.btn} onError={setFailed} />
       </div>
       {failed ? <TaxFormErrorBanner kind="failed" message={failed} /> : null}
 
       {/* ③ 목록 — 목록만 스크롤 · 머리 줄 고정 */}
       <div className={`${t.card} ${t.listCard}`}>
         <div className={t.listScroll}>
-          <table className={`${t.tbl} ${t.tblSticky}`}>
-            <colgroup>
-              <col className={t.wChk} />
-              <col style={{ width: 64 }} />
-              <col style={{ width: 120 }} />
-              <col />
-              <col style={{ width: 180 }} />
-              {/* 금액 110 → 120 — 글자 15px 에서 「-100,000,000」(약 92px)이 칸 안에 들어가게(2026-11-16) */}
-              <col style={{ width: 120 }} />
-              <col style={{ width: 260 }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th aria-label="선택" />
-                <th>날짜</th>
-                <th>출처</th>
-                <th>사용처</th>
-                <th>내용</th>
-                <th className={t.num}>금액</th>
-                <th>계정과목</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className={t.empty}>
-                    {status === 'L' && kind === 'all' && !item && !fileId ? (
-                      <TaxEmpty icon="circle-check" lead="이번 달 정리를 마쳤습니다" />
-                    ) : (
-                      <TaxEmpty icon="file-pen-line" lead="해당하는 줄이 없습니다" />
-                    )}
-                  </td>
-                </tr>
-              ) : (
-                data.rows.map((r) => {
-                  const rk = classifyRowKey(r);
-                  const sales = isSales(r);
-                  const on = sel.includes(rk);
-                  const open = !sales && (r.itemCode === null || editing.has(rk));
-                  const pick = picks[rk];
-                  const value = pick ?? (editing.has(rk) ? (r.itemCode ?? '') : (r.suggestedItemCode ?? ''));
-                  const source = classifySourceLabel(r, names);
-                  const place = classifyPlaceOf(r);
-                  const content = classifyContentOf(r);
-                  return (
-                    <tr
-                      key={rk}
-                      className={`${sales ? '' : t.clickable} ${on ? t.pick : ''}`}
-                      onClick={sales ? undefined : () => toggle(rk)}
-                    >
-                      <td>
+          {/* ★ 2026-11-26 세무 일관성 ① — 표 = 공통 Table(머리글 아쿠아 · 머리 고정). 줄을 누르면 고름 · 칸 안 입력 · 선택 상자는 그대로 */}
+          <Table cols={CLASSIFY_COLS}>
+            <TableHead sticky>
+              <span aria-label="선택" />
+              <span>날짜</span>
+              <span>출처</span>
+              <span>사용처</span>
+              <span>내용</span>
+              <span className={tableCell.right}>금액</span>
+              <span>계정과목</span>
+            </TableHead>
+            {data.rows.length === 0 ? (
+              <TableEmpty>
+                {status === 'L' && kind === 'all' && !item && !fileId ? (
+                  <TaxEmpty icon="circle-check" lead="이번 달 정리를 마쳤습니다" />
+                ) : (
+                  <TaxEmpty icon="file-pen-line" lead="해당하는 줄이 없습니다" />
+                )}
+              </TableEmpty>
+            ) : (
+              data.rows.map((r) => {
+                const rk = classifyRowKey(r);
+                const sales = isSales(r);
+                const on = sel.includes(rk);
+                const open = !sales && (r.itemCode === null || editing.has(rk));
+                const pick = picks[rk];
+                const value = pick ?? (editing.has(rk) ? (r.itemCode ?? '') : (r.suggestedItemCode ?? ''));
+                const source = classifySourceLabel(r, names);
+                const place = classifyPlaceOf(r);
+                const content = classifyContentOf(r);
+                return (
+                  <TableRow key={rk} selected={on} onClick={sales ? undefined : () => toggle(rk)}>
+                    <span className={t.cellChk}>
+                      <input
+                        type="checkbox"
+                        className={t.rowchk}
+                        checked={on}
+                        disabled={sales}
+                        aria-label="선택"
+                        onChange={() => toggle(rk)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </span>
+                    <span className={t.tnum}>{shortDate(r.writeDate)}</span>
+                    <span className={`${t.mutT} ${tableCell.ellipsis}`} title={source}>
+                      {source}
+                    </span>
+                    <span className={tableCell.ellipsis} title={place ?? undefined}>
+                      {place ?? <span className={t.mut}>{DASH}</span>}
+                    </span>
+                    <span className={r.kind === 'CARD' && open ? undefined : tableCell.ellipsis} title={content ?? undefined}>
+                      {r.kind === 'CARD' && open ? (
                         <input
-                          type="checkbox"
-                          className={t.rowchk}
-                          checked={on}
-                          disabled={sales}
-                          aria-label="선택"
-                          onChange={() => toggle(rk)}
+                          className={t.input}
+                          style={{ width: '100%', height: 36 }}
+                          maxLength={CARD_NOTE_MAX}
+                          placeholder="사용 내용"
+                          aria-label="내용"
+                          value={notes[rk] ?? r.note ?? ''}
+                          disabled={!canClassify}
                           onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => setNotes((n) => ({ ...n, [rk]: e.target.value }))}
                         />
-                      </td>
-                      <td className={t.tnum}>{shortDate(r.writeDate)}</td>
-                      <td className={`${t.mut} ${t.ell}`} title={source}>
-                        {source}
-                      </td>
-                      <td className={t.ell} title={place ?? undefined}>
-                        {place ?? <span className={t.mut}>{DASH}</span>}
-                      </td>
-                      <td className={r.kind === 'CARD' && open ? undefined : t.ell} title={content ?? undefined}>
-                        {r.kind === 'CARD' && open ? (
-                          <input
-                            className={t.input}
+                      ) : (
+                        (content ?? <span className={t.mut}>{DASH}</span>)
+                      )}
+                    </span>
+                    <span className={t.numC}>
+                      {r.direction === TAX_INV_DIR_SALES ? '+' : ''}
+                      {won(r.totalAmount)}
+                    </span>
+                    <span>
+                      {sales ? (
+                        <span className={t.mut}>{DASH}</span>
+                      ) : open ? (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <select
+                            className={t.select}
                             style={{ width: '100%', height: 36 }}
-                            maxLength={CARD_NOTE_MAX}
-                            placeholder="사용 내용"
-                            aria-label="내용"
-                            value={notes[rk] ?? r.note ?? ''}
+                            value={value}
                             disabled={!canClassify}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setNotes((n) => ({ ...n, [rk]: e.target.value }))}
-                          />
-                        ) : (
-                          (content ?? <span className={t.mut}>{DASH}</span>)
-                        )}
-                      </td>
-                      <td className={t.num}>
-                        {r.direction === TAX_INV_DIR_SALES ? '+' : ''}
-                        {won(r.totalAmount)}
-                      </td>
-                      <td>
-                        {sales ? (
-                          <span className={t.mut}>{DASH}</span>
-                        ) : open ? (
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <select
-                              className={t.select}
-                              style={{ width: '100%', height: 36 }}
-                              value={value}
-                              disabled={!canClassify}
-                              aria-label="계정과목"
-                              onChange={(e) => setPicks((p) => ({ ...p, [rk]: e.target.value }))}
-                            >
-                              {itemOptions}
-                            </select>
-                          </div>
-                        ) : (
-                          <span style={{ fontWeight: 700 }}>{itemName(r.itemCode!)}</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                            aria-label="계정과목"
+                            onChange={(e) => setPicks((p) => ({ ...p, [rk]: e.target.value }))}
+                          >
+                            {itemOptions}
+                          </select>
+                        </div>
+                      ) : (
+                        <span style={{ fontWeight: 700 }}>{itemName(r.itemCode!)}</span>
+                      )}
+                    </span>
+                  </TableRow>
+                );
+              })
+            )}
+          </Table>
         </div>
       </div>
 
