@@ -1,0 +1,21 @@
+/*
+ * 자료 올리기(s050200010) 전용 — ★ 2026-11-26 세무 일관성(삐용 기준).
+ * 표는 공통 Table(머리글 · 줄 선 · 색은 그 부품). 여기는 칸 안 글자 모양 · 폭만.
+ * ★ 색은 토큰만.
+ */
+
+/* 올린 파일 표 — 창이 좁아져 파일 이름 칸이 160 아래로 줄면 표가 줄지 않고 목록 안에서 옆으로 스크롤(종전 .tblUploads min-width 862 와 같은 뜻).
+ *   862(칸 폭 합 · 파일 이름 160) + Table 칸 사이 12px × 5 + 좌우 여백 16px × 2 = 954 */
+.uploadsTable { min-width: 954px; }
+
+/* 올린 시각 — 한 줄(종전 인라인 whiteSpace nowrap) · 숫자 칸은 세무 공통 .numC */
+.nowrap { white-space: nowrap; }
+
+/* 줄 안 [보기] [삭제] — 한 줄(종전 .row gap 6 · nowrap) */
+.acts { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+
+/* 미리보기 표 「… 앞 5줄만 보여 줍니다」 — 표 폭 전체 가운데 */
+.more { grid-column: 1 / -1; text-align: center; }
+
+/* 올리기 팝업 — 종전 아래 줄 왼쪽 안내(확인 중 · 빠지는 파일 수)를 본문 끝으로 */
+.status { margin: 0; }
