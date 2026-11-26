@@ -105,6 +105,91 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 줄 전체가 링크(정한 것 11) — 첫 칸의 <a>(.rowLink)가 ::after 로 줄을 덮는다(법무 목록 corp-changes .rowLink 와 같은 수법).
+ * 올림 바탕은 부품의 누르는 줄(clickable)과 같은 값 — 이 줄은 onClick 이 아니라 링크라 화면이 준다 */
+.linkRow {
+  position: relative;
+}
+
+.linkRow:hover {
+  background: var(--surface-alt);
+}
+
+.rowLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.rowLink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.rowLink:focus-visible {
+  outline: none;
+}
+
+.rowLink:focus-visible::after {
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
+}
+
+/* ── 767 이하 카드 목록(정한 것 10) ── 종전 .list · .row 그대로 · px 글자만 토큰(16 → body 15 · 14 → fs-sm · 12 → micro 13) ── */
+.list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.card {
+  display: block;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  transition: background var(--dur) var(--ease-out);
+}
+
+.card:hover {
+  background: var(--surface-alt);
+}
+
+.cardWhen {
+  display: block;
+  font-size: var(--text-body-size);
+  font-weight: 700;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.cardRoom {
+  margin-top: 6px;
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.cardBooker {
+  margin-top: 3px;
+  display: block;
+  font-size: var(--text-micro-size);
+  color: var(--text-caption);
+}
+
+/* 카드 쪽 빈 상태 — 종전처럼 패널 가운데(.empty 바깥 여백 60 · 24) */
+.cardEmpty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
 /* ── 빈 상태 ── 문의상담관리와 같다(표 안 TableEmpty 에 넣는다) ── */
 .empty {
   display: flex;

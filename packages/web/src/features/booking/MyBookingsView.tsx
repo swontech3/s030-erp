@@ -16,7 +16,6 @@
  * ★ 데이터는 클라이언트가 받는다 — 「지금」을 보는 사람의 시각으로 정한다(예약 화면과 같다).
  */
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { localDayMinutes } from '@swonbiz/shared/domain/reservation-rules';
 import {
@@ -28,6 +27,7 @@ import {
   type MyBooking,
 } from '@swonbiz/shared/domain/my-bookings';
 import { Icon, Table, TableEmpty, TableHead, TableRow, tableCell } from '@/components/ds';
+import { widthMode } from './booking-model';
 import styles from './my-bookings.module.css';
 
 /**
@@ -37,7 +37,18 @@ import styles from './my-bookings.module.css';
 const LIST_COLS = 'minmax(0,1.6fr) minmax(0,1fr) minmax(0,0.8fr)';
 
 export function MyBookingsView() {
-  const router = useRouter();
+  /**
+   * ★ 정한 것 10(2026-11-26) — 767 이하(앱 웹뷰 포함)는 종전 카드 목록, 768 이상은 공통 Table.
+   *   폭 기준은 예약 화면과 같은 `widthMode`(08-responsive · sm = 767 이하). 문의상담관리처럼 좁은 쪽은 카드다.
+   *   첫 그림은 폭을 재기 전이라 목록 자리를 비워 둔다(표 → 카드로 깜빡이지 않게).
+   */
+  const [narrow, setNarrow] = useState<boolean | null>(null);
+  useEffect(() => {
+    const read = () => setNarrow(widthMode(window.innerWidth) === 'sm');
+    read();
+    window.addEventListener('resize', read);
+    return () => window.removeEventListener('resize', read);
+  }, []);
   const [items, setItems] = useState<MyBooking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,41 +98,84 @@ export function MyBookingsView() {
       </div>
 
       <div className={styles.panel}>
-        {/* ★ 2026-11-26 일관성 — 카드 목록 → 공통 Table(머리글 아쿠아). 한 줄을 누르면 종전처럼 예약 화면의 그날 · 그 회의실로 간다 */}
-        <div className={styles.scroll}>
-          <Table cols={LIST_COLS}>
-            <TableHead sticky>
-              <span>날짜 · 시간</span>
-              <span>회의실</span>
-              <span>예약한 사람</span>
-            </TableHead>
-            {items === null ? (
-              <TableEmpty>
-                <Empty icon="calendar-check" lead="예약을 불러오는 중입니다" />
-              </TableEmpty>
-            ) : error ? (
-              <TableEmpty>
-                <Empty icon="circle-alert" lead={error} />
-              </TableEmpty>
-            ) : items.length === 0 ? (
-              <TableEmpty>
-                <Empty icon="calendar-check" lead="예정된 예약이 없습니다" sub="「예약하기」에서 회의실을 예약할 수 있습니다" />
-              </TableEmpty>
-            ) : (
-              items.map((r) => {
+        {narrow === null ? null : narrow ? (
+          /* 767 이하 — 종전 카드 목록(세 줄 · 한 건 전체가 링크) */
+          items === null ? (
+            <CardEmpty icon="calendar-check" lead="예약을 불러오는 중입니다" />
+          ) : error ? (
+            <CardEmpty icon="circle-alert" lead={error} />
+          ) : items.length === 0 ? (
+            <CardEmpty icon="calendar-check" lead="예정된 예약이 없습니다" sub="「예약하기」에서 회의실을 예약할 수 있습니다" />
+          ) : (
+            <ul className={styles.list}>
+              {items.map((r) => {
                 const line = myBookingLine(r);
                 return (
-                  <TableRow key={r.reservationId} onClick={() => router.push(myBookingHref(r))}>
-                    <span className={`${styles.when} ${tableCell.ellipsis}`}>{line.when}</span>
-                    <span className={tableCell.ellipsis}>{line.room}</span>
-                    <span className={tableCell.ellipsis}>{line.booker}</span>
-                  </TableRow>
+                  <li key={r.reservationId}>
+                    <Link href={myBookingHref(r)} className={styles.card} data-booking-row={r.reservationId}>
+                      <span className={styles.cardWhen}>{line.when}</span>
+                      <span className={styles.cardRoom}>{line.room}</span>
+                      <span className={styles.cardBooker}>{line.booker}</span>
+                    </Link>
+                  </li>
                 );
-              })
-            )}
-          </Table>
-        </div>
+              })}
+            </ul>
+          )
+        ) : (
+          /* 768 이상 — 공통 Table(머리글 아쿠아) */
+          <div className={styles.scroll}>
+            <Table cols={LIST_COLS}>
+              <TableHead sticky>
+                <span>날짜 · 시간</span>
+                <span>회의실</span>
+                <span>예약한 사람</span>
+              </TableHead>
+              {items === null ? (
+                <TableEmpty>
+                  <Empty icon="calendar-check" lead="예약을 불러오는 중입니다" />
+                </TableEmpty>
+              ) : error ? (
+                <TableEmpty>
+                  <Empty icon="circle-alert" lead={error} />
+                </TableEmpty>
+              ) : items.length === 0 ? (
+                <TableEmpty>
+                  <Empty icon="calendar-check" lead="예정된 예약이 없습니다" sub="「예약하기」에서 회의실을 예약할 수 있습니다" />
+                </TableEmpty>
+              ) : (
+                items.map((r) => {
+                  const line = myBookingLine(r);
+                  /*
+                   * ★ 정한 것 11(2026-11-26) — 줄 전체가 링크(법무 목록과 같은 수법 : 첫 칸 `<a>` 가 ::after 로 줄을 덮는다).
+                   *   누르면 그날 · 그 회의실로 가고(Link · 방문 기록), Ctrl/⌘ · 가운데 단추는 브라우저가 새 탭으로 연다.
+                   */
+                  return (
+                    <TableRow key={r.reservationId} className={styles.linkRow}>
+                      <span className={`${styles.when} ${tableCell.ellipsis}`}>
+                        <Link href={myBookingHref(r)} className={styles.rowLink} data-booking-row={r.reservationId}>
+                          {line.when}
+                        </Link>
+                      </span>
+                      <span className={tableCell.ellipsis}>{line.room}</span>
+                      <span className={tableCell.ellipsis}>{line.booker}</span>
+                    </TableRow>
+                  );
+                })
+              )}
+            </Table>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+/** 767 이하 카드 목록의 빈 · 불러오는 중 · 오류 — 종전처럼 패널 가운데 */
+function CardEmpty(props: { icon: 'calendar-check' | 'circle-alert'; lead: string; sub?: string }) {
+  return (
+    <div className={styles.cardEmpty}>
+      <Empty {...props} />
     </div>
   );
 }
