@@ -95,6 +95,14 @@ export const BBIYONG = {
   PASSWORD_RESET_PATH: "/SignIn?reset=1",
 
   /**
+   * 삐용 **로그인 화면** — ERP 로그인으로 들어온 사람을 여기로 보낸다(2026-11-27 · 가지 erp-login-redirect).
+   * 삐용에서 로그인하면 삐용 틀 · 권한관리에 따른 그 사람의 왼쪽 메뉴로 간다.
+   * ★ 위 PASSWORD_RESET_PATH 처럼 **사람이 가는 화면 주소**다 · `WEB_URL`(NEXT_PUBLIC_BBIYONG_WEB_URL)에 붙여 쓴다.
+   * ★ `/` 가 아니라 `/SignIn` 이다 — `/` 는 로그인 폼이 없는 랜딩이다(위 주석, 2026-10-05 확인).
+   */
+  SIGN_IN_SCREEN_PATH: "/SignIn",
+
+  /**
    * 회사 등록 — 회사·대표·구독·역할을 한 번에 만든다(연동규격 §2, 한 SQL 문장).
    *
    * ★ 부르는 토큰은 **ERP 를 쓰는 운영사 직원 자기 것**이고(결정 Q1), 그 토큰에

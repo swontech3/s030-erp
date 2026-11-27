@@ -17,6 +17,14 @@ import Link from 'next/link';
 import { Button, Icon } from '@/components/ds';
 import styles from './landing.module.css';
 import { NAV, inquiryHref } from './landing-model';
+/* ★ 2026-11-27 — 「로그인」은 삐용 로그인 화면으로(가지 erp-login-redirect) */
+import { BBIYONG_SIGN_IN_URL } from '@/lib/bbiyong-web';
+
+/**
+ * 「로그인」이 가는 곳 — 삐용 로그인 화면. ERP 로그인 화면을 거치지 않는다.
+ * ★ 삐용 화면 주소가 비면 지금처럼 `/login` 이다(기본값 없음 · 결정 2026-10-05).
+ */
+const LOGIN_HREF = BBIYONG_SIGN_IN_URL || '/login';
 
 export function LandingHeader() {
   const [open, setOpen] = useState(false);
@@ -67,8 +75,8 @@ export function LandingHeader() {
         </nav>
 
         <div className={styles.headRight}>
-          {/* 시안은 href="#" 다. 로그인 화면이 하나뿐이라 거기로 잇는다 */}
-          <Link className={styles.login} href="/login">
+          {/* 시안은 href="#" 다. 삐용 로그인 화면으로 잇는다(위 LOGIN_HREF) */}
+          <Link className={styles.login} href={LOGIN_HREF}>
             로그인
           </Link>
           <Button as="a" size="sm" href={inquiryHref('상담')}>
@@ -106,7 +114,7 @@ export function LandingHeader() {
                 {n.label}
               </a>
             ))}
-            <Link className={styles.login} href="/login" onClick={() => setOpen(false)}>
+            <Link className={styles.login} href={LOGIN_HREF} onClick={() => setOpen(false)}>
               로그인
             </Link>
             <div className={styles.drawerCta}>
