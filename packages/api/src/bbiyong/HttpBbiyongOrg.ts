@@ -628,7 +628,14 @@ export class HttpBbiyongOrg implements BbiyongOrg {
     for (let page = 1; page <= ORG_LIST_MAX_PAGES; page++) {
       const body = await this.#get(
         BBIYONG.ORG_LIST_PATH,
-        { orgName: name, memberName: '', limit: String(ORG_LIST_PAGE_SIZE), curPage: String(page) },
+        {
+          orgName: name,
+          memberName: '',
+          limit: String(ORG_LIST_PAGE_SIZE),
+          curPage: String(page),
+          // ★ 2026-11-27 — 구독 모듈로 거르기. 줄 때만 싣는다(안 보내면 삐용은 지금과 같다)
+          ...(search.moduleCode ? { moduleCode: search.moduleCode } : {}),
+        },
         accessToken,
         '단체 목록',
       );

@@ -149,6 +149,13 @@ export const BBIYONG = {
   ORG_LIST_PATH: "/rest/v1/s021100010/org-list",
 
   /**
+   * 법무 서비스 모듈 코드 — `org-list` 에 `moduleCode` 로 보내면 **지금 이 기능을 구독 중인 회사만** 준다
+   * (삐용 2026-11-27 · 안 보내면 지금과 같다). 법인설립 · 법인변경 [새 건]의 회사 조회만 붙인다.
+   * ★ `LEGAL` 이 아니다 — ERP 의 `SUBSCRIBABLE_MODULES` 의 `LEGAL` 과 다른 삐용 코드다(그쪽은 손대지 않는다).
+   */
+  LEGAL_MODULE_CODE: "LEGAL_INCORP",
+
+  /**
    * 직원정보 — 구성원 신규(`I`) · 수정(`U`) · 삭제(`D`) 를 **한 엔드포인트**로 받는다
    * (삐용 규격 2026-10-05). 가르는 것은 본문의 `regTp` 다.
    *

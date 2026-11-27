@@ -6,7 +6,7 @@
  */
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { ErpSession, ScopeRole } from '@swonbiz/shared';
+import { BBIYONG, type ErpSession, type ScopeRole } from '@swonbiz/shared';
 import type { OrgInfo } from '@swonbiz/shared/domain/org-lookup';
 import { MockBbiyongOrg } from '../bbiyong/MockBbiyongOrg.ts';
 import { registerOrgLookupRoutes, type OrgLookupDeps } from './orgLookup.ts';
@@ -31,8 +31,8 @@ function fakeDeps(over: Partial<OrgLookupDeps> = {}): OrgLookupDeps & { calls: s
   const calls: string[] = [];
   return {
     calls,
-    listOrgs: async (_s, name) => {
-      calls.push(`list:${name}`);
+    listOrgs: async (_s, name, moduleCode) => {
+      calls.push(moduleCode ? `list:${name}:${moduleCode}` : `list:${name}`);
       return { kind: 'ok', value: ORGS.filter((o) => o.orgName.includes(name)) };
     },
     getOrg: async (_s, key) => {
@@ -160,7 +160,69 @@ describe('GET /org-lookup/one — 단건', () => {
   });
 });
 
+describe('GET /org-lookup — 구독 모듈로 거르기(moduleCode, 2026-11-27)', () => {
+  it('★ 법무 코드(BBIYONG.LEGAL_MODULE_CODE = LEGAL_INCORP)를 그대로 삐용 쪽에 넘긴다', async () => {
+    expect(BBIYONG.LEGAL_MODULE_CODE).toBe('LEGAL_INCORP');
+    const deps = fakeDeps();
+    const a = await build(session('operator', 1), deps);
+    const res = await a.inject({ method: 'GET', url: `/org-lookup?q=&moduleCode=${BBIYONG.LEGAL_MODULE_CODE}` });
+    expect(res.statusCode).toBe(200);
+    expect(deps.calls).toEqual(['list::LEGAL_INCORP']);
+  });
+
+  it('★ 안 주면 지금과 같다 — 모듈 코드 없이 부른다(ERP 화면의 회사 조회)', async () => {
+    const deps = fakeDeps();
+    const a = await build(session('operator', 1), deps);
+    await a.inject({ method: 'GET', url: '/org-lookup?q=' });
+    await a.inject({ method: 'GET', url: '/org-lookup?q=&moduleCode=' });
+    expect(deps.calls).toEqual(['list:', 'list:']);
+  });
+
+  it('★ 다른 코드(ERP 의 LEGAL 등)는 400 — 삐용을 부르지 않는다', async () => {
+    const deps = fakeDeps();
+    const a = await build(session('operator', 1), deps);
+    for (const code of ['LEGAL', 'OFFICE', 'legal_incorp']) {
+      const res = await a.inject({ method: 'GET', url: `/org-lookup?moduleCode=${code}` });
+      expect(res.statusCode).toBe(400);
+    }
+    expect(deps.calls).toEqual([]);
+  });
+
+  it('회사 사용자는 모듈 코드가 있어도 403', async () => {
+    const deps = fakeDeps();
+    const a = await build(session('tenant', 9003), deps);
+    const res = await a.inject({ method: 'GET', url: `/org-lookup?moduleCode=${BBIYONG.LEGAL_MODULE_CODE}` });
+    expect(res.statusCode).toBe(403);
+    expect(deps.calls).toEqual([]);
+  });
+});
+
 describe('MockBbiyongOrg — 단체 조회', () => {
+  it('★ moduleCode 가 오면 그 모듈 구독 회사만 — 모의 회사 중 한빛법인(Z99)만 법무 구독', async () => {
+    const mock = new MockBbiyongOrg();
+    const legal = await mock.listOrgs({ name: '', moduleCode: BBIYONG.LEGAL_MODULE_CODE }, 't');
+    expect(legal.kind === 'ok' && legal.value.map((o) => o.orgCode)).toEqual(['Z99']);
+    // 이름 검색과 함께 — 법무 구독이 아닌 회사는 이름이 맞아도 안 나온다
+    const named = await mock.listOrgs({ name: '비앤케이', moduleCode: BBIYONG.LEGAL_MODULE_CODE }, 't');
+    expect(named.kind === 'ok' && named.value).toEqual([]);
+    // 안 주면 지금과 같다
+    const all = await mock.listOrgs({ name: '' }, 't');
+    expect(all.kind === 'ok' && all.value.map((o) => o.orgCode)).toEqual(['Z97', 'Z98', 'Z99']);
+  });
+
+  it('이 프로세스가 등록한 회사는 등록 때 보낸 모듈로 거른다', async () => {
+    const mock = new MockBbiyongOrg();
+    await mock.createOrg(
+      { orgCode: 'Z04', orgName: '사무실회사', memberName: '김대표', hpNo: '01000000002', email: 'o@p.q',
+        countryCode: 'KR', moduleCodes: ['OFFICE', 'AUTHZ'] },
+      't',
+    );
+    const office = await mock.listOrgs({ name: '', moduleCode: 'OFFICE' }, 't');
+    const legal = await mock.listOrgs({ name: '', moduleCode: BBIYONG.LEGAL_MODULE_CODE }, 't');
+    expect(office.kind === 'ok' && office.value.map((o) => o.orgCode)).toEqual(['Z04']);
+    expect(legal.kind === 'ok' && legal.value.map((o) => o.orgCode)).toEqual(['Z99']);
+  });
+
   it('★ 모의 계정 단체가 나오고, 이름으로 찾는다', async () => {
     const mock = new MockBbiyongOrg();
     const all = await mock.listOrgs({ name: '' }, 't');

@@ -37,6 +37,11 @@ interface Props {
   onClose: () => void;
   /** 고른 단체 — **셋뿐이다**(머리말). */
   onPick: (pick: OrgPick) => void;
+  /**
+   * 구독 모듈 코드 — 주면 그 모듈을 지금 구독 중인 회사만 나온다(삐용 org-list, 2026-11-27).
+   * ★ 법인설립 · 법인변경 [새 건]만 `BBIYONG.LEGAL_MODULE_CODE` 를 준다. 안 주면 지금과 같다.
+   */
+  moduleCode?: string;
 }
 
 type Load =
@@ -44,7 +49,7 @@ type Load =
   | { state: 'ok'; items: OrgLookupItem[] }
   | { state: 'error'; message: string };
 
-export function OrgLookupDialog({ title = '회사 조회', onClose, onPick }: Props) {
+export function OrgLookupDialog({ title = '회사 조회', onClose, onPick, moduleCode }: Props) {
   const [query, setQuery] = useState('');
   const [load, setLoad] = useState<Load>({ state: 'loading' });
   const [selected, setSelected] = useState<number | null>(null);
@@ -56,7 +61,8 @@ export function OrgLookupDialog({ title = '회사 조회', onClose, onPick }: Pr
     setLoad({ state: 'loading' });
     setSelected(null);
     try {
-      const res = await fetch(`/api/org-lookup?q=${encodeURIComponent(q.trim())}`, { cache: 'no-store' });
+      const mod = moduleCode ? `&moduleCode=${encodeURIComponent(moduleCode)}` : '';
+      const res = await fetch(`/api/org-lookup?q=${encodeURIComponent(q.trim())}${mod}`, { cache: 'no-store' });
       const body = (await res.json().catch(() => ({}))) as { orgs?: OrgLookupItem[]; message?: string };
       if (mine !== seq.current) return;
       if (!res.ok) {
@@ -67,7 +73,7 @@ export function OrgLookupDialog({ title = '회사 조회', onClose, onPick }: Pr
     } catch {
       if (mine === seq.current) setLoad({ state: 'error', message: '서버에 연결할 수 없습니다' });
     }
-  }, []);
+  }, [moduleCode]);
 
   // 열 때 전부 띄운다 — 삐용이 「법무 서비스를 받은 회사」로 걸러 보낸다(회신 2026-10-09).
   useEffect(() => {

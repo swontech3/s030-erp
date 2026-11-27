@@ -9,5 +9,8 @@ import { forwardGetJson } from '@/lib/forward';
  */
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q') ?? '';
-  return forwardGetJson(`/org-lookup?q=${encodeURIComponent(q)}`);
+  // ★ 2026-11-27 — 법무 [새 건]만 `moduleCode` 를 싣는다. 있을 때만 넘긴다(판정은 Fastify)
+  const moduleCode = request.nextUrl.searchParams.get('moduleCode');
+  const extra = moduleCode ? `&moduleCode=${encodeURIComponent(moduleCode)}` : '';
+  return forwardGetJson(`/org-lookup?q=${encodeURIComponent(q)}${extra}`);
 }

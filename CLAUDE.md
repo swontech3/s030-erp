@@ -115,3 +115,11 @@
 - 삐용 주소 : 이미 있는 `NEXT_PUBLIC_BBIYONG_WEB_URL`(erp-web.env)을 쓴다 · 새 칸을 만들지 않는다 · 소스에 주소를 박지 않는다
 - 그대로 : 삐용 틀 안(iframe · `html[data-embedded]`) 로그인 연결 · 앱 웹뷰(UA `SwonBizApp`) 로그인 — 둘은 지금처럼 `/login` 의 ERP 로그인을 쓴다
 - 손대지 않는다 : 로그인 들어오는 길 밖 · 삐용 소스 · 다른 화면 · DB · 서버 띄우기 · 다시 띄우기 · 끄기
+
+## 법무 회사 조회 — 법무 서비스 구독 회사만 (2026-11-27 · 가지 legal-company-lookup ← s030-erp/master 9b4e72d)
+
+- 근거 : 삐용 `org-list` 에 `moduleCode` 칸 추가 — 보내면 그 기능을 지금 구독 중인 회사만, 안 보내면 지금과 같다 · 법무 코드는 `LEGAL_INCORP`(LEGAL 아님)
+- 고칠 것 : 법인설립 · 법인변경 [새 건]에서 회사 조회를 부를 때만 `moduleCode=LEGAL_INCORP` 를 붙인다 — ERP 화면의 회사 조회는 그대로(안 붙임)
+- 값은 `@swonbiz/shared` 의 `BBIYONG` 에 한 줄 — 화면 · 서버 곳곳에 박지 않는다
+- 모의 삐용도 `moduleCode` 를 받아 거른다(모의 회사 중 일부만 LEGAL_INCORP 구독)
+- 손대지 않는다 : 회사 조회 거르기 밖 · ERP 의 다른 서비스 코드(LEGAL 등) · 삐용 소스 · DB · 서버 띄우기 · 다시 띄우기 · 끄기

@@ -13,7 +13,7 @@
  * ★ 2026-10-22 — 비밀번호로 로그인하던 signIn · MOCK_PASSWORD 를 없앴다. ERP 서버는 비밀번호를
  *   받지 않는다(규격서 Q6). 남은 것은 mock 토큰을 확인하는 verifySession 이다.
  */
-import type { ScopeRole } from '@swonbiz/shared';
+import { BBIYONG, type ScopeRole } from '@swonbiz/shared';
 import {
   BbiyongAuthError,
   INVALID_CREDENTIALS_MESSAGE,
@@ -51,6 +51,11 @@ interface MockAccount extends Omit<BbiyongLoginResult, 'accessToken' | 'refreshT
    * ★ `memberName`(운영자 이름)과 다른 사람이다. 없으면 대표자 빈칸.
    */
   ceoName?: string;
+  /**
+   * 지금 구독 중인 모듈 코드 — 회사 단체에만. 단체 조회에 `moduleCode` 가 오면 이것으로 거른다(2026-11-27).
+   * ★ 법무(`BBIYONG.LEGAL_MODULE_CODE`)는 **한빛법인(Z99)만** — 일부만 구독이라야 거르기가 보인다.
+   */
+  moduleCodes?: readonly string[];
   /**
    * 삐용 「내 메뉴」(`my-menus`)가 줄 **삐용** 화면코드(대문자) — `screens`(ERP 화면)와 다른 어휘다.
    * 법무 회사 정보 「받기」가 토큰을 확인할 때 본다(2026-10-23). 운영사 계정에만 단체관리(`S021100010`).
@@ -150,6 +155,8 @@ export const MOCK_ACCOUNTS: readonly MockAccount[] = [
     screens: ['s030000050', 's040100010', 's040100020', 's040200010', 's040200011', 's050100010', 's050100020', 's050200010', 's050300010', 's050300040', 's050300050', 's050300060', 's050400010', 's050400020', 's050500010'],
     orgCode: 'Z99',
     ceoName: '정한빛',
+    // ★ 2026-11-27 — 모의 회사 중 이 회사만 법무 구독(법무 [새 건] 회사 조회에 나온다)
+    moduleCodes: [BBIYONG.LEGAL_MODULE_CODE],
     // ★ 화면 확인용(2026-10-25) — 「내 단체 정보」 수정 키가 있는 회사 사용자. 법무 회사 정보 칸이 열린다.
     bbiyongMenus: ['S021100021'],
     bbiyongMenuKeys: { S021100021: ['F002'] },
