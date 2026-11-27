@@ -33,6 +33,7 @@ import type { CodeOption } from '@swonbiz/shared/domain/corp-change-list';
 import type { OrgPick } from '@swonbiz/shared/domain/org-lookup';
 import { Button, Dialog, Icon } from '@/components/ds';
 import { OrgLookupDialog } from '@/components/org-lookup/OrgLookupDialog';
+import { BBIYONG } from '@swonbiz/shared';
 import styles from './corp-changes.module.css';
 
 interface Props {
@@ -226,6 +227,8 @@ export function NewCorpChangeDialog({ changeTypes, pickOrg, onClose, onStart }: 
       {lookup ? (
         <OrgLookupDialog
           title="법인변경 회사 선택"
+          // ★ 2026-11-27 — 법무 서비스를 지금 구독 중인 회사만(삐용 org-list moduleCode)
+          moduleCode={BBIYONG.LEGAL_MODULE_CODE}
           onClose={() => setLookup(false)}
           onPick={(pick) => {
             setOrg(pick);

@@ -454,6 +454,11 @@ export interface BbiyongOrgInfo {
 export interface BbiyongOrgSearch {
   /** 회사명 일부. 빈 문자열이면 받은 목록 전부. */
   name: string;
+  /**
+   * 구독 모듈 코드 — 있으면 **지금 그 기능을 구독 중인 회사만**(삐용 `org-list` 의 `moduleCode`, 2026-11-27).
+   * 없으면 지금과 같다. 법무 [새 건]만 `BBIYONG.LEGAL_MODULE_CODE` 를 준다.
+   */
+  moduleCode?: string;
 }
 
 /** 단건 조건 — 단체 ID 또는 단체코드 하나. */

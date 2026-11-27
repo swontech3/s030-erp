@@ -138,10 +138,23 @@ export class MockBbiyongOrg implements BbiyongOrg {
    * ★ 재기동하면 비어 있다(`#byCode` 와 같다). 진실원은 삐용이고, 여기는 대역이다.
    */
   readonly #createdInfo = new Map<string, BbiyongOrgInfo>();
+  /** 이 프로세스가 만든 회사의 구독 모듈(등록 때 보낸 `moduleCodes`) — 단체 조회 `moduleCode` 거르기가 본다. */
+  readonly #createdModules = new Map<string, readonly string[]>();
 
   /** 조회 대상 전부 — 모의 계정 단체 + 이 프로세스가 만든 회사. */
   #directory(): BbiyongOrgInfo[] {
     return [...seededOrgs(), ...this.#createdInfo.values()];
+  }
+
+  /**
+   * 그 모듈을 구독 중인 단체코드 — 모의 계정표의 `moduleCodes` + 이 프로세스가 등록하며 보낸 `moduleCodes`(2026-11-27).
+   * ★ 퇴실(OFFICE 끔)은 `#officeOn` 으로 따로 센다 — OFFICE 로 묻는 사람이 없어 여기서는 합치지 않는다.
+   */
+  #subscribedTo(moduleCode: string): Set<string> {
+    const codes = new Set<string>();
+    for (const a of MOCK_ACCOUNTS) if (a.orgCode && a.moduleCodes?.includes(moduleCode)) codes.add(a.orgCode);
+    for (const [orgCode, mods] of this.#createdModules) if (mods.includes(moduleCode)) codes.add(orgCode);
+    return codes;
   }
 
   /** 이 프로세스가 아는 코드인가. 모르면 중복 판정을 하지 않는다(위 주석). */
@@ -199,6 +212,7 @@ export class MockBbiyongOrg implements BbiyongOrg {
       repName: null, // ★★ 빈칸 — 등록 요청에 `ceoName` 칸이 없다. `memberName` 은 운영자 이름이라 쓰지 않는다(2026-11-18)
       status: MOCK_ORG_STATUS,
     });
+    this.#createdModules.set(req.orgCode, [...req.moduleCodes]);
     // ★ 등록은 OFFICE 를 켠 상태로 만든다 — moduleCodes 에 OFFICE 를 보내기 때문이다.
     if (req.moduleCodes.includes('OFFICE')) this.#officeOn.add(req.orgCode);
     // ★ 평문 로그에 이메일·전화를 남기지 않는다. 남는 것은 코드와 번호뿐이다.
@@ -267,12 +281,15 @@ export class MockBbiyongOrg implements BbiyongOrg {
   /**
    * 단체 목록 — 회사명 일부로 찾는다(삐용 회신 2026-10-09).
    * ★ 실물은 「법무 서비스를 받은 회사」만 준다 — 거르는 것은 삐용 몫이다. mock 은 자기가
-   *   아는 단체(모의 계정 + 이 프로세스가 만든 회사)를 **거르지 않고** 준다.
+   *   아는 단체(모의 계정 + 이 프로세스가 만든 회사)를 준다 — `moduleCode` 가 올 때만 그 구독으로 거른다(2026-11-27).
    * ★ 대소문자·앞뒤 공백을 무시한다. 빈 검색어는 전부다. 코드 순으로 준다.
    */
   async listOrgs(search: BbiyongOrgSearch, _accessToken: string): Promise<OrgLookupOutcome<BbiyongOrgInfo[]>> {
     const needle = search.name.trim().toLowerCase();
+    // ★ 2026-11-27 — `moduleCode` 가 오면 그 모듈을 구독 중인 회사만(실물 org-list 와 같다). 안 오면 지금과 같다
+    const subscribed = search.moduleCode ? this.#subscribedTo(search.moduleCode) : null;
     const value = this.#directory()
+      .filter((o) => subscribed === null || subscribed.has(o.orgCode))
       .filter((o) => needle === '' || o.orgName.toLowerCase().includes(needle))
       .sort((a, b) => a.orgCode.localeCompare(b.orgCode));
     return { kind: 'ok', value };

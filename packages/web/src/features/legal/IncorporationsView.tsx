@@ -35,6 +35,7 @@ import type { CodeOption } from '@swonbiz/shared/domain/corp-change-list';
 import { Button, Icon, Table, TableHead, TableRow, tableCell } from '@/components/ds';
 import { ListFrame, ListNote, ListScroll, ListSpacer } from '@/components/patterns/ListFrame';
 import { OrgLookupDialog } from '@/components/org-lookup/OrgLookupDialog';
+import { BBIYONG } from '@swonbiz/shared';
 import type { LegalDetailPane } from './CorpChangeDetail';
 import { IncorporationDetailPane, PaneEmpty } from './LegalDetailPanes';
 import { readSel, selHref, selKey, writeSel, type LegalSel } from './legal-split';
@@ -298,6 +299,8 @@ export function IncorporationsView({
       {lookup ? (
         <OrgLookupDialog
           title="법인설립 회사 선택"
+          // ★ 2026-11-27 — 법무 서비스를 지금 구독 중인 회사만(삐용 org-list moduleCode)
+          moduleCode={BBIYONG.LEGAL_MODULE_CODE}
           onClose={() => setLookup(false)}
           onPick={(pick) => {
             setLookup(false);

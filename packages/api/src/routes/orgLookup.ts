@@ -26,7 +26,7 @@
  *   (`domain/org-lookup.ts` 의 `toOrgPick`).
  */
 import type { FastifyInstance } from 'fastify';
-import type { ErpSession } from '@swonbiz/shared';
+import { BBIYONG, type ErpSession } from '@swonbiz/shared';
 import {
   markTenants,
   normalizeOrgQuery,
@@ -43,18 +43,26 @@ import { listLinkedOrgIds } from '../db/orgLookup.ts';
 
 /** 바꿔 끼울 수 있는 바깥 — 시험이 삐용·DB 없이 권한과 딱지 판정을 본다. */
 export interface OrgLookupDeps {
-  listOrgs(session: ErpSession, name: string): Promise<OrgLookupOutcome<OrgInfo[]>>;
+  /** `moduleCode` 가 있으면 그 모듈을 지금 구독 중인 회사만(삐용 org-list, 2026-11-27). */
+  listOrgs(session: ErpSession, name: string, moduleCode?: string): Promise<OrgLookupOutcome<OrgInfo[]>>;
   getOrg(session: ErpSession, key: OrgKey): Promise<OrgLookupOutcome<OrgInfo | null>>;
   /** 주어진 단체 ID 중 ERP 입주사에 연결된 것. */
   linkedOrgIds(session: ErpSession, orgIds: readonly number[]): Promise<number[]>;
 }
 
 const defaultDeps: OrgLookupDeps = {
-  listOrgs: (session, name) => callBbiyong(session.erpSid, (token) => bbiyongOrg.listOrgs({ name }, token)),
+  listOrgs: (session, name, moduleCode) =>
+    callBbiyong(session.erpSid, (token) => bbiyongOrg.listOrgs(moduleCode ? { name, moduleCode } : { name }, token)),
   getOrg: (session, key) => callBbiyong(session.erpSid, (token) => bbiyongOrg.getOrg(key, token)),
   linkedOrgIds: (session, orgIds) =>
     withCompanyScope(scopeOfSession(session), (client) => listLinkedOrgIds(client, orgIds)),
 };
+
+/**
+ * 회사 조회가 받는 `moduleCode` — **법무 [새 건]의 그 값 하나뿐**이다(2026-11-27). 다른 값은 400.
+ * ★ 값은 `BBIYONG.LEGAL_MODULE_CODE` 한 곳이다. 안 오면 지금과 같다(ERP 화면의 회사 조회).
+ */
+const ORG_LOOKUP_MODULE_CODES: readonly string[] = [BBIYONG.LEGAL_MODULE_CODE];
 
 const FORBIDDEN = { error: 'forbidden', message: '회사 조회는 운영사만 할 수 있습니다' } as const;
 
@@ -87,14 +95,19 @@ async function lookup<T>(log: Log, run: () => Promise<T>): Promise<T> {
 }
 
 export function registerOrgLookupRoutes(app: FastifyInstance, deps: OrgLookupDeps = defaultDeps): void {
-  app.get<{ Querystring: { q?: string } }>('/org-lookup', async (req, reply) => {
+  app.get<{ Querystring: { q?: string; moduleCode?: string } }>('/org-lookup', async (req, reply) => {
     const session = requireSession(req);
     if (session.role !== 'operator') return reply.code(403).send(FORBIDDEN);
 
-    const out = await lookup(req.log, () => deps.listOrgs(session, normalizeOrgQuery(req.query.q)));
+    const moduleCode = req.query.moduleCode?.trim() || undefined;
+    if (moduleCode !== undefined && !ORG_LOOKUP_MODULE_CODES.includes(moduleCode)) {
+      return reply.code(400).send({ error: 'invalid_request', message: '회사 조회에 쓸 수 없는 모듈 코드입니다' });
+    }
+
+    const out = await lookup(req.log, () => deps.listOrgs(session, normalizeOrgQuery(req.query.q), moduleCode));
     if (refuseOutcome(out, reply, req.log) || out.kind !== 'ok') return reply;
-    // ★ 받은 목록을 그대로 보여 준다 — 「법무 서비스를 받은 회사」로 거르는 것은 삐용 몫이다
-    //   (삐용 회신 2026-10-09). 단체코드 대역(Z 등)으로 거르지 않는다.
+    // ★ 받은 목록을 그대로 보여 준다 — 구독으로 거르는 것은 삐용 몫이다(`moduleCode`, 2026-11-27).
+    //   단체코드 대역(Z 등)으로 거르지 않는다.
     const orgs = out.value;
     const linked = await deps.linkedOrgIds(session, orgs.map((o) => o.orgId));
     return reply.send({ orgs: markTenants(orgs, linked) });

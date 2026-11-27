@@ -532,6 +532,14 @@ describe('HttpBbiyongOrg — 단체 목록(org-list)', () => {
     expect(out).toEqual({ kind: 'ok', value: [{ orgId: 5, orgCode: 'VHF', orgName: '해피프렌즈', repName: null, telNo: null, status: null }] });
   });
 
+  it('★ moduleCode 를 주면 쿼리에 싣는다(2026-11-27) — 거르기는 삐용이 한다', async () => {
+    const { org, calls } = adapter(page([row(1, 'SWT', '(주)에스원테크', 1)]));
+    await org.listOrgs({ name: '', moduleCode: 'LEGAL_INCORP' }, 'tok');
+    expect(Object.fromEntries(new URL(calls[0]!.url).searchParams)).toEqual({
+      orgName: '', memberName: '', limit: '100', curPage: '1', moduleCode: 'LEGAL_INCORP',
+    });
+  });
+
   it('★ 전체 수(totCnt)만큼 쪽을 넘겨 끝까지 받는다', async () => {
     const first = Array.from({ length: 100 }, (_, i) => row(i + 1, `A${String(i).padStart(3, '0')}`, `회사${i}`, 130));
     const second = Array.from({ length: 30 }, (_, i) => row(i + 101, `B${String(i).padStart(3, '0')}`, `회사${i + 100}`, 130));
