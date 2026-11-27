@@ -99,3 +99,11 @@
   기능 · 데이터 · API · 계산 · 엑셀 올리기 동작 · 인쇄 동작 · 종이 면 · 돈 · 손익 숫자의 빨간 글자(음수 · 미납)
 - 세무 화면 css 는 세무 폴더 안(tax.module.css · tax-report.module.css · 화면 전용 새 css)만 고친다
 - 기준에 없는 것 · 다르게 할 이유가 있는 것은 고치지 않고 「정할 것」 · 색은 토큰만 · 녹색 금지 · 서버 띄우기 · 끄기 하지 않는다
+
+## 세무 표 머리글 색 (2026-11-27 · 가지 feature/design-tax-head ← origin/master ff26d2e)
+
+- 대상 : 부가세 조회(TaxVatView · 머리 두 줄) · 세무사 전달 서류 시트 미리보기(TaxHandoffView) — 둘 다 세무 공용 css `tax.module.css` 의 `.tbl`
+- 고칠 것 : 머리글 색만 공통 Table 머리글과 같게 — 바탕 `--color-accent-bg` · 글자 `--color-primary-hover` · 아래 선 `--color-primary`
+  · 두 줄 머리는 두 줄 같은 바탕 · 아래 선은 맨 아랫줄에만(첫 줄 rowSpan 칸은 맨 아래에 닿으므로 선 있음)
+- 그대로 : 표 구조 · 칸 폭 · 칸 합치기 · 글자 크기 · 머리 칸 사이 세로 선 · components/ds · 법무와 같이 쓰는 파일
+- 공통 Table 이 아닌 다른 세무 표는 고치지 않고 목록만 보고
