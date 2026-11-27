@@ -94,3 +94,22 @@
 :global(html[data-embedded]) .embedReveal .embedForm {
   display: block;
 }
+
+/*
+ * ★ 2026-11-27 — 삐용 로그인으로 보낼 때(가지 erp-login-redirect) — ERP 입력칸을 보이지 않고 「잠시만요」만.
+ *   서버는 iframe 인지 모르므로 처음부터 감추고, 마운트 뒤 혼자 열렸으면 삐용으로 보낸다(LoginView).
+ *   안에 떴는데 토큰을 못 받으면 `.embedReveal` 로 바뀌어 위 규칙대로 입력칸이 되살아난다.
+ */
+.toBbiyong .embedWait {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  font-family: var(--font-core);
+  font-size: var(--text-body-size);
+  color: var(--text-muted);
+}
+.toBbiyong .embedForm {
+  display: none;
+}
