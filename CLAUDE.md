@@ -123,3 +123,13 @@
 - 값은 `@swonbiz/shared` 의 `BBIYONG` 에 한 줄 — 화면 · 서버 곳곳에 박지 않는다
 - 모의 삐용도 `moduleCode` 를 받아 거른다(모의 회사 중 일부만 LEGAL_INCORP 구독)
 - 손대지 않는다 : 회사 조회 거르기 밖 · ERP 의 다른 서비스 코드(LEGAL 등) · 삐용 소스 · DB · 서버 띄우기 · 다시 띄우기 · 끄기
+
+## 운영 설정 기동 막힘 둘 (2026-11-28 · 가지 erp-acl-http ← s030-erp/master 96d6359)
+
+- ① `HttpBbiyongAcl` — 모의(`MockBbiyongAcl`)와 같은 판정을 삐용 서버 값으로. 이미 쓰는 삐용 「내 메뉴」(`my-menus` · 화면 · 기능 키) 연동을 그대로 다시 쓴다 — 새 연동 길을 만들지 않는다
+  · 삐용 응답에 판정에 필요한 정보가 없으면 고치지 않고 멈추고 보고(삐용에 필요한 것)
+  · 운영 모드(`NODE_ENV=production` · `BBIYONG_ACL_MODE=http`)에서 기동이 막히지 않게
+- ② `npm start`(`node --experimental-strip-types`) 실패 — 걷어 낼 수 없는 문법(생성자 매개변수 속성 등)을 `packages/api/src` 전체에서 찾아 평범한 필드 선언으로
+  · 확인 : `tsc --noEmit --erasableSyntaxOnly` 통과
+- 시험 전체 통과 확인 → 커밋 · push
+- 이 두 가지만 · 삐용 소스 · DB 손대지 않음 · 동작은 그대로 · 임의 판단 금지 · 서버 띄우기 · 다시 띄우기 · 끄기 하지 않음

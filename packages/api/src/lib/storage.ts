@@ -49,11 +49,11 @@ const authHeaders = (): Record<string, string> => ({
 
 /** 스토리지가 거절했을 때. 호출한 쪽이 HTTP 코드를 정한다. */
 export class StorageError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
     super(message);
+    this.status = status;
     this.name = 'StorageError';
   }
 }

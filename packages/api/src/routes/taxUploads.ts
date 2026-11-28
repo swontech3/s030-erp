@@ -422,8 +422,11 @@ const run = <T>(session: ErpSession, fn: (client: ScopedClient) => Promise<T>) =
  *   던져 끝내고 바깥에서 다시 결과로 바꾼다. 409 앞에 쓴 것이 없어도, 나중에 순서가 바뀌어도 반쯤 남지 않게.
  */
 class OpFailed extends Error {
-  constructor(readonly result: TaxOpFail) {
+  readonly result: TaxOpFail;
+
+  constructor(result: TaxOpFail) {
     super(result.message);
+    this.result = result;
   }
 }
 export async function runOp<T>(session: ErpSession, fn: (client: ScopedClient) => Promise<TaxOp<T>>): Promise<TaxOp<T>> {

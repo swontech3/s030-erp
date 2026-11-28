@@ -71,8 +71,11 @@ function scopeOf(session: { role: string; companyId: string | null }): CompanySc
 
 /** 사유를 단 실패 — 라우트가 상태코드로 바꾼다. */
 class BookingError extends Error {
-  constructor(public reason: ReservationReason | 'NOT_FOUND' | 'ALREADY' | 'STARTED') {
+  reason: ReservationReason | 'NOT_FOUND' | 'ALREADY' | 'STARTED';
+
+  constructor(reason: ReservationReason | 'NOT_FOUND' | 'ALREADY' | 'STARTED') {
     super(reason);
+    this.reason = reason;
   }
 }
 

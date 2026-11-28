@@ -109,12 +109,12 @@ export class BbiyongReloginRequiredError extends BbiyongAuthError {
  *   URL 을 그대로 붙여 던지고, `/re-issue` 의 URL 에는 토큰 2개가 쿼리스트링으로 실려 있다.
  */
 export class BbiyongUnavailableError extends Error {
-  constructor(
-    message: string,
-    /** 삐용이 HTTP 비정상(401 밖)으로 답했을 때 그 상태. 못 붙었거나 본문이 깨졌으면 없다. */
-    readonly httpStatus?: number,
-  ) {
+  /** 삐용이 HTTP 비정상(401 밖)으로 답했을 때 그 상태. 못 붙었거나 본문이 깨졌으면 없다. */
+  readonly httpStatus?: number;
+
+  constructor(message: string, httpStatus?: number) {
     super(message);
+    this.httpStatus = httpStatus;
     this.name = 'BbiyongUnavailableError';
   }
 }
